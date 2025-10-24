@@ -1,6 +1,34 @@
 {
+  "name": "home-trading-platform",
+  "version": "1.0.0",
+  "description": "Professional algorithmic trading platform with DhanHQ integration",
+  "main": "index.js",
+  "scripts": {
+    "build": "cd frontend && npm run build",
+    "start": "cd backend && node algorroms-server.js",
+    "dev": "concurrently \"cd backend && node algorroms-server.js\" \"cd frontend && npm start\"",
+    "install-all": "npm install && cd frontend && npm install && cd backend && npm install"
+  },
+  "keywords": [
+    "trading",
+    "algorithmic",
+    "dhan",
+    "market-data",
+    "react",
+    "nodejs",
+    "dhanhq"
+  ],
+  "author": "Satvik",
+  "license": "MIT",
   "dependencies": {
     "axios": "^1.12.2",
     "firebase": "^12.4.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
   }
 }
