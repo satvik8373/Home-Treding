@@ -17,5 +17,11 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
+  ],
+  "functions": {},
+  "ignore": [
+    "backend/**",
+    "package.json",
+    "package-lock.json"
   ]
 }

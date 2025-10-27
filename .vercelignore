@@ -1,0 +1,12 @@
+backend/
+package.json
+package-lock.json
+build.js
+build.sh
+node_modules/
+.git/
+.vscode/
+.kiro/
+*.md
+docker-compose.yml
+firestore.rules
