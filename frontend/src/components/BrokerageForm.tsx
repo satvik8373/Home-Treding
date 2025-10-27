@@ -61,22 +61,8 @@ const BrokerageForm: React.FC<BrokerageFormProps> = ({ onBrokerAdded, onCancel }
       if (response.data.success) {
         const newBroker = response.data.broker;
         
-        // Auto-activate terminal like AlgoRooms
-        try {
-          const activateResponse = await axios.post('http://localhost:5000/api/broker/activate-terminal', {
-            brokerId: newBroker.id
-          });
-          
-          if (activateResponse.data.success) {
-            newBroker.terminalActivated = true;
-            setSuccess('🚀 Broker connected and terminal activated! Ready for live trading like AlgoRooms.');
-          } else {
-            setSuccess('✅ Broker connected! Terminal activation pending.');
-          }
-        } catch (error) {
-          console.warn('Terminal activation failed:', error);
-          setSuccess('✅ Broker connected! Please activate terminal manually.');
-        }
+        // Just connect broker - no auto-activation (like AlgoRooms)
+        setSuccess('✅ Broker connected successfully! Use Terminal toggle to activate trading.');
         
         onBrokerAdded(newBroker);
         

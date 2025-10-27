@@ -2,14 +2,14 @@ const axios = require('axios');
 
 async function testTerminalActivation() {
     try {
-        console.log('🧪 Testing Terminal Activation API (Like AlgoRooms)...');
+        console.log('🧪 Testing Real Dhan Credentials...');
         
-        // Step 1: Connect a broker first
-        console.log('\n1. Connecting broker...');
+        // Step 1: Connect a broker with real credentials
+        console.log('\n1. Connecting broker with real Dhan credentials...');
         const connectResponse = await axios.post('http://localhost:5000/api/broker/connect', {
             broker: 'DHAN',
             clientId: '1108893841',
-            accessToken: 'demo_token_for_testing'
+            accessToken: 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJkaGFuIiwicGFydG5lcklkIjoiIiwiZXhwIjoxNzYxNjUzNTkxLCJpYXQiOjE3NjE1NjcxOTEsInRva2VuQ29uc3VtZXJUeXBlIjoiU0VMRiIsIndlYmhvb2tVcmwiOiIiLCJkaGFuQ2xpZW50SWQiOiIxMTA4ODkzODQxIn0.8IMH_F0w2tLtMfyhygARc3a__t9cdlEnRHhds9hOh2sDrPCyi64pm9Yc8wBXwVnc722BFLFdyp_0VoIA33qxKQ'
         });
         
         if (connectResponse.data.success) {

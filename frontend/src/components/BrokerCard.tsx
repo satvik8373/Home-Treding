@@ -24,7 +24,6 @@ import {
   Refresh
 } from '@mui/icons-material';
 import axios from 'axios';
-import DhanTerminal from './DhanTerminal';
 
 interface Broker {
   id: string;
@@ -50,7 +49,6 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
   const [loading, setLoading] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [error, setError] = useState('');
-  const [terminalOpen, setTerminalOpen] = useState(false);
 
   const handleToggleTerminal = async () => {
     if (!broker.terminalEnabled) {
@@ -58,43 +56,28 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
       setError('');
 
       try {
-        // Step 1: Activate Dhan Trading Terminal (Like AlgoRooms)
-        const activateResponse = await axios.post('http://localhost:5000/api/broker/activate-terminal', {
+        // Check terminal status like AlgoRooms
+        const statusResponse = await axios.post('http://localhost:5000/api/broker/terminal-status', {
           brokerId: broker.id
         });
 
-        if (activateResponse.data.success) {
-          // Step 2: Enable terminal toggle
+        if (statusResponse.data.success) {
+          // Just enable the toggle - no popup, no terminal board
           updateBrokerToggle('terminal', true);
           
-          // Step 3: Show success message
-          const accountInfo = activateResponse.data.accountInfo;
-          alert(
-            `🚀 Trading Terminal Activated!\n\n` +
-            `Account: ${accountInfo.clientId}\n` +
-            `Status: ${accountInfo.status}\n` +
-            `Orders: ${accountInfo.totalOrders}\n` +
-            `Positions: ${accountInfo.activePositions}\n` +
-            `Can Place Orders: ${accountInfo.canPlaceOrders ? 'YES' : 'NO'}\n\n` +
-            `✅ Ready for live trading like AlgoRooms!`
-          );
-          
-          // Step 4: Open the integrated terminal board
-          setTimeout(() => {
-            setTerminalOpen(true);
-          }, 1000);
-          
+          // Show simple success message like AlgoRooms
+          setError(''); // Clear any previous errors
         } else {
-          setError('Failed to activate terminal: ' + activateResponse.data.message);
+          setError('Terminal not active. Please activate terminal in Dhan app first.');
         }
       } catch (error: any) {
-        setError('Failed to activate terminal: ' + (error.response?.data?.message || error.message));
+        // Show terminal not active status like AlgoRooms
+        setError('Terminal not active. Please activate terminal in Dhan app.');
       } finally {
         setLoading(false);
       }
     } else {
-      // If terminal is being disabled, close the terminal board
-      setTerminalOpen(false);
+      // Just disable the toggle
       updateBrokerToggle('terminal', false);
     }
   };
@@ -186,7 +169,7 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
             </Box>
           </Box>
 
-          {/* Account Info */}
+          {/* Account Info (AlgoRooms Style) */}
           <Box sx={{ mb: 3 }}>
             <Typography variant="body2" color="textSecondary">
               Broker Account: <strong>{broker.clientId}</strong>
@@ -194,18 +177,13 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
             <Typography variant="body2" color="textSecondary">
               Strategy Performance: <strong>{broker.strategyPerformance || '0.00%'}</strong>
             </Typography>
-            {broker.terminalEnabled && (
-              <>
-                <Typography variant="body2" color="textSecondary">
-                  Total Orders: <strong>{broker.totalOrders || 0}</strong>
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  Active Positions: <strong>{broker.activePositions || 0}</strong>
-                </Typography>
-                <Typography variant="body2" color="success.main">
-                  Last Activity: <strong>{broker.lastActivity ? new Date(broker.lastActivity).toLocaleTimeString() : 'Just now'}</strong>
-                </Typography>
-              </>
+            <Typography variant="body2" color={broker.terminalEnabled ? 'success.main' : 'error.main'}>
+              Terminal Status: <strong>{broker.terminalEnabled ? 'Active' : 'Not Active'}</strong>
+            </Typography>
+            {!broker.terminalEnabled && (
+              <Typography variant="caption" color="error.main" display="block" sx={{ mt: 0.5 }}>
+                Please activate terminal in Dhan app to enable trading
+              </Typography>
             )}
           </Box>
 
@@ -217,19 +195,18 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
 
           {/* Controls */}
           <Box sx={{ space: 2 }}>
-            {/* Terminal Toggle */}
+            {/* Terminal Status (AlgoRooms Style) */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Terminal fontSize="small" color={broker.terminalEnabled ? 'success' : 'disabled'} />
-                <Typography variant="body2">Terminal</Typography>
+                <Terminal fontSize="small" color={broker.terminalEnabled ? 'success' : 'error'} />
+                <Typography variant="body2">
+                  Terminal: {broker.terminalEnabled ? 'Active' : 'Not Active'}
+                </Typography>
                 {broker.terminalEnabled && (
-                  <Box sx={{ 
-                    width: 8, 
-                    height: 8, 
-                    borderRadius: '50%', 
-                    bgcolor: 'success.main',
-                    animation: 'pulse 2s infinite'
-                  }} />
+                  <Chip label="ON" color="success" size="small" />
+                )}
+                {!broker.terminalEnabled && (
+                  <Chip label="OFF" color="error" size="small" />
                 )}
               </Box>
               <Switch
@@ -269,18 +246,7 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
             </Button>
           )}
 
-          {broker.terminalEnabled && broker.status === 'Connected' && (
-            <Button
-              fullWidth
-              variant="contained"
-              startIcon={<Terminal />}
-              onClick={() => setTerminalOpen(true)}
-              size="small"
-              sx={{ mt: 1 }}
-            >
-              Open Terminal Board
-            </Button>
-          )}
+
         </CardContent>
       </Card>
 
@@ -301,12 +267,7 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
         </DialogActions>
       </Dialog>
 
-      {/* Dhan Terminal */}
-      <DhanTerminal
-        open={terminalOpen}
-        onClose={() => setTerminalOpen(false)}
-        broker={broker}
-      />
+
     </>
   );
 };
