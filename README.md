@@ -165,9 +165,29 @@ const response = await fetch('http://localhost:5000/api/dhan/orders/place', {
 
 ## 🚀 Deployment
 
-### **Production Setup**
+### **Vercel Deployment (Frontend)**
+The React frontend is automatically deployed to Vercel:
+
+1. **Automatic Deployment:** Connected to GitHub for auto-deploy
+2. **Build Command:** `cd frontend && npm run build`
+3. **Output Directory:** `frontend/build`
+4. **Live URL:** Will be provided after successful deployment
+
+### **Backend Deployment**
+For the backend API server, you can deploy to:
+
+**Option 1: Railway/Render**
+```bash
+# Deploy backend to Railway or Render
+# Set environment variables:
+# - DHAN_CLIENT_ID
+# - DHAN_ACCESS_TOKEN
+# - PORT=5000
+```
+
+**Option 2: Traditional VPS**
 1. Set up environment variables
-2. Configure HTTPS certificates
+2. Configure HTTPS certificates  
 3. Set up reverse proxy (Nginx)
 4. Configure PM2 for process management
 5. Set up monitoring and logging

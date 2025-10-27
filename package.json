@@ -4,7 +4,7 @@
   "description": "Professional algorithmic trading platform with DhanHQ integration",
   "main": "index.js",
   "scripts": {
-    "build": "cd frontend && npm run build",
+    "build": "echo 'Building React frontend...' && ls -la && cd frontend && ls -la && npm run build",
     "start": "cd backend && node algorroms-server.js",
     "dev": "concurrently \"cd backend && node algorroms-server.js\" \"cd frontend && npm start\"",
     "install-all": "npm install && cd frontend && npm install && cd backend && npm install"
