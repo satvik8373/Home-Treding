@@ -1,6 +1,5 @@
 {
-  "buildCommand": "cd frontend && npm ci && npm run build",
+  "buildCommand": "node build.js",
   "outputDirectory": "frontend/build",
-  "installCommand": "echo 'No root dependencies needed'",
-  "framework": null
+  "installCommand": "npm install"
 }
