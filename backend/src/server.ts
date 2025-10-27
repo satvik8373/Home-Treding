@@ -45,6 +45,7 @@ app.get('/health', (_req, res) => {
 // Import routes
 import marketRoutes from './routes/market';
 import oauthRoutes from './routes/oauthRoutes';
+import brokerRoutes from './routes/brokerRoutes';
 import strategyTestRoutes from './routes/strategyTest';
 
 // API Routes
@@ -60,6 +61,9 @@ app.use('/api/market', marketRoutes);
 
 // OAuth routes
 app.use('/api/oauth', oauthRoutes);
+
+// Broker routes
+app.use('/api/broker', brokerRoutes);
 
 // Strategy testing routes
 app.use('/api/strategy-test', strategyTestRoutes);

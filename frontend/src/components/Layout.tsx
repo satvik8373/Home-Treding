@@ -18,7 +18,8 @@ import {
   AccountBalance,
   Assessment,
   Settings,
-  ShowChart
+  ShowChart,
+  Link as LinkIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -31,6 +32,7 @@ const drawerWidth = 240;
 const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Market Data', icon: <ShowChart />, path: '/market-data' },
+  { text: 'Brokers', icon: <LinkIcon />, path: '/brokers' },
   { text: 'Strategies', icon: <TrendingUp />, path: '/strategies' },
   { text: 'Portfolio', icon: <AccountBalance />, path: '/portfolio' },
   { text: 'Reports', icon: <Assessment />, path: '/reports' },
