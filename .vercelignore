@@ -10,3 +10,4 @@ node_modules/
 *.md
 docker-compose.yml
 firestore.rules
+tsconfig.json
