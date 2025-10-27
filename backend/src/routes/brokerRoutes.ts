@@ -4,15 +4,17 @@
 
 import { Router } from 'express';
 import {
-  connectBroker,
-  listBrokers,
-  toggleTerminal,
-  toggleTradingEngine,
-  reconnectBroker,
-  deleteBroker,
-  placeOrder,
-  getOrders,
-  getPositions
+    connectBroker,
+    listBrokers,
+    activateTerminal,
+    checkTerminalStatus,
+    toggleTerminal,
+    toggleTradingEngine,
+    reconnectBroker,
+    deleteBroker,
+    placeOrder,
+    getOrders,
+    getPositions
 } from '../controllers/brokerController';
 
 const router = Router();
@@ -24,6 +26,8 @@ router.post('/reconnect', reconnectBroker);
 router.delete('/:brokerId', deleteBroker);
 
 // Terminal and Trading Engine toggles
+router.post('/activate-terminal', activateTerminal);
+router.post('/terminal-status', checkTerminalStatus);
 router.post('/terminal', toggleTerminal);
 router.post('/tradingEngine', toggleTradingEngine);
 

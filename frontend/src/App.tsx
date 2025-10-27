@@ -7,6 +7,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import MarketDataPage from './pages/MarketDataPage';
 import Brokers from './pages/Brokers';
+import TestPage from './pages/TestPage';
 import Strategies from './pages/Strategies';
 import StrategyTest from './pages/StrategyTest';
 import Portfolio from './pages/Portfolio';
@@ -25,6 +26,8 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/market-data" element={<MarketDataPage />} />
           <Route path="/brokers" element={<Brokers />} />
+          <Route path="/brokerage" element={<Brokers />} />
+          <Route path="/test" element={<TestPage />} />
           <Route path="/strategies" element={<Strategies />} />
           <Route path="/strategy-test" element={<StrategyTest />} />
           <Route path="/portfolio" element={<Portfolio />} />

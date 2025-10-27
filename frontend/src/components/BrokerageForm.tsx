@@ -59,8 +59,26 @@ const BrokerageForm: React.FC<BrokerageFormProps> = ({ onBrokerAdded, onCancel }
       });
 
       if (response.data.success) {
-        setSuccess('✅ Broker connected successfully!');
-        onBrokerAdded(response.data.broker);
+        const newBroker = response.data.broker;
+        
+        // Auto-activate terminal like AlgoRooms
+        try {
+          const activateResponse = await axios.post('http://localhost:5000/api/broker/activate-terminal', {
+            brokerId: newBroker.id
+          });
+          
+          if (activateResponse.data.success) {
+            newBroker.terminalActivated = true;
+            setSuccess('🚀 Broker connected and terminal activated! Ready for live trading like AlgoRooms.');
+          } else {
+            setSuccess('✅ Broker connected! Terminal activation pending.');
+          }
+        } catch (error) {
+          console.warn('Terminal activation failed:', error);
+          setSuccess('✅ Broker connected! Please activate terminal manually.');
+        }
+        
+        onBrokerAdded(newBroker);
         
         // Reset form
         setFormData({
@@ -121,16 +139,20 @@ const BrokerageForm: React.FC<BrokerageFormProps> = ({ onBrokerAdded, onCancel }
             </Select>
           </FormControl>
 
-          <Alert severity="info" sx={{ mb: 3 }}>
+          <Alert severity="warning" sx={{ mb: 3 }}>
             <Typography variant="body2">
-              <strong>How to get DHAN credentials:</strong>
+              <strong>⚠️ Real Dhan Account Required:</strong>
             </Typography>
             <ol style={{ marginTop: 8, marginBottom: 0, paddingLeft: 20 }}>
-              <li>Login to your DHAN account</li>
-              <li>Go to Profile → DhanHQ Trading APIs</li>
-              <li>Generate Access Token</li>
-              <li>Copy your Client ID and Access Token</li>
+              <li><strong>Login to your real Dhan account</strong> at dhan.co</li>
+              <li>Go to <strong>Profile → DhanHQ Trading APIs</strong></li>
+              <li>Create <strong>real API Key and Access Token</strong></li>
+              <li>Ensure <strong>trading permissions are enabled</strong></li>
+              <li>Enter <strong>real credentials below</strong> (no demo mode)</li>
             </ol>
+            <Typography variant="caption" display="block" sx={{ mt: 1, color: 'error.main' }}>
+              🚨 Only real Dhan accounts with valid trading permissions will work
+            </Typography>
           </Alert>
 
           <TextField

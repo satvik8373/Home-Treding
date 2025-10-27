@@ -145,6 +145,186 @@ export const listBrokers = asyncHandler(async (req: Request, res: Response) => {
 });
 
 /**
+ * Activate Dhan Trading Terminal (Like AlgoRooms)
+ */
+export const activateTerminal = asyncHandler(async (req: Request, res: Response) => {
+  const { brokerId } = req.body;
+
+  const broker = brokers.get(brokerId);
+  if (!broker) {
+    return res.status(404).json({
+      success: false,
+      message: 'Broker not found'
+    });
+  }
+
+  try {
+    logger.info('🔥 Activating Dhan Trading Terminal for broker:', brokerId);
+
+    // Step 1: Activate trading terminal using Dhan API
+    const activateResponse = await axios.post(
+      'https://api.dhan.co/v2/trade/activate',
+      {},
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Client-Id': broker.clientId,
+          'Access-Token': broker.accessToken
+        },
+        timeout: 10000
+      }
+    );
+
+    logger.info('✅ Terminal activation response:', activateResponse.data);
+
+    // Step 2: Verify terminal is active by checking orders endpoint
+    const verifyResponse = await axios.get(DHAN_CONFIG.ordersUrl, {
+      headers: {
+        'access-token': broker.accessToken,
+        'Content-Type': 'application/json'
+      },
+      timeout: 5000
+    });
+
+    // Step 3: Get account info and activity
+    const positionsResponse = await axios.get(DHAN_CONFIG.positionsUrl, {
+      headers: {
+        'access-token': broker.accessToken,
+        'Content-Type': 'application/json'
+      },
+      timeout: 5000
+    }).catch(() => ({ data: [] }));
+
+    const accountInfo = {
+      clientId: broker.clientId,
+      status: 'Terminal Active',
+      terminalActivated: true,
+      lastLogin: new Date().toISOString(),
+      totalOrders: Array.isArray(verifyResponse.data) ? verifyResponse.data.length : 0,
+      activePositions: Array.isArray(positionsResponse.data) ? positionsResponse.data.length : 0,
+      connectionStatus: 'Connected',
+      marketStatus: 'Open',
+      lastActivity: new Date().toISOString(),
+      canPlaceOrders: true
+    };
+
+    // Update broker with terminal active status
+    broker.terminalActivated = true;
+    broker.lastActivity = new Date();
+    brokers.set(brokerId, broker);
+
+    logger.info('🚀 Terminal activated successfully for broker:', brokerId);
+
+    res.json({
+      success: true,
+      message: 'Trading Terminal activated successfully! Ready to place orders.',
+      accountInfo,
+      recentActivity: {
+        orders: verifyResponse.data?.slice(0, 5) || [],
+        positions: positionsResponse.data?.slice(0, 5) || []
+      }
+    });
+
+  } catch (error: any) {
+    logger.error('❌ Terminal activation error:', error.response?.data || error.message);
+    
+    if (error.response?.status === 401) {
+      res.status(401).json({
+        success: false,
+        message: 'Invalid credentials. Please reconnect your broker account.'
+      });
+    } else if (error.response?.status === 403) {
+      res.status(403).json({
+        success: false,
+        message: 'Terminal activation denied. Please check your Dhan account permissions.'
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to activate terminal. Please check your Dhan account and try again.',
+        error: error.message
+      });
+    }
+  }
+});
+
+/**
+ * Check Terminal Status and Account Activity
+ */
+export const checkTerminalStatus = asyncHandler(async (req: Request, res: Response) => {
+  const { brokerId } = req.body;
+
+  const broker = brokers.get(brokerId);
+  if (!broker) {
+    return res.status(404).json({
+      success: false,
+      message: 'Broker not found'
+    });
+  }
+
+  try {
+    // Get live account info and recent activity from DHAN
+    const [ordersResponse, positionsResponse] = await Promise.all([
+      axios.get(DHAN_CONFIG.ordersUrl, {
+        headers: {
+          'access-token': broker.accessToken,
+          'Content-Type': 'application/json'
+        },
+        timeout: 5000
+      }),
+      axios.get(DHAN_CONFIG.positionsUrl, {
+        headers: {
+          'access-token': broker.accessToken,
+          'Content-Type': 'application/json'
+        },
+        timeout: 5000
+      }).catch(() => ({ data: [] })) // Positions might not be available
+    ]);
+
+    const accountInfo = {
+      clientId: broker.clientId,
+      status: broker.terminalActivated ? 'Terminal Active' : 'Terminal Inactive',
+      terminalActivated: broker.terminalActivated || false,
+      lastLogin: new Date().toISOString(),
+      totalOrders: Array.isArray(ordersResponse.data) ? ordersResponse.data.length : 0,
+      activePositions: Array.isArray(positionsResponse.data) ? positionsResponse.data.length : 0,
+      connectionStatus: 'Connected',
+      marketStatus: 'Open',
+      lastActivity: new Date().toISOString(),
+      canPlaceOrders: broker.terminalActivated || false
+    };
+
+    logger.info('🖥️ Terminal status checked for broker:', brokerId, accountInfo);
+
+    res.json({
+      success: true,
+      message: 'Terminal status retrieved successfully',
+      accountInfo,
+      recentActivity: {
+        orders: ordersResponse.data?.slice(0, 5) || [], // Last 5 orders
+        positions: positionsResponse.data?.slice(0, 5) || [] // Current positions
+      }
+    });
+
+  } catch (error: any) {
+    logger.error('❌ Terminal status check error:', error.message);
+    
+    if (error.response?.status === 401) {
+      res.status(401).json({
+        success: false,
+        message: 'Session expired. Please reconnect your broker account.'
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: 'Unable to check terminal status. Please try again.',
+        error: error.message
+      });
+    }
+  }
+});
+
+/**
  * Toggle Terminal (WebSocket connection)
  */
 export const toggleTerminal = asyncHandler(async (req: Request, res: Response) => {
@@ -392,6 +572,8 @@ export const getPositions = asyncHandler(async (req: Request, res: Response) => 
 export default {
   connectBroker,
   listBrokers,
+  activateTerminal,
+  checkTerminalStatus,
   toggleTerminal,
   toggleTradingEngine,
   reconnectBroker,
