@@ -7,6 +7,7 @@ import {
     connectBroker,
     listBrokers,
     activateTerminal,
+    getDhanLoginUrl,
     checkTerminalStatus,
     toggleTerminal,
     toggleTradingEngine,
@@ -27,12 +28,14 @@ router.delete('/:brokerId', deleteBroker);
 
 // Terminal and Trading Engine toggles
 router.post('/activate-terminal', activateTerminal);
+router.post('/dhan-login-url', getDhanLoginUrl);
 router.post('/terminal-status', checkTerminalStatus);
 router.post('/terminal', toggleTerminal);
 router.post('/tradingEngine', toggleTradingEngine);
 
 // Trading operations
 router.post('/order', placeOrder);
+router.post('/strategy-order', placeOrder); // Strategy integration endpoint
 router.get('/orders/:brokerId', getOrders);
 router.get('/positions/:brokerId', getPositions);
 

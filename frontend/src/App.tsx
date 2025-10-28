@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import MarketDataPage from './pages/MarketDataPage';
 import Brokers from './pages/Brokers';
 import TestPage from './pages/TestPage';
+import DhanCallback from './pages/DhanCallback';
 import Strategies from './pages/Strategies';
 import StrategyTest from './pages/StrategyTest';
 import Portfolio from './pages/Portfolio';
@@ -27,6 +28,7 @@ function App() {
           <Route path="/market-data" element={<MarketDataPage />} />
           <Route path="/brokers" element={<Brokers />} />
           <Route path="/brokerage" element={<Brokers />} />
+          <Route path="/dhan-connect" element={<DhanCallback />} />
           <Route path="/test" element={<TestPage />} />
           <Route path="/strategies" element={<Strategies />} />
           <Route path="/strategy-test" element={<StrategyTest />} />

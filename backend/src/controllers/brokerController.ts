@@ -246,6 +246,51 @@ export const activateTerminal = asyncHandler(async (req: Request, res: Response)
 });
 
 /**
+ * Generate Dhan Login URL for Terminal Activation (AlgoRooms Style)
+ */
+export const getDhanLoginUrl = asyncHandler(async (req: Request, res: Response) => {
+  const { brokerId } = req.body;
+
+  const broker = brokers.get(brokerId);
+  if (!broker) {
+    return res.status(404).json({
+      success: false,
+      message: 'Broker not found'
+    });
+  }
+
+  try {
+    // Generate secure state token
+    const state = Math.random().toString(36).substring(2, 15);
+    const redirectUri = 'http://localhost:3000/dhan-connect';
+    
+    // Store state for verification
+    broker.loginState = state;
+    brokers.set(brokerId, broker);
+
+    // Create Dhan login URL (like AlgoRooms)
+    const loginUrl = `https://web.dhan.co/login?client_id=${broker.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+
+    logger.info('🔗 Generated Dhan login URL for terminal activation:', brokerId);
+
+    res.json({
+      success: true,
+      loginUrl,
+      state,
+      message: 'Dhan login URL generated for terminal activation'
+    });
+
+  } catch (error: any) {
+    logger.error('❌ Login URL generation error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate login URL',
+      error: error.message
+    });
+  }
+});
+
+/**
  * Check Terminal Status and Account Activity
  */
 export const checkTerminalStatus = asyncHandler(async (req: Request, res: Response) => {
@@ -451,10 +496,10 @@ export const placeOrder = asyncHandler(async (req: Request, res: Response) => {
     });
   }
 
-  if (!broker.tradingEngineEnabled) {
+  if (!broker.terminalActivated) {
     return res.status(400).json({
       success: false,
-      message: 'Trading Engine is disabled. Please enable it first.'
+      message: 'Terminal not activated. Please activate terminal first.'
     });
   }
 
@@ -570,6 +615,7 @@ export default {
   connectBroker,
   listBrokers,
   activateTerminal,
+  getDhanLoginUrl,
   checkTerminalStatus,
   toggleTerminal,
   toggleTradingEngine,

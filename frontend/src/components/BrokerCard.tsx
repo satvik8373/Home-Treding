@@ -56,28 +56,80 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
       setError('');
 
       try {
-        // Check terminal status like AlgoRooms
+        // Step 1: Check if terminal needs activation (like AlgoRooms)
         const statusResponse = await axios.post('http://localhost:5000/api/broker/terminal-status', {
           brokerId: broker.id
         });
 
-        if (statusResponse.data.success) {
-          // Just enable the toggle - no popup, no terminal board
+        if (statusResponse.data.success && statusResponse.data.accountInfo?.terminalActivated) {
+          // Terminal already active - just enable toggle
           updateBrokerToggle('terminal', true);
-          
-          // Show simple success message like AlgoRooms
-          setError(''); // Clear any previous errors
+          setError('');
         } else {
-          setError('Terminal not active. Please activate terminal in Dhan app first.');
+          // Terminal not active - redirect to Dhan login (like AlgoRooms)
+          const confirmRedirect = window.confirm(
+            `🔐 Terminal Activation Required\n\n` +
+            `To activate terminal, you need to login to Dhan.\n` +
+            `This will open Dhan login page in a new window.\n\n` +
+            `Click OK to proceed to Dhan login.`
+          );
+
+          if (confirmRedirect) {
+            // Get Dhan login URL from backend (like AlgoRooms)
+            const loginUrlResponse = await axios.post('http://localhost:5000/api/broker/dhan-login-url', {
+              brokerId: broker.id
+            });
+
+            if (loginUrlResponse.data.success) {
+              const loginWindow = window.open(
+                loginUrlResponse.data.loginUrl,
+                'dhan-terminal-login',
+                'width=500,height=700,scrollbars=yes,resizable=yes,toolbar=no,menubar=no'
+              );
+
+              console.log('🔗 Opening Dhan login:', loginUrlResponse.data.loginUrl);
+
+            // Monitor the popup window
+            const checkClosed = setInterval(() => {
+              if (loginWindow?.closed) {
+                clearInterval(checkClosed);
+                
+                // After login window closes, check terminal status again
+                setTimeout(async () => {
+                  try {
+                    const recheckResponse = await axios.post('http://localhost:5000/api/broker/terminal-status', {
+                      brokerId: broker.id
+                    });
+                    
+                    if (recheckResponse.data.success && recheckResponse.data.accountInfo?.terminalActivated) {
+                      updateBrokerToggle('terminal', true);
+                      setError('');
+                      alert('✅ Terminal activated successfully! You can now place orders.');
+                    } else {
+                      setError('Terminal activation incomplete. Please try again or activate manually in Dhan app.');
+                    }
+                  } catch (error) {
+                    setError('Please check terminal status in Dhan app and try again.');
+                  }
+                }, 2000);
+              }
+            }, 1000);
+
+            // Auto-close check after 5 minutes
+            setTimeout(() => {
+              if (!loginWindow?.closed) {
+                clearInterval(checkClosed);
+              }
+            }, 300000);
+          }
         }
       } catch (error: any) {
-        // Show terminal not active status like AlgoRooms
-        setError('Terminal not active. Please activate terminal in Dhan app.');
+        setError('Unable to check terminal status. Please try again.');
       } finally {
         setLoading(false);
       }
     } else {
-      // Just disable the toggle
+      // Disable terminal
       updateBrokerToggle('terminal', false);
     }
   };
