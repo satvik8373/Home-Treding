@@ -14,7 +14,9 @@
     "check-errors": "node final-error-check.js",
     "verify-platform": "node final-error-check.js",
     "compile-ts": "cd backend && npx tsc",
-
+    "build": "node build.js",
+    "build:frontend": "cd frontend && npm run build",
+    "verify-deployment": "node verify-deployment.js",
     "clean": "node cleanup-unused-files.js"
   },
   "keywords": [

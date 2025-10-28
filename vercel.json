@@ -1,5 +1,16 @@
 {
+  "version": 2,
+  "name": "algorooms-trading-platform",
   "buildCommand": "node build.js",
   "outputDirectory": "frontend/build",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "routes": [
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
 }
