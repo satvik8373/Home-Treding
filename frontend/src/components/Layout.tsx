@@ -31,12 +31,11 @@ const drawerWidth = 240;
 
 const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-  { text: 'Market Data', icon: <ShowChart />, path: '/market-data' },
+  { text: 'Trading', icon: <ShowChart />, path: '/trading-dashboard' },
   { text: 'Brokers', icon: <LinkIcon />, path: '/brokers' },
   { text: 'Strategies', icon: <TrendingUp />, path: '/strategies' },
   { text: 'Portfolio', icon: <AccountBalance />, path: '/portfolio' },
-  { text: 'Reports', icon: <Assessment />, path: '/reports' },
-  { text: 'Backtest', icon: <Settings />, path: '/backtest' }
+  { text: 'Reports', icon: <Assessment />, path: '/reports' }
 ];
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {

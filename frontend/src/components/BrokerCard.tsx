@@ -20,7 +20,6 @@ import {
   Delete as DeleteIcon,
   Terminal,
   PlayArrow,
-  Stop,
   Refresh
 } from '@mui/icons-material';
 import axios from 'axios';
@@ -37,6 +36,8 @@ interface Broker {
   lastActivity?: string;
   totalOrders?: number;
   activePositions?: number;
+  connectedAt?: string;
+  lastValidated?: string;
 }
 
 interface BrokerCardProps {
@@ -49,94 +50,6 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
   const [loading, setLoading] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [error, setError] = useState('');
-
-  const handleToggleTerminal = async () => {
-    if (!broker.terminalEnabled) {
-      setLoading(true);
-      setError('');
-
-      try {
-        // Step 1: Check if terminal needs activation (like AlgoRooms)
-        const statusResponse = await axios.post('http://localhost:5000/api/broker/terminal-status', {
-          brokerId: broker.id
-        });
-
-        if (statusResponse.data.success && statusResponse.data.accountInfo?.terminalActivated) {
-          // Terminal already active - just enable toggle
-          updateBrokerToggle('terminal', true);
-          setError('');
-        } else {
-          // Terminal not active - redirect to Dhan login (like AlgoRooms)
-          const confirmRedirect = window.confirm(
-            `🔐 Terminal Activation Required\n\n` +
-            `To activate terminal, you need to login to Dhan.\n` +
-            `This will open Dhan login page in a new window.\n\n` +
-            `Click OK to proceed to Dhan login.`
-          );
-
-          if (confirmRedirect) {
-            // Get Dhan login URL from backend (like AlgoRooms)
-            const loginUrlResponse = await axios.post('http://localhost:5000/api/broker/dhan-login-url', {
-              brokerId: broker.id
-            });
-
-            if (loginUrlResponse.data.success) {
-              const loginWindow = window.open(
-                loginUrlResponse.data.loginUrl,
-                'dhan-terminal-login',
-                'width=500,height=700,scrollbars=yes,resizable=yes,toolbar=no,menubar=no'
-              );
-
-              console.log('🔗 Opening Dhan login:', loginUrlResponse.data.loginUrl);
-
-            // Monitor the popup window
-            const checkClosed = setInterval(() => {
-              if (loginWindow?.closed) {
-                clearInterval(checkClosed);
-                
-                // After login window closes, check terminal status again
-                setTimeout(async () => {
-                  try {
-                    const recheckResponse = await axios.post('http://localhost:5000/api/broker/terminal-status', {
-                      brokerId: broker.id
-                    });
-                    
-                    if (recheckResponse.data.success && recheckResponse.data.accountInfo?.terminalActivated) {
-                      updateBrokerToggle('terminal', true);
-                      setError('');
-                      alert('✅ Terminal activated successfully! You can now place orders.');
-                    } else {
-                      setError('Terminal activation incomplete. Please try again or activate manually in Dhan app.');
-                    }
-                  } catch (error) {
-                    setError('Please check terminal status in Dhan app and try again.');
-                  }
-                }, 2000);
-              }
-            }, 1000);
-
-            // Auto-close check after 5 minutes
-            setTimeout(() => {
-              if (!loginWindow?.closed) {
-                clearInterval(checkClosed);
-              }
-            }, 300000);
-          }
-        }
-      } catch (error: any) {
-        setError('Unable to check terminal status. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      // Disable terminal
-      updateBrokerToggle('terminal', false);
-    }
-  };
-
-  const handleToggleTradingEngine = async () => {
-    updateBrokerToggle('tradingEngine', !broker.tradingEngineEnabled);
-  };
 
   const updateBrokerToggle = async (toggle: 'terminal' | 'tradingEngine', enabled: boolean) => {
     setLoading(true);
@@ -162,6 +75,174 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleToggleTerminal = async () => {
+    if (!broker.terminalEnabled) {
+      setLoading(true);
+      setError('');
+
+      // Show OAuth confirmation
+      const confirmRedirect = window.confirm(
+        `🔐 Dhan Terminal Activation (OAuth)\n\n` +
+        `To activate terminal, you need to authorize via Dhan OAuth.\n` +
+        `This will open Dhan Partner login in a new window.\n\n` +
+        `Click OK to proceed with OAuth authorization.`
+      );
+
+      if (confirmRedirect) {
+        try {
+          // Get Dhan OAuth login URL from backend
+          const loginUrlResponse = await axios.post('http://localhost:5000/api/broker/dhan-login-url', {
+            brokerId: broker.id
+          });
+
+          if (loginUrlResponse.data.success) {
+            // Check if terminal was directly activated (AlgoRooms style with real API)
+            if (loginUrlResponse.data.directActivation && loginUrlResponse.data.algoRoomsStyle) {
+              console.log('✅ Dhan terminal activated (AlgoRooms style) using real API');
+              
+              // Update with the complete broker data from API
+              const updatedBroker = {
+                ...broker,
+                ...loginUrlResponse.data.broker,
+                terminalEnabled: true,
+                terminalActivated: true,
+                status: 'Connected' as const
+              };
+              onUpdate(updatedBroker);
+              setError('');
+              setLoading(false);
+              
+              alert(`✅ Dhan Terminal Activated! (AlgoRooms Style)\n\n` +
+                    `Broker: Dhan (${loginUrlResponse.data.broker.clientId})\n` +
+                    `Status: Connected\n` +
+                    `Orders: ${loginUrlResponse.data.broker.totalOrders}\n` +
+                    `Positions: ${loginUrlResponse.data.broker.activePositions}\n\n` +
+                    `Ready for live trading!`);
+              return;
+            }
+            
+            // Check if it's development mode
+            if (loginUrlResponse.data.isDevelopment) {
+              console.log('🧪 Development mode: Simulating OAuth flow');
+              
+              // Show development mode message
+              alert('🧪 Development Mode\n\nSimulating Dhan OAuth flow...\nThis will auto-complete in 3 seconds.');
+              
+              // Simulate OAuth success after 3 seconds
+              setTimeout(() => {
+                const updatedBroker = {
+                  ...broker,
+                  terminalEnabled: true,
+                  terminalActivated: true,
+                  status: 'Connected' as const
+                };
+                onUpdate(updatedBroker);
+                setError('');
+                setLoading(false);
+                
+                alert('✅ Development OAuth completed! Terminal activated successfully.');
+              }, 3000);
+              
+              return;
+            }
+            
+            const loginWindow = window.open(
+              loginUrlResponse.data.loginUrl,
+              'dhan-oauth-login',
+              'width=600,height=800,scrollbars=yes,resizable=yes,toolbar=no,menubar=no'
+            );
+
+            console.log('🔗 Opening Dhan OAuth login:', loginUrlResponse.data.loginUrl);
+
+            // Listen for OAuth success message from popup
+            const handleMessage = (event: MessageEvent) => {
+              if (event.data.type === 'DHAN_OAUTH_SUCCESS') {
+                console.log('✅ OAuth success received:', event.data.data);
+                
+                // Update broker state with OAuth success
+                const updatedBroker = {
+                  ...broker,
+                  terminalEnabled: true,
+                  terminalActivated: true,
+                  status: 'Connected' as const
+                };
+                onUpdate(updatedBroker);
+                setError('');
+                setLoading(false);
+                
+                alert('✅ Terminal activated successfully via OAuth! You can now place orders.');
+                
+                // Remove event listener
+                window.removeEventListener('message', handleMessage);
+              }
+            };
+
+            // Add message listener
+            window.addEventListener('message', handleMessage);
+
+            // Monitor the popup window for manual close
+            const checkClosed = setInterval(() => {
+              if (loginWindow?.closed) {
+                clearInterval(checkClosed);
+                window.removeEventListener('message', handleMessage);
+                
+                // If window closed without success message, check status
+                setTimeout(async () => {
+                  try {
+                    const recheckResponse = await axios.post('http://localhost:5000/api/broker/terminal-status', {
+                      brokerId: broker.id
+                    });
+                    
+                    if (recheckResponse.data.success && recheckResponse.data.accountInfo?.terminalActivated) {
+                      const updatedBroker = {
+                        ...broker,
+                        terminalEnabled: true,
+                        terminalActivated: true,
+                        status: 'Connected' as const
+                      };
+                      onUpdate(updatedBroker);
+                      setError('');
+                      alert('✅ Terminal activated successfully! You can now place orders.');
+                    } else {
+                      setError('OAuth authorization incomplete. Please try again.');
+                    }
+                  } catch (error) {
+                    setError('Please check terminal status and try again.');
+                  }
+                  setLoading(false);
+                }, 2000);
+              }
+            }, 1000);
+
+            // Auto-close check after 10 minutes
+            setTimeout(() => {
+              if (!loginWindow?.closed) {
+                clearInterval(checkClosed);
+                window.removeEventListener('message', handleMessage);
+                setLoading(false);
+              }
+            }, 600000);
+          } else {
+            setError('Failed to generate Dhan OAuth login URL');
+            setLoading(false);
+          }
+        } catch (error: any) {
+          setError('Unable to open Dhan OAuth login. Please try again.');
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    } else {
+      // Disable terminal
+      updateBrokerToggle('terminal', false);
+    }
+  };
+
+  const handleToggleTradingEngine = async () => {
+    updateBrokerToggle('tradingEngine', !broker.tradingEngineEnabled);
   };
 
   const handleReconnect = async () => {
@@ -247,7 +328,7 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
 
           {/* Controls */}
           <Box sx={{ space: 2 }}>
-            {/* Terminal Status (AlgoRooms Style) */}
+            {/* Terminal Toggle (AlgoRooms Style) */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Terminal fontSize="small" color={broker.terminalEnabled ? 'success' : 'error'} />
@@ -297,8 +378,6 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
               {loading ? 'Reconnecting...' : 'Reconnect'}
             </Button>
           )}
-
-
         </CardContent>
       </Card>
 
@@ -318,8 +397,6 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
           </Button>
         </DialogActions>
       </Dialog>
-
-
     </>
   );
 };

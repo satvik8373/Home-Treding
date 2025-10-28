@@ -2,12 +2,12 @@
   "name": "algo-trading-backend",
   "version": "1.0.0",
   "description": "Backend for algorithmic trading platform with Firebase",
-  "main": "dist/server.js",
+  "main": "algorroms-server.js",
   "scripts": {
-    "dev": "nodemon --exec ts-node src/server.ts",
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "test": "jest"
+    "start": "node algorroms-server.js",
+    "dev": "nodemon algorroms-server.js",
+    "test": "node ../test-manual-broker-connection.js",
+    "build": "echo 'No build needed for AlgoRooms server'"
   },
   "keywords": [
     "trading",

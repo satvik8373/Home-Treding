@@ -17,6 +17,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import authService, { UserProfile } from '../services/authService';
 import firestoreService, { Strategy, Brokerage } from '../services/firestoreService';
+import axios from 'axios';
 import Layout from '../components/Layout';
 import MarketData from '../components/MarketData';
 
@@ -25,7 +26,21 @@ const Dashboard: React.FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [brokerages, setBrokerages] = useState<Brokerage[]>([]);
+  const [algoRoomsBrokers, setAlgoRoomsBrokers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Function to load AlgoRooms brokers
+  const loadAlgoRoomsBrokers = async () => {
+    try {
+      const brokersResponse = await axios.get('http://localhost:5000/api/broker/list');
+      if (brokersResponse.data.success) {
+        setAlgoRoomsBrokers(brokersResponse.data.brokers);
+      }
+    } catch (error) {
+      console.error('Failed to load AlgoRooms brokers:', error);
+      setAlgoRoomsBrokers([]);
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -34,7 +49,7 @@ const Dashboard: React.FC = () => {
           const profile = await authService.getUserProfile(firebaseUser.uid);
           setUser(profile);
           
-          // Load strategies and brokerages
+          // Load strategies, brokerages, and AlgoRooms brokers
           const [strategiesData, brokeragesData] = await Promise.all([
             firestoreService.getStrategies(firebaseUser.uid),
             firestoreService.getBrokerages(firebaseUser.uid)
@@ -42,6 +57,9 @@ const Dashboard: React.FC = () => {
           
           setStrategies(strategiesData);
           setBrokerages(brokeragesData);
+          
+          // Load AlgoRooms brokers
+          await loadAlgoRoomsBrokers();
         } catch (error) {
           console.error('Failed to load data:', error);
         }
@@ -54,6 +72,17 @@ const Dashboard: React.FC = () => {
     return () => unsubscribe();
   }, [navigate]);
 
+  // Auto-refresh broker status every 30 seconds
+  useEffect(() => {
+    if (!loading && user) {
+      const interval = setInterval(() => {
+        loadAlgoRoomsBrokers();
+      }, 30000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [loading, user]);
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -63,7 +92,11 @@ const Dashboard: React.FC = () => {
   }
 
   const liveStrategies = strategies.filter(s => s.status === 'live').length;
-  const hasBrokerage = brokerages.length > 0;
+  const hasAlgoRoomsBroker = algoRoomsBrokers.length > 0;
+  const connectedBrokers = algoRoomsBrokers.filter(b => b.status === 'Connected').length;
+  
+  // Use AlgoRooms brokers as primary broker status
+  const hasBrokerConnected = hasAlgoRoomsBroker && connectedBrokers > 0;
 
   return (
     <Layout>
@@ -95,16 +128,16 @@ const Dashboard: React.FC = () => {
                 Hello {user?.name}!
               </Typography>
               <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                {hasBrokerage 
-                  ? 'Your account is connected and ready to trade'
+                {hasBrokerConnected 
+                  ? `${connectedBrokers} broker${connectedBrokers > 1 ? 's' : ''} connected and ready to trade`
                   : 'Connect your broker to start trading'}
               </Typography>
             </Box>
-            {!hasBrokerage && (
+            {!hasBrokerConnected && (
               <Button
                 variant="contained"
                 size="large"
-                onClick={() => navigate('/brokerage')}
+                onClick={() => navigate('/brokers')}
                 sx={{
                   bgcolor: 'white',
                   color: '#1976d2',
@@ -119,10 +152,20 @@ const Dashboard: React.FC = () => {
         </Paper>
 
         {/* Alert if no brokerage */}
-        {!hasBrokerage && (
+        {!hasBrokerConnected && (
           <Alert severity="warning" sx={{ mb: 3 }}>
             <Typography variant="body2">
               <strong>No broker connected!</strong> Please link your Dhan account to start trading.
+            </Typography>
+          </Alert>
+        )}
+        
+        {/* Show connected brokers info */}
+        {hasBrokerConnected && (
+          <Alert severity="success" sx={{ mb: 3 }}>
+            <Typography variant="body2">
+              <strong>✅ {connectedBrokers} broker{connectedBrokers > 1 ? 's' : ''} connected!</strong> 
+              {algoRoomsBrokers.map(broker => ` ${broker.broker} (${broker.clientId})`).join(', ')} - Ready for trading.
             </Typography>
           </Alert>
         )}
@@ -137,16 +180,16 @@ const Dashboard: React.FC = () => {
                     Broker Status
                   </Typography>
                   <Typography variant="h5">
-                    {hasBrokerage ? 'Connected' : 'Not Connected'}
+                    {hasBrokerConnected ? `${connectedBrokers} Connected` : 'Not Connected'}
                   </Typography>
                   <Chip
-                    label={hasBrokerage ? 'Active' : 'Inactive'}
-                    color={hasBrokerage ? 'success' : 'default'}
+                    label={hasBrokerConnected ? 'Active' : 'Inactive'}
+                    color={hasBrokerConnected ? 'success' : 'default'}
                     size="small"
                     sx={{ mt: 1 }}
                   />
                 </Box>
-                <AccountBalance sx={{ fontSize: 48, color: hasBrokerage ? '#4caf50' : '#ccc' }} />
+                <AccountBalance sx={{ fontSize: 48, color: hasBrokerConnected ? '#4caf50' : '#ccc' }} />
               </Box>
             </CardContent>
           </Card>
@@ -181,7 +224,7 @@ const Dashboard: React.FC = () => {
                     ₹0.00
                   </Typography>
                   <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                    {hasBrokerage ? 'No trades today' : 'Connect broker to see P&L'}
+                    {hasBrokerConnected ? 'No trades today' : 'Connect broker to see P&L'}
                   </Typography>
                 </Box>
                 <Assessment sx={{ fontSize: 48, color: '#ff9800' }} />
@@ -199,6 +242,15 @@ const Dashboard: React.FC = () => {
             <Button
               variant="contained"
               size="large"
+              startIcon={<ShowChart />}
+              onClick={() => navigate('/trading-dashboard')}
+              disabled={!hasBrokerConnected}
+            >
+              Trading Dashboard
+            </Button>
+            <Button
+              variant="outlined"
+              size="large"
               startIcon={<Add />}
               onClick={() => navigate('/strategies')}
             >
@@ -207,9 +259,9 @@ const Dashboard: React.FC = () => {
             <Button
               variant="outlined"
               size="large"
-              onClick={() => navigate('/brokerage')}
+              onClick={() => navigate('/brokers')}
             >
-              {hasBrokerage ? 'Manage Brokers' : 'Link Broker'}
+              {hasBrokerConnected ? 'Manage Brokers' : 'Link Broker'}
             </Button>
             <Button
               variant="outlined"

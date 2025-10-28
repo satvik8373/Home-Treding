@@ -9,8 +9,8 @@ import {
 } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import Layout from '../components/Layout';
-import BrokerageForm from '../components/BrokerageForm';
 import BrokerCard from '../components/BrokerCard';
+import AddBrokerForm from '../components/AddBrokerForm';
 import axios from 'axios';
 
 interface Broker {
@@ -22,6 +22,11 @@ interface Broker {
     strategyPerformance?: string;
     terminalEnabled: boolean;
     tradingEngineEnabled: boolean;
+    lastActivity?: string;
+    totalOrders?: number;
+    activePositions?: number;
+    connectedAt?: string;
+    lastValidated?: string;
 }
 
 const Brokers: React.FC = () => {
@@ -30,6 +35,13 @@ const Brokers: React.FC = () => {
 
     useEffect(() => {
         fetchBrokers();
+        
+        // Auto-refresh broker status every 30 seconds
+        const interval = setInterval(() => {
+            fetchBrokers();
+        }, 30000);
+        
+        return () => clearInterval(interval);
     }, []);
 
     const fetchBrokers = async () => {
@@ -41,10 +53,7 @@ const Brokers: React.FC = () => {
         }
     };
 
-    const handleBrokerAdded = (newBroker: Broker) => {
-        setBrokers([...brokers, newBroker]);
-        setShowAddForm(false);
-    };
+
 
     const handleBrokerUpdate = (updatedBroker: Broker) => {
         setBrokers(brokers.map(broker =>
@@ -54,6 +63,11 @@ const Brokers: React.FC = () => {
 
     const handleBrokerDelete = (brokerId: string) => {
         setBrokers(brokers.filter(broker => broker.id !== brokerId));
+    };
+
+    const handleBrokerAdded = (newBroker: Broker) => {
+        setBrokers([...brokers, newBroker]);
+        setShowAddForm(false);
     };
 
     return (
@@ -76,28 +90,20 @@ const Brokers: React.FC = () => {
 
 
 
-                    {showAddForm && (
-                        <Box sx={{ mb: 4 }}>
-                            <BrokerageForm
-                                onBrokerAdded={handleBrokerAdded}
-                                onCancel={() => setShowAddForm(false)}
-                            />
-                        </Box>
-                    )}
-
-                    {brokers.length === 0 && !showAddForm && (
+                    {brokers.length === 0 && (
                         <Card sx={{ textAlign: 'center', py: 6 }}>
                             <CardContent>
                                 <Typography variant="h6" color="textSecondary" gutterBottom>
                                     No Brokers Connected
                                 </Typography>
                                 <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-                                    Connect your first broker to start trading
+                                    Connect your broker account to start live trading
                                 </Typography>
                                 <Button
                                     variant="outlined"
                                     startIcon={<AddIcon />}
                                     onClick={() => setShowAddForm(true)}
+                                    size="large"
                                 >
                                     Add Your First Broker
                                 </Button>
@@ -125,6 +131,13 @@ const Brokers: React.FC = () => {
                             ))}
                         </Box>
                     )}
+
+                    {/* Add Broker Form Dialog */}
+                    <AddBrokerForm
+                        open={showAddForm}
+                        onClose={() => setShowAddForm(false)}
+                        onBrokerAdded={handleBrokerAdded}
+                    />
                 </Box>
             </Container>
         </Layout>

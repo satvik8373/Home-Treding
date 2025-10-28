@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Box, Typography, CircularProgress, Alert, Card, CardContent } from '@mui/material';
 import { CheckCircle, Error } from '@mui/icons-material';
 import { useLocation } from 'react-router-dom';
+import axios from 'axios';
 
 const DhanCallback: React.FC = () => {
   const location = useLocation();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('Processing Dhan login...');
+  const [message, setMessage] = useState('Processing Dhan OAuth login...');
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -14,33 +15,63 @@ const DhanCallback: React.FC = () => {
         const urlParams = new URLSearchParams(location.search);
         const code = urlParams.get('code');
         const state = urlParams.get('state');
+        const error = urlParams.get('error');
+
+        console.log('🔄 Dhan OAuth Callback received:', { code: code?.substring(0, 10) + '...', state, error });
+
+        if (error) {
+          setStatus('error');
+          setMessage(`❌ Dhan OAuth failed: ${error}`);
+          return;
+        }
 
         if (code && state) {
-          // Successful login from Dhan
-          setStatus('success');
-          setMessage('✅ Dhan login successful! Terminal activated.');
+          setMessage('🔄 Processing Dhan Partner OAuth callback...');
+
+          // Get connection ID from localStorage
+          const connectionId = localStorage.getItem('dhan_connection_id');
           
-          // Close this popup window after 3 seconds
-          setTimeout(() => {
-            window.close();
-          }, 3000);
-        } else {
-          // No code received - might be an error
-          const error = urlParams.get('error');
-          if (error) {
+          if (!connectionId) {
             setStatus('error');
-            setMessage(`❌ Dhan login failed: ${error}`);
-          } else {
+            setMessage('❌ Connection session not found. Please try connecting again.');
+            return;
+          }
+
+          // Send code and connection ID to Dhan Partner callback endpoint
+          const response = await axios.post('http://localhost:5000/api/dhan-partner/callback', {
+            code,
+            state,
+            connectionId
+          });
+
+          if (response.data.success) {
             setStatus('success');
-            setMessage('✅ Dhan login completed. You can close this window.');
+            setMessage('✅ Dhan Partner connected successfully! Terminal activated.');
+            
+            // Notify parent window about successful Dhan Partner connection
+            if (window.opener) {
+              window.opener.postMessage({
+                type: 'DHAN_PARTNER_SUCCESS',
+                data: response.data.broker
+              }, '*');
+            }
+            
+            // Close this popup window after 3 seconds
             setTimeout(() => {
               window.close();
-            }, 2000);
+            }, 3000);
+          } else {
+            setStatus('error');
+            setMessage(`❌ Dhan Partner connection failed: ${response.data.message}`);
           }
+        } else {
+          setStatus('error');
+          setMessage('❌ Missing authorization code or state parameter');
         }
-      } catch (error) {
+      } catch (error: any) {
+        console.error('Dhan OAuth callback error:', error);
         setStatus('error');
-        setMessage('❌ Error processing Dhan callback');
+        setMessage(`❌ OAuth processing failed: ${error.response?.data?.message || error.message}`);
       }
     };
 

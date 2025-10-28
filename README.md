@@ -1,226 +1,136 @@
-# Home Trading Platform
+# 🚀 AlgoRooms Trading Platform - Advanced
 
-A professional algorithmic trading platform with real-time market data, DhanHQ broker integration, and advanced trading strategies.
+Professional algorithmic trading platform with real-time market data, order management, and portfolio tracking.
 
-## 🚀 Features
+## ⚡ Quick Setup
 
-### ✅ **Real-Time Market Data**
-- Live NSE stock prices (RELIANCE, TCS, INFY, HDFCBANK)
-- Real-time NIFTY 50 and NIFTY BANK indices
-- Auto-refresh every 2 seconds
-- Yahoo Finance API integration
-
-### ✅ **DhanHQ Broker Integration**
-- Professional API integration with DhanHQ
-- Real-time order placement (LIMIT, MARKET, STOP_LOSS)
-- Live portfolio and positions tracking
-- WebSocket streaming for instant updates
-- Secure authentication with Client ID + Access Token
-
-### ✅ **Trading Features**
-- Algorithmic trading strategies
-- First Candle Breakout strategy
-- Strategy backtesting and optimization
-- Risk management and position sizing
-- Real-time P&L tracking
-
-### ✅ **Professional UI**
-- Modern React + Material-UI interface
-- Responsive design for all devices
-- Real-time charts and market data
-- Professional trading dashboard
-- Portfolio management interface
-
-## 🛠️ Technology Stack
-
-### **Frontend**
-- **React 18** with TypeScript
-- **Material-UI (MUI)** for professional UI components
-- **Axios** for API communication
-- **React Router** for navigation
-- **WebSocket** for real-time updates
-
-### **Backend**
-- **Node.js** with Express.js
-- **DhanHQ API** integration for live trading
-- **Yahoo Finance API** for market data
-- **WebSocket** server for real-time communication
-- **Firebase** for authentication and data storage
-
-## 📦 Installation & Setup
-
-### **Prerequisites**
-- Node.js 16+ installed
-- DhanHQ trading account (for live trading)
-- Git installed
-
-### **1. Clone Repository**
+### Automated Setup (Recommended)
 ```bash
-git clone https://github.com/satvik8373/Home-Treding.git
-cd Home-Treding
+npm run setup-advanced
 ```
 
-### **2. Backend Setup**
+### Manual Setup
 ```bash
-cd backend
-npm install
+# Install dependencies
+cd backend && npm install socket.io ws @types/ws typescript @types/node
+cd ../frontend && npm install socket.io-client
+
+# Compile TypeScript
+cd backend && npx tsc
+
+# Start services
+cd backend && npm start  # Terminal 1
+cd frontend && npm start # Terminal 2
 ```
 
-Create `.env` file:
-```env
-DHAN_CLIENT_ID=your_dhan_client_id
-DHAN_ACCESS_TOKEN=your_dhan_access_token
-PORT=5000
-```
+## 🎯 Access Points
 
-Start backend server:
-```bash
-npm start
-# or for development
-node algorroms-server.js
-```
+- **Main Dashboard**: http://localhost:3000/dashboard
+- **Trading Dashboard**: http://localhost:3000/trading-dashboard
+- **Broker Management**: http://localhost:3000/brokers
+- **Portfolio**: http://localhost:3000/portfolio
+- **Strategies**: http://localhost:3000/strategies
 
-### **3. Frontend Setup**
-```bash
-cd frontend
-npm install
-npm start
-```
+## 🆕 Advanced Features
 
-The app will open at `http://localhost:3000`
+### 🔥 Real-time Trading Engine
+- Live order execution and management
+- Market data streaming via WebSocket
+- Position tracking with real-time P&L
+- Risk management and validation
 
-## 🔧 DhanHQ Integration Setup
+### 📊 Professional Dashboard
+- Live market data feeds
+- Real-time order book
+- Portfolio performance tracking
+- Trading engine controls
 
-### **Step 1: Get DhanHQ Credentials**
-1. Login to your Dhan trading account
-2. Go to **Profile → DhanHQ Trading APIs**
-3. Generate **Access Token**
-4. Copy your **Client ID** and **Access Token**
+### 💼 Portfolio Management
+- Real-time position updates
+- P&L calculation (realized & unrealized)
+- Performance metrics and analytics
+- Trade history and reporting
 
-### **Step 2: Connect via UI**
-1. Open the app at `http://localhost:3000`
-2. Go to **"Link Brokerage Account"**
-3. Enter your **Client ID** and **Access Token**
-4. Click **"Connect to DhanHQ"**
-5. Start live trading!
-
-## 📊 API Endpoints
-
-### **Market Data**
-- `GET /api/market/all` - Get all live market data
-- `GET /api/dhan/market/ltp/:symbol` - Get live price for specific symbol
-
-### **Trading**
-- `POST /api/dhan/orders/place` - Place new order
-- `GET /api/dhan/orders/:clientId` - Get all orders
-- `GET /api/dhan/portfolio/:clientId` - Get portfolio and positions
-
-### **Authentication**
-- `POST /api/dhan/auth/login` - Connect to DhanHQ
-- `GET /api/dhan/status/:clientId` - Check connection status
-
-## 🎯 Usage Examples
-
-### **Live Market Data**
-```javascript
-// Get real-time market data
-const response = await fetch('http://localhost:5000/api/market/all');
-const data = await response.json();
-console.log(data.data.stocks); // Live stock prices
-```
-
-### **Place Order via DhanHQ**
-```javascript
-const order = {
-  clientId: 'your_client_id',
-  symbol: 'RELIANCE',
-  quantity: 10,
-  orderType: 'LIMIT',
-  price: 2850,
-  exchange: 'NSE_EQ'
-};
-
-const response = await fetch('http://localhost:5000/api/dhan/orders/place', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(order)
-});
-```
-
-## 🔒 Security Features
-
-- Secure DhanHQ API authentication
-- Environment variables for sensitive data
-- HTTPS support for production
-- Rate limiting and error handling
-- Input validation and sanitization
-
-## 📈 Trading Strategies
-
-### **First Candle Breakout**
-- Automated strategy implementation
-- Real-time signal generation
-- Risk management integration
+### 🤖 Strategy Framework
+- Algorithm lifecycle management
 - Backtesting capabilities
+- Risk settings per strategy
+- Performance monitoring
 
-## 🚀 Deployment
+### 🛡️ Security & Risk Management
+- Input validation and sanitization
+- Position size limits
+- Price deviation checks
+- Real-time risk monitoring
 
-### **Vercel Deployment (Frontend)**
-The React frontend is automatically deployed to Vercel:
+## 🔧 API Endpoints
 
-1. **Automatic Deployment:** Connected to GitHub for auto-deploy
-2. **Build Command:** `cd frontend && npm run build`
-3. **Output Directory:** `frontend/build`
-4. **Live URL:** Will be provided after successful deployment
+### Trading Engine
+- `GET /api/trading/engine/status` - Engine status
+- `POST /api/trading/engine/start` - Start engine
+- `POST /api/trading/engine/stop` - Stop engine
 
-### **Backend Deployment**
-For the backend API server, you can deploy to:
+### Orders
+- `POST /api/trading/orders` - Place order
+- `GET /api/trading/orders` - Get orders
+- `DELETE /api/trading/orders/:id` - Cancel order
 
-**Option 1: Railway/Render**
+### Portfolio
+- `GET /api/portfolio/positions` - Get positions
+- `GET /api/portfolio/summary` - Portfolio summary
+- `GET /api/portfolio/performance` - Performance metrics
+
+## 🔌 WebSocket Events
+
+Real-time updates for:
+- Market data ticks
+- Order status changes
+- Position updates
+- Portfolio changes
+- Trading engine status
+
+## 📱 Usage Guide
+
+1. **Setup**: Run `npm run setup-advanced`
+2. **Start Services**: Backend + Frontend
+3. **Connect Broker**: Add Dhan credentials in /brokers
+4. **Start Trading**: Access /trading-dashboard
+5. **Monitor Portfolio**: View real-time P&L in /portfolio
+
+## 🚨 Verification
+
 ```bash
-# Deploy backend to Railway or Render
-# Set environment variables:
-# - DHAN_CLIENT_ID
-# - DHAN_ACCESS_TOKEN
-# - PORT=5000
+node verify-setup.js  # Check setup status
 ```
 
-**Option 2: Traditional VPS**
-1. Set up environment variables
-2. Configure HTTPS certificates  
-3. Set up reverse proxy (Nginx)
-4. Configure PM2 for process management
-5. Set up monitoring and logging
+## 🏗️ Architecture
 
-## 🤝 Contributing
+```
+Frontend (React + TypeScript + Material-UI)
+├── Trading Dashboard
+├── Real-time Components  
+├── WebSocket Integration
+└── Professional UI/UX
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+Backend (Node.js + TypeScript + Socket.IO)
+├── Trading Engine
+├── Order Management
+├── Portfolio Service
+├── WebSocket Service
+└── Risk Management
+```
 
-## 📝 License
+## 📈 Production Ready
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- ✅ Real-time market data streaming
+- ✅ Professional order management
+- ✅ Live portfolio tracking
+- ✅ WebSocket connectivity
+- ✅ Risk management system
+- ✅ Scalable architecture
+- ✅ Modern UI/UX
+- ✅ TypeScript implementation
 
-## ⚠️ Disclaimer
+## 🎉 Ready to Trade!
 
-This software is for educational and research purposes. Trading involves substantial risk of loss. Use at your own risk and ensure compliance with local regulations.
-
-## 📞 Support
-
-For support and questions:
-- Create an issue on GitHub
-- Email: support@hometrading.com
-
-## 🎉 Acknowledgments
-
-- DhanHQ for providing professional trading APIs
-- Yahoo Finance for market data
-- Material-UI for beautiful components
-- React community for excellent documentation
-
----
-
-**Built with ❤️ for algorithmic traders**
+Your platform now includes enterprise-grade algorithmic trading capabilities with real-time data processing, professional order management, and comprehensive portfolio tracking.

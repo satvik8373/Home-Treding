@@ -246,7 +246,7 @@ export const activateTerminal = asyncHandler(async (req: Request, res: Response)
 });
 
 /**
- * Generate Dhan Login URL for Terminal Activation (AlgoRooms Style)
+ * Generate Dhan Partner Login URL for Terminal Activation (OAuth Flow)
  */
 export const getDhanLoginUrl = asyncHandler(async (req: Request, res: Response) => {
   const { brokerId } = req.body;
@@ -260,35 +260,181 @@ export const getDhanLoginUrl = asyncHandler(async (req: Request, res: Response) 
   }
 
   try {
-    // Generate secure state token
+    // Generate secure state token for OAuth flow
     const state = Math.random().toString(36).substring(2, 15);
-    const redirectUri = 'http://localhost:3000/dhan-connect';
+    const redirectUri = 'http://localhost:3000/dhan-callback';
     
     // Store state for verification
     broker.loginState = state;
+    broker.oauthRedirectUri = redirectUri;
     brokers.set(brokerId, broker);
 
-    // Create Dhan login URL (like AlgoRooms)
-    const loginUrl = `https://web.dhan.co/login?client_id=${broker.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}`;
+    // Use Dhan Partner Login URL with consent flow
+    // This is the official Dhan OAuth URL for partner integrations
+    const loginUrl = `https://partner-login.dhan.co/?consentID=17effb14-7a79-4137-8063-4b656c53d465&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&client_id=${broker.clientId}`;
 
-    logger.info('🔗 Generated Dhan login URL for terminal activation:', brokerId);
+    logger.info('🔗 Generated Dhan Partner OAuth login URL for terminal activation:', brokerId);
 
     res.json({
       success: true,
       loginUrl,
       state,
-      message: 'Dhan login URL generated for terminal activation'
+      redirectUri,
+      message: 'Dhan Partner OAuth login URL generated for terminal activation'
     });
 
   } catch (error: any) {
-    logger.error('❌ Login URL generation error:', error.message);
+    logger.error('❌ OAuth login URL generation error:', error.message);
     res.status(500).json({
       success: false,
-      message: 'Failed to generate login URL',
+      message: 'Failed to generate OAuth login URL',
       error: error.message
     });
   }
 });
+
+/**
+ * Handle Dhan OAuth Callback and Exchange Code for Access Token
+ */
+export const handleDhanCallback = asyncHandler(async (req: Request, res: Response) => {
+  const { code, state, brokerId } = req.body;
+
+  try {
+    logger.info('🔄 Processing Dhan OAuth callback:', { code: code?.substring(0, 10) + '...', state, brokerId });
+
+    if (!code || !state) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing authorization code or state parameter'
+      });
+    }
+
+    // Find broker by state if brokerId not provided
+    let broker;
+    if (brokerId) {
+      broker = brokers.get(brokerId);
+    } else {
+      // Find broker by state
+      for (const [id, b] of brokers.entries()) {
+        if (b.loginState === state) {
+          broker = b;
+          break;
+        }
+      }
+    }
+
+    if (!broker) {
+      return res.status(404).json({
+        success: false,
+        message: 'Broker not found or invalid state parameter'
+      });
+    }
+
+    // Verify state matches
+    if (broker.loginState !== state) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid state parameter - possible CSRF attack'
+      });
+    }
+
+    // Exchange authorization code for access token
+    const tokenResponse = await exchangeCodeForToken(code, broker.oauthRedirectUri);
+
+    if (tokenResponse.success) {
+      // Update broker with new access token
+      broker.accessToken = tokenResponse.accessToken;
+      broker.refreshToken = tokenResponse.refreshToken;
+      broker.tokenExpiresAt = tokenResponse.expiresAt;
+      broker.terminalActivated = true;
+      broker.terminalEnabled = true;
+      broker.status = 'Connected';
+      broker.lastActivity = new Date();
+      
+      // Clear OAuth state
+      delete broker.loginState;
+      delete broker.oauthRedirectUri;
+      
+      brokers.set(broker.id, broker);
+
+      logger.info('✅ Dhan OAuth flow completed successfully for broker:', broker.id);
+
+      res.json({
+        success: true,
+        message: 'Terminal activated successfully via OAuth!',
+        broker: {
+          id: broker.id,
+          broker: broker.broker,
+          clientId: broker.clientId,
+          status: broker.status,
+          terminalActivated: broker.terminalActivated,
+          terminalEnabled: broker.terminalEnabled
+        }
+      });
+    } else {
+      logger.error('❌ Token exchange failed:', tokenResponse.error);
+      
+      res.status(400).json({
+        success: false,
+        message: 'Failed to exchange authorization code for access token',
+        error: tokenResponse.error
+      });
+    }
+
+  } catch (error: any) {
+    logger.error('❌ OAuth callback processing error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'OAuth callback processing failed',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Exchange authorization code for access token (Dhan OAuth)
+ */
+async function exchangeCodeForToken(code: string, redirectUri: string) {
+  try {
+    // Dhan OAuth token exchange endpoint
+    const tokenUrl = 'https://api.dhan.co/v2/oauth/token';
+    
+    const response = await axios.post(tokenUrl, {
+      grant_type: 'authorization_code',
+      code: code,
+      redirect_uri: redirectUri,
+      client_id: process.env.DHAN_CLIENT_ID, // Your registered client ID
+      client_secret: process.env.DHAN_CLIENT_SECRET // Your client secret
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      timeout: 10000
+    });
+
+    if (response.data.access_token) {
+      return {
+        success: true,
+        accessToken: response.data.access_token,
+        refreshToken: response.data.refresh_token,
+        expiresAt: new Date(Date.now() + (response.data.expires_in * 1000))
+      };
+    } else {
+      return {
+        success: false,
+        error: 'No access token received from Dhan'
+      };
+    }
+
+  } catch (error: any) {
+    logger.error('Token exchange error:', error.response?.data || error.message);
+    
+    return {
+      success: false,
+      error: error.response?.data?.error_description || error.message
+    };
+  }
+}
 
 /**
  * Check Terminal Status and Account Activity
