@@ -17,6 +17,7 @@
     "build": "node build.js",
     "build:frontend": "cd frontend && npm run build",
     "deploy": "node deploy.js",
+    "deploy-now": "node deploy-now.js",
     "verify-deployment": "node verify-deployment.js",
     "clean": "node cleanup-unused-files.js"
   },
