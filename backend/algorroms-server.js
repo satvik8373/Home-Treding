@@ -1402,6 +1402,22 @@ if (tradingEngine && orderManagement && portfolioService) {
     });
 }
 
+// Root endpoint
+app.get('/', (req, res) => {
+    res.json({
+        name: 'AlgoRooms Trading API',
+        version: '1.0.0',
+        status: 'running',
+        endpoints: {
+            health: '/health',
+            market: '/api/market/*',
+            broker: '/api/broker/*',
+            trading: '/api/trading/*',
+            portfolio: '/api/portfolio/*'
+        }
+    });
+});
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({
