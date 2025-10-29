@@ -68,7 +68,7 @@ const PortfolioDashboard: React.FC = () => {
   }, []);
 
   const setupWebSocket = () => {
-    const wsUrl = process.env.REACT_APP_WS_URL || 'http://localhost:5000';
+    const wsUrl = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:5000';
     const newSocket = io(wsUrl);
 
     newSocket.on('connect', () => {

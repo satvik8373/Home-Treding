@@ -70,7 +70,7 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
     }, 2000);
 
     // Try WebSocket connection (will fail gracefully in demo mode)
-    const wsUrl = process.env.REACT_APP_WS_URL || 'http://localhost:5000';
+    const wsUrl = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:5000';
     const newSocket = io(wsUrl, {
       autoConnect: false // Don't auto-connect to prevent console errors
     });

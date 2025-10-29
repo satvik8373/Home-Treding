@@ -92,7 +92,7 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
   const setupWebSocket = () => {
     if (socket) return; // Prevent multiple connections
 
-    const newSocket = io('http://localhost:5000', {
+    const newSocket = io((process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'), {
       autoConnect: false // Don't auto-connect to prevent errors
     });
 
@@ -168,7 +168,7 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
 
   const handleCancelOrder = async (orderId: string) => {
     try {
-      await axios.delete(`http://localhost:5000/api/trading/orders/${orderId}`);
+      await axios.delete(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/trading/orders/${orderId}`);
       await loadOrders();
     } catch (error: any) {
       console.error('Failed to cancel order:', error);

@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_BASE = API_CONFIG.BASE_URL;
 const DHAN_API_BASE = `${API_BASE}/api/dhan`;
 
 export interface DhanCredentials {

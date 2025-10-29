@@ -1,7 +1,8 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { auth } from '../config/firebase';
+import { API_CONFIG } from '../config/api';
 
-const API_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+const API_URL = API_CONFIG.BASE_URL;
 
 class ApiService {
   private api: AxiosInstance;

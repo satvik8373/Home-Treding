@@ -223,7 +223,7 @@ const Strategies: React.FC = () => {
       }
 
       // Call backend API to start strategy
-      const response = await axios.post(`http://localhost:5000/api/strategies/${strategyId}/start`, {
+      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/${strategyId}/start`, {
         brokerId: connectedBroker.id
       }).catch(() => ({ data: { success: false } }));
 
@@ -246,7 +246,7 @@ const Strategies: React.FC = () => {
   const handleStopStrategy = async (strategyId: string) => {
     try {
       // Call backend API to stop strategy
-      const response = await axios.post(`http://localhost:5000/api/strategies/${strategyId}/stop`)
+      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/${strategyId}/stop`)
         .catch(() => ({ data: { success: false } }));
 
       if (response.data.success) {

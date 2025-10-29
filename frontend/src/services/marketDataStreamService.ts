@@ -38,7 +38,7 @@ class MarketDataStreamService {
   }
 
   private connect() {
-    const serverUrl = process.env.REACT_APP_WS_URL || 'http://localhost:5000';
+    const serverUrl = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:5000';
     
     this.socket = io(serverUrl, {
       transports: ['websocket', 'polling'],

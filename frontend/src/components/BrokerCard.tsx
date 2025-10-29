@@ -56,7 +56,7 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
     setError('');
 
     try {
-      const response = await axios.post(`http://localhost:5000/api/broker/${toggle}`, {
+      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/${toggle}`, {
         brokerId: broker.id,
         enabled
       });
@@ -250,7 +250,7 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
     setError('');
 
     try {
-      const response = await axios.post(`http://localhost:5000/api/broker/reconnect`, {
+      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/reconnect`, {
         brokerId: broker.id
       });
 
@@ -268,7 +268,7 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
 
   const handleDelete = async () => {
     try {
-      await axios.delete(`http://localhost:5000/api/broker/${broker.id}`);
+      await axios.delete(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/${broker.id}`);
       onDelete(broker.id);
       setDeleteDialog(false);
     } catch (error) {

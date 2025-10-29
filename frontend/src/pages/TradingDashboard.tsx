@@ -102,7 +102,7 @@ const TradingDashboard: React.FC = () => {
   const handleEngineToggle = async () => {
     try {
       const action = engineStatus?.isRunning ? 'stop' : 'start';
-      const response = await axios.post(`http://localhost:5000/api/trading/engine/${action}`);
+      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/trading/engine/${action}`);
       
       if (response.data.success) {
         await loadDashboardData();
