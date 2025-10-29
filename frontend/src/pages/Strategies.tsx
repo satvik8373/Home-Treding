@@ -40,7 +40,7 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-const StrategiesNew: React.FC = () => {
+const Strategies: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -400,6 +400,75 @@ const StrategiesNew: React.FC = () => {
             </Button>
           </Box>
 
+          <Grid container spacing={3}>
+            {templates.map((template) => (
+              <Grid item xs={12} sm={6} md={4} key={template.id}>
+                <Card
+                  sx={{
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                    borderRadius: 3,
+                    border: '1px solid #f1f3f5',
+                    overflow: 'hidden',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                      transform: 'translateY(-2px)'
+                    }
+                  }}
+                >
+                  <Box
+                    sx={{
+                      height: 150,
+                      bgcolor: '#f8f9fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderBottom: '1px solid #f1f3f5'
+                    }}
+                  >
+                    <AssessmentIcon sx={{ fontSize: 60, color: '#dee2e6' }} />
+                  </Box>
+                  <Box sx={{ p: 2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                      {template.name}
+                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#868e96', display: 'block' }}>
+                          Max DD
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: '#51cf66' }}>
+                          {template.maxDD}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#868e96', display: 'block' }}>
+                          Margin
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 500, color: '#51cf66' }}>
+                          {template.margin}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        textTransform: 'none',
+                        borderRadius: 2,
+                        borderColor: '#4c6ef5',
+                        color: '#4c6ef5',
+                        '&:hover': { bgcolor: '#e7f5ff' }
+                      }}
+                    >
+                      Add to my strategy
+                    </Button>
+                  </Box>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
         </TabPanel>
 
         <TabPanel value={tabValue} index={4}>
@@ -419,4 +488,4 @@ const StrategiesNew: React.FC = () => {
   );
 };
 
-export default StrategiesNew;
+export default Strategies;
