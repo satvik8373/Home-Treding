@@ -46,7 +46,12 @@ const Brokers: React.FC = () => {
 
     const fetchBrokers = async () => {
         try {
-            const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/list`);
+            // Get current user ID
+            const { auth } = await import('../config/firebase');
+            const userId = auth.currentUser?.uid;
+            
+            // Fetch only user's brokers
+            const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/list${userId ? `?userId=${userId}` : ''}`);
             setBrokers(response.data.brokers || []);
         } catch (error) {
             console.error('Failed to fetch brokers:', error);

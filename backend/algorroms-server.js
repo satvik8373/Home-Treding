@@ -465,10 +465,10 @@ app.delete('/api/broker/:brokerId', async (req, res) => {
 
 // Connect Broker with Manual Credentials (User Input)
 app.post('/api/broker/connect-manual', async (req, res) => {
-    const { broker, clientId, accessToken } = req.body;
+    const { broker, clientId, accessToken, userId } = req.body;
 
     try {
-        console.log('🔗 Connecting broker with manual credentials:', { broker, clientId });
+        console.log('🔗 Connecting broker with manual credentials:', { broker, clientId, userId });
 
         if (!broker || !clientId || !accessToken) {
             return res.status(400).json({
@@ -519,6 +519,7 @@ app.post('/api/broker/connect-manual', async (req, res) => {
             // Create broker record with user credentials
             const brokerRecord = {
                 id: `${broker.toLowerCase()}_${clientId}_${Date.now()}`,
+                userId: userId || 'anonymous', // Store user ID
                 broker: broker,
                 clientId: clientId,
                 accessToken: accessToken,
@@ -626,9 +627,15 @@ async function validateBrokerStatus(broker) {
 // List all brokers with real-time status check
 app.get('/api/broker/list', async (req, res) => {
     try {
-        const brokerList = Array.from(brokers.values());
+        const { userId } = req.query;
+        
+        // Filter brokers by userId if provided
+        let brokerList = Array.from(brokers.values());
+        if (userId) {
+            brokerList = brokerList.filter(b => b.userId === userId);
+        }
 
-        console.log(`📋 Listing ${brokerList.length} brokers with status validation`);
+        console.log(`📋 Listing ${brokerList.length} brokers${userId ? ` for user ${userId}` : ''} with status validation`);
 
         // Validate each broker's status in parallel
         const validationPromises = brokerList.map(async (broker) => {

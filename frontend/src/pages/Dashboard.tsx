@@ -32,7 +32,10 @@ const Dashboard: React.FC = () => {
   // Function to load AlgoRooms brokers
   const loadAlgoRoomsBrokers = async () => {
     try {
-      const brokersResponse = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/list`);
+      // Get current user ID
+      const userId = auth.currentUser?.uid;
+      
+      const brokersResponse = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/list${userId ? `?userId=${userId}` : ''}`);
       if (brokersResponse.data.success) {
         setAlgoRoomsBrokers(brokersResponse.data.brokers);
       }
