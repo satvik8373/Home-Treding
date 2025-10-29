@@ -400,6 +400,7 @@ const StrategiesNew: React.FC = () => {
             </Button>
           </Box>
 
+        </TabPanel>
 
         <TabPanel value={tabValue} index={4}>
           <Box sx={{ textAlign: 'center', py: 8 }}>
