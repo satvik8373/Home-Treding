@@ -46,7 +46,7 @@ const Brokers: React.FC = () => {
 
     const fetchBrokers = async () => {
         try {
-            const response = await axios.get('http://localhost:5000/api/broker/list');
+            const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/list`);
             setBrokers(response.data.brokers || []);
         } catch (error) {
             console.error('Failed to fetch brokers:', error);

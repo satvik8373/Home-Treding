@@ -79,8 +79,8 @@ const TradingDashboard: React.FC = () => {
   const loadDashboardData = async () => {
     try {
       const [engineResponse, brokersResponse] = await Promise.all([
-        axios.get('http://localhost:5000/api/trading/engine/status').catch(() => ({ data: { success: false } })),
-        axios.get('http://localhost:5000/api/broker/list')
+        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/trading/engine/status`).catch(() => ({ data: { success: false } })),
+        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/list`)
       ]);
 
       if (engineResponse.data.success) {

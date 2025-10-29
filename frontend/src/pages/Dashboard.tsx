@@ -32,7 +32,7 @@ const Dashboard: React.FC = () => {
   // Function to load AlgoRooms brokers
   const loadAlgoRoomsBrokers = async () => {
     try {
-      const brokersResponse = await axios.get('http://localhost:5000/api/broker/list');
+      const brokersResponse = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/list`);
       if (brokersResponse.data.success) {
         setAlgoRoomsBrokers(brokersResponse.data.brokers);
       }

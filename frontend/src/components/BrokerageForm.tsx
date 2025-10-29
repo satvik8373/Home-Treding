@@ -52,7 +52,7 @@ const BrokerageForm: React.FC<BrokerageFormProps> = ({ onBrokerAdded, onCancel }
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/broker/connect', {
+      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/connect`, {
         broker: formData.broker,
         clientId: formData.clientId.trim(),
         accessToken: formData.accessToken.trim()

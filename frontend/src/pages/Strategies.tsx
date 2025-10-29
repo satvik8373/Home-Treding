@@ -115,7 +115,7 @@ const Strategies: React.FC = () => {
       setLoading(true);
       
       // Try to load from backend API
-      const response = await axios.get('http://localhost:5000/api/strategies').catch(() => ({ data: { success: false } }));
+      const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies`).catch(() => ({ data: { success: false } }));
       
       if (response.data.success) {
         setStrategies(response.data.strategies || []);
@@ -205,7 +205,7 @@ const Strategies: React.FC = () => {
 
   const loadBrokers = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/broker/list');
+      const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/list`);
       if (response.data.success) {
         setBrokers(response.data.brokers || []);
       }
@@ -273,7 +273,7 @@ const Strategies: React.FC = () => {
       }
 
       // Call backend API to create strategy
-      const response = await axios.post('http://localhost:5000/api/strategies', createForm)
+      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies`, createForm)
         .catch(() => ({ data: { success: false } }));
 
       if (response.data.success) {

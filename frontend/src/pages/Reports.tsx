@@ -64,8 +64,8 @@ const Reports: React.FC = () => {
 
       // Load real data from backend APIs
       const [tradesResponse, performanceResponse] = await Promise.all([
-        axios.get('http://localhost:5000/api/portfolio/trades?limit=100').catch(() => ({ data: { success: false, trades: [] } })),
-        axios.get('http://localhost:5000/api/portfolio/performance').catch(() => ({ data: { success: false, performance: {} } }))
+        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/portfolio/trades?limit=100`).catch(() => ({ data: { success: false, trades: [] } })),
+        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/portfolio/performance`).catch(() => ({ data: { success: false, performance: {} } }))
       ]);
 
       if (tradesResponse.data.success) {

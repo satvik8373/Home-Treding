@@ -129,7 +129,7 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5000/api/trading/orders', {
+      const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/trading/orders`, {
         params: brokerId ? { brokerId } : {}
       });
 
@@ -146,7 +146,7 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
 
   const handlePlaceOrder = async () => {
     try {
-      const response = await axios.post('http://localhost:5000/api/trading/orders', orderForm);
+      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/trading/orders`, orderForm);
 
       if (response.data.success) {
         setShowOrderForm(false);

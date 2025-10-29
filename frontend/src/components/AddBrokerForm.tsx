@@ -72,7 +72,7 @@ const AddBrokerForm: React.FC<AddBrokerFormProps> = ({ open, onClose, onBrokerAd
       console.log('🔗 Connecting Dhan broker with user credentials');
 
       // Call backend to connect broker with user-provided credentials
-      const response = await axios.post('http://localhost:5000/api/broker/connect-manual', {
+      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/connect-manual`, {
         broker: 'Dhan',
         clientId: formData.clientId,
         accessToken: formData.accessToken

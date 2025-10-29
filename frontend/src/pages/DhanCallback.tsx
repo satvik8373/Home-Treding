@@ -38,7 +38,7 @@ const DhanCallback: React.FC = () => {
           }
 
           // Send code and connection ID to Dhan Partner callback endpoint
-          const response = await axios.post('http://localhost:5000/api/dhan-partner/callback', {
+          const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/dhan-partner/callback`, {
             code,
             state,
             connectionId

@@ -93,7 +93,7 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
       if (confirmRedirect) {
         try {
           // Get Dhan OAuth login URL from backend
-          const loginUrlResponse = await axios.post('http://localhost:5000/api/broker/dhan-login-url', {
+          const loginUrlResponse = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/dhan-login-url`, {
             brokerId: broker.id
           });
 
@@ -191,7 +191,7 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
                 // If window closed without success message, check status
                 setTimeout(async () => {
                   try {
-                    const recheckResponse = await axios.post('http://localhost:5000/api/broker/terminal-status', {
+                    const recheckResponse = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/terminal-status`, {
                       brokerId: broker.id
                     });
                     
