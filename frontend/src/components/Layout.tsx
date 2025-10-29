@@ -261,7 +261,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         component="main"
         sx={{
           flexGrow: 1,
-          bgcolor: '#f5f7fa',
+          bgcolor: '#ffffff',
           minHeight: '100vh',
           pb: { xs: 8, md: 3 },
           pt: 3,

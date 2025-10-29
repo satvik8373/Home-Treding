@@ -7,7 +7,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Brokers from './pages/Brokers';
 import DhanCallback from './pages/DhanCallback';
-import Strategies from './pages/Strategies';
+import Strategies from './pages/StrategiesNew';
 import Portfolio from './pages/Portfolio';
 import Reports from './pages/Reports';
 import TradingDashboard from './pages/TradingDashboard';
