@@ -4,10 +4,10 @@
     "broker": "Dhan",
     "clientId": "1108893841",
     "accessToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJkaGFuIiwicGFydG5lcklkIjoiIiwiZXhwIjoxNzYxODEyNjA3LCJpYXQiOjE3NjE3MjYyMDcsInRva2VuQ29uc3VtZXJUeXBlIjoiU0VMRiIsIndlYmhvb2tVcmwiOiIiLCJkaGFuQ2xpZW50SWQiOiIxMTA4ODkzODQxIn0.rCpGE_vQnwMqVI388px2K9vSobSA5QAqR50Yi69JpZ6Oct1aszqbyDYzWdzDOptVZO6kkLr6zp60Az6VV16dUA",
-    "terminalEnabled": true,
+    "terminalEnabled": false,
     "terminalActivated": true,
     "tradingEngineEnabled": true,
-    "status": "Connected",
+    "status": "Disconnected",
     "accountName": "Dhan Account 1108893841",
     "strategyPerformance": "0.00%",
     "totalOrders": 0,
@@ -16,6 +16,6 @@
     "connectedAt": "2025-10-29T08:25:20.552Z",
     "credentialsSource": "user_input",
     "lastValidated": "2025-10-29T12:26:16.613Z",
-    "lastRestart": "2025-10-29T12:09:47.871Z"
+    "lastRestart": "2025-10-29T13:08:49.537Z"
   }
 ]
