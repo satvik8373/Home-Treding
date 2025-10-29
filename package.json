@@ -14,7 +14,7 @@
     "check-errors": "node final-error-check.js",
     "verify-platform": "node final-error-check.js",
     "compile-ts": "cd backend && npx tsc",
-    "build": "node build.js",
+    "build": "cd frontend && npm install && npm run build",
     "build:frontend": "cd frontend && npm run build",
     "deploy": "node deploy.js",
     "deploy-now": "node deploy-now.js",
