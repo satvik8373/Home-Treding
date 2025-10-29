@@ -400,9 +400,9 @@ const Strategies: React.FC = () => {
             </Button>
           </Box>
 
-          <Grid container spacing={3}>
-            {templates.map((template) => (
-              <Grid item xs={12} sm={6} md={4} key={template.id}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 3 }}>
+            {STRATEGY_TEMPLATES.filter(t => t.id !== 'custom').map((template) => (
+              <Box key={template.id}>
                 <Card
                   sx={{
                     boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
@@ -466,9 +466,9 @@ const Strategies: React.FC = () => {
                     </Button>
                   </Box>
                 </Card>
-              </Grid>
+              </Box>
             ))}
-          </Grid>
+          </Box>
         </TabPanel>
 
         <TabPanel value={tabValue} index={4}>
