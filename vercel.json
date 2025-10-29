@@ -1,17 +1,5 @@
 {
-  "version": 2,
-  "name": "algorooms-trading-platform",
-  "buildCommand": "cd frontend && npm install && npm run build",
+  "buildCommand": "npm --prefix frontend install && npm --prefix frontend run build",
   "outputDirectory": "frontend/build",
-  "installCommand": "echo 'Skipping root install'",
-  "ignoreCommand": "if [ \"$VERCEL_ENV\" == \"production\" ]; then exit 1; else exit 0; fi",
-  "routes": [
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ]
+  "installCommand": "npm --prefix frontend install"
 }
