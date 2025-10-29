@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Card, CardContent, Typography, Chip, Alert, CircularProgress } from '@mui/material';
 import { TrendingUp, TrendingDown, Refresh } from '@mui/icons-material';
-import axios from 'axios';
+import apiService from '../services/apiService';
 
 interface Stock {
   symbol: string;
@@ -24,11 +24,13 @@ const MarketData: React.FC = () => {
     const fetchData = async () => {
       try {
         setError(null);
-        const response = await axios.get('http://localhost:5000/api/market/all');
+        const response = await apiService.get<{ success: boolean; data: { stocks: Stock[]; indices: Stock[] } }>(
+          '/api/market/all'
+        );
         
-        if (response.data.success) {
-          setStocks(response.data.data.stocks || []);
-          setIndices(response.data.data.indices || []);
+        if (response.success) {
+          setStocks(response.data.stocks || []);
+          setIndices(response.data.indices || []);
           setLastUpdate(new Date());
         } else {
           setError('Failed to fetch live market data');

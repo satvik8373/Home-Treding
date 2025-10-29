@@ -22,7 +22,7 @@ import {
   Assessment,
   ShowChart
 } from '@mui/icons-material';
-import axios from 'axios';
+import apiService from '../services/apiService';
 import { io, Socket } from 'socket.io-client';
 
 interface Position {
@@ -68,7 +68,8 @@ const PortfolioDashboard: React.FC = () => {
   }, []);
 
   const setupWebSocket = () => {
-    const newSocket = io('http://localhost:5000');
+    const wsUrl = process.env.REACT_APP_WS_URL || 'http://localhost:5000';
+    const newSocket = io(wsUrl);
 
     newSocket.on('connect', () => {
       console.log('📡 Connected to portfolio updates');
@@ -102,13 +103,13 @@ const PortfolioDashboard: React.FC = () => {
 
       // Try to load real data from backend
       const [positionsResponse, summaryResponse] = await Promise.all([
-        axios.get('http://localhost:5000/api/portfolio/positions').catch(() => ({ data: { success: false } })),
-        axios.get('http://localhost:5000/api/portfolio/summary').catch(() => ({ data: { success: false } }))
+        apiService.get<any>('/api/portfolio/positions').catch(() => ({ success: false })),
+        apiService.get<any>('/api/portfolio/summary').catch(() => ({ success: false }))
       ]);
 
-      if (positionsResponse.data.success && summaryResponse.data.success) {
-        setPositions(positionsResponse.data.positions || []);
-        setSummary(summaryResponse.data.summary);
+      if (positionsResponse.success && summaryResponse.success) {
+        setPositions(positionsResponse.positions || []);
+        setSummary(summaryResponse.summary);
       } else {
         // Fallback to demo data with realistic values
         console.log('Using demo portfolio data');
