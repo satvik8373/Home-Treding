@@ -16,7 +16,11 @@ import {
   useMediaQuery,
   BottomNavigation,
   BottomNavigationAction,
-  Paper
+  Paper,
+  Avatar,
+  Menu,
+  MenuItem,
+  Divider
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -26,9 +30,13 @@ import {
   ShowChart,
   Link as LinkIcon,
   Menu as MenuIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  Logout as LogoutIcon,
+  Person as PersonIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { auth } from '../config/firebase';
+import authService from '../services/authService';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -51,6 +59,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const user = auth.currentUser;
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -60,6 +70,23 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     navigate(path);
     if (isMobile) {
       setMobileOpen(false);
+    }
+  };
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
     }
   };
 
@@ -135,6 +162,63 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             {menuItems.find(item => item.path === location.pathname)?.text || 'AlgoRooms'}
           </Typography>
+          
+          {/* User Menu */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" sx={{ display: { xs: 'none', sm: 'block' } }}>
+              {user?.displayName || user?.email}
+            </Typography>
+            <IconButton onClick={handleMenuOpen} sx={{ p: 0 }}>
+              <Avatar 
+                sx={{ 
+                  width: 36, 
+                  height: 36,
+                  bgcolor: 'rgba(255,255,255,0.2)',
+                  border: '2px solid rgba(255,255,255,0.3)'
+                }}
+              >
+                {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
+              </Avatar>
+            </IconButton>
+          </Box>
+
+          <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={handleMenuClose}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            PaperProps={{
+              sx: {
+                mt: 1.5,
+                minWidth: 200,
+                borderRadius: 2,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+              }
+            }}
+          >
+            <Box sx={{ px: 2, py: 1.5 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                {user?.displayName || 'User'}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {user?.email}
+              </Typography>
+            </Box>
+            <Divider />
+            <MenuItem onClick={() => { handleMenuClose(); navigate('/profile'); }}>
+              <ListItemIcon>
+                <PersonIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Profile</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { handleMenuClose(); handleLogout(); }}>
+              <ListItemIcon>
+                <LogoutIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Logout</ListItemText>
+            </MenuItem>
+          </Menu>
         </Toolbar>
       </AppBar>
       

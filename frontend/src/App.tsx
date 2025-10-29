@@ -11,6 +11,7 @@ import Strategies from './pages/Strategies';
 import Portfolio from './pages/Portfolio';
 import Reports from './pages/Reports';
 import TradingDashboard from './pages/TradingDashboard';
+import InstallPWA from './components/InstallPWA';
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
           <Route path="/reports" element={<Reports />} />
           <Route path="/dhan-callback" element={<DhanCallback />} />
         </Routes>
+        <InstallPWA />
       </Router>
     </ThemeProvider>
   );
