@@ -353,7 +353,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           bgcolor: '#f8fafc',
           minHeight: '100vh',
           pb: { 
-            xs: 'calc(72px + env(safe-area-inset-bottom))', 
+            xs: 'calc(64px + max(env(safe-area-inset-bottom), 0px))', 
             md: 4 
           },
           pt: 3,
@@ -361,7 +361,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           width: '100%',
           maxWidth: '100vw',
           overflowX: 'hidden',
-          marginTop: 'env(safe-area-inset-top)'
+          marginTop: 'max(env(safe-area-inset-top), 0px)',
+          // Fallback for older browsers
+          '@supports not (padding: max(0px))': {
+            pb: { 
+              xs: 'calc(64px + env(safe-area-inset-bottom, 0px))', 
+              md: 4 
+            },
+            marginTop: 'env(safe-area-inset-top, 0px)'
+          }
         }}
       >
         <Toolbar sx={{ minHeight: { xs: 64, sm: 72 } }} />
@@ -378,22 +386,29 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </Container>
       </Box>
 
-      {/* Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation - iOS PWA Safe Area Fixed */}
       {isMobile && (
-        <Paper
+        <Box
           sx={{
             position: 'fixed',
             bottom: 0,
             left: 0,
             right: 0,
             zIndex: 1200,
-            paddingBottom: 'env(safe-area-inset-bottom)',
-            paddingLeft: 'env(safe-area-inset-left)',
-            paddingRight: 'env(safe-area-inset-right)',
+            bgcolor: '#ffffff',
             borderTop: '1px solid #f1f5f9',
-            boxShadow: '0 -4px 6px -1px rgb(0 0 0 / 0.1), 0 -2px 4px -2px rgb(0 0 0 / 0.1)'
+            boxShadow: '0 -4px 6px -1px rgb(0 0 0 / 0.1), 0 -2px 4px -2px rgb(0 0 0 / 0.1)',
+            // iOS PWA Safe Area Support
+            paddingBottom: 'max(env(safe-area-inset-bottom), 0px)',
+            paddingLeft: 'max(env(safe-area-inset-left), 0px)',
+            paddingRight: 'max(env(safe-area-inset-right), 0px)',
+            // Fallback for older iOS versions
+            '@supports not (padding: max(0px))': {
+              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+              paddingLeft: 'env(safe-area-inset-left, 0px)',
+              paddingRight: 'env(safe-area-inset-right, 0px)',
+            }
           }}
-          elevation={0}
         >
           <BottomNavigation
             value={location.pathname}
@@ -402,20 +417,23 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             }}
             showLabels
             sx={{
-              height: 72,
+              height: 64,
+              bgcolor: 'transparent',
               '& .MuiBottomNavigationAction-root': {
                 minWidth: 'auto',
-                padding: '8px 12px',
+                padding: '6px 12px',
                 color: '#64748b',
+                transition: 'all 0.2s',
                 '&.Mui-selected': {
                   color: '#6366f1',
                   fontWeight: 600
                 }
               },
               '& .MuiBottomNavigationAction-label': {
-                fontSize: '0.75rem',
+                fontSize: '0.7rem',
+                marginTop: '4px',
                 '&.Mui-selected': {
-                  fontSize: '0.75rem'
+                  fontSize: '0.7rem'
                 }
               }
             }}
@@ -429,8 +447,32 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               />
             ))}
           </BottomNavigation>
-        </Paper>
+        </Box>
       )}
+
+      {/* iOS PWA Safe Area Styles */}
+      <style>
+        {`
+          /* Ensure proper viewport height on iOS */
+          @supports (-webkit-touch-callout: none) {
+            html {
+              height: -webkit-fill-available;
+            }
+            body {
+              min-height: 100vh;
+              min-height: -webkit-fill-available;
+            }
+          }
+          
+          /* PWA Standalone Mode */
+          @media all and (display-mode: standalone) {
+            html, body {
+              height: 100%;
+              height: -webkit-fill-available;
+            }
+          }
+        `}
+      </style>
     </Box>
   );
 };

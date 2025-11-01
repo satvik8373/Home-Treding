@@ -118,15 +118,25 @@ button {
   --sal: env(safe-area-inset-left);
 }
 
+/* iOS PWA Safe Area Support */
 @supports (padding: max(0px)) {
   body {
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
+    padding-left: max(env(safe-area-inset-left), 0px);
+    padding-right: max(env(safe-area-inset-right), 0px);
   }
   
-  /* Don't add padding-top to body, let AppBar handle it */
   #root {
-    padding-bottom: env(safe-area-inset-bottom);
+    /* Don't add padding-bottom here, let components handle it */
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Fallback for older iOS versions */
+@supports not (padding: max(0px)) {
+  body {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
 }
 
@@ -157,28 +167,46 @@ body {
 /* PWA Standalone Mode Detection and Fixes */
 @media all and (display-mode: standalone) {
   /* When app is installed as PWA */
-  body {
-    padding-top: env(safe-area-inset-top);
+  html {
+    height: 100%;
+    height: -webkit-fill-available;
   }
   
-  /* Ensure content doesn't go under status bar */
+  body {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+  
   #root {
-    min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
   }
 }
 
 /* iOS PWA specific fixes */
 @supports (-webkit-touch-callout: none) {
   /* iOS devices */
-  body {
-    /* Prevent content from going under notch */
-    padding-top: constant(safe-area-inset-top); /* iOS 11.0 */
-    padding-top: env(safe-area-inset-top); /* iOS 11.2+ */
+  html {
+    height: -webkit-fill-available;
   }
   
-  /* Fix for bottom navigation on iOS */
-  .MuiBottomNavigation-root {
-    padding-bottom: constant(safe-area-inset-bottom);
-    padding-bottom: env(safe-area-inset-bottom);
+  body {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    /* Prevent content from going under notch */
+    padding-top: constant(safe-area-inset-top); /* iOS 11.0 */
+    padding-top: max(env(safe-area-inset-top), 0px); /* iOS 11.2+ */
+  }
+  
+  #root {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* iOS Home Indicator Area Fix */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  body {
+    padding-bottom: 0 !important;
   }
 }
