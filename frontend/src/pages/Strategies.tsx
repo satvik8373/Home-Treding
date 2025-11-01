@@ -277,8 +277,7 @@ const Strategies: React.FC = () => {
     : availableInstruments;
   
   const handleSelectInstrument = (instrument: string) => {
-    if (!selectedInstruments.includes(instrument)) {
-      setSelectedInstruments([...selectedInstruments, instrument]);
+    if (!selectedInstruments.includes(instrument)) {    setSelectedInstruments([...selectedInstruments, instrument]);
     }
   };
   

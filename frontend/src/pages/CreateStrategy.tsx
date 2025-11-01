@@ -19,21 +19,19 @@ import {
     RadioGroup,
     Alert,
     CircularProgress,
-    Divider,
     Stack,
     Chip,
-    IconButton,
     Dialog,
     DialogTitle,
     DialogContent,
-    DialogActions
+    DialogActions,
+    useMediaQuery,
+    useTheme
 } from '@mui/material';
 import {
     Save,
     ArrowBack,
     Add,
-    Delete,
-    AccessTime,
     Print
 } from '@mui/icons-material';
 import Layout from '../components/Layout';
@@ -44,6 +42,8 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 const CreateStrategy: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
@@ -66,8 +66,6 @@ const CreateStrategy: React.FC = () => {
     const [transactionType, setTransactionType] = useState('Both Side');
     const [chartType, setChartType] = useState('Candle');
     const [interval, setInterval] = useState('5 Min');
-    const [longEntryConditions, setLongEntryConditions] = useState<any[]>([]);
-    const [shortEntryConditions, setShortEntryConditions] = useState<any[]>([]);
     
     // Risk Management
     const [exitOnProfit, setExitOnProfit] = useState('');
@@ -170,12 +168,22 @@ const CreateStrategy: React.FC = () => {
 
     return (
         <Layout>
-            <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-                <Box mb={3}>
+            <Container 
+                maxWidth="lg" 
+                sx={{ 
+                    mt: { xs: 2, sm: 3, md: 4 }, 
+                    mb: { xs: 10, sm: 4 },
+                    px: { xs: 1, sm: 2, md: 3 }
+                }}
+            >
+                <Box mb={{ xs: 2, sm: 3 }}>
                     <Button
                         startIcon={<ArrowBack />}
                         onClick={() => navigate('/strategies')}
-                        sx={{ mb: 2 }}
+                        sx={{ 
+                            mb: 2,
+                            fontSize: { xs: '0.875rem', sm: '1rem' }
+                        }}
                     >
                         Back to Strategies
                     </Button>
@@ -193,11 +201,16 @@ const CreateStrategy: React.FC = () => {
                     </Alert>
                 )}
 
-                <Paper elevation={2} sx={{ p: 4 }}>
-                    <Stack spacing={4}>
+                <Paper elevation={2} sx={{ p: { xs: 2, sm: 3, md: 4 } }}>
+                    <Stack spacing={{ xs: 3, sm: 4 }}>
                         {/* Strategy Type */}
                         <Box>
-                            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                            <Typography 
+                                variant="subtitle1" 
+                                fontWeight="bold" 
+                                gutterBottom
+                                sx={{ fontSize: { xs: '0.95rem', sm: '1rem' } }}
+                            >
                                 Strategy Type
                             </Typography>
                             <ToggleButtonGroup
@@ -205,11 +218,18 @@ const CreateStrategy: React.FC = () => {
                                 exclusive
                                 onChange={(e, value) => value && setStrategyType(value)}
                                 sx={{ mt: 1 }}
+                                fullWidth={isMobile}
                             >
-                                <ToggleButton value="time-based">
+                                <ToggleButton 
+                                    value="time-based"
+                                    sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+                                >
                                     Time Based
                                 </ToggleButton>
-                                <ToggleButton value="indicator-based">
+                                <ToggleButton 
+                                    value="indicator-based"
+                                    sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+                                >
                                     Indicator Based
                                 </ToggleButton>
                             </ToggleButtonGroup>
@@ -217,23 +237,33 @@ const CreateStrategy: React.FC = () => {
 
                         {/* Select Instruments */}
                         <Box>
-                            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                            <Typography 
+                                variant="subtitle1" 
+                                fontWeight="bold" 
+                                gutterBottom
+                                sx={{ fontSize: { xs: '0.95rem', sm: '1rem' } }}
+                            >
                                 Select Instruments
                             </Typography>
-                            <Box display="flex" gap={2} flexWrap="wrap" mt={2}>
+                            <Box display="flex" gap={{ xs: 1, sm: 2 }} flexWrap="wrap" mt={2}>
                                 {instruments.map((instrument) => (
                                     <Chip
                                         key={instrument}
                                         label={instrument}
                                         onDelete={() => handleRemoveInstrument(instrument)}
                                         color="primary"
+                                        sx={{ fontSize: { xs: '0.75rem', sm: '0.8125rem' } }}
                                     />
                                 ))}
                                 <Button
                                     variant="outlined"
                                     startIcon={<Add />}
                                     onClick={handleAddInstrument}
-                                    sx={{ borderStyle: 'dashed' }}
+                                    sx={{ 
+                                        borderStyle: 'dashed',
+                                        fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                                    }}
+                                    size={isMobile ? 'small' : 'medium'}
                                 >
                                     Add Instruments
                                 </Button>
@@ -243,24 +273,50 @@ const CreateStrategy: React.FC = () => {
                         {strategyType === 'time-based' && (
                             <>
                                 {/* Order Type, Start Time, Square Off */}
-                                <Box display="flex" gap={2} flexWrap="wrap">
-                                    <Box flex="1" minWidth="200px">
-                                        <Typography variant="caption" color="text.secondary">
+                                <Box 
+                                    sx={{
+                                        display: 'flex',
+                                        flexDirection: { xs: 'column', sm: 'row' },
+                                        gap: 2
+                                    }}
+                                >
+                                    <Box flex="1">
+                                        <Typography 
+                                            variant="caption" 
+                                            color="text.secondary"
+                                            sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                                        >
                                             Order Type
                                         </Typography>
                                         <RadioGroup
-                                            row
+                                            row={!isMobile}
                                             value={orderType}
                                             onChange={(e) => setOrderType(e.target.value)}
                                         >
-                                            <FormControlLabel value="MIS" control={<Radio />} label="MIS" />
-                                            <FormControlLabel value="CNC" control={<Radio />} label="CNC" />
-                                            <FormControlLabel value="BTST" control={<Radio />} label="BTST" />
+                                            <FormControlLabel 
+                                                value="MIS" 
+                                                control={<Radio size={isMobile ? 'small' : 'medium'} />} 
+                                                label={<Typography sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>MIS</Typography>}
+                                            />
+                                            <FormControlLabel 
+                                                value="CNC" 
+                                                control={<Radio size={isMobile ? 'small' : 'medium'} />} 
+                                                label={<Typography sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>CNC</Typography>}
+                                            />
+                                            <FormControlLabel 
+                                                value="BTST" 
+                                                control={<Radio size={isMobile ? 'small' : 'medium'} />} 
+                                                label={<Typography sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>BTST</Typography>}
+                                            />
                                         </RadioGroup>
                                     </Box>
 
-                                    <Box flex="1" minWidth="150px">
-                                        <Typography variant="caption" color="text.secondary">
+                                    <Box flex="1">
+                                        <Typography 
+                                            variant="caption" 
+                                            color="text.secondary"
+                                            sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                                        >
                                             Start time
                                         </Typography>
                                         <TextField
@@ -273,8 +329,12 @@ const CreateStrategy: React.FC = () => {
                                         />
                                     </Box>
 
-                                    <Box flex="1" minWidth="150px">
-                                        <Typography variant="caption" color="text.secondary">
+                                    <Box flex="1">
+                                        <Typography 
+                                            variant="caption" 
+                                            color="text.secondary"
+                                            sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                                        >
                                             Square off
                                         </Typography>
                                         <TextField
@@ -298,6 +358,10 @@ const CreateStrategy: React.FC = () => {
                                                 onClick={() => handleDayToggle(day)}
                                                 color={tradingDays.includes(day) ? 'primary' : 'default'}
                                                 variant={tradingDays.includes(day) ? 'filled' : 'outlined'}
+                                                sx={{ 
+                                                    fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                                                    height: { xs: 28, sm: 32 }
+                                                }}
                                             />
                                         ))}
                                     </Box>
@@ -308,7 +372,10 @@ const CreateStrategy: React.FC = () => {
                                     <Button
                                         variant="text"
                                         onClick={() => navigate('/strategies/templates')}
-                                        sx={{ textTransform: 'none' }}
+                                        sx={{ 
+                                            textTransform: 'none',
+                                            fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                                        }}
                                     >
                                         Readymade Templates ↗
                                     </Button>
@@ -319,9 +386,19 @@ const CreateStrategy: React.FC = () => {
                         {strategyType === 'indicator-based' && (
                             <>
                                 {/* Transaction Type, Chart Type, Interval */}
-                                <Box display="flex" gap={2} flexWrap="wrap">
-                                    <Box flex="1" minWidth="200px">
-                                        <Typography variant="caption" color="text.secondary">
+                                <Box 
+                                    sx={{
+                                        display: 'flex',
+                                        flexDirection: { xs: 'column', sm: 'row' },
+                                        gap: 2
+                                    }}
+                                >
+                                    <Box flex="1">
+                                        <Typography 
+                                            variant="caption" 
+                                            color="text.secondary"
+                                            sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                                        >
                                             Transaction type
                                         </Typography>
                                         <ToggleButtonGroup
@@ -331,15 +408,20 @@ const CreateStrategy: React.FC = () => {
                                             size="small"
                                             fullWidth
                                             sx={{ mt: 0.5 }}
+                                            orientation={isMobile ? 'vertical' : 'horizontal'}
                                         >
-                                            <ToggleButton value="Both Side">Both Side</ToggleButton>
-                                            <ToggleButton value="Only Long">Only Long</ToggleButton>
-                                            <ToggleButton value="Only Short">Only Short</ToggleButton>
+                                            <ToggleButton value="Both Side" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Both Side</ToggleButton>
+                                            <ToggleButton value="Only Long" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Only Long</ToggleButton>
+                                            <ToggleButton value="Only Short" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Only Short</ToggleButton>
                                         </ToggleButtonGroup>
                                     </Box>
 
-                                    <Box flex="1" minWidth="150px">
-                                        <Typography variant="caption" color="text.secondary">
+                                    <Box flex="1">
+                                        <Typography 
+                                            variant="caption" 
+                                            color="text.secondary"
+                                            sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                                        >
                                             Chart type
                                         </Typography>
                                         <ToggleButtonGroup
@@ -350,13 +432,17 @@ const CreateStrategy: React.FC = () => {
                                             fullWidth
                                             sx={{ mt: 0.5 }}
                                         >
-                                            <ToggleButton value="Candle">Candle</ToggleButton>
-                                            <ToggleButton value="Heikin Ashi">Heikin Ashi</ToggleButton>
+                                            <ToggleButton value="Candle" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Candle</ToggleButton>
+                                            <ToggleButton value="Heikin Ashi" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>Heikin Ashi</ToggleButton>
                                         </ToggleButtonGroup>
                                     </Box>
 
-                                    <Box flex="1" minWidth="150px">
-                                        <Typography variant="caption" color="text.secondary">
+                                    <Box flex="1">
+                                        <Typography 
+                                            variant="caption" 
+                                            color="text.secondary"
+                                            sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                                        >
                                             Interval
                                         </Typography>
                                         <Box display="flex" gap={0.5} flexWrap="wrap" mt={0.5}>
@@ -368,6 +454,10 @@ const CreateStrategy: React.FC = () => {
                                                     onClick={() => setInterval(int)}
                                                     color={interval === int ? 'primary' : 'default'}
                                                     variant={interval === int ? 'filled' : 'outlined'}
+                                                    sx={{ 
+                                                        fontSize: { xs: '0.65rem', sm: '0.7rem' },
+                                                        height: { xs: 24, sm: 28 }
+                                                    }}
                                                 />
                                             ))}
                                         </Box>
@@ -376,21 +466,31 @@ const CreateStrategy: React.FC = () => {
 
                                 {/* Entry Conditions */}
                                 <Box>
-                                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                                    <Typography 
+                                        variant="subtitle1" 
+                                        fontWeight="bold" 
+                                        gutterBottom
+                                        sx={{ fontSize: { xs: '0.95rem', sm: '1rem' } }}
+                                    >
                                         Entry conditions
                                     </Typography>
                                     <FormControlLabel
-                                        control={<Checkbox />}
-                                        label="Use Combined Chart"
+                                        control={<Checkbox size={isMobile ? 'small' : 'medium'} />}
+                                        label={<Typography sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>Use Combined Chart</Typography>}
                                     />
 
                                     <Box mt={2}>
-                                        <Typography variant="body2" color="success.main" gutterBottom>
+                                        <Typography 
+                                            variant="body2" 
+                                            color="success.main" 
+                                            gutterBottom
+                                            sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+                                        >
                                             Long Entry condition
                                         </Typography>
-                                        <Box display="flex" gap={2} mb={2}>
+                                        <Stack spacing={2} mb={2}>
                                             <FormControl fullWidth size="small">
-                                                <InputLabel>Select Indicator</InputLabel>
+                                                <InputLabel sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>Select Indicator</InputLabel>
                                                 <Select label="Select Indicator">
                                                     <MenuItem value="RSI">RSI</MenuItem>
                                                     <MenuItem value="MACD">MACD</MenuItem>
@@ -398,7 +498,7 @@ const CreateStrategy: React.FC = () => {
                                                 </Select>
                                             </FormControl>
                                             <FormControl fullWidth size="small">
-                                                <InputLabel>Select Comparator</InputLabel>
+                                                <InputLabel sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>Select Comparator</InputLabel>
                                                 <Select label="Select Comparator">
                                                     <MenuItem value=">">Greater Than</MenuItem>
                                                     <MenuItem value="<">Less Than</MenuItem>
@@ -406,19 +506,24 @@ const CreateStrategy: React.FC = () => {
                                                 </Select>
                                             </FormControl>
                                             <FormControl fullWidth size="small">
-                                                <InputLabel>Select Indicator</InputLabel>
+                                                <InputLabel sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>Select Indicator</InputLabel>
                                                 <Select label="Select Indicator">
                                                     <MenuItem value="Value">Value</MenuItem>
                                                 </Select>
                                             </FormControl>
-                                        </Box>
+                                        </Stack>
 
-                                        <Typography variant="body2" color="error.main" gutterBottom>
+                                        <Typography 
+                                            variant="body2" 
+                                            color="error.main" 
+                                            gutterBottom
+                                            sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+                                        >
                                             Short Entry condition
                                         </Typography>
-                                        <Box display="flex" gap={2} mb={2}>
+                                        <Stack spacing={2} mb={2}>
                                             <FormControl fullWidth size="small">
-                                                <InputLabel>Select Indicator</InputLabel>
+                                                <InputLabel sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>Select Indicator</InputLabel>
                                                 <Select label="Select Indicator">
                                                     <MenuItem value="RSI">RSI</MenuItem>
                                                     <MenuItem value="MACD">MACD</MenuItem>
@@ -426,7 +531,7 @@ const CreateStrategy: React.FC = () => {
                                                 </Select>
                                             </FormControl>
                                             <FormControl fullWidth size="small">
-                                                <InputLabel>Select Comparator</InputLabel>
+                                                <InputLabel sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>Select Comparator</InputLabel>
                                                 <Select label="Select Comparator">
                                                     <MenuItem value=">">Greater Than</MenuItem>
                                                     <MenuItem value="<">Less Than</MenuItem>
@@ -434,38 +539,58 @@ const CreateStrategy: React.FC = () => {
                                                 </Select>
                                             </FormControl>
                                             <FormControl fullWidth size="small">
-                                                <InputLabel>Select Indicator</InputLabel>
+                                                <InputLabel sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>Select Indicator</InputLabel>
                                                 <Select label="Select Indicator">
                                                     <MenuItem value="Value">Value</MenuItem>
                                                 </Select>
                                             </FormControl>
-                                        </Box>
+                                        </Stack>
 
-                                        <Button variant="outlined" size="small">
+                                        <Button 
+                                            variant="outlined" 
+                                            size="small"
+                                            sx={{ fontSize: { xs: '0.75rem', sm: '0.8125rem' } }}
+                                        >
                                             Add Condition +
                                         </Button>
                                     </Box>
 
                                     <FormControlLabel
-                                        control={<Checkbox />}
-                                        label="Exit conditions (Optional)"
+                                        control={<Checkbox size={isMobile ? 'small' : 'medium'} />}
+                                        label={<Typography sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>Exit conditions (Optional)</Typography>}
                                         sx={{ mt: 2 }}
                                     />
                                 </Box>
 
                                 {/* Option Position Builder */}
                                 <Box>
-                                    <Box display="flex" justifyContent="space-between" alignItems="center">
-                                        <Typography variant="subtitle1" fontWeight="bold">
+                                    <Box 
+                                        display="flex" 
+                                        flexDirection={{ xs: 'column', sm: 'row' }}
+                                        justifyContent="space-between" 
+                                        alignItems={{ xs: 'flex-start', sm: 'center' }}
+                                        gap={2}
+                                    >
+                                        <Typography 
+                                            variant="subtitle1" 
+                                            fontWeight="bold"
+                                            sx={{ fontSize: { xs: '0.95rem', sm: '1rem' } }}
+                                        >
                                             Option Position builder
                                         </Typography>
-                                        <Button variant="contained" size="small" startIcon={<Add />}>
+                                        <Button 
+                                            variant="contained" 
+                                            size="small" 
+                                            startIcon={<Add />}
+                                            fullWidth={isMobile}
+                                            sx={{ fontSize: { xs: '0.75rem', sm: '0.8125rem' } }}
+                                        >
                                             Add leg +
                                         </Button>
                                     </Box>
                                     <FormControlLabel
-                                        control={<Checkbox />}
-                                        label="Add Signal Candle Condition (Optional)"
+                                        control={<Checkbox size={isMobile ? 'small' : 'medium'} />}
+                                        label={<Typography sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>Add Signal Candle Condition (Optional)</Typography>}
                                         sx={{ mt: 1 }}
                                     />
                                 </Box>
@@ -474,59 +599,105 @@ const CreateStrategy: React.FC = () => {
 
                         {/* Risk Management */}
                         <Box>
-                            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                            <Typography 
+                                variant="subtitle1" 
+                                fontWeight="bold" 
+                                gutterBottom
+                                sx={{ fontSize: { xs: '0.95rem', sm: '1rem' } }}
+                            >
                                 Risk management
                             </Typography>
-                            <Box display="flex" gap={2} flexWrap="wrap" mt={2}>
+                            <Stack spacing={2} mt={2}>
                                 <TextField
                                     label="Exit When Over All Profit In Amount (INR)"
                                     size="small"
+                                    fullWidth
                                     value={exitOnProfit}
                                     onChange={(e) => setExitOnProfit(e.target.value)}
-                                    sx={{ flex: 1, minWidth: '200px' }}
+                                    InputLabelProps={{
+                                        sx: { fontSize: { xs: '0.8rem', sm: '0.875rem' } }
+                                    }}
                                 />
                                 <TextField
                                     label="Exit When Over All Loss In Amount(INR)"
                                     size="small"
+                                    fullWidth
                                     value={exitOnLoss}
                                     onChange={(e) => setExitOnLoss(e.target.value)}
-                                    sx={{ flex: 1, minWidth: '200px' }}
+                                    InputLabelProps={{
+                                        sx: { fontSize: { xs: '0.8rem', sm: '0.875rem' } }
+                                    }}
                                 />
-                                <TextField
-                                    label="Max Trade Cycle"
-                                    size="small"
-                                    value={maxTradeCycle}
-                                    onChange={(e) => setMaxTradeCycle(e.target.value)}
-                                    sx={{ flex: 1, minWidth: '150px' }}
-                                />
-                                <Box flex="1" minWidth="150px">
-                                    <Typography variant="caption" color="text.secondary">
-                                        No Trade After
-                                    </Typography>
+                                <Box 
+                                    sx={{
+                                        display: 'flex',
+                                        flexDirection: { xs: 'column', sm: 'row' },
+                                        gap: 2
+                                    }}
+                                >
                                     <TextField
-                                        type="time"
-                                        fullWidth
+                                        label="Max Trade Cycle"
                                         size="small"
-                                        value={noTradeAfter}
-                                        onChange={(e) => setNoTradeAfter(e.target.value)}
-                                        sx={{ mt: 0.5 }}
+                                        fullWidth
+                                        value={maxTradeCycle}
+                                        onChange={(e) => setMaxTradeCycle(e.target.value)}
+                                        InputLabelProps={{
+                                            sx: { fontSize: { xs: '0.8rem', sm: '0.875rem' } }
+                                        }}
                                     />
+                                    <Box flex="1">
+                                        <Typography 
+                                            variant="caption" 
+                                            color="text.secondary"
+                                            sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                                        >
+                                            No Trade After
+                                        </Typography>
+                                        <TextField
+                                            type="time"
+                                            fullWidth
+                                            size="small"
+                                            value={noTradeAfter}
+                                            onChange={(e) => setNoTradeAfter(e.target.value)}
+                                            sx={{ mt: 0.5 }}
+                                        />
+                                    </Box>
                                 </Box>
-                            </Box>
+                            </Stack>
 
                             <Box mt={2}>
-                                <Typography variant="caption" color="text.secondary">
+                                <Typography 
+                                    variant="caption" 
+                                    color="text.secondary"
+                                    sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                                >
                                     Profit Trailing
                                 </Typography>
                                 <RadioGroup
-                                    row
+                                    row={!isMobile}
                                     value={profitTrailing}
                                     onChange={(e) => setProfitTrailing(e.target.value)}
                                 >
-                                    <FormControlLabel value="No Trailing" control={<Radio />} label="No Trailing" />
-                                    <FormControlLabel value="Lock Fix Profit" control={<Radio />} label="Lock Fix Profit" />
-                                    <FormControlLabel value="Trail Profit" control={<Radio />} label="Trail Profit" />
-                                    <FormControlLabel value="Lock and Trail" control={<Radio />} label="Lock and Trail" />
+                                    <FormControlLabel 
+                                        value="No Trailing" 
+                                        control={<Radio size={isMobile ? 'small' : 'medium'} />} 
+                                        label={<Typography sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>No Trailing</Typography>}
+                                    />
+                                    <FormControlLabel 
+                                        value="Lock Fix Profit" 
+                                        control={<Radio size={isMobile ? 'small' : 'medium'} />} 
+                                        label={<Typography sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Lock Fix Profit</Typography>}
+                                    />
+                                    <FormControlLabel 
+                                        value="Trail Profit" 
+                                        control={<Radio size={isMobile ? 'small' : 'medium'} />} 
+                                        label={<Typography sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Trail Profit</Typography>}
+                                    />
+                                    <FormControlLabel 
+                                        value="Lock and Trail" 
+                                        control={<Radio size={isMobile ? 'small' : 'medium'} />} 
+                                        label={<Typography sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Lock and Trail</Typography>}
+                                    />
                                 </RadioGroup>
                             </Box>
                         </Box>
@@ -538,19 +709,35 @@ const CreateStrategy: React.FC = () => {
                             value={strategyName}
                             onChange={(e) => setStrategyName(e.target.value)}
                             placeholder="Enter strategy name"
+                            InputLabelProps={{
+                                sx: { fontSize: { xs: '0.9rem', sm: '1rem' } }
+                            }}
                         />
 
                         {/* Action Buttons */}
-                        <Box display="flex" gap={2} justifyContent="flex-end">
-                            <IconButton>
-                                <Print />
-                            </IconButton>
+                        <Box 
+                            display="flex" 
+                            flexDirection={{ xs: 'column', sm: 'row' }}
+                            gap={2} 
+                            justifyContent="flex-end"
+                        >
+                            <Button
+                                variant="outlined"
+                                size={isMobile ? 'medium' : 'large'}
+                                startIcon={<Print />}
+                                fullWidth={isMobile}
+                                sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
+                            >
+                                Print
+                            </Button>
                             <Button
                                 variant="contained"
-                                size="large"
+                                size={isMobile ? 'medium' : 'large'}
                                 startIcon={loading ? <CircularProgress size={20} /> : <Save />}
                                 onClick={handleSubmit}
                                 disabled={loading || !strategyName}
+                                fullWidth={isMobile}
+                                sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
                             >
                                 {loading ? 'Saving...' : 'Save & Continue'}
                             </Button>
@@ -564,15 +751,25 @@ const CreateStrategy: React.FC = () => {
                     onClose={() => setInstrumentDialogOpen(false)}
                     maxWidth="sm"
                     fullWidth
+                    fullScreen={isMobile}
+                    PaperProps={{
+                        sx: {
+                            m: { xs: 0, sm: 2 },
+                            maxHeight: { xs: '100%', sm: '90vh' }
+                        }
+                    }}
                 >
-                    <DialogTitle>
+                    <DialogTitle sx={{ p: { xs: 2, sm: 3 } }}>
                         <TextField
                             fullWidth
                             placeholder="Search scripts: ie. - State Bank Of India, Banknifty, Crudeoil"
                             size="small"
+                            InputProps={{
+                                sx: { fontSize: { xs: '0.8rem', sm: '0.875rem' } }
+                            }}
                         />
                     </DialogTitle>
-                    <DialogContent>
+                    <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
                         <Box>
                             <ToggleButtonGroup
                                 value={selectedInstrumentType}
@@ -580,7 +777,15 @@ const CreateStrategy: React.FC = () => {
                                 onChange={(e, value) => value && setSelectedInstrumentType(value)}
                                 size="small"
                                 fullWidth
-                                sx={{ mb: 2 }}
+                                sx={{ 
+                                    mb: 2,
+                                    flexWrap: 'wrap',
+                                    '& .MuiToggleButton-root': {
+                                        fontSize: { xs: '0.7rem', sm: '0.75rem' },
+                                        py: { xs: 0.5, sm: 1 }
+                                    }
+                                }}
+                                orientation={isMobile ? 'vertical' : 'horizontal'}
                             >
                                 <ToggleButton value="OPTIONS">Options</ToggleButton>
                                 <ToggleButton value="EQUITY">Equity</ToggleButton>
@@ -590,7 +795,11 @@ const CreateStrategy: React.FC = () => {
                                 <ToggleButton value="MCX">MCX</ToggleButton>
                             </ToggleButtonGroup>
                             {selectedInstrumentType === 'OPTIONS' && (
-                                <Typography variant="caption" color="text.secondary">
+                                <Typography 
+                                    variant="caption" 
+                                    color="text.secondary"
+                                    sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                                >
                                     * Only option category allowed for Time-Based strategy type
                                 </Typography>
                             )}
@@ -601,7 +810,12 @@ const CreateStrategy: React.FC = () => {
                                         variant="outlined"
                                         fullWidth
                                         onClick={() => handleSelectInstrument(instrument)}
-                                        sx={{ justifyContent: 'flex-start', textTransform: 'none' }}
+                                        sx={{ 
+                                            justifyContent: 'flex-start', 
+                                            textTransform: 'none',
+                                            fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                                            py: { xs: 1, sm: 1.5 }
+                                        }}
                                     >
                                         {instrument}
                                     </Button>
@@ -609,8 +823,12 @@ const CreateStrategy: React.FC = () => {
                             </Stack>
                         </Box>
                     </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setInstrumentDialogOpen(false)}>
+                    <DialogActions sx={{ p: { xs: 2, sm: 2 } }}>
+                        <Button 
+                            onClick={() => setInstrumentDialogOpen(false)}
+                            fullWidth={isMobile}
+                            sx={{ fontSize: { xs: '0.875rem', sm: '0.9375rem' } }}
+                        >
                             Close
                         </Button>
                     </DialogActions>

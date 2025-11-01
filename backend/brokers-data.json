@@ -16,7 +16,8 @@
     "lastActivity": "2025-11-01T06:02:56.272Z",
     "connectedAt": "2025-11-01T06:02:46.950Z",
     "credentialsSource": "user_input",
-    "lastValidated": "2025-11-01T07:24:33.872Z",
-    "lastRestart": "2025-11-01T07:21:53.299Z"
+    "lastValidated": "2025-11-01T08:16:04.902Z",
+    "lastRestart": "2025-11-01T07:21:53.299Z",
+    "lastError": "Connection failed"
   }
 ]
