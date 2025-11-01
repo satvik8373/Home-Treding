@@ -175,12 +175,23 @@ body {
 }
 
 
-/* iOS PWA Bottom Navigation Debug Helper */
-/* This ensures the bottom navigation is always visible and properly positioned */
+/* iOS PWA Bottom Navigation - No Gaps Fix */
 @media (max-width: 768px) {
-  /* Force proper positioning on mobile */
+  /* Force proper positioning on mobile - no gaps */
   body {
     padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+  }
+  
+  #root {
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+  }
+  
+  /* Ensure bottom navigation sticks perfectly */
+  .MuiBottomNavigation-root {
+    margin: 0 !important;
+    padding: 0 !important;
   }
 }
 

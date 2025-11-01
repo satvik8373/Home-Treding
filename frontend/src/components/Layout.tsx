@@ -379,8 +379,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Mobile Bottom Navigation - Compact & iOS PWA Safe Area Fixed */}
       {isMobile && (
-        <Paper
-          elevation={0}
+        <Box
           sx={{
             position: 'fixed',
             bottom: 0,
@@ -390,10 +389,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             bgcolor: '#ffffff',
             borderTop: '1px solid #f1f5f9',
             boxShadow: '0 -2px 4px -1px rgb(0 0 0 / 0.08)',
-            // Critical iOS PWA Fix
+            // Critical iOS PWA Fix - No gaps
             pb: 'env(safe-area-inset-bottom)',
             pl: 'env(safe-area-inset-left)',
             pr: 'env(safe-area-inset-right)',
+            m: 0,
           }}
         >
           <BottomNavigation
@@ -405,12 +405,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             sx={{
               height: 48,
               bgcolor: 'transparent',
+              m: 0,
+              p: 0,
               '& .MuiBottomNavigationAction-root': {
                 minWidth: 'auto',
-                padding: '4px 6px',
+                padding: '2px 4px',
                 color: '#64748b',
                 transition: 'all 0.2s',
                 minHeight: 48,
+                maxHeight: 48,
                 '&.Mui-selected': {
                   color: '#6366f1',
                   fontWeight: 600
@@ -418,14 +421,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               },
               '& .MuiBottomNavigationAction-label': {
                 fontSize: '0.625rem',
-                marginTop: '2px',
+                marginTop: '1px',
                 lineHeight: 1,
                 '&.Mui-selected': {
                   fontSize: '0.625rem'
                 }
               },
               '& .MuiSvgIcon-root': {
-                fontSize: '1.25rem'
+                fontSize: '1.125rem',
+                marginBottom: '1px'
               }
             }}
           >
@@ -438,7 +442,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               />
             ))}
           </BottomNavigation>
-        </Paper>
+        </Box>
       )}
     </Box>
   );
