@@ -353,7 +353,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           bgcolor: '#f8fafc',
           minHeight: '100vh',
           pb: { 
-            xs: 'calc(56px + env(safe-area-inset-bottom))', 
+            xs: 'calc(48px + env(safe-area-inset-bottom))', 
             md: 3 
           },
           pt: { xs: 'calc(56px + env(safe-area-inset-top))', sm: 'calc(64px + env(safe-area-inset-top))', md: 3 },
@@ -377,7 +377,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </Container>
       </Box>
 
-      {/* Mobile Bottom Navigation - iOS PWA Safe Area Fixed */}
+      {/* Mobile Bottom Navigation - Compact & iOS PWA Safe Area Fixed */}
       {isMobile && (
         <Paper
           elevation={0}
@@ -389,7 +389,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             zIndex: 1200,
             bgcolor: '#ffffff',
             borderTop: '1px solid #f1f5f9',
-            boxShadow: '0 -4px 6px -1px rgb(0 0 0 / 0.1), 0 -2px 4px -2px rgb(0 0 0 / 0.1)',
+            boxShadow: '0 -2px 4px -1px rgb(0 0 0 / 0.08)',
             // Critical iOS PWA Fix
             pb: 'env(safe-area-inset-bottom)',
             pl: 'env(safe-area-inset-left)',
@@ -403,24 +403,29 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             }}
             showLabels
             sx={{
-              height: 56,
+              height: 48,
               bgcolor: 'transparent',
               '& .MuiBottomNavigationAction-root': {
                 minWidth: 'auto',
-                padding: '6px 8px',
+                padding: '4px 6px',
                 color: '#64748b',
                 transition: 'all 0.2s',
+                minHeight: 48,
                 '&.Mui-selected': {
                   color: '#6366f1',
                   fontWeight: 600
                 }
               },
               '& .MuiBottomNavigationAction-label': {
-                fontSize: '0.65rem',
+                fontSize: '0.625rem',
                 marginTop: '2px',
+                lineHeight: 1,
                 '&.Mui-selected': {
-                  fontSize: '0.65rem'
+                  fontSize: '0.625rem'
                 }
+              },
+              '& .MuiSvgIcon-root': {
+                fontSize: '1.25rem'
               }
             }}
           >
