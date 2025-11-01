@@ -204,54 +204,54 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           top: 0
         }}
       >
-        <Toolbar sx={{ minHeight: { xs: 64, sm: 72 }, px: { xs: 2, sm: 3 } }}>
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 }, px: { xs: 1.5, sm: 3 } }}>
           {isMobile && (
             <IconButton
               edge="start"
               onClick={handleDrawerToggle}
-              sx={{ mr: 2, color: '#64748b' }}
+              sx={{ mr: 1.5, color: '#64748b', p: 0.75 }}
             >
-              <MenuIcon />
+              <MenuIcon sx={{ fontSize: 22 }} />
             </IconButton>
           )}
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 600, color: '#0f172a' }}>
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 600, color: '#0f172a', fontSize: { xs: '1rem', sm: '1.25rem' } }}>
             {menuItems.find(item => item.path === location.pathname)?.text || 'AlgoRooms'}
           </Typography>
           
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1 } }}>
             <Tooltip title="Notifications">
-              <IconButton size="small" sx={{ color: '#64748b' }}>
+              <IconButton size="small" sx={{ color: '#64748b', p: { xs: 0.5, sm: 1 } }}>
                 <Badge badgeContent={3} color="error">
-                  <NotificationsIcon />
+                  <NotificationsIcon sx={{ fontSize: { xs: 20, sm: 24 } }} />
                 </Badge>
               </IconButton>
             </Tooltip>
             
             <Tooltip title="Settings">
-              <IconButton size="small" sx={{ color: '#64748b', display: { xs: 'none', sm: 'inline-flex' } }}>
-                <SettingsIcon />
+              <IconButton size="small" sx={{ color: '#64748b', display: { xs: 'none', sm: 'inline-flex' }, p: 1 }}>
+                <SettingsIcon sx={{ fontSize: 24 }} />
               </IconButton>
             </Tooltip>
 
             <Divider orientation="vertical" flexItem sx={{ mx: 1, display: { xs: 'none', sm: 'block' } }} />
 
             <Box sx={{ display: { xs: 'none', sm: 'flex' }, flexDirection: 'column', alignItems: 'flex-end', mr: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', lineHeight: 1.2 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', lineHeight: 1.2, fontSize: '0.875rem' }}>
                 {user?.displayName || 'User'}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b' }}>
+              <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.75rem' }}>
                 {user?.email}
               </Typography>
             </Box>
 
-            <IconButton onClick={handleMenuOpen} sx={{ p: 0.5 }}>
+            <IconButton onClick={handleMenuOpen} sx={{ p: { xs: 0.25, sm: 0.5 } }}>
               <Avatar 
                 sx={{ 
-                  width: 40, 
-                  height: 40,
+                  width: { xs: 32, sm: 36 }, 
+                  height: { xs: 32, sm: 36 },
                   background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
                   fontWeight: 600,
-                  fontSize: '1rem'
+                  fontSize: { xs: '0.875rem', sm: '1rem' }
                 }}
               >
                 {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
@@ -353,16 +353,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           minHeight: '100vh',
           pb: { 
             xs: 'calc(56px + env(safe-area-inset-bottom))', 
-            md: 4 
+            md: 3 
           },
-          pt: 3,
+          pt: { xs: 2, sm: 2.5, md: 3 },
           px: { xs: 0, sm: 2, md: 3 },
           width: '100%',
           maxWidth: '100vw',
           overflowX: 'hidden',
         }}
       >
-        <Toolbar sx={{ minHeight: { xs: 64, sm: 72 } }} />
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }} />
         <Container 
           maxWidth="xl" 
           sx={{ 
