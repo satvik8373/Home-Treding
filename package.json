@@ -1,6 +1,6 @@
 {
   "name": "home-trading-platform",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Professional algorithmic trading platform with DhanHQ integration",
   "private": true,
   "scripts": {

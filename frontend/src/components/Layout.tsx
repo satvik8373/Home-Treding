@@ -265,11 +265,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           minHeight: '100vh',
           pb: { xs: 8, md: 3 },
           pt: 3,
-          px: { xs: 2, sm: 3 }
+          px: { xs: 0, sm: 2, md: 3 },
+          width: '100%',
+          maxWidth: '100vw',
+          overflowX: 'hidden'
         }}
       >
         <Toolbar />
-        <Container maxWidth="xl" sx={{ px: { xs: 0, sm: 2 } }}>
+        <Container 
+          maxWidth="xl" 
+          sx={{ 
+            px: { xs: 0, sm: 2 },
+            width: '100%',
+            maxWidth: '100%',
+            overflowX: 'hidden'
+          }}
+        >
           {children}
         </Container>
       </Box>

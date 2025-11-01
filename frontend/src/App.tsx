@@ -1,6 +1,5 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { ThemeProvider, CssBaseline, Box } from '@mui/material';
 import { theme } from './theme';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -14,30 +13,35 @@ import Portfolio from './pages/Portfolio';
 import Reports from './pages/Reports';
 import TradingDashboard from './pages/TradingDashboard';
 import TestLiveTrading from './pages/TestLiveTrading';
-import InstallPWA from './components/InstallPWA';
 
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router>
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/trading-dashboard" element={<TradingDashboard />} />
-          <Route path="/brokers" element={<Brokers />} />
-          <Route path="/strategies" element={<Strategies />} />
-          <Route path="/strategies/create" element={<CreateStrategy />} />
-          <Route path="/strategies/templates" element={<StrategyTemplate />} />
-          <Route path="/portfolio" element={<Portfolio />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/dhan-callback" element={<DhanCallback />} />
-          <Route path="/test-live-trading" element={<TestLiveTrading />} />
-        </Routes>
-        <InstallPWA />
-      </Router>
+      <Box sx={{
+        width: '100%',
+        maxWidth: '100vw',
+        overflowX: 'hidden',
+        position: 'relative'
+      }}>
+        <Router>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/trading-dashboard" element={<TradingDashboard />} />
+            <Route path="/brokers" element={<Brokers />} />
+            <Route path="/strategies" element={<Strategies />} />
+            <Route path="/strategies/create" element={<CreateStrategy />} />
+            <Route path="/strategies/templates" element={<StrategyTemplate />} />
+            <Route path="/portfolio" element={<Portfolio />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/dhan-callback" element={<DhanCallback />} />
+            <Route path="/test-live-trading" element={<TestLiveTrading />} />
+          </Routes>
+        </Router>
+      </Box>
     </ThemeProvider>
   );
 }

@@ -4,7 +4,6 @@ import {
     Box,
     Container,
     Typography,
-    Paper,
     Button,
     Card,
     CardContent,
@@ -15,14 +14,15 @@ import {
     DialogContent,
     DialogActions,
     Divider,
-    Stack
+    Stack,
+    useMediaQuery,
+    useTheme,
+    Alert
 } from '@mui/material';
 import {
     TrendingUp,
-    ShowChart,
-    Timeline,
-    Assessment,
-    ContentCopy
+    ContentCopy,
+    CheckCircle
 } from '@mui/icons-material';
 import Layout from '../components/Layout';
 
@@ -44,140 +44,75 @@ interface StrategyTemplate {
 
 const StrategyTemplate: React.FC = () => {
     const navigate = useNavigate();
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const [selectedTemplate, setSelectedTemplate] = useState<StrategyTemplate | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
 
-    const templates: StrategyTemplate[] = [
-        {
-            id: 'market-opening-range',
-            name: 'Market Opening Range Breakout',
-            description: 'Trade based on 9:20 AM candle breakout with strict market opening conditions',
-            category: 'Intraday',
-            instrumentType: 'OPTIONS',
-            timeframe: '5m',
-            icon: <TrendingUp />,
-            maxDD: '₹0.00',
-            margin: '₹0.00',
-            logic: [
-                '✓ Market opens within ±150 points of previous close',
-                '✓ Wait for 9:20 AM 5-minute candle close (A)',
-                '✓ Calculate Upper Trigger = A × 1.0009',
-                '✓ Calculate Lower Trigger = A × 0.9991',
-                '✓ Target = Upper Trigger − Lower Trigger'
-            ],
-            entryRules: [
-                '📈 CALL Entry: Candle closes above Upper Trigger → Buy ATM Call when price breaks candle high',
-                '📉 PUT Entry: Candle closes below Lower Trigger → Buy ATM Put when price breaks candle low',
-                '💰 Averaging: If premium falls 20 points below entry, buy 1 additional lot (only once)'
-            ],
-            exitRules: [
-                '🎯 Target: Calculated difference (Upper Trigger − Lower Trigger)',
-                '🛑 Call SL: Day Low of underlying index',
-                '🛑 Put SL: Day High of underlying index',
-                '✅ Exit when target or SL hit (including after averaging)'
-            ],
-            riskManagement: [
-                'No trading if market opens beyond ±150 points',
-                'Maximum 1 averaging per trade',
-                'Strict stop loss at day high/low',
-                'Single trade per day per direction'
-            ]
-        },
-        {
-            id: 'advanced-delta-neutral',
-            name: 'Advanced Delta Neutral',
-            description: 'Time-based options strategy with segment-specific execution',
-            category: 'Options',
-            instrumentType: 'OPTIONS',
-            timeframe: '1m',
-            icon: <ShowChart />,
-            maxDD: '60.00k',
-            margin: '₹0.00',
-            logic: [
-                '✓ Start Time: 09:22',
-                '✓ End Time: 15:11',
-                '✓ Segment Type: OPTION',
-                '✓ Strategy Type: Time Based'
-            ],
-            entryRules: [
-                'Execute at specific time windows',
-                'Monitor NIFTY BANK, ATM CE, ATM PE',
-                'Delta neutral positioning'
-            ],
-            exitRules: [
-                'Time-based exit at 15:11',
-                'Dynamic adjustment based on delta',
-                'Profit booking at predefined levels'
-            ],
-            riskManagement: [
-                'Max drawdown: 60k',
-                'Position sizing based on margin',
-                'Hedged positions only'
-            ]
-        },
-        {
-            id: 'sl-strangle-bnf',
-            name: '1% SL Strangle BNF',
-            description: 'Bank Nifty strangle strategy with 1% stop loss',
-            category: 'Options',
-            instrumentType: 'OPTIONS',
-            timeframe: '5m',
-            icon: <Timeline />,
-            maxDD: '80.00k',
-            margin: '₹0.00',
-            logic: [
-                '✓ Sell OTM Call and Put (Strangle)',
-                '✓ 1% stop loss on each leg',
-                '✓ Bank Nifty specific'
-            ],
-            entryRules: [
-                'Sell strangle at market open',
-                'Equal distance from ATM',
-                'Premium collection strategy'
-            ],
-            exitRules: [
-                '1% SL on individual legs',
-                'Time-based exit at 3:15 PM',
-                'Profit target: 50% of premium'
-            ],
-            riskManagement: [
-                'Max loss: 1% per leg',
-                'Hedge with far OTM options',
-                'Position adjustment on breach'
-            ]
-        },
-        {
-            id: 'sl-strangle-bn-15',
-            name: '1.5% SL Strangle BN',
-            description: 'Bank Nifty strangle with wider 1.5% stop loss for better success rate',
-            category: 'Options',
-            instrumentType: 'OPTIONS',
-            timeframe: '5m',
-            icon: <Assessment />,
-            maxDD: '1.2M',
-            margin: '₹0.00',
-            logic: [
-                '✓ Wider stop loss for trending markets',
-                '✓ 1.5% SL on each leg',
-                '✓ Higher success rate'
-            ],
-            entryRules: [
-                'Sell strangle after initial volatility',
-                'Wider strike selection',
-                'Premium optimization'
-            ],
-            exitRules: [
-                '1.5% SL on individual legs',
-                'Trailing stop after 30% profit',
-                'Time decay advantage'
-            ],
-            riskManagement: [
-                'Max drawdown: 1.2M',
-                'Position sizing based on volatility',
-                'Dynamic hedge adjustment'
-            ]
-        }
-    ];
+    // MX Strategies - 5-Minute Trigger Candle Strategy
+    const mxStrategy: StrategyTemplate = {
+        id: 'mx-5min-trigger',
+        name: 'MX Strategies - 5-Minute Trigger Candle',
+        description: 'Professional 5-minute trigger candle strategy for Index Options with automatic Dhan API integration',
+        category: 'Professional',
+        instrumentType: 'OPTIONS',
+        timeframe: '5m',
+        icon: <TrendingUp />,
+        maxDD: '₹2,500',
+        margin: '₹50,000',
+        logic: [
+            '✓ Market opens within ±150 points of previous close',
+            '✓ Wait for 9:20 AM 5-minute candle close (A)',
+            '✓ Calculate Upper Trigger = A × 1.0009',
+            '✓ Calculate Lower Trigger = A × 0.9991',
+            '✓ Target = Upper Trigger − Lower Trigger',
+            '✓ Watch for trigger candle formation',
+            '✓ Enter on breakout of trigger candle high/low'
+        ],
+        entryRules: [
+            '� CALL UEntry:',
+            '  • Candle closes above Upper Trigger',
+            '  • Wait for price to break trigger candle HIGH',
+            '  • Buy ATM Call option immediately',
+            '',
+            '� PUT Enltry:',
+            '  • Candle closes below Lower Trigger',
+            '  • Wait for price to break trigger candle LOW',
+            '  • Buy ATM Put option immediately',
+            '',
+            '💰 Averaging (Only Once):',
+            '  • If premium falls 20 points below entry',
+            '  • Add 1 additional lot at current price',
+            '  • No further averaging allowed'
+        ],
+        exitRules: [
+            '🎯 Target Exit:',
+            '  • Exit when premium reaches calculated target',
+            '  • Target = (Upper Trigger − Lower Trigger)',
+            '  • Close all positions including averaged lots',
+            '',
+            '🛑 Stop Loss - CALL:',
+            '  • Exit if underlying index touches Day Low',
+            '  • Close all positions immediately',
+            '',
+            '🛑 Stop Loss - PUT:',
+            '  • Exit if underlying index touches Day High',
+            '  • Close all positions immediately',
+            '',
+            '⏰ Time-Based Exit:',
+            '  • Square off all positions by 3:15 PM',
+            '  • No overnight positions'
+        ],
+        riskManagement: [
+            '❌ No trading if market opens beyond ±150 points',
+            '✅ Maximum 1 averaging per trade (at -20 points)',
+            '✅ Strict stop loss at day high/low',
+            '✅ Single trade per day per direction',
+            '✅ Automatic position sizing based on margin',
+            '✅ Real-time P&L tracking',
+            '✅ Automatic square-off at 3:15 PM'
+        ]
+    };
 
     const handleViewDetails = (template: StrategyTemplate) => {
         setSelectedTemplate(template);
@@ -190,167 +125,279 @@ const StrategyTemplate: React.FC = () => {
     };
 
     const handleAddToMyStrategy = (template: StrategyTemplate) => {
-        // Navigate to create strategy with pre-filled data
-        const fullDescription = `${template.description}
+        // Open duplicate dialog instead of navigating directly
+        setSelectedTemplate(template);
+        setDialogOpen(true);
+    };
+
+    const handleConfirmAddStrategy = () => {
+        if (!selectedTemplate) return;
+
+        const fullDescription = `${selectedTemplate.description}
 
 STRATEGY LOGIC:
-${template.logic.join('\n')}
+${selectedTemplate.logic.join('\n')}
+
+ENTRY RULES:
+${selectedTemplate.entryRules.join('\n')}
+
+EXIT RULES:
+${selectedTemplate.exitRules.join('\n')}
 
 RISK MANAGEMENT:
-${template.riskManagement.join('\n')}`;
+${selectedTemplate.riskManagement.join('\n')}
 
-        navigate('/strategies/create', {
+DHAN API INTEGRATION:
+This strategy automatically connects to Dhan API for:
+- Real-time market data monitoring
+- Automatic order placement
+- Position tracking and management
+- Stop loss and target execution
+- Averaging logic implementation
+
+REQUIREMENTS:
+- Active Dhan account with API access
+- Sufficient margin (₹50,000 recommended)
+- Broker connection configured in AlgoRooms
+- Terminal activated for live trading`;
+
+        navigate('/strategies', {
             state: {
+                addStrategy: true,
                 template: {
-                    name: template.name,
+                    name: selectedTemplate.name,
                     description: fullDescription,
-                    instrumentType: template.instrumentType,
-                    timeframe: template.timeframe,
-                    entryRule: template.entryRules.join('\n\n'),
-                    exitRule: template.exitRules.join('\n\n'),
-                    symbol: template.instrumentType === 'OPTIONS' ? 'NIFTY' : '',
+                    instrumentType: selectedTemplate.instrumentType,
+                    timeframe: selectedTemplate.timeframe,
+                    entryRule: selectedTemplate.entryRules.join('\n\n'),
+                    exitRule: selectedTemplate.exitRules.join('\n\n'),
+                    symbol: 'BANKNIFTY',
                     stopLossPercent: '2',
                     targetPercent: '5',
-                    positionSize: '75',
-                    maxPositions: '1'
+                    positionSize: '1',
+                    maxPositions: '2', // 1 initial + 1 averaging
+                    strategyType: 'time-based',
+                    orderType: 'MIS',
+                    startTime: '09:16',
+                    squareOffTime: '15:15',
+                    tradingDays: ['MON', 'TUE', 'WED', 'THU', 'FRI']
                 }
             }
         });
+        setDialogOpen(false);
     };
 
     return (
         <Layout>
-            <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-                <Box mb={4}>
-                    <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
-                        Strategy Templates
+            <Container 
+                maxWidth="xl" 
+                sx={{ 
+                    mt: { xs: 2, sm: 3, md: 4 }, 
+                    mb: { xs: 10, sm: 4 },
+                    px: { xs: 1, sm: 2, md: 3 }
+                }}
+            >
+                {/* Header */}
+                <Box mb={{ xs: 2, sm: 3, md: 4 }}>
+                    <Typography 
+                        variant="h4" 
+                        component="h1" 
+                        fontWeight="bold" 
+                        gutterBottom
+                        sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}
+                    >
+                        MX Strategies
                     </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                        Ready-made strategies with proven logic. Clone and customize to your needs.
+                    <Typography 
+                        variant="body1" 
+                        color="text.secondary"
+                        sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}
+                    >
+                        Professional algorithmic trading strategy with automatic Dhan API integration
                     </Typography>
                 </Box>
 
-                <Box display="grid" gridTemplateColumns="repeat(auto-fill, minmax(320px, 1fr))" gap={3}>
-                    {templates.map((template) => (
-                        <Card 
-                            key={template.id} 
-                            elevation={2}
-                            sx={{ 
-                                display: 'flex', 
-                                flexDirection: 'column',
-                                transition: 'transform 0.2s, box-shadow 0.2s',
-                                '&:hover': {
-                                    transform: 'translateY(-4px)',
-                                    boxShadow: 4
-                                }
-                            }}
-                        >
-                            <CardContent sx={{ flexGrow: 1 }}>
-                                <Box display="flex" alignItems="center" gap={2} mb={2}>
-                                    <Box 
-                                        sx={{ 
-                                            p: 1.5, 
-                                            borderRadius: 2, 
-                                            bgcolor: 'primary.light',
-                                            color: 'primary.main',
-                                            display: 'flex'
-                                        }}
-                                    >
-                                        {template.icon}
-                                    </Box>
-                                    <Box flex={1}>
-                                        <Typography variant="h6" fontWeight="bold" gutterBottom>
-                                            {template.name}
-                                        </Typography>
-                                        <Chip 
-                                            label={template.category} 
-                                            size="small" 
-                                            color="primary" 
-                                            variant="outlined"
-                                        />
-                                    </Box>
-                                </Box>
+                {/* Alert Box */}
+                <Alert 
+                    severity="info" 
+                    sx={{ 
+                        mb: { xs: 2, sm: 3 },
+                        fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                    }}
+                >
+                    <strong>Live Trading Ready:</strong> This strategy automatically connects to your Dhan account for real-time order execution. Ensure your broker is connected and terminal is activated.
+                </Alert>
 
-                                <Typography variant="body2" color="text.secondary" mb={2}>
-                                    {template.description}
+                {/* Strategy Card */}
+                <Card
+                    elevation={3}
+                    sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        transition: 'transform 0.2s, box-shadow 0.2s',
+                        '&:hover': {
+                            transform: 'translateY(-4px)',
+                            boxShadow: 6
+                        },
+                        border: '2px solid #4c6ef5'
+                    }}
+                >
+                    <CardContent sx={{ flexGrow: 1, p: { xs: 2, sm: 3 } }}>
+                        {/* Header */}
+                        <Box display="flex" alignItems="center" gap={2} mb={2}>
+                            <Box
+                                sx={{
+                                    p: { xs: 1, sm: 1.5 },
+                                    borderRadius: 2,
+                                    bgcolor: 'primary.light',
+                                    color: 'primary.main',
+                                    display: 'flex'
+                                }}
+                            >
+                                {mxStrategy.icon}
+                            </Box>
+                            <Box flex={1}>
+                                <Typography 
+                                    variant="h5" 
+                                    fontWeight="bold" 
+                                    gutterBottom
+                                    sx={{ 
+                                        fontSize: { xs: '1.1rem', sm: '1.3rem' },
+                                        lineHeight: 1.3,
+                                        mb: 1
+                                    }}
+                                >
+                                    {mxStrategy.name}
                                 </Typography>
-
-                                <Divider sx={{ my: 2 }} />
-
-                                <Stack spacing={1}>
-                                    <Box display="flex" justifyContent="space-between">
-                                        <Typography variant="caption" color="text.secondary">
-                                            Instrument
-                                        </Typography>
-                                        <Typography variant="caption" fontWeight="bold">
-                                            {template.instrumentType}
-                                        </Typography>
-                                    </Box>
-                                    <Box display="flex" justifyContent="space-between">
-                                        <Typography variant="caption" color="text.secondary">
-                                            Timeframe
-                                        </Typography>
-                                        <Typography variant="caption" fontWeight="bold">
-                                            {template.timeframe}
-                                        </Typography>
-                                    </Box>
-                                    <Box display="flex" justifyContent="space-between">
-                                        <Typography variant="caption" color="text.secondary">
-                                            Max DD
-                                        </Typography>
-                                        <Typography variant="caption" fontWeight="bold" color="error">
-                                            {template.maxDD}
-                                        </Typography>
-                                    </Box>
-                                    <Box display="flex" justifyContent="space-between">
-                                        <Typography variant="caption" color="text.secondary">
-                                            Margin
-                                        </Typography>
-                                        <Typography variant="caption" fontWeight="bold" color="success.main">
-                                            {template.margin}
-                                        </Typography>
-                                    </Box>
+                                <Stack direction="row" spacing={1} flexWrap="wrap">
+                                    <Chip
+                                        label={mxStrategy.category}
+                                        size="small"
+                                        color="primary"
+                                        sx={{ height: { xs: 20, sm: 24 }, fontSize: { xs: '0.65rem', sm: '0.75rem' } }}
+                                    />
+                                    <Chip
+                                        icon={<CheckCircle sx={{ fontSize: { xs: '0.9rem', sm: '1rem' } }} />}
+                                        label="Dhan API Ready"
+                                        size="small"
+                                        color="success"
+                                        sx={{ height: { xs: 20, sm: 24 }, fontSize: { xs: '0.65rem', sm: '0.75rem' } }}
+                                    />
                                 </Stack>
-                            </CardContent>
+                            </Box>
+                        </Box>
 
-                            <CardActions sx={{ p: 2, pt: 0 }}>
-                                <Button 
-                                    size="small" 
-                                    onClick={() => handleViewDetails(template)}
-                                    fullWidth
-                                    variant="outlined"
-                                >
-                                    View Details
-                                </Button>
-                                <Button 
-                                    size="small" 
-                                    onClick={() => handleAddToMyStrategy(template)}
-                                    fullWidth
-                                    variant="contained"
-                                    startIcon={<ContentCopy />}
-                                >
-                                    Add to My Strategy
-                                </Button>
-                            </CardActions>
-                        </Card>
-                    ))}
-                </Box>
+                        <Typography 
+                            variant="body2" 
+                            color="text.secondary" 
+                            mb={2}
+                            sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+                        >
+                            {mxStrategy.description}
+                        </Typography>
+
+                        <Divider sx={{ my: 2 }} />
+
+                        {/* Strategy Details */}
+                        <Stack spacing={1.5}>
+                            <Box display="flex" justifyContent="space-between">
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                                    Instrument
+                                </Typography>
+                                <Typography variant="caption" fontWeight="bold" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                                    {mxStrategy.instrumentType}
+                                </Typography>
+                            </Box>
+                            <Box display="flex" justifyContent="space-between">
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                                    Timeframe
+                                </Typography>
+                                <Typography variant="caption" fontWeight="bold" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                                    {mxStrategy.timeframe}
+                                </Typography>
+                            </Box>
+                            <Box display="flex" justifyContent="space-between">
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                                    Max Drawdown
+                                </Typography>
+                                <Typography variant="caption" fontWeight="bold" color="error" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                                    {mxStrategy.maxDD}
+                                </Typography>
+                            </Box>
+                            <Box display="flex" justifyContent="space-between">
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                                    Recommended Margin
+                                </Typography>
+                                <Typography variant="caption" fontWeight="bold" color="success.main" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                                    {mxStrategy.margin}
+                                </Typography>
+                            </Box>
+                        </Stack>
+
+                        {/* Quick Preview */}
+                        <Box mt={3}>
+                            <Typography variant="subtitle2" fontWeight="bold" mb={1} sx={{ fontSize: { xs: '0.85rem', sm: '0.95rem' } }}>
+                                Strategy Highlights
+                            </Typography>
+                            <Stack spacing={0.5}>
+                                {mxStrategy.logic.slice(0, 4).map((item, index) => (
+                                    <Typography 
+                                        key={index} 
+                                        variant="caption" 
+                                        sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                                    >
+                                        {item}
+                                    </Typography>
+                                ))}
+                            </Stack>
+                        </Box>
+                    </CardContent>
+
+                    <CardActions sx={{ p: { xs: 1.5, sm: 2 }, pt: 0, flexDirection: { xs: 'column', sm: 'row' }, gap: 1 }}>
+                        <Button
+                            size="small"
+                            onClick={() => handleViewDetails(mxStrategy)}
+                            fullWidth
+                            variant="outlined"
+                            sx={{ fontSize: { xs: '0.75rem', sm: '0.8125rem' } }}
+                        >
+                            View Full Details
+                        </Button>
+                        <Button
+                            size="small"
+                            onClick={() => handleAddToMyStrategy(mxStrategy)}
+                            fullWidth
+                            variant="contained"
+                            startIcon={<ContentCopy sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
+                            sx={{ fontSize: { xs: '0.75rem', sm: '0.8125rem' } }}
+                        >
+                            Add to My Strategies
+                        </Button>
+                    </CardActions>
+                </Card>
 
                 {/* Details Dialog */}
-                <Dialog 
-                    open={dialogOpen} 
+                <Dialog
+                    open={dialogOpen}
                     onClose={handleCloseDialog}
                     maxWidth="md"
                     fullWidth
+                    fullScreen={isMobile}
+                    PaperProps={{
+                        sx: {
+                            m: { xs: 0, sm: 2 },
+                            maxHeight: { xs: '100%', sm: '90vh' }
+                        }
+                    }}
                 >
                     {selectedTemplate && (
                         <>
-                            <DialogTitle>
+                            <DialogTitle sx={{ p: { xs: 2, sm: 3 } }}>
                                 <Box display="flex" alignItems="center" gap={2}>
-                                    <Box 
-                                        sx={{ 
-                                            p: 1.5, 
-                                            borderRadius: 2, 
+                                    <Box
+                                        sx={{
+                                            p: { xs: 1, sm: 1.5 },
+                                            borderRadius: 2,
                                             bgcolor: 'primary.light',
                                             color: 'primary.main',
                                             display: 'flex'
@@ -358,25 +405,42 @@ ${template.riskManagement.join('\n')}`;
                                     >
                                         {selectedTemplate.icon}
                                     </Box>
-                                    <Box>
-                                        <Typography variant="h5" fontWeight="bold">
+                                    <Box flex={1}>
+                                        <Typography 
+                                            variant="h5" 
+                                            fontWeight="bold"
+                                            sx={{ fontSize: { xs: '1.1rem', sm: '1.5rem' } }}
+                                        >
                                             {selectedTemplate.name}
                                         </Typography>
-                                        <Typography variant="body2" color="text.secondary">
+                                        <Typography 
+                                            variant="body2" 
+                                            color="text.secondary"
+                                            sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+                                        >
                                             {selectedTemplate.description}
                                         </Typography>
                                     </Box>
                                 </Box>
                             </DialogTitle>
-                            <DialogContent dividers>
-                                <Stack spacing={3}>
+                            <DialogContent dividers sx={{ p: { xs: 2, sm: 3 } }}>
+                                <Stack spacing={{ xs: 2.5, sm: 3 }}>
                                     <Box>
-                                        <Typography variant="h6" gutterBottom fontWeight="bold">
+                                        <Typography 
+                                            variant="h6" 
+                                            gutterBottom 
+                                            fontWeight="bold"
+                                            sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
+                                        >
                                             Strategy Logic
                                         </Typography>
                                         <Stack spacing={1}>
                                             {selectedTemplate.logic.map((item, index) => (
-                                                <Typography key={index} variant="body2">
+                                                <Typography 
+                                                    key={index} 
+                                                    variant="body2"
+                                                    sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+                                                >
                                                     {item}
                                                 </Typography>
                                             ))}
@@ -384,12 +448,24 @@ ${template.riskManagement.join('\n')}`;
                                     </Box>
 
                                     <Box>
-                                        <Typography variant="h6" gutterBottom fontWeight="bold">
+                                        <Typography 
+                                            variant="h6" 
+                                            gutterBottom 
+                                            fontWeight="bold"
+                                            sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
+                                        >
                                             Entry Rules
                                         </Typography>
-                                        <Stack spacing={1}>
+                                        <Stack spacing={0.5}>
                                             {selectedTemplate.entryRules.map((rule, index) => (
-                                                <Typography key={index} variant="body2">
+                                                <Typography 
+                                                    key={index} 
+                                                    variant="body2"
+                                                    sx={{ 
+                                                        fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                                                        whiteSpace: 'pre-line'
+                                                    }}
+                                                >
                                                     {rule}
                                                 </Typography>
                                             ))}
@@ -397,12 +473,24 @@ ${template.riskManagement.join('\n')}`;
                                     </Box>
 
                                     <Box>
-                                        <Typography variant="h6" gutterBottom fontWeight="bold">
+                                        <Typography 
+                                            variant="h6" 
+                                            gutterBottom 
+                                            fontWeight="bold"
+                                            sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
+                                        >
                                             Exit Rules
                                         </Typography>
-                                        <Stack spacing={1}>
+                                        <Stack spacing={0.5}>
                                             {selectedTemplate.exitRules.map((rule, index) => (
-                                                <Typography key={index} variant="body2">
+                                                <Typography 
+                                                    key={index} 
+                                                    variant="body2"
+                                                    sx={{ 
+                                                        fontSize: { xs: '0.8rem', sm: '0.875rem' },
+                                                        whiteSpace: 'pre-line'
+                                                    }}
+                                                >
                                                     {rule}
                                                 </Typography>
                                             ))}
@@ -410,32 +498,51 @@ ${template.riskManagement.join('\n')}`;
                                     </Box>
 
                                     <Box>
-                                        <Typography variant="h6" gutterBottom fontWeight="bold">
+                                        <Typography 
+                                            variant="h6" 
+                                            gutterBottom 
+                                            fontWeight="bold"
+                                            sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
+                                        >
                                             Risk Management
                                         </Typography>
                                         <Stack spacing={1}>
                                             {selectedTemplate.riskManagement.map((item, index) => (
-                                                <Typography key={index} variant="body2">
-                                                    • {item}
+                                                <Typography 
+                                                    key={index} 
+                                                    variant="body2"
+                                                    sx={{ fontSize: { xs: '0.8rem', sm: '0.875rem' } }}
+                                                >
+                                                    {item}
                                                 </Typography>
                                             ))}
                                         </Stack>
                                     </Box>
+
+                                    <Alert severity="success" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                                        <strong>Dhan API Integration:</strong> This strategy will automatically connect to your Dhan account for live trading. All order placement, position tracking, and risk management will be handled automatically.
+                                    </Alert>
                                 </Stack>
                             </DialogContent>
-                            <DialogActions sx={{ p: 2 }}>
-                                <Button onClick={handleCloseDialog}>
+                            <DialogActions sx={{ p: { xs: 2, sm: 2 }, flexDirection: { xs: 'column', sm: 'row' }, gap: 1 }}>
+                                <Button 
+                                    onClick={handleCloseDialog}
+                                    fullWidth={isMobile}
+                                    sx={{ fontSize: { xs: '0.875rem', sm: '0.9375rem' } }}
+                                >
                                     Close
                                 </Button>
-                                <Button 
-                                    variant="contained" 
+                                <Button
+                                    variant="contained"
                                     onClick={() => {
                                         handleAddToMyStrategy(selectedTemplate);
                                         handleCloseDialog();
                                     }}
                                     startIcon={<ContentCopy />}
+                                    fullWidth={isMobile}
+                                    sx={{ fontSize: { xs: '0.875rem', sm: '0.9375rem' } }}
                                 >
-                                    Add to My Strategy
+                                    Add to My Strategies
                                 </Button>
                             </DialogActions>
                         </>

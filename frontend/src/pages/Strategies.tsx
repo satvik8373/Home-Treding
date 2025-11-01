@@ -103,70 +103,27 @@ const Strategies: React.FC = () => {
   const templates: StrategyTemplate[] = [
     {
       id: 1,
-      name: 'Advanced Delta Neutral',
+      name: 'MX Strategies - 5-Minute Trigger Candle',
       category: 'HNI',
-      maxDD: '0.00',
-      margin: '60.00',
-      chart: '/chart1.png',
-      description: 'Professional delta-neutral strategy for high net worth investors'
-    },
-    {
-      id: 2,
-      name: '1 % SL Strangle BNF',
-      category: 'Basic',
-      maxDD: '0.00',
-      margin: '60.00',
-      chart: '/chart2.png',
-      description: 'Basic strangle strategy with 1% stop loss for BankNifty'
-    },
-    {
-      id: 3,
-      name: '1.5 % SL Strangle BN',
-      category: 'Retail',
-      maxDD: '0.00',
-      margin: '60.00',
-      chart: '/chart3.png',
-      description: 'Retail-friendly strangle with 1.5% stop loss'
-    },
-    {
-      id: 4,
-      name: 'Bullish Spread',
-      category: 'Basic',
-      maxDD: '2.50',
-      margin: '45.00',
+      maxDD: '2500.00',
+      margin: '50000.00',
       chart: '',
-      description: 'Simple bullish spread strategy for beginners'
-    },
-    {
-      id: 5,
-      name: 'Iron Condor',
-      category: 'HNI',
-      maxDD: '1.20',
-      margin: '80.00',
-      chart: '',
-      description: 'Advanced iron condor for experienced traders'
-    },
-    {
-      id: 6,
-      name: 'Covered Call',
-      category: 'Retail',
-      maxDD: '3.00',
-      margin: '50.00',
-      chart: '',
-      description: 'Conservative covered call strategy'
+      description: 'Professional 5-minute trigger candle strategy for Index Options with automatic Dhan API integration. Market opens within ±150 points, waits for 9:20 AM candle, calculates triggers, and executes trades with intelligent averaging and dynamic stop loss.'
     }
   ];
 
   const [templateFilter, setTemplateFilter] = useState<'All' | 'Basic' | 'HNI' | 'Retail'>('All');
-  const filteredTemplates = templateFilter === 'All' 
-    ? templates 
-    : templates.filter(t => t.category === templateFilter);
+  // Only MX Strategies template - no filtering needed
+  const filteredTemplates = templates;
 
   // State for template charts
   const [templateCharts, setTemplateCharts] = useState<Record<number, { equity: { x: string; y: number }[] }>>({});
 
   useEffect(() => {
     let isMounted = true;
+    // Only load charts when viewing the Strategy Template tab (tabValue === 3)
+    if (tabValue !== 3) return;
+    
     // Load quick backtest once per template to render real graphs
     const loadCharts = async () => {
       try {
@@ -190,7 +147,7 @@ const Strategies: React.FC = () => {
     };
     loadCharts();
     return () => { isMounted = false; };
-  }, []);
+  }, [tabValue]);
 
   // Duplicate modal state
   const [dupOpen, setDupOpen] = useState<{ open: boolean; template?: StrategyTemplate }>(() => ({ open: false }));
@@ -199,7 +156,15 @@ const Strategies: React.FC = () => {
   // Deploy modal state - now supports both strategies and templates
   const [deployOpen, setDeployOpen] = useState<{ open: boolean; strategy?: MyStrategyCard; template?: StrategyTemplate }>({ open: false });
   const [deployAccept, setDeployAccept] = useState(false);
-  const [deployForm, setDeployForm] = useState({ qtyMultiplier: '1', maxProfit: '0', maxLoss: '2500', broker: '', squareOff: '15:11', type: 'forward' });
+  const [deployForm, setDeployForm] = useState({ 
+    qtyMultiplier: '1', 
+    maxProfit: '0', 
+    maxLoss: '2500', 
+    broker: '', 
+    squareOff: '03:11', 
+    type: 'live',
+    acceptTerms: false 
+  });
   const [menuFor, setMenuFor] = useState<string | null>(null);
   
   // Confirmation dialog state
@@ -335,13 +300,33 @@ const Strategies: React.FC = () => {
 
   return (
     <Layout>
-      <Box sx={{ bgcolor: 'white', minHeight: '100vh', p: 3 }}>
+      <Box sx={{ 
+        bgcolor: 'white', 
+        minHeight: '100vh', 
+        p: { xs: 1, sm: 2, md: 3 },
+        pb: { xs: 10, sm: 3 }, // Extra padding for mobile bottom nav
+        width: '100%',
+        maxWidth: '100%',
+        overflowX: 'hidden', // Prevent horizontal scroll
+        boxSizing: 'border-box'
+      }}>
         {/* Header */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h5" sx={{ fontWeight: 600, color: '#1a1a1a' }}>
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: 'space-between', 
+          alignItems: { xs: 'flex-start', sm: 'center' }, 
+          mb: { xs: 2, sm: 3 },
+          gap: { xs: 2, sm: 0 }
+        }}>
+          <Typography variant="h5" sx={{ 
+            fontWeight: 600, 
+            color: '#1a1a1a',
+            fontSize: { xs: '1.25rem', sm: '1.5rem' }
+          }}>
             Strategies
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1, width: { xs: '100%', sm: 'auto' } }}>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
@@ -349,7 +334,9 @@ const Strategies: React.FC = () => {
                 bgcolor: '#4c6ef5',
                 textTransform: 'none',
                 borderRadius: 2,
-                px: 3,
+                px: { xs: 2, sm: 3 },
+                fontSize: { xs: '0.875rem', sm: '1rem' },
+                flex: { xs: 1, sm: 'none' },
                 '&:hover': { bgcolor: '#3b5bdb' }
               }}
             >
@@ -362,17 +349,35 @@ const Strategies: React.FC = () => {
         </Box>
 
         {/* Tabs */}
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+        <Box sx={{ 
+          borderBottom: 1, 
+          borderColor: 'divider', 
+          mb: 2,
+          mx: { xs: -1, sm: 0 }, // Extend to edges on mobile
+          overflowX: 'auto',
+          '&::-webkit-scrollbar': {
+            height: '4px'
+          },
+          '&::-webkit-scrollbar-thumb': {
+            backgroundColor: 'rgba(0,0,0,0.2)',
+            borderRadius: '4px'
+          }
+        }}>
           <Tabs
             value={tabValue}
             onChange={handleTabChange}
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
             sx={{
               '& .MuiTab-root': {
                 textTransform: 'none',
-                fontSize: '0.95rem',
+                fontSize: { xs: '0.8rem', sm: '0.95rem' },
                 fontWeight: 500,
                 color: '#666',
                 minHeight: 48,
+                minWidth: { xs: 'auto', sm: 90 },
+                px: { xs: 1.5, sm: 2 },
                 '&.Mui-selected': {
                   color: '#4c6ef5',
                   fontWeight: 600
@@ -385,31 +390,46 @@ const Strategies: React.FC = () => {
               }
             }}
           >
-            <Tab label="Create Strategy" />
+            <Tab label="Create" />
             <Tab label="My Strategies" />
-            <Tab label="Deployed Strategies" />
-            <Tab label="Strategy Template" />
-            <Tab label="My Portfolio" />
+            <Tab label="Deployed" />
+            <Tab label="Templates" />
+            <Tab label="Portfolio" />
           </Tabs>
         </Box>
 
         {/* Tab Content */}
         <TabPanel value={tabValue} index={0}>
-          <Box sx={{ maxWidth: 1200 }}>
+          <Box sx={{ 
+            maxWidth: { xs: '100%', sm: '100%', md: 1200 },
+            width: '100%',
+            overflowX: 'hidden'
+          }}>
             {/* Strategy Type */}
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+            <Box sx={{ mb: { xs: 3, sm: 4 } }}>
+              <Typography variant="h6" sx={{ 
+                mb: 2, 
+                fontWeight: 600,
+                fontSize: { xs: '1rem', sm: '1.25rem' }
+              }}>
                 Strategy Type
               </Typography>
-              <Box sx={{ display: 'flex', gap: 2 }}>
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: { xs: 'column', sm: 'row' },
+                gap: 2,
+                width: { xs: '100%', sm: 'auto' }
+              }}>
                 <Button
                   variant={strategyType === 'time-based' ? 'contained' : 'outlined'}
                   onClick={() => setStrategyType('time-based')}
+                  fullWidth={true}
                   sx={{ 
                     textTransform: 'none', 
-                    px: 4, 
+                    px: { xs: 2, sm: 4 }, 
                     py: 1.5,
                     borderRadius: 2,
+                    fontSize: { xs: '0.875rem', sm: '1rem' },
                     bgcolor: strategyType === 'time-based' ? '#e7f5ff' : 'transparent',
                     color: strategyType === 'time-based' ? '#4c6ef5' : '#666',
                     border: strategyType === 'time-based' ? '1px solid #4c6ef5' : '1px solid #dee2e6',
@@ -423,11 +443,13 @@ const Strategies: React.FC = () => {
                 <Button
                   variant={strategyType === 'indicator-based' ? 'contained' : 'outlined'}
                   onClick={() => setStrategyType('indicator-based')}
+                  fullWidth={true}
                   sx={{ 
                     textTransform: 'none', 
-                    px: 4, 
+                    px: { xs: 2, sm: 4 }, 
                     py: 1.5,
                     borderRadius: 2,
+                    fontSize: { xs: '0.875rem', sm: '1rem' },
                     bgcolor: strategyType === 'indicator-based' ? '#e7f5ff' : 'transparent',
                     color: strategyType === 'indicator-based' ? '#4c6ef5' : '#666',
                     border: strategyType === 'indicator-based' ? '1px solid #4c6ef5' : '1px solid #dee2e6',
@@ -442,8 +464,12 @@ const Strategies: React.FC = () => {
             </Box>
 
             {/* Select Instruments */}
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+            <Box sx={{ mb: { xs: 3, sm: 4 } }}>
+              <Typography variant="h6" sx={{ 
+                mb: 2, 
+                fontWeight: 600,
+                fontSize: { xs: '1rem', sm: '1.25rem' }
+              }}>
                 Select Instruments
               </Typography>
               
@@ -458,6 +484,7 @@ const Strategies: React.FC = () => {
                         onDelete={() => handleRemoveInstrument(inst)}
                         color="primary"
                         variant="outlined"
+                        sx={{ fontSize: { xs: '0.75rem', sm: '0.8125rem' } }}
                       />
                     ))}
                   </Box>
@@ -470,17 +497,21 @@ const Strategies: React.FC = () => {
                 sx={{ 
                   border: '2px dashed #4c6ef5', 
                   bgcolor: '#f8f9fa', 
-                  p: 3, 
+                  p: { xs: 2, sm: 3 }, 
                   textAlign: 'center', 
                   cursor: 'pointer', 
                   borderRadius: 2, 
-                  maxWidth: 300,
+                  maxWidth: { xs: '100%', sm: 300 },
                   '&:hover': { bgcolor: '#e7f5ff' },
                   transition: 'all 0.2s'
                 }}
               >
-                <AddIcon sx={{ fontSize: 32, color: '#4c6ef5', mb: 1 }} />
-                <Typography sx={{ color: '#4c6ef5', fontWeight: 500 }}>
+                <AddIcon sx={{ fontSize: { xs: 28, sm: 32 }, color: '#4c6ef5', mb: 1 }} />
+                <Typography sx={{ 
+                  color: '#4c6ef5', 
+                  fontWeight: 500,
+                  fontSize: { xs: '0.875rem', sm: '1rem' }
+                }}>
                   Add Instruments.
                 </Typography>
               </Box>
@@ -489,15 +520,27 @@ const Strategies: React.FC = () => {
             {strategyType === 'time-based' && (
               <Box>
                 {/* Order Type, Start Time, Square Off */}
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'auto 1fr 1fr' }, gap: 3, mb: 4, alignItems: 'flex-start' }}>
+                <Box sx={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'auto 1fr 1fr' }, 
+                  gap: { xs: 2, sm: 3 }, 
+                  mb: { xs: 3, sm: 4 }, 
+                  alignItems: 'flex-start' 
+                }}>
                   {/* Order Type */}
-                  <Box>
-                    <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#495057' }}>
+                  <Box sx={{ gridColumn: { xs: '1', sm: '1 / -1', md: 'auto' } }}>
+                    <Typography variant="body2" sx={{ 
+                      mb: 1, 
+                      fontWeight: 500, 
+                      color: '#495057',
+                      fontSize: { xs: '0.8rem', sm: '0.875rem' }
+                    }}>
                       Order Type
                     </Typography>
                     <ToggleButtonGroup
                       value={orderType}
                       exclusive
+                      fullWidth
                       onChange={(e, value) => value && setOrderType(value)}
                       size="small"
                     >
@@ -1211,16 +1254,16 @@ const Strategies: React.FC = () => {
         </TabPanel>
 
         <TabPanel value={tabValue} index={4}>
-          <MyPortfolioSection />
+          <MyPortfolioSection isActive={tabValue === 4} />
         </TabPanel>
 
         {/* Duplicate dialog */}
         <DuplicateDialog
           open={dupOpen.open}
-          name={dupName}
-          onNameChange={setDupName}
+          strategyName={dupName}
+          setStrategyName={setDupName}
           onClose={() => setDupOpen({ open: false })}
-          onConfirm={async () => {
+          onDuplicate={async () => {
             const tpl = dupOpen.template as StrategyTemplate | undefined;
             if (tpl) {
               const uid = auth.currentUser?.uid;
@@ -1653,18 +1696,53 @@ function BacktestResultsDialog({ open, results, loading, onClose }: {
   );
 }
 
-// Duplicate Strategy Dialog
-function DuplicateDialog({ open, name, onNameChange, onClose, onConfirm }: { open: boolean; name: string; onNameChange: (v: string) => void; onClose: () => void; onConfirm: () => void; }) {
+// Duplicate Dialog
+function DuplicateDialog({ open, strategyName, setStrategyName, onClose, onDuplicate }:
+  { open: boolean; strategyName: string; setStrategyName: (name: string) => void; onClose: () => void; onDuplicate: () => void; }) {
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Duplicate Strategy</DialogTitle>
+      <DialogTitle>Duplicate MX Strategies</DialogTitle>
       <DialogContent>
-        <Typography variant="body2" sx={{ mb: 2 }}>Are you sure you want to duplicate this Strategy?</Typography>
-        <TextField fullWidth label="Name Of Duplicate Strategy" value={name} onChange={(e) => onNameChange(e.target.value)} />
+        <Box sx={{ textAlign: 'center', py: 3 }}>
+          <Box sx={{ 
+            width: 80, 
+            height: 80, 
+            borderRadius: '50%', 
+            bgcolor: '#FFA726', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            margin: '0 auto 24px'
+          }}>
+            <Typography variant="h3" sx={{ color: 'white', fontWeight: 'bold' }}>!</Typography>
+          </Box>
+          <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
+            Are you sure you want to duplicate this Strategy?
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            This action will create one more strategy of same type.
+          </Typography>
+        </Box>
+        <TextField
+          fullWidth
+          label="Name Of Duplicate Strategy"
+          value={strategyName}
+          onChange={(e) => setStrategyName(e.target.value)}
+          sx={{ mb: 2 }}
+        />
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={onConfirm}>Duplicate</Button>
+      <DialogActions sx={{ px: 3, pb: 3 }}>
+        <Button onClick={onClose} variant="outlined" sx={{ px: 4 }}>
+          Cancel
+        </Button>
+        <Button 
+          variant="contained" 
+          onClick={onDuplicate}
+          disabled={!strategyName.trim()}
+          sx={{ px: 4 }}
+        >
+          Duplicate
+        </Button>
       </DialogActions>
     </Dialog>
   );
@@ -1675,7 +1753,7 @@ function DeployDialog({ open, form, setForm, accept, setAccept, onClose, onDeplo
   { open: boolean; form: any; setForm: (f: any) => void; accept: boolean; setAccept: (v: boolean) => void; onClose: () => void; onDeploy: () => void; strategyName?: string; }) {
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Deploy Strategy</DialogTitle>
+      <DialogTitle>Deploy {strategyName || 'Strategy'}</DialogTitle>
       <DialogContent>
         {strategyName && (
           <Box sx={{ mb: 2, p: 2, bgcolor: '#f8f9fa', borderRadius: 1 }}>
@@ -1705,23 +1783,28 @@ function DeployDialog({ open, form, setForm, accept, setAccept, onClose, onDeplo
 }
 
 // My Portfolio (trades) section
-function MyPortfolioSection() {
+function MyPortfolioSection({ isActive }: { isActive: boolean }) {
   const [trades, setTrades] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
+    // Only load data when tab becomes active and hasn't been loaded yet
+    if (!isActive || hasLoaded) return;
+    
     const load = async () => {
       try {
         const uid = auth.currentUser?.uid;
         if (!uid) { setTrades([]); return; }
         const rows = await firestoreService.getTrades(uid);
         setTrades(rows);
+        setHasLoaded(true);
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, []);
+  }, [isActive, hasLoaded]);
 
   if (loading) {
     return <Box sx={{ textAlign: 'center', py: 6 }}><Typography>Loading portfolio...</Typography></Box>;
