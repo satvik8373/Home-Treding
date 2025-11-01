@@ -145,10 +145,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           width: { md: `calc(100% - ${drawerWidth}px)` },
           ml: { md: `${drawerWidth}px` },
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+          // PWA safe area support for top notch
+          paddingTop: 'env(safe-area-inset-top)',
+          top: 0
         }}
       >
-        <Toolbar>
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
           {isMobile && (
             <IconButton
               color="inherit"
@@ -263,15 +266,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           flexGrow: 1,
           bgcolor: '#ffffff',
           minHeight: '100vh',
-          pb: { xs: 8, md: 3 },
+          pb: { 
+            xs: 'calc(56px + env(safe-area-inset-bottom))', 
+            md: 3 
+          },
           pt: 3,
           px: { xs: 0, sm: 2, md: 3 },
           width: '100%',
           maxWidth: '100vw',
-          overflowX: 'hidden'
+          overflowX: 'hidden',
+          // Account for top safe area
+          marginTop: 'env(safe-area-inset-top)'
         }}
       >
-        <Toolbar />
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }} />
         <Container 
           maxWidth="xl" 
           sx={{ 
@@ -294,7 +302,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             left: 0,
             right: 0,
             zIndex: 1200,
-            boxShadow: '0 -2px 10px rgba(0,0,0,0.1)'
+            boxShadow: '0 -2px 10px rgba(0,0,0,0.1)',
+            // PWA safe area support for bottom navigation bar
+            paddingBottom: 'env(safe-area-inset-bottom)',
+            paddingLeft: 'env(safe-area-inset-left)',
+            paddingRight: 'env(safe-area-inset-right)'
           }}
           elevation={3}
         >
@@ -304,6 +316,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               navigate(newValue);
             }}
             showLabels
+            sx={{
+              height: 'auto',
+              minHeight: 56
+            }}
           >
             {menuItems.slice(0, 4).map((item) => (
               <BottomNavigationAction
@@ -311,6 +327,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 label={item.text}
                 value={item.path}
                 icon={item.icon}
+                sx={{
+                  minHeight: 56,
+                  padding: '6px 12px 8px'
+                }}
               />
             ))}
           </BottomNavigation>
