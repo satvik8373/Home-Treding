@@ -125,7 +125,7 @@ const Strategies: React.FC = () => {
     let isMounted = true;
     // Only load charts when viewing the Strategy Template tab (tabValue === 3)
     if (tabValue !== 3) return;
-    
+
     // Load quick backtest once per template to render real graphs
     const loadCharts = async () => {
       try {
@@ -158,23 +158,23 @@ const Strategies: React.FC = () => {
   // Deploy modal state - now supports both strategies and templates
   const [deployOpen, setDeployOpen] = useState<{ open: boolean; strategy?: MyStrategyCard; template?: StrategyTemplate }>({ open: false });
   const [deployAccept, setDeployAccept] = useState(false);
-  const [deployForm, setDeployForm] = useState({ 
-    qtyMultiplier: '1', 
-    maxProfit: '0', 
-    maxLoss: '2500', 
-    broker: '', 
-    squareOff: '03:11', 
+  const [deployForm, setDeployForm] = useState({
+    qtyMultiplier: '1',
+    maxProfit: '0',
+    maxLoss: '2500',
+    broker: '',
+    squareOff: '03:11',
     type: 'live',
-    acceptTerms: false 
+    acceptTerms: false
   });
   const [menuFor, setMenuFor] = useState<string | null>(null);
-  
+
   // Confirmation dialog state
-  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; message: string; onConfirm: () => void }>({ open: false, message: '', onConfirm: () => {} });
-  
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; message: string; onConfirm: () => void }>({ open: false, message: '', onConfirm: () => { } });
+
   // Rename dialog state
   const [renameDialog, setRenameDialog] = useState<{ open: boolean; strategyId: string; currentName: string; newName: string }>({ open: false, strategyId: '', currentName: '', newName: '' });
-  
+
   // Backtest dialog state
   const [backtestDialog, setBacktestDialog] = useState<{ open: boolean; strategyId: string | null }>({ open: false, strategyId: null });
   const [backtestResults, setBacktestResults] = useState<any>(null);
@@ -214,20 +214,20 @@ const Strategies: React.FC = () => {
   });
   const [creating, setCreating] = useState(false);
   const [wizardStep, setWizardStep] = useState(0);
-  
+
   // Instrument selection state
   const [instrumentDialogOpen, setInstrumentDialogOpen] = useState(false);
   const [selectedInstruments, setSelectedInstruments] = useState<string[]>([]);
   const [selectedInstrumentType, setSelectedInstrumentType] = useState('OPTIONS');
   const [instrumentSearch, setInstrumentSearch] = useState('');
-  
+
   // AlgoRooms style Create Strategy fields
   const [strategyType, setStrategyType] = useState<'time-based' | 'indicator-based'>('time-based');
   const [orderType, setOrderType] = useState('MIS');
   const [startTime, setStartTime] = useState('09:16');
   const [squareOffTime, setSquareOffTime] = useState('03:15');
   const [tradingDays, setTradingDays] = useState<string[]>(['MON', 'TUE', 'WED', 'THU', 'FRI']);
-  
+
   // Available instruments (mock data - can be replaced with API call)
   const availableInstrumentsByType: Record<string, string[]> = {
     OPTIONS: ['BANKNIFTY', 'NIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX'],
@@ -237,17 +237,18 @@ const Strategies: React.FC = () => {
     CDS: ['USDINR', 'EURINR', 'GBPINR', 'JPYINR'],
     MCX: ['GOLD', 'SILVER', 'CRUDEOIL', 'NATURALGAS', 'COPPER']
   };
-  
+
   const availableInstruments = availableInstrumentsByType[selectedInstrumentType] || [];
-  const filteredInstruments = instrumentSearch 
+  const filteredInstruments = instrumentSearch
     ? availableInstruments.filter(i => i.toLowerCase().includes(instrumentSearch.toLowerCase()))
     : availableInstruments;
-  
+
   const handleSelectInstrument = (instrument: string) => {
-    if (!selectedInstruments.includes(instrument)) {    setSelectedInstruments([...selectedInstruments, instrument]);
+    if (!selectedInstruments.includes(instrument)) {
+      setSelectedInstruments([...selectedInstruments, instrument]);
     }
   };
-  
+
   const handleRemoveInstrument = (instrument: string) => {
     setSelectedInstruments(selectedInstruments.filter(i => i !== instrument));
   };
@@ -259,10 +260,10 @@ const Strategies: React.FC = () => {
     setCreating(true);
     try {
       // Use selected instruments or fallback to symbol
-      const instrumentsList = selectedInstruments.length > 0 
-        ? selectedInstruments 
+      const instrumentsList = selectedInstruments.length > 0
+        ? selectedInstruments
         : [createForm.symbol || 'BANKNIFTY'];
-      
+
       const newId = await firestoreService.addStrategy(uid, {
         name: createForm.name.trim(),
         description: createForm.description || createForm.name.trim(),
@@ -302,67 +303,75 @@ const Strategies: React.FC = () => {
 
   return (
     <Layout>
-      <Box sx={{ 
-        bgcolor: 'white', 
-        minHeight: '100vh', 
-        p: { xs: 1, sm: 2, md: 3 },
-        pb: { xs: 10, sm: 3 }, // Extra padding for mobile bottom nav
+      <Box sx={{
+        minHeight: '100vh',
+        p: { xs: 1.5, sm: 2 },
+        pb: { xs: 10, sm: 3 },
         width: '100%',
         maxWidth: '100%',
-        overflowX: 'hidden', // Prevent horizontal scroll
+        overflowX: 'hidden',
         boxSizing: 'border-box'
       }}>
-        {/* Header */}
-        <Box sx={{ 
-          display: 'flex', 
-          flexDirection: { xs: 'column', sm: 'row' },
-          justifyContent: 'space-between', 
-          alignItems: { xs: 'flex-start', sm: 'center' }, 
-          mb: { xs: 2, sm: 3 },
-          gap: { xs: 2, sm: 0 }
+        {/* Compact Header */}
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          mb: 2,
+          flexWrap: 'wrap',
+          gap: 1.5
         }}>
-          <Typography variant="h5" sx={{ 
-            fontWeight: 600, 
-            color: '#1a1a1a',
-            fontSize: { xs: '1.25rem', sm: '1.5rem' }
-          }}>
-            Strategies
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1, width: { xs: '100%', sm: 'auto' } }}>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              sx={{
-                bgcolor: '#4c6ef5',
-                textTransform: 'none',
-                borderRadius: 2,
-                px: { xs: 2, sm: 3 },
-                fontSize: { xs: '0.875rem', sm: '1rem' },
-                flex: { xs: 1, sm: 'none' },
-                '&:hover': { bgcolor: '#3b5bdb' }
+          <Box>
+            <Typography variant="h5" sx={{
+              fontWeight: 700,
+              color: '#0f172a',
+              fontSize: { xs: '1.25rem', sm: '1.5rem' },
+              mb: 0.25
+            }}>
+              Strategies
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.8125rem' }}>
+              Create, manage, and deploy your trading strategies
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <TextField
+              placeholder="Search strategies..."
+              size="small"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ fontSize: 18, color: '#94a3b8' }} />
+                  </InputAdornment>
+                ),
               }}
-            >
-              GO GO
-            </Button>
-            <IconButton sx={{ border: '1px solid #e0e0e0', borderRadius: 2 }}>
-              <FilterIcon />
-            </IconButton>
+              sx={{
+                width: { xs: 180, sm: 220 },
+                '& .MuiOutlinedInput-root': {
+                  height: 36,
+                  fontSize: '0.875rem',
+                  bgcolor: 'white'
+                }
+              }}
+            />
           </Box>
         </Box>
 
-        {/* Tabs */}
-        <Box sx={{ 
-          borderBottom: 1, 
-          borderColor: 'divider', 
+        {/* Modern Tabs */}
+        <Box sx={{
+          borderBottom: 1,
+          borderColor: '#e2e8f0',
           mb: 2,
-          mx: { xs: -1, sm: 0 }, // Extend to edges on mobile
           overflowX: 'auto',
           '&::-webkit-scrollbar': {
-            height: '4px'
+            height: '3px'
           },
           '&::-webkit-scrollbar-thumb': {
-            backgroundColor: 'rgba(0,0,0,0.2)',
-            borderRadius: '4px'
+            backgroundColor: '#cbd5e1',
+            borderRadius: '3px'
           }
         }}>
           <Tabs
@@ -372,21 +381,27 @@ const Strategies: React.FC = () => {
             scrollButtons="auto"
             allowScrollButtonsMobile
             sx={{
+              minHeight: 44,
               '& .MuiTab-root': {
                 textTransform: 'none',
-                fontSize: { xs: '0.8rem', sm: '0.95rem' },
-                fontWeight: 500,
-                color: '#666',
-                minHeight: 48,
-                minWidth: { xs: 'auto', sm: 90 },
-                px: { xs: 1.5, sm: 2 },
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                color: '#64748b',
+                minHeight: 44,
+                minWidth: { xs: 'auto', sm: 100 },
+                px: { xs: 2, sm: 3 },
+                transition: 'all 0.2s',
                 '&.Mui-selected': {
-                  color: '#4c6ef5',
-                  fontWeight: 600
+                  color: '#6366f1',
+                  fontWeight: 700
+                },
+                '&:hover': {
+                  color: '#6366f1',
+                  bgcolor: 'rgba(99, 102, 241, 0.04)'
                 }
               },
               '& .MuiTabs-indicator': {
-                backgroundColor: '#4c6ef5',
+                backgroundColor: '#6366f1',
                 height: 3,
                 borderRadius: '3px 3px 0 0'
               }
@@ -402,22 +417,22 @@ const Strategies: React.FC = () => {
 
         {/* Tab Content */}
         <TabPanel value={tabValue} index={0}>
-          <Box sx={{ 
+          <Box sx={{
             maxWidth: { xs: '100%', sm: '100%', md: 1200 },
             width: '100%',
             overflowX: 'hidden'
           }}>
             {/* Strategy Type */}
             <Box sx={{ mb: { xs: 3, sm: 4 } }}>
-              <Typography variant="h6" sx={{ 
-                mb: 2, 
+              <Typography variant="h6" sx={{
+                mb: 2,
                 fontWeight: 600,
                 fontSize: { xs: '1rem', sm: '1.25rem' }
               }}>
                 Strategy Type
               </Typography>
-              <Box sx={{ 
-                display: 'flex', 
+              <Box sx={{
+                display: 'flex',
                 flexDirection: { xs: 'column', sm: 'row' },
                 gap: 2,
                 width: { xs: '100%', sm: 'auto' }
@@ -426,9 +441,9 @@ const Strategies: React.FC = () => {
                   variant={strategyType === 'time-based' ? 'contained' : 'outlined'}
                   onClick={() => setStrategyType('time-based')}
                   fullWidth={true}
-                  sx={{ 
-                    textTransform: 'none', 
-                    px: { xs: 2, sm: 4 }, 
+                  sx={{
+                    textTransform: 'none',
+                    px: { xs: 2, sm: 4 },
                     py: 1.5,
                     borderRadius: 2,
                     fontSize: { xs: '0.875rem', sm: '1rem' },
@@ -446,9 +461,9 @@ const Strategies: React.FC = () => {
                   variant={strategyType === 'indicator-based' ? 'contained' : 'outlined'}
                   onClick={() => setStrategyType('indicator-based')}
                   fullWidth={true}
-                  sx={{ 
-                    textTransform: 'none', 
-                    px: { xs: 2, sm: 4 }, 
+                  sx={{
+                    textTransform: 'none',
+                    px: { xs: 2, sm: 4 },
                     py: 1.5,
                     borderRadius: 2,
                     fontSize: { xs: '0.875rem', sm: '1rem' },
@@ -467,14 +482,14 @@ const Strategies: React.FC = () => {
 
             {/* Select Instruments */}
             <Box sx={{ mb: { xs: 3, sm: 4 } }}>
-              <Typography variant="h6" sx={{ 
-                mb: 2, 
+              <Typography variant="h6" sx={{
+                mb: 2,
                 fontWeight: 600,
                 fontSize: { xs: '1rem', sm: '1.25rem' }
               }}>
                 Select Instruments
               </Typography>
-              
+
               {/* Selected Instruments */}
               {selectedInstruments.length > 0 && (
                 <Box sx={{ mb: 2 }}>
@@ -492,25 +507,25 @@ const Strategies: React.FC = () => {
                   </Box>
                 </Box>
               )}
-              
+
               {/* Add Instruments Button */}
-              <Box 
+              <Box
                 onClick={() => setInstrumentDialogOpen(true)}
-                sx={{ 
-                  border: '2px dashed #4c6ef5', 
-                  bgcolor: '#f8f9fa', 
-                  p: { xs: 2, sm: 3 }, 
-                  textAlign: 'center', 
-                  cursor: 'pointer', 
-                  borderRadius: 2, 
+                sx={{
+                  border: '2px dashed #4c6ef5',
+                  bgcolor: '#f8f9fa',
+                  p: { xs: 2, sm: 3 },
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  borderRadius: 2,
                   maxWidth: { xs: '100%', sm: 300 },
                   '&:hover': { bgcolor: '#e7f5ff' },
                   transition: 'all 0.2s'
                 }}
               >
                 <AddIcon sx={{ fontSize: { xs: 28, sm: 32 }, color: '#4c6ef5', mb: 1 }} />
-                <Typography sx={{ 
-                  color: '#4c6ef5', 
+                <Typography sx={{
+                  color: '#4c6ef5',
                   fontWeight: 500,
                   fontSize: { xs: '0.875rem', sm: '1rem' }
                 }}>
@@ -522,18 +537,18 @@ const Strategies: React.FC = () => {
             {strategyType === 'time-based' && (
               <Box>
                 {/* Order Type, Start Time, Square Off */}
-                <Box sx={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'auto 1fr 1fr' }, 
-                  gap: { xs: 2, sm: 3 }, 
-                  mb: { xs: 3, sm: 4 }, 
-                  alignItems: 'flex-start' 
+                <Box sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'auto 1fr 1fr' },
+                  gap: { xs: 2, sm: 3 },
+                  mb: { xs: 3, sm: 4 },
+                  alignItems: 'flex-start'
                 }}>
                   {/* Order Type */}
                   <Box sx={{ gridColumn: { xs: '1', sm: '1 / -1', md: 'auto' } }}>
-                    <Typography variant="body2" sx={{ 
-                      mb: 1, 
-                      fontWeight: 500, 
+                    <Typography variant="body2" sx={{
+                      mb: 1,
+                      fontWeight: 500,
                       color: '#495057',
                       fontSize: { xs: '0.8rem', sm: '0.875rem' }
                     }}>
@@ -597,7 +612,7 @@ const Strategies: React.FC = () => {
                         }}
                         color={tradingDays.includes(day) ? 'primary' : 'default'}
                         variant={tradingDays.includes(day) ? 'filled' : 'outlined'}
-                        sx={{ 
+                        sx={{
                           cursor: 'pointer',
                           fontWeight: 500,
                           px: 2
@@ -624,32 +639,32 @@ const Strategies: React.FC = () => {
                     Order Legs
                   </Typography>
                   <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-                    <TextField 
-                      label="Strategy Name" 
-                      value={createForm.name} 
-                      onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} 
+                    <TextField
+                      label="Strategy Name"
+                      value={createForm.name}
+                      onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
                       placeholder="Enter strategy name"
                       size="small"
                     />
-                    <TextField 
-                      label="Stop Loss %" 
-                      type="number" 
-                      value={createForm.stopLossPercent} 
-                      onChange={(e) => setCreateForm({ ...createForm, stopLossPercent: e.target.value })} 
+                    <TextField
+                      label="Stop Loss %"
+                      type="number"
+                      value={createForm.stopLossPercent}
+                      onChange={(e) => setCreateForm({ ...createForm, stopLossPercent: e.target.value })}
                       size="small"
                     />
-                    <TextField 
-                      label="Target Profit %" 
-                      type="number" 
-                      value={createForm.targetPercent} 
-                      onChange={(e) => setCreateForm({ ...createForm, targetPercent: e.target.value })} 
+                    <TextField
+                      label="Target Profit %"
+                      type="number"
+                      value={createForm.targetPercent}
+                      onChange={(e) => setCreateForm({ ...createForm, targetPercent: e.target.value })}
                       size="small"
                     />
-                    <TextField 
-                      label="Position Size" 
-                      type="number" 
-                      value={createForm.positionSize} 
-                      onChange={(e) => setCreateForm({ ...createForm, positionSize: e.target.value })} 
+                    <TextField
+                      label="Position Size"
+                      type="number"
+                      value={createForm.positionSize}
+                      onChange={(e) => setCreateForm({ ...createForm, positionSize: e.target.value })}
                       size="small"
                     />
                   </Box>
@@ -699,17 +714,17 @@ const Strategies: React.FC = () => {
                     Configure your indicator-based strategy rules
                   </Typography>
                   <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-                    <TextField 
-                      label="Strategy Name *" 
-                      value={createForm.name} 
-                      onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} 
+                    <TextField
+                      label="Strategy Name *"
+                      value={createForm.name}
+                      onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
                       required
                       size="small"
                     />
-                    <TextField 
-                      label="Symbol" 
-                      value={createForm.symbol} 
-                      onChange={(e) => setCreateForm({ ...createForm, symbol: e.target.value })} 
+                    <TextField
+                      label="Symbol"
+                      value={createForm.symbol}
+                      onChange={(e) => setCreateForm({ ...createForm, symbol: e.target.value })}
                       size="small"
                     />
                     <FormControl size="small">
@@ -722,28 +737,28 @@ const Strategies: React.FC = () => {
                         <MuiMenuItem value="1d">1 day</MuiMenuItem>
                       </Select>
                     </FormControl>
-                    <TextField 
-                      label="Description" 
-                      value={createForm.description} 
-                      onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })} 
+                    <TextField
+                      label="Description"
+                      value={createForm.description}
+                      onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
                       multiline
                       rows={2}
                       size="small"
                     />
                     <TextField label="Entry Rule" placeholder="e.g., RSI < 30" size="small" />
                     <TextField label="Exit Rule" placeholder="e.g., RSI > 70" size="small" />
-                    <TextField 
-                      label="Stop Loss %" 
-                      type="number" 
-                      value={createForm.stopLossPercent} 
-                      onChange={(e) => setCreateForm({ ...createForm, stopLossPercent: e.target.value })} 
+                    <TextField
+                      label="Stop Loss %"
+                      type="number"
+                      value={createForm.stopLossPercent}
+                      onChange={(e) => setCreateForm({ ...createForm, stopLossPercent: e.target.value })}
                       size="small"
                     />
-                    <TextField 
-                      label="Target Profit %" 
-                      type="number" 
-                      value={createForm.targetPercent} 
-                      onChange={(e) => setCreateForm({ ...createForm, targetPercent: e.target.value })} 
+                    <TextField
+                      label="Target Profit %"
+                      type="number"
+                      value={createForm.targetPercent}
+                      onChange={(e) => setCreateForm({ ...createForm, targetPercent: e.target.value })}
                       size="small"
                     />
                   </Box>
@@ -781,117 +796,121 @@ const Strategies: React.FC = () => {
         <TabPanel value={tabValue} index={1}>
           {strategies.length > 0 ? (
             <Box>
-              <TextField
-                placeholder="Search Strategies"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                size="small"
-                sx={{ mb: 3, maxWidth: 400 }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon sx={{ color: '#adb5bd' }} />
-                    </InputAdornment>
-                  ),
-                  sx: { borderRadius: 2, bgcolor: '#f8f9fa' }
-                }}
-              />
-            {strategies.map((strategy) => (
+              {strategies.map((strategy) => (
                 <Card
                   key={strategy.id}
                   sx={{
-                    mb: 2,
-                    p: 3,
+                    mb: 1.5,
+                    p: 2,
                     boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                    borderRadius: 3,
-                    border: '1px solid #f1f3f5'
+                    borderRadius: 2,
+                    border: '1px solid #e2e8f0',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      borderColor: '#6366f1',
+                      boxShadow: '0 4px 12px rgba(99, 102, 241, 0.15)'
+                    }
                   }}
                 >
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
                     <Box sx={{ flex: 1 }}>
-                      <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5, fontSize: '1.1rem' }}>
-                        {strategy.name}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#868e96', mb: 2, fontSize: '0.85rem' }}>
-                        By {strategy.author}
-                      </Typography>
-                      <Box sx={{ display: 'grid', gridTemplateColumns: 'auto auto auto auto', gap: 4, mb: 2 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Box component="span" sx={{ fontSize: '1rem' }}>⏰</Box>
-                          <Box>
-                            <Typography variant="caption" sx={{ color: '#868e96', display: 'block', fontSize: '0.7rem' }}>
-                              Start Time
-                            </Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#51cf66', fontSize: '0.9rem' }}>
-                              {strategy.startTime}
-                            </Typography>
-                          </Box>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Box component="span" sx={{ fontSize: '1rem' }}>⏰</Box>
-                          <Box>
-                            <Typography variant="caption" sx={{ color: '#868e96', display: 'block', fontSize: '0.7rem' }}>
-                              End Time
-                            </Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#ff6b6b', fontSize: '0.9rem' }}>
-                              {strategy.endTime}
-                            </Typography>
-                          </Box>
-                        </Box>
-                        <Box>
-                          <Typography variant="caption" sx={{ color: '#868e96', display: 'block', fontSize: '0.7rem' }}>
-                            Segment Type
-                          </Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                            {strategy.segmentType}
-                          </Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="caption" sx={{ color: '#868e96', display: 'block', fontSize: '0.7rem' }}>
-                            Strategy Type
-                          </Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                            {strategy.strategyType}
-                          </Typography>
-                        </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1rem', color: '#0f172a' }}>
+                          {strategy.name}
+                        </Typography>
+                        <Chip
+                          label={strategy.status === 'active' ? 'Active' : 'Draft'}
+                          size="small"
+                          color={strategy.status === 'active' ? 'success' : 'default'}
+                          sx={{ height: 20, fontSize: '0.7rem', fontWeight: 600 }}
+                        />
                       </Box>
-                      <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                        {strategy.instruments.map((inst, idx) => (
-                          <Chip
-                            key={idx}
-                            label={inst}
-                            size="small"
-                            sx={{
-                              bgcolor: '#f1f3f5',
-                              color: '#495057',
-                              fontSize: '0.7rem',
-                              height: '22px',
-                              borderRadius: '4px'
-                            }}
-                          />
-                        ))}
-                      </Box>
+                      <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.75rem' }}>
+                        {strategy.strategyType} • {strategy.segmentType}
+                      </Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <IconButton size="small" onClick={(e) => { setAnchorEl(e.currentTarget); setMenuFor(strategy.id); }}>
-                        <MoreIcon />
-                      </IconButton>
+
+                    <IconButton
+                      size="small"
+                      onClick={(e) => { setAnchorEl(e.currentTarget); setMenuFor(strategy.id); }}
+                      sx={{
+                        bgcolor: '#f8fafc',
+                        '&:hover': { bgcolor: '#f1f5f9' }
+                      }}
+                    >
+                      <MoreIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', gap: 2, mb: 1.5, flexWrap: 'wrap' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem' }}>
+                        Start:
+                      </Typography>
+                      <Chip
+                        label={strategy.startTime}
+                        size="small"
+                        sx={{ height: 20, fontSize: '0.7rem', bgcolor: '#dcfce7', color: '#10b981', fontWeight: 600 }}
+                      />
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem' }}>
+                        End:
+                      </Typography>
+                      <Chip
+                        label={strategy.endTime}
+                        size="small"
+                        sx={{ height: 20, fontSize: '0.7rem', bgcolor: '#fee2e2', color: '#ef4444', fontWeight: 600 }}
+                      />
                     </Box>
                   </Box>
-                  <Box sx={{ display: 'flex', gap: 2, mt: 3, justifyContent: 'center' }}>
+
+                  <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mb: 1.5 }}>
+                    {strategy.instruments.slice(0, 3).map((inst, idx) => (
+                      <Chip
+                        key={idx}
+                        label={inst}
+                        size="small"
+                        sx={{
+                          bgcolor: '#f1f5f9',
+                          color: '#475569',
+                          fontSize: '0.7rem',
+                          height: 20,
+                          fontWeight: 500
+                        }}
+                      />
+                    ))}
+                    {strategy.instruments.length > 3 && (
+                      <Chip
+                        label={`+${strategy.instruments.length - 3} more`}
+                        size="small"
+                        sx={{
+                          bgcolor: '#e0e7ff',
+                          color: '#6366f1',
+                          fontSize: '0.7rem',
+                          height: 20,
+                          fontWeight: 600
+                        }}
+                      />
+                    )}
+                  </Box>
+
+                  <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                     <Button
                       variant="outlined"
+                      size="small"
+                      startIcon={<AssessmentIcon sx={{ fontSize: 16 }} />}
                       sx={{
                         textTransform: 'none',
-                        borderRadius: 2,
-                        borderColor: '#e0e0e0',
-                        color: '#4c6ef5',
-                        px: 4,
-                        py: 1,
-                        bgcolor: '#f8f9fa',
-                        '&:hover': { 
-                          bgcolor: '#e7f5ff',
-                          borderColor: '#4c6ef5'
+                        fontSize: '0.8125rem',
+                        py: 0.5,
+                        px: 2,
+                        borderColor: '#e2e8f0',
+                        color: '#64748b',
+                        '&:hover': {
+                          borderColor: '#6366f1',
+                          color: '#6366f1',
+                          bgcolor: 'rgba(99, 102, 241, 0.04)'
                         }
                       }}
                       onClick={async () => {
@@ -908,21 +927,20 @@ const Strategies: React.FC = () => {
                         }
                       }}
                     >
-                      Back Test
+                      Backtest
                     </Button>
                     <Button
                       variant="contained"
+                      size="small"
+                      startIcon={<PlayIcon sx={{ fontSize: 16 }} />}
                       sx={{
                         textTransform: 'none',
-                        borderRadius: 2,
-                        bgcolor: '#e7f5ff',
-                        color: '#4c6ef5',
-                        px: 4,
-                        py: 1,
-                        boxShadow: 'none',
-                        '&:hover': { 
-                          bgcolor: '#d0ebff',
-                          boxShadow: 'none'
+                        fontSize: '0.8125rem',
+                        py: 0.5,
+                        px: 2,
+                        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
                         }
                       }}
                       onClick={() => { setDeployOpen({ open: true, strategy }); setDeployAccept(false); }}
@@ -1073,7 +1091,7 @@ const Strategies: React.FC = () => {
                             onConfirm: async () => {
                               await firestoreService.updateStrategy(strategy.id, { status: 'paused' } as any);
                               setStrategies(prev => prev.map(p => p.id === strategy.id ? { ...p, status: 'draft' } : p));
-                              setConfirmDialog({ open: false, message: '', onConfirm: () => {} });
+                              setConfirmDialog({ open: false, message: '', onConfirm: () => { } });
                             }
                           });
                         }}
@@ -1171,87 +1189,87 @@ const Strategies: React.FC = () => {
             {filteredTemplates
               .filter(t => !searchQuery || t.name.toLowerCase().includes(searchQuery.toLowerCase()))
               .map((template: StrategyTemplate) => (
-              <Box key={template.id}>
-                <Card
-                  sx={{
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                    borderRadius: 3,
-                    border: '1px solid #f1f3f5',
-                    overflow: 'hidden',
-                    transition: 'all 0.2s',
-                    '&:hover': {
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-                      transform: 'translateY(-2px)'
-                    }
-                  }}
-                >
-                  <Box sx={{ p: 2, pb: 0 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                        {template.name}
-                      </Typography>
-                      <Chip 
-                        label={template.category} 
-                        size="small" 
-                        color={template.category === 'HNI' ? 'primary' : template.category === 'Retail' ? 'secondary' : 'default'}
-                        sx={{ ml: 1 }}
-                      />
-                    </Box>
-                    {template.description && (
-                      <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1 }}>
-                        {template.description}
-                      </Typography>
-                    )}
-                  </Box>
-                  <Box sx={{ height: 180, px: 2 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={(templateCharts[template.id]?.equity || []).map(p => ({ date: p.x, value: p.y }))}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" hide />
-                        <YAxis hide />
-                        <Tooltip formatter={(v: number) => [`₹${v.toFixed(2)}`, 'Equity']} />
-                        <Line type="monotone" dataKey="value" stroke="#4c6ef5" dot={false} strokeWidth={2} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </Box>
-                  <Box sx={{ p: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                      <Box>
-                        <Typography variant="caption" sx={{ color: '#868e96', display: 'block' }}>
-                          Max DD
+                <Box key={template.id}>
+                  <Card
+                    sx={{
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                      borderRadius: 3,
+                      border: '1px solid #f1f3f5',
+                      overflow: 'hidden',
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                        transform: 'translateY(-2px)'
+                      }
+                    }}
+                  >
+                    <Box sx={{ p: 2, pb: 0 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                          {template.name}
                         </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 500, color: '#51cf66' }}>
-                          {template.maxDD}
-                        </Typography>
+                        <Chip
+                          label={template.category}
+                          size="small"
+                          color={template.category === 'HNI' ? 'primary' : template.category === 'Retail' ? 'secondary' : 'default'}
+                          sx={{ ml: 1 }}
+                        />
                       </Box>
-                      <Box>
-                        <Typography variant="caption" sx={{ color: '#868e96', display: 'block' }}>
-                          Margin
+                      {template.description && (
+                        <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1 }}>
+                          {template.description}
                         </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 500, color: '#51cf66' }}>
-                          {template.margin}
-                        </Typography>
-                      </Box>
+                      )}
                     </Box>
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      size="small"
-                      sx={{
-                        textTransform: 'none',
-                        borderRadius: 2,
-                        borderColor: '#4c6ef5',
-                        color: '#4c6ef5',
-                        '&:hover': { bgcolor: '#e7f5ff' }
-                      }}
-                      onClick={() => { setDeployOpen({ open: true, template }); setDeployAccept(false); }}
-                    >
-                      Add to my strategy
-                    </Button>
-                  </Box>
-                </Card>
-              </Box>
-            ))}
+                    <Box sx={{ height: 180, px: 2 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={(templateCharts[template.id]?.equity || []).map(p => ({ date: p.x, value: p.y }))}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" hide />
+                          <YAxis hide />
+                          <Tooltip formatter={(v: number) => [`₹${v.toFixed(2)}`, 'Equity']} />
+                          <Line type="monotone" dataKey="value" stroke="#4c6ef5" dot={false} strokeWidth={2} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </Box>
+                    <Box sx={{ p: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                        <Box>
+                          <Typography variant="caption" sx={{ color: '#868e96', display: 'block' }}>
+                            Max DD
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 500, color: '#51cf66' }}>
+                            {template.maxDD}
+                          </Typography>
+                        </Box>
+                        <Box>
+                          <Typography variant="caption" sx={{ color: '#868e96', display: 'block' }}>
+                            Margin
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 500, color: '#51cf66' }}>
+                            {template.margin}
+                          </Typography>
+                        </Box>
+                      </Box>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        size="small"
+                        sx={{
+                          textTransform: 'none',
+                          borderRadius: 2,
+                          borderColor: '#4c6ef5',
+                          color: '#4c6ef5',
+                          '&:hover': { bgcolor: '#e7f5ff' }
+                        }}
+                        onClick={() => { setDeployOpen({ open: true, template }); setDeployAccept(false); }}
+                      >
+                        Add to my strategy
+                      </Button>
+                    </Box>
+                  </Card>
+                </Box>
+              ))}
           </Box>
         </TabPanel>
 
@@ -1314,9 +1332,9 @@ const Strategies: React.FC = () => {
             try {
               const uid = auth.currentUser?.uid;
               if (!uid) { setDeployOpen({ open: false }); return; }
-              
+
               let strategyId: string;
-              
+
               // If deploying from template, create strategy first
               if (deployOpen.template) {
                 const newId = await firestoreService.addStrategy(uid, {
@@ -1353,7 +1371,7 @@ const Strategies: React.FC = () => {
                 setDeployOpen({ open: false });
                 return;
               }
-              
+
               // Deploy the strategy
               try {
                 await apiService.post('/api/strategies/deploy', {
@@ -1370,11 +1388,11 @@ const Strategies: React.FC = () => {
                 console.warn('Deploy API call failed, but updating Firestore status:', error.message);
                 // You might want to show a toast notification here
               }
-              
+
               // Update status to live in Firestore (always do this even if API fails)
               await firestoreService.updateStrategy(strategyId, { status: 'live' } as any);
               setStrategies(prev => prev.map(p => p.id === strategyId ? { ...p, status: 'active' } : p));
-              
+
               // Refresh strategies list
               const rows = await firestoreService.getStrategies(uid);
               const mapped: MyStrategyCard[] = rows.map(r => ({
@@ -1434,20 +1452,20 @@ const Strategies: React.FC = () => {
               onConfirm: async () => {
                 await firestoreService.deleteStrategy(s.id);
                 setStrategies(prev => prev.filter(p => p.id !== s.id));
-                setConfirmDialog({ open: false, message: '', onConfirm: () => {} });
+                setConfirmDialog({ open: false, message: '', onConfirm: () => { } });
               }
             });
           }}>Delete</MenuItem>
         </Menu>
 
         {/* Confirmation Dialog */}
-        <Dialog open={confirmDialog.open} onClose={() => setConfirmDialog({ open: false, message: '', onConfirm: () => {} })}>
+        <Dialog open={confirmDialog.open} onClose={() => setConfirmDialog({ open: false, message: '', onConfirm: () => { } })}>
           <DialogTitle>Confirm</DialogTitle>
           <DialogContent>
             <Typography>{confirmDialog.message}</Typography>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setConfirmDialog({ open: false, message: '', onConfirm: () => {} })}>Cancel</Button>
+            <Button onClick={() => setConfirmDialog({ open: false, message: '', onConfirm: () => { } })}>Cancel</Button>
             <Button variant="contained" color="primary" onClick={() => {
               confirmDialog.onConfirm();
             }}>Confirm</Button>
@@ -1714,13 +1732,13 @@ function DuplicateDialog({ open, strategyName, setStrategyName, onClose, onDupli
       <DialogTitle>Duplicate MX Strategies</DialogTitle>
       <DialogContent>
         <Box sx={{ textAlign: 'center', py: 3 }}>
-          <Box sx={{ 
-            width: 80, 
-            height: 80, 
-            borderRadius: '50%', 
-            bgcolor: '#FFA726', 
-            display: 'flex', 
-            alignItems: 'center', 
+          <Box sx={{
+            width: 80,
+            height: 80,
+            borderRadius: '50%',
+            bgcolor: '#FFA726',
+            display: 'flex',
+            alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto 24px'
           }}>
@@ -1745,8 +1763,8 @@ function DuplicateDialog({ open, strategyName, setStrategyName, onClose, onDupli
         <Button onClick={onClose} variant="outlined" sx={{ px: 4 }}>
           Cancel
         </Button>
-        <Button 
-          variant="contained" 
+        <Button
+          variant="contained"
           onClick={onDuplicate}
           disabled={!strategyName.trim()}
           sx={{ px: 4 }}
@@ -1801,7 +1819,7 @@ function MyPortfolioSection({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     // Only load data when tab becomes active and hasn't been loaded yet
     if (!isActive || hasLoaded) return;
-    
+
     const load = async () => {
       try {
         const uid = auth.currentUser?.uid;
