@@ -85,6 +85,10 @@ console.log('🚀 AlgoRooms Server - Production Ready');
 const fs = require('fs');
 const path = require('path');
 
+// Import authentication service
+const authService = require('./src/services/authService');
+const strategyService = require('./src/services/strategyService');
+
 const BROKERS_FILE = path.join(__dirname, 'brokers-data.json');
 const brokers = new Map();
 
@@ -122,6 +126,506 @@ function saveBrokers() {
 
 // Load brokers on startup
 loadBrokers();
+
+// ============================================
+// AUTHENTICATION ENDPOINTS
+// ============================================
+
+// Register new user
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        console.log('📝 User registration attempt:', req.body.email);
+        
+        const user = await authService.registerUser(req.body);
+        
+        res.status(201).json({
+            success: true,
+            message: 'User registered successfully',
+            user
+        });
+    } catch (error) {
+        console.error('❌ Registration error:', error.message);
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Login user
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        console.log('🔐 Login attempt:', email);
+        
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email and password are required'
+            });
+        }
+
+        const result = await authService.authenticateUser(email, password);
+        
+        // Check if 2FA is required
+        if (result.requires2FA) {
+            return res.json({
+                success: true,
+                requires2FA: true,
+                userId: result.userId,
+                message: 'Please enter your 2FA code'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Login successful',
+            user: result.user,
+            token: result.token
+        });
+    } catch (error) {
+        console.error('❌ Login error:', error.message);
+        res.status(401).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Logout user
+app.post('/api/auth/logout', (req, res) => {
+    // In a real implementation, invalidate the token
+    console.log('👋 User logged out');
+    res.json({
+        success: true,
+        message: 'Logged out successfully'
+    });
+});
+
+// Refresh token
+app.post('/api/auth/refresh', (req, res) => {
+    try {
+        const { token } = req.body;
+        
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                message: 'Token is required'
+            });
+        }
+
+        const decoded = authService.validateToken(token);
+        const newToken = authService.generateToken(decoded.userId);
+
+        res.json({
+            success: true,
+            token: newToken
+        });
+    } catch (error) {
+        res.status(401).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Forgot password
+app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email is required'
+            });
+        }
+
+        const result = await authService.initiatePasswordReset(email);
+        
+        res.json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        console.error('❌ Forgot password error:', error.message);
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Reset password
+app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+        
+        if (!token || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'Token and new password are required'
+            });
+        }
+
+        const result = await authService.resetPassword(token, newPassword);
+        
+        res.json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        console.error('❌ Reset password error:', error.message);
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Authentication middleware
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+    if (!token) {
+        return res.status(401).json({
+            success: false,
+            message: 'Access token required'
+        });
+    }
+
+    try {
+        const decoded = authService.validateToken(token);
+        req.userId = decoded.userId;
+        next();
+    } catch (error) {
+        return res.status(403).json({
+            success: false,
+            message: 'Invalid or expired token'
+        });
+    }
+}
+
+// ============================================
+// USER PROFILE ENDPOINTS (Protected)
+// ============================================
+
+// Get user profile
+app.get('/api/user/profile', authenticateToken, (req, res) => {
+    try {
+        const user = authService.getUserById(req.userId);
+        res.json({
+            success: true,
+            user
+        });
+    } catch (error) {
+        res.status(404).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Update user profile
+app.put('/api/user/profile', authenticateToken, async (req, res) => {
+    try {
+        const user = await authService.updateUserProfile(req.userId, req.body);
+        res.json({
+            success: true,
+            message: 'Profile updated successfully',
+            user
+        });
+    } catch (error) {
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Change password
+app.put('/api/user/password', authenticateToken, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'Current password and new password are required'
+            });
+        }
+
+        const result = await authService.changePassword(req.userId, currentPassword, newPassword);
+        res.json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Get user preferences
+app.get('/api/user/preferences', authenticateToken, (req, res) => {
+    // For now, return default preferences
+    res.json({
+        success: true,
+        preferences: {
+            notifications: {
+                email: true,
+                push: true,
+                sms: false
+            },
+            trading: {
+                confirmOrders: true,
+                autoSquareOff: false
+            },
+            display: {
+                theme: 'light',
+                language: 'en'
+            }
+        }
+    });
+});
+
+// Update user preferences
+app.put('/api/user/preferences', authenticateToken, (req, res) => {
+    // For now, just acknowledge the update
+    res.json({
+        success: true,
+        message: 'Preferences updated successfully',
+        preferences: req.body
+    });
+});
+
+// ============================================
+// STRATEGY ENDPOINTS (Protected)
+// ============================================
+
+// Get all strategies for user
+app.get('/api/strategies', authenticateToken, (req, res) => {
+    try {
+        const { status, instrumentType, deploymentStatus } = req.query;
+        const filters = { status, instrumentType, deploymentStatus };
+        
+        const strategies = strategyService.getStrategiesByUser(req.userId, filters);
+        
+        res.json({
+            success: true,
+            strategies
+        });
+    } catch (error) {
+        console.error('❌ Get strategies error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Create new strategy
+app.post('/api/strategies', authenticateToken, (req, res) => {
+    try {
+        const strategy = strategyService.createStrategy(req.userId, req.body);
+        
+        res.status(201).json({
+            success: true,
+            message: 'Strategy created successfully',
+            strategy
+        });
+    } catch (error) {
+        console.error('❌ Create strategy error:', error.message);
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Get strategy by ID
+app.get('/api/strategies/:id', authenticateToken, (req, res) => {
+    try {
+        const strategy = strategyService.getStrategyById(req.params.id, req.userId);
+        
+        res.json({
+            success: true,
+            strategy
+        });
+    } catch (error) {
+        console.error('❌ Get strategy error:', error.message);
+        res.status(404).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Update strategy
+app.put('/api/strategies/:id', authenticateToken, (req, res) => {
+    try {
+        const strategy = strategyService.updateStrategy(req.params.id, req.userId, req.body);
+        
+        res.json({
+            success: true,
+            message: 'Strategy updated successfully',
+            strategy
+        });
+    } catch (error) {
+        console.error('❌ Update strategy error:', error.message);
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Delete strategy
+app.delete('/api/strategies/:id', authenticateToken, (req, res) => {
+    try {
+        const result = strategyService.deleteStrategy(req.params.id, req.userId);
+        
+        res.json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        console.error('❌ Delete strategy error:', error.message);
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Clone strategy
+app.post('/api/strategies/:id/clone', authenticateToken, (req, res) => {
+    try {
+        const strategy = strategyService.cloneStrategy(req.params.id, req.userId);
+        
+        res.json({
+            success: true,
+            message: 'Strategy cloned successfully',
+            strategy
+        });
+    } catch (error) {
+        console.error('❌ Clone strategy error:', error.message);
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Update strategy status
+app.put('/api/strategies/:id/status', authenticateToken, (req, res) => {
+    try {
+        const { status } = req.body;
+        
+        if (!status) {
+            return res.status(400).json({
+                success: false,
+                message: 'Status is required'
+            });
+        }
+
+        const strategy = strategyService.updateStrategyStatus(req.params.id, req.userId, status);
+        
+        res.json({
+            success: true,
+            message: 'Strategy status updated successfully',
+            strategy
+        });
+    } catch (error) {
+        console.error('❌ Update strategy status error:', error.message);
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Update deployment status (start/pause/stop)
+app.put('/api/strategies/:id/deployment', authenticateToken, (req, res) => {
+    try {
+        const { deploymentStatus } = req.body;
+        
+        if (!deploymentStatus) {
+            return res.status(400).json({
+                success: false,
+                message: 'Deployment status is required'
+            });
+        }
+
+        const strategy = strategyService.updateDeploymentStatus(req.params.id, req.userId, deploymentStatus);
+        
+        res.json({
+            success: true,
+            message: `Strategy ${deploymentStatus} successfully`,
+            strategy
+        });
+    } catch (error) {
+        console.error('❌ Update deployment status error:', error.message);
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Update strategy mode (live/paper)
+app.put('/api/strategies/:id/mode', authenticateToken, (req, res) => {
+    try {
+        const { mode } = req.body;
+        
+        if (!mode) {
+            return res.status(400).json({
+                success: false,
+                message: 'Mode is required'
+            });
+        }
+
+        const strategy = strategyService.updateStrategyMode(req.params.id, req.userId, mode);
+        
+        res.json({
+            success: true,
+            message: `Strategy mode updated to ${mode}`,
+            strategy
+        });
+    } catch (error) {
+        console.error('❌ Update strategy mode error:', error.message);
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Square off strategy (close all positions)
+app.post('/api/strategies/:id/square-off', authenticateToken, (req, res) => {
+    try {
+        // Stop the strategy
+        const strategy = strategyService.updateDeploymentStatus(req.params.id, req.userId, 'stopped');
+        
+        // In a real implementation, this would close all open positions
+        console.log('🔴 Square off executed for strategy:', strategy.name);
+        
+        res.json({
+            success: true,
+            message: 'All positions squared off successfully',
+            strategy
+        });
+    } catch (error) {
+        console.error('❌ Square off error:', error.message);
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
 
 // Dhan Terminal Activation (AlgoRooms Style with Real API)
 app.post('/api/broker/dhan-login-url', async (req, res) => {

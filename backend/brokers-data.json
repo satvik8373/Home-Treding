@@ -1,21 +1,22 @@
 [
   {
-    "id": "dhan_1108893841_1761726320552",
+    "id": "dhan_1108893841_1761976966950",
+    "userId": "VMRXTPJYAVhg8fzulmIn4518BXE2",
     "broker": "Dhan",
     "clientId": "1108893841",
-    "accessToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJkaGFuIiwicGFydG5lcklkIjoiIiwiZXhwIjoxNzYxODEyNjA3LCJpYXQiOjE3NjE3MjYyMDcsInRva2VuQ29uc3VtZXJUeXBlIjoiU0VMRiIsIndlYmhvb2tVcmwiOiIiLCJkaGFuQ2xpZW50SWQiOiIxMTA4ODkzODQxIn0.rCpGE_vQnwMqVI388px2K9vSobSA5QAqR50Yi69JpZ6Oct1aszqbyDYzWdzDOptVZO6kkLr6zp60Az6VV16dUA",
-    "terminalEnabled": false,
+    "accessToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJkaGFuIiwicGFydG5lcklkIjoiIiwiZXhwIjoxNzYyMDYzMzI5LCJpYXQiOjE3NjE5NzY5MjksInRva2VuQ29uc3VtZXJUeXBlIjoiU0VMRiIsIndlYmhvb2tVcmwiOiIiLCJkaGFuQ2xpZW50SWQiOiIxMTA4ODkzODQxIn0.AmaNffhhWU5ZE_rJfuyZzB0iLKAVklaWmZflorEU9dE8sv2kaON8hP-TSqz7QDYko8ZaapW0yEyKiobVYt-qGQ",
+    "terminalEnabled": true,
     "terminalActivated": true,
     "tradingEngineEnabled": true,
-    "status": "Disconnected",
+    "status": "Connected",
     "accountName": "Dhan Account 1108893841",
     "strategyPerformance": "0.00%",
     "totalOrders": 0,
     "activePositions": 0,
-    "lastActivity": "2025-10-29T08:31:20.258Z",
-    "connectedAt": "2025-10-29T08:25:20.552Z",
+    "lastActivity": "2025-11-01T06:02:56.272Z",
+    "connectedAt": "2025-11-01T06:02:46.950Z",
     "credentialsSource": "user_input",
-    "lastValidated": "2025-10-29T13:29:48.922Z",
-    "lastRestart": "2025-10-29T13:33:07.554Z"
+    "lastValidated": "2025-11-01T07:24:33.872Z",
+    "lastRestart": "2025-11-01T07:21:53.299Z"
   }
 ]

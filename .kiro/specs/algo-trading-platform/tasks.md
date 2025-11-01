@@ -24,7 +24,9 @@
 
 
 
-  - [ ] 2.1 Create user registration endpoint
+  - [x] 2.1 Create user registration endpoint
+
+
     - Implement POST /api/auth/register with validation
 
     - Hash passwords using bcrypt
@@ -36,6 +38,7 @@
     - Generate and return JWT tokens
     - Store session in Redis
     - _Requirements: 1.4_
+
 
   - [ ] 2.3 Implement password reset flow
     - Create POST /api/auth/forgot-password endpoint
@@ -52,13 +55,16 @@
     - Write unit tests for auth endpoints
     - _Requirements: 1.1-1.6_
 
+
 - [ ] 3. Build user profile and settings management
   - [ ] 3.1 Create user profile endpoints
     - Implement GET /api/user/profile
 
 
+
     - Implement PUT /api/user/profile with validation
     - _Requirements: 10.2_
+
   - [ ] 3.2 Implement password change functionality
     - Create PUT /api/user/password endpoint
     - Verify current password before allowing change
@@ -89,19 +95,25 @@
     - Implement DELETE /api/brokerages/:id for unlinking
     - Implement POST /api/brokerages/:id/test for connection testing
     - _Requirements: 2.6, 10.7_
-  - [ ]* 4.5 Write integration tests for Dhan API wrapper
+  - [x]* 4.5 Write integration tests for Dhan API wrapper
+
     - Mock Dhan API responses
     - Test error scenarios (invalid credentials, static IP issues)
     - _Requirements: 2.3_
 
-- [ ] 5. Develop strategy creation and management
+
+- [-] 5. Develop strategy creation and management
+
   - [ ] 5.1 Create strategy data models and validation
     - Define strategy schema in database
     - Create validation functions for entry/exit rules
     - Implement risk parameter validation
+
     - _Requirements: 3.1, 3.3, 3.4_
   - [ ] 5.2 Build strategy CRUD endpoints
     - Implement POST /api/strategies for creation
+
+
     - Implement GET /api/strategies for listing with filters
     - Implement GET /api/strategies/:id for details
     - Implement PUT /api/strategies/:id for updates
@@ -381,8 +393,13 @@
     - _Requirements: 2.5, 2.6_
 
 - [ ] 18. Develop frontend strategy pages
-  - [ ] 18.1 Build strategy creation form
+  - [x] 18.1 Build strategy creation form
+
+
+
     - Create form with all strategy fields
+
+
     - Add instrument type dropdown
     - Add timeframe selector
     - Implement entry/exit rule editors

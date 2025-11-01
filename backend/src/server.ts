@@ -47,6 +47,7 @@ import marketRoutes from './routes/market';
 import oauthRoutes from './routes/oauthRoutes';
 import brokerRoutes from './routes/brokerRoutes';
 import strategyTestRoutes from './routes/strategyTest';
+import strategyRoutes from './routes/strategyRoutes';
 
 // API Routes
 app.get('/api', (_req, res) => {
@@ -67,6 +68,9 @@ app.use('/api/broker', brokerRoutes);
 
 // Strategy testing routes
 app.use('/api/strategy-test', strategyTestRoutes);
+
+// Strategy management routes
+app.use('/api/strategies', strategyRoutes);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {

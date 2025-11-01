@@ -113,7 +113,13 @@ const DhanTerminal: React.FC<DhanTerminalProps> = ({ open, onClose, broker }) =>
 
     } catch (error: any) {
       console.error('Failed to fetch terminal data:', error);
-      setError('Failed to fetch real-time data from Dhan. Please check your connection.');
+      const errorMsg = error.response?.data?.message || error.message || 'Unknown error';
+      console.error('Orders API error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        brokerId: broker.id
+      });
+      setError(`Failed to fetch real-time data from Dhan: ${errorMsg}. Please check your connection and broker status.`);
       // Set empty data on error - no demo fallbacks
       setPositions([]);
       setOrders([]);
@@ -290,29 +296,39 @@ const DhanTerminal: React.FC<DhanTerminalProps> = ({ open, onClose, broker }) =>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {orders.map((order, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{order.orderId}</TableCell>
-                      <TableCell>{order.symbol}</TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={order.side} 
-                          color={order.side === 'BUY' ? 'success' : 'error'} 
-                          size="small"
-                        />
+                  {orders.length > 0 ? (
+                    orders.map((order, index) => (
+                      <TableRow key={order.orderId || index}>
+                        <TableCell>{order.orderId || 'N/A'}</TableCell>
+                        <TableCell>{order.symbol || 'N/A'}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={order.side || 'N/A'} 
+                            color={order.side === 'BUY' ? 'success' : 'error'} 
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell align="right">{order.quantity || 0}</TableCell>
+                        <TableCell align="right">₹{(order.price || 0).toFixed(2)}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={order.status || 'PENDING'} 
+                            color={order.status === 'EXECUTED' || order.status === 'FILLED' ? 'success' : 'warning'} 
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>{order.time || 'N/A'}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                        <Typography variant="body2" color="textSecondary">
+                          No orders found
+                        </Typography>
                       </TableCell>
-                      <TableCell align="right">{order.quantity}</TableCell>
-                      <TableCell align="right">₹{order.price.toFixed(2)}</TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={order.status} 
-                          color={order.status === 'EXECUTED' ? 'success' : 'warning'} 
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>{order.time}</TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>

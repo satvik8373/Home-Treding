@@ -703,9 +703,35 @@ export const getOrders = asyncHandler(async (req: Request, res: Response) => {
       }
     });
 
+    // Handle different Dhan API response formats
+    let rawOrders = [];
+    if (Array.isArray(response.data)) {
+      rawOrders = response.data;
+    } else if (response.data.data && Array.isArray(response.data.data)) {
+      rawOrders = response.data.data;
+    } else if (response.data.orders && Array.isArray(response.data.orders)) {
+      rawOrders = response.data.orders;
+    } else if (response.data) {
+      rawOrders = [response.data];
+    }
+
+    // Map Dhan API fields to frontend expected format
+    const orders = rawOrders.map((order: any) => ({
+      orderId: order.orderId || order.order_id || order.id || order.DHAN_ORDER_ID || '',
+      symbol: order.securityId || order.symbol || order.symbol || '',
+      side: order.transactionType || order.side || (order.orderType === 'BUY' ? 'BUY' : 'SELL'),
+      quantity: order.quantity || order.qty || order.orderQuantity || 0,
+      price: order.price || order.orderPrice || order.limitPrice || 0,
+      status: order.orderStatus || order.status || (order.status === 'FILLED' ? 'EXECUTED' : order.status || 'PENDING'),
+      time: order.orderTimestamp || order.timestamp || order.time || new Date().toLocaleTimeString(),
+      orderType: order.orderType || order.type || 'LIMIT'
+    }));
+
+    logger.info(`📋 Fetched ${orders.length} orders for broker ${brokerId}`);
+
     res.json({
       success: true,
-      orders: response.data
+      orders: orders
     });
 
   } catch (error: any) {
