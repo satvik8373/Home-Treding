@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -68,6 +69,7 @@ function TabPanel(props: TabPanelProps) {
 }
 
 const Strategies: React.FC = () => {
+  const navigate = useNavigate();
   const [tabValue, setTabValue] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -1399,6 +1401,14 @@ const Strategies: React.FC = () => {
           open={Boolean(anchorEl)}
           onClose={() => { setAnchorEl(null); setMenuFor(null); }}
         >
+          <MenuItem onClick={() => {
+            const s = strategies.find(x => x.id === menuFor);
+            if (!s) { setAnchorEl(null); setMenuFor(null); return; }
+            setAnchorEl(null);
+            setMenuFor(null);
+            // Navigate to edit page or open edit dialog
+            navigate(`/strategies/edit/${s.id}`);
+          }}>Edit</MenuItem>
           <MenuItem onClick={async () => {
             const s = strategies.find(x => x.id === menuFor);
             if (!s) { setAnchorEl(null); setMenuFor(null); return; }

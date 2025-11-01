@@ -267,7 +267,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           bgcolor: '#ffffff',
           minHeight: '100vh',
           pb: { 
-            xs: 'calc(60px + env(safe-area-inset-bottom))', 
+            xs: 'calc(56px + env(safe-area-inset-bottom))', 
             md: 3 
           },
           pt: 3,
@@ -302,12 +302,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             left: 0,
             right: 0,
             zIndex: 1200,
-            boxShadow: '0 -2px 10px rgba(0,0,0,0.1)',
             // PWA safe area support for bottom navigation bar
             paddingBottom: 'env(safe-area-inset-bottom)',
             paddingLeft: 'env(safe-area-inset-left)',
-            paddingRight: 'env(safe-area-inset-right)',
-            borderTop: '1px solid rgba(0,0,0,0.08)'
+            paddingRight: 'env(safe-area-inset-right)'
           }}
           elevation={3}
         >
@@ -317,11 +315,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               navigate(newValue);
             }}
             showLabels
-            sx={{
-              height: 56,
-              minHeight: 56,
-              maxHeight: 56
-            }}
           >
             {menuItems.slice(0, 4).map((item) => (
               <BottomNavigationAction
@@ -329,18 +322,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 label={item.text}
                 value={item.path}
                 icon={item.icon}
-                sx={{
-                  minHeight: 56,
-                  maxHeight: 56,
-                  padding: '4px 0',
-                  '& .MuiBottomNavigationAction-label': {
-                    fontSize: '0.7rem',
-                    marginTop: '2px'
-                  },
-                  '& .MuiSvgIcon-root': {
-                    fontSize: '1.3rem'
-                  }
-                }}
               />
             ))}
           </BottomNavigation>

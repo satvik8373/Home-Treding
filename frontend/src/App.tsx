@@ -34,6 +34,7 @@ function App() {
             <Route path="/brokers" element={<Brokers />} />
             <Route path="/strategies" element={<Strategies />} />
             <Route path="/strategies/create" element={<CreateStrategy />} />
+            <Route path="/strategies/edit/:id" element={<CreateStrategy />} />
             <Route path="/strategies/templates" element={<StrategyTemplate />} />
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/reports" element={<Reports />} />
