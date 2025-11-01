@@ -201,7 +201,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           bgcolor: '#ffffff',
           color: '#0f172a',
           borderBottom: '1px solid #f1f5f9',
-          top: 0
+          top: 0,
+          pt: 'env(safe-area-inset-top)',
         }}
       >
         <Toolbar sx={{ minHeight: { xs: 56, sm: 64 }, px: { xs: 1.5, sm: 3 } }}>
@@ -355,14 +356,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             xs: 'calc(56px + env(safe-area-inset-bottom))', 
             md: 3 
           },
-          pt: { xs: 2, sm: 2.5, md: 3 },
+          pt: { xs: 'calc(56px + env(safe-area-inset-top))', sm: 'calc(64px + env(safe-area-inset-top))', md: 3 },
           px: { xs: 0, sm: 2, md: 3 },
           width: '100%',
           maxWidth: '100vw',
           overflowX: 'hidden',
         }}
       >
-        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }} />
+        <Box sx={{ height: { xs: 2, sm: 2.5, md: 3 }, width: '100%' }} />
         <Container 
           maxWidth="xl" 
           sx={{ 

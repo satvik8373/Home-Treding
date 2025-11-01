@@ -164,6 +164,8 @@ body {
     height: 100%;
     min-height: 100vh;
     min-height: -webkit-fill-available;
+    /* Don't add padding-top, let AppBar handle it */
+    padding-top: 0 !important;
   }
   
   #root {
