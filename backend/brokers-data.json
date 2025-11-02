@@ -1,0 +1,23 @@
+[
+  {
+    "id": "dhan_1108893841_1761976966950",
+    "userId": "VMRXTPJYAVhg8fzulmIn4518BXE2",
+    "broker": "Dhan",
+    "clientId": "1108893841",
+    "accessToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJkaGFuIiwicGFydG5lcklkIjoiIiwiZXhwIjoxNzYyMDYzMzI5LCJpYXQiOjE3NjE5NzY5MjksInRva2VuQ29uc3VtZXJUeXBlIjoiU0VMRiIsIndlYmhvb2tVcmwiOiIiLCJkaGFuQ2xpZW50SWQiOiIxMTA4ODkzODQxIn0.AmaNffhhWU5ZE_rJfuyZzB0iLKAVklaWmZflorEU9dE8sv2kaON8hP-TSqz7QDYko8ZaapW0yEyKiobVYt-qGQ",
+    "terminalEnabled": false,
+    "terminalActivated": false,
+    "tradingEngineEnabled": true,
+    "status": "Disconnected",
+    "accountName": "Dhan Account 1108893841",
+    "strategyPerformance": "0.00%",
+    "totalOrders": 0,
+    "activePositions": 0,
+    "lastActivity": "2025-11-01T06:02:56.272Z",
+    "connectedAt": "2025-11-01T06:02:46.950Z",
+    "credentialsSource": "user_input",
+    "lastValidated": "2025-11-02T13:45:12.181Z",
+    "lastRestart": "2025-11-02T13:44:13.688Z",
+    "lastError": "Client ID or user generated access token is invalid or expired."
+  }
+]

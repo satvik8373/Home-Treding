@@ -1,0 +1,49 @@
+{
+  "name": "home-trading-platform",
+  "version": "2.0.0",
+  "description": "Professional algorithmic trading platform with DhanHQ integration",
+  "private": true,
+  "scripts": {
+    "start": "cd backend && npm start",
+    "backend": "cd backend && npm start",
+    "frontend": "cd frontend && npm start",
+    "dev": "cd backend && npm run dev",
+    "install-all": "npm install && cd frontend && npm install && cd backend && npm install",
+    "setup-advanced": "node setup-advanced-features.js",
+    "fix-errors": "node fix-errors.js",
+    "check-errors": "node final-error-check.js",
+    "verify-platform": "node final-error-check.js",
+    "compile-ts": "cd backend && npx tsc",
+    "build": "cd frontend && npm install && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "deploy": "node deploy.js",
+    "deploy-now": "node deploy-now.js",
+    "deploy-immediately": "node deploy-immediately.js",
+    "deploy-final": "node DEPLOY-FINAL-SOLUTION.js",
+    "deploy-simple": "node deploy-simple.js",
+    "verify-deployment": "node verify-deployment.js",
+    "clean": "node cleanup-unused-files.js"
+  },
+  "keywords": [
+    "trading",
+    "algorithmic",
+    "dhan",
+    "market-data",
+    "react",
+    "nodejs",
+    "dhanhq"
+  ],
+  "author": "Satvik",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.12.2",
+    "dotenv": "^17.2.3"
+  }
+}

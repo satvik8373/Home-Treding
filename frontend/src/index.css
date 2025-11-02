@@ -1,0 +1,216 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  /* iOS PWA viewport fix */
+  height: -webkit-fill-available;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100vw;
+  min-height: 100vh;
+  /* iOS PWA viewport fix */
+  min-height: -webkit-fill-available;
+  overflow-x: hidden !important;
+  position: fixed;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: pan-y;
+  background-color: #f8fafc;
+}
+
+#root {
+  width: 100%;
+  max-width: 100vw;
+  min-height: 100vh;
+  /* iOS PWA viewport fix */
+  min-height: -webkit-fill-available;
+  overflow-y: auto;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent any element from causing horizontal scroll */
+* {
+  max-width: 100%;
+}
+
+/* Specific fixes for common overflow culprits */
+.MuiContainer-root,
+.MuiBox-root,
+.MuiPaper-root,
+.MuiCard-root {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+}
+
+/* Fix for buttons extending beyond viewport */
+.MuiButton-root {
+  max-width: 100%;
+  word-wrap: break-word;
+}
+
+/* Fix for text fields */
+.MuiTextField-root {
+  max-width: 100%;
+}
+
+/* Fix for grids */
+.MuiGrid-root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Prevent zoom on input focus (iOS) */
+input, select, textarea {
+  font-size: 16px !important;
+  touch-action: manipulation;
+}
+
+/* Prevent double-tap zoom */
+button, a {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Mobile-first responsive utilities */
+@media (max-width: 600px) {
+  body {
+    font-size: 14px;
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Remove default button styles */
+button {
+  font-family: inherit;
+}
+
+/* Improve touch targets on mobile */
+@media (max-width: 900px) {
+  button, a, input, select, textarea {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* PWA Safe Area (for notch devices and home screen apps) */
+:root {
+  --sat: env(safe-area-inset-top);
+  --sar: env(safe-area-inset-right);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+}
+
+/* Prevent text selection on UI elements */
+.MuiButton-root,
+.MuiIconButton-root,
+.MuiListItemButton-root {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Improve scrolling performance */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide scrollbar but keep functionality */
+::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+/* Prevent pull-to-refresh on Chrome mobile */
+body {
+  overscroll-behavior-y: contain;
+}
+
+/* iOS PWA specific fixes */
+@supports (-webkit-touch-callout: none) {
+  /* iOS devices - ensure proper viewport */
+  html {
+    height: 100%;
+    height: -webkit-fill-available;
+  }
+  
+  body {
+    height: 100%;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    /* Don't add padding-top, let AppBar handle it */
+    padding-top: 0 !important;
+  }
+  
+  #root {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+}
+
+
+/* iOS PWA Bottom Navigation - No Gaps Fix */
+@media (max-width: 768px) {
+  /* Force proper positioning on mobile - no gaps */
+  body {
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+  }
+  
+  #root {
+    padding-bottom: 0 !important;
+    margin-bottom: 0 !important;
+  }
+  
+  /* Ensure bottom navigation sticks perfectly */
+  .MuiBottomNavigation-root {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+/* PWA Standalone Mode - Critical Fix */
+@media all and (display-mode: standalone) {
+  html {
+    height: 100%;
+    height: -webkit-fill-available;
+  }
+  
+  body {
+    height: 100%;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+  
+  #root {
+    height: 100%;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+}
