@@ -17,6 +17,22 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
     .split(',')
     .map(o => o.trim());
 
+// Explicit CORS headers for all responses, including errors and 404s
+app.use((req, res, next) => {
+    const origin = req.headers.origin as string | undefined;
+    if (origin && (allowedOrigins.includes(origin) || allowedOrigins.includes('*'))) {
+        res.header('Access-Control-Allow-Origin', origin);
+        res.header('Vary', 'Origin');
+        res.header('Access-Control-Allow-Credentials', 'true');
+        res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        if (req.method === 'OPTIONS') {
+            return res.sendStatus(204);
+        }
+    }
+    next();
+});
+
 const io = new SocketIOServer(httpServer, {
     cors: {
         origin: allowedOrigins.length ? allowedOrigins : true,
