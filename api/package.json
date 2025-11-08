@@ -1,9 +1,0 @@
-{
-  "name": "algorooms-api",
-  "version": "1.0.0",
-  "description": "Serverless API for AlgoRooms Trading Platform",
-  "main": "index.js",
-  "dependencies": {
-    "axios": "^1.6.0"
-  }
-}
