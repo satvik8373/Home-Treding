@@ -216,47 +216,6 @@ class RealMarketDataService {
   }
 
   /**
-   * Generate realistic mock data as fallback
-   */
-  generateMockData(symbols) {
-    const baseValues = {
-      'NIFTY': 22000,
-      'BANKNIFTY': 47000,
-      'SENSEX': 72000,
-      'RELIANCE': 2800,
-      'TCS': 3900,
-      'INFY': 1500,
-      'HDFC': 1650,
-      'ICICIBANK': 1100,
-      'SBIN': 750,
-      'HDFCBANK': 1650
-    };
-
-    return symbols.map(symbol => {
-      const baseValue = baseValues[symbol] || 1000;
-      const randomChange = (Math.random() - 0.5) * 2; // -1% to +1%
-      const ltp = baseValue * (1 + randomChange / 100);
-      const change = ltp - baseValue;
-      const changePercent = (change / baseValue) * 100;
-
-      return {
-        symbol,
-        ltp: ltp.toFixed(2),
-        change: change.toFixed(2),
-        changePercent: changePercent.toFixed(2),
-        volume: Math.floor(Math.random() * 10000000),
-        high: (ltp * 1.01).toFixed(2),
-        low: (ltp * 0.99).toFixed(2),
-        open: baseValue.toFixed(2),
-        prevClose: baseValue.toFixed(2),
-        timestamp: Date.now(),
-        lastUpdate: new Date().toISOString(),
-        source: 'Mock Data (API Unavailable)'
-      };
-    });
-  }
-
-  /**
    * Fetch live market data with optimized fallback strategy
    */
   async fetchLiveData(symbols = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'RELIANCE', 'TCS', 'INFY', 'HDFC']) {
@@ -285,9 +244,11 @@ class RealMarketDataService {
 
     try {
       // Try Yahoo Finance first (fastest and most reliable)
+      console.log('Fetching from Yahoo Finance...');
       data = await this.fetchFromYahoo(symbols);
       
       if (data.length > 0) {
+        console.log(`Yahoo Finance returned ${data.length} symbols`);
         this.cache.set(cacheKey, { data, timestamp: Date.now() });
         return data;
       }
@@ -297,6 +258,7 @@ class RealMarketDataService {
       data = await this.fetchFromNSE(symbols);
       
       if (data.length > 0) {
+        console.log(`NSE returned ${data.length} symbols`);
         this.cache.set(cacheKey, { data, timestamp: Date.now() });
         return data;
       }
@@ -306,6 +268,7 @@ class RealMarketDataService {
       data = await this.fetchFromFinnhub(symbols);
       
       if (data.length > 0) {
+        console.log(`Finnhub returned ${data.length} symbols`);
         this.cache.set(cacheKey, { data, timestamp: Date.now() });
         return data;
       }
@@ -321,11 +284,9 @@ class RealMarketDataService {
       return cached.data;
     }
 
-    // Last resort: return mock data so users always see something
-    console.log('Returning mock data as fallback');
-    const mockData = this.generateMockData(symbols);
-    this.cache.set(cacheKey, { data: mockData, timestamp: Date.now() });
-    return mockData;
+    // Return empty array if no data available
+    console.log('No data available from any source');
+    return [];
   }
 
   /**
