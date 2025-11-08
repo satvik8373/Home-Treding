@@ -217,7 +217,10 @@ const PortfolioDashboard: React.FC = () => {
     }).format(amount);
   };
 
-  const formatPercentage = (percentage: number): string => {
+  const formatPercentage = (percentage: number | undefined): string => {
+    if (percentage === undefined || percentage === null || isNaN(percentage)) {
+      return '0.00%';
+    }
     const sign = percentage >= 0 ? '+' : '';
     return `${sign}${percentage.toFixed(2)}%`;
   };
@@ -288,7 +291,7 @@ const PortfolioDashboard: React.FC = () => {
                 </Typography>
               </Box>
               <Typography variant="body2" color={getPnLColor(summary.totalPnl)}>
-                {formatPercentage(summary.totalPnlPercentage)}
+                {formatPercentage(summary?.totalPnlPercentage)}
               </Typography>
             </CardContent>
           </Card>
@@ -306,7 +309,7 @@ const PortfolioDashboard: React.FC = () => {
                 </Typography>
               </Box>
               <Typography variant="body2" color={getPnLColor(summary.dayPnl)}>
-                {formatPercentage(summary.dayPnlPercentage)}
+                {formatPercentage(summary?.dayPnlPercentage)}
               </Typography>
             </CardContent>
           </Card>
@@ -377,14 +380,14 @@ const PortfolioDashboard: React.FC = () => {
                           {formatCurrency(position.pnl)}
                         </Typography>
                         <Typography variant="caption" color={getPnLColor(position.pnl)}>
-                          {formatPercentage(position.pnlPercentage)}
+                          {formatPercentage(position?.pnlPercentage)}
                         </Typography>
                       </Box>
                     </Box>
                   </TableCell>
                   <TableCell align="right">
                     <Chip
-                      label={formatPercentage(position.dayChangePercentage)}
+                      label={formatPercentage(position?.dayChangePercentage)}
                       color={position.dayChange >= 0 ? 'success' : 'error'}
                       size="small"
                       variant="outlined"
