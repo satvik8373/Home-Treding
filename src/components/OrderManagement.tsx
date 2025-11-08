@@ -107,7 +107,7 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
       console.log('📡 WebSocket connection failed (expected in demo mode)');
     });
 
-    newSocket.on('order_update', (update) => {
+    newSocket.on('order_update', (update: any) => {
       console.log('📋 Order update received:', update);
       setOrders(prev => {
         const updated = [...prev];
