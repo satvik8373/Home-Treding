@@ -4,7 +4,6 @@
  */
 
 import { io, Socket } from 'socket.io-client';
-import API_CONFIG from '../config/api';
 
 export interface LiveMarketData {
   symbol: string;
@@ -39,18 +38,12 @@ class MarketDataStreamService {
   }
 
   private connect() {
-    const serverUrl = API_CONFIG.WS_URL || 'http://localhost:5000';
-
+    const serverUrl = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:5000';
+    
     this.socket = io(serverUrl, {
       transports: ['websocket', 'polling'],
       timeout: 20000,
-      forceNew: true,
-      withCredentials: true,
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 10000,
-      autoConnect: true
+      forceNew: true
     });
 
     this.socket.on('connect', () => {
@@ -60,7 +53,7 @@ class MarketDataStreamService {
       this.emit('connected');
     });
 
-    this.socket.on('disconnect', (reason: string) => {
+    this.socket.on('disconnect', (reason) => {
       console.log('Disconnected from market data stream:', reason);
       this.isConnected = false;
       this.emit('disconnected', reason);
@@ -71,22 +64,16 @@ class MarketDataStreamService {
       }
     });
 
-    this.socket.on('connect_error', (error: Error) => {
+    this.socket.on('connect_error', (error) => {
       console.error('Connection error:', error);
       this.isConnected = false;
       this.emit('error', error);
       this.handleReconnect();
     });
 
-    // Market data events (support both legacy and current backend events)
+    // Market data events
     this.socket.on('market-data-update', (data: MarketDataStream) => {
       this.emit('marketDataUpdate', data);
-    });
-
-    // Backend emits individual ticks as 'market_tick'
-    this.socket.on('market_tick', (tick: any) => {
-      // Re-emit as a generic update for consumers
-      this.emit('marketTick', tick);
     });
 
     this.socket.on('indian-market-update', (data: LiveMarketData) => {
