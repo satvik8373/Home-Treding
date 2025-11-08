@@ -1,0 +1,15 @@
+{
+  "name": "algorooms-backend",
+  "version": "1.0.0",
+  "description": "AlgoRooms Trading Backend API",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node algorroms-server.js",
+    "dev": "nodemon algorroms-server.js"
+  },
+  "dependencies": {
+    "axios": "^1.12.2",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}
