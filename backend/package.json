@@ -1,0 +1,48 @@
+{
+  "name": "algo-trading-backend",
+  "version": "1.0.0",
+  "description": "Backend for algorithmic trading platform with Firebase",
+  "main": "algorroms-server.js",
+  "scripts": {
+    "start": "node algorroms-server.js",
+    "dev": "nodemon algorroms-server.js",
+    "test": "node ../test-manual-broker-connection.js",
+    "build": "echo 'No build needed for AlgoRooms server'"
+  },
+  "keywords": [
+    "trading",
+    "algorithmic",
+    "firebase",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@types/pg": "^8.15.5",
+    "axios": "^1.12.2",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.1",
+    "firebase-admin": "^12.7.0",
+    "helmet": "^7.2.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3",
+    "redis": "^5.8.3",
+    "socket.io": "^4.8.1",
+    "winston": "^3.18.3",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.23",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.19.22",
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.10",
+    "ts-jest": "^29.4.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

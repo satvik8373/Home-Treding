@@ -193,6 +193,3 @@ config/keys.js
 config/prod.js
 private-keys/
 
-# Old backend (not used in Vercel deployment)
-backend/
-frontend/
