@@ -1,8 +1,0 @@
-.git
-.vscode
-.kiro
-*.md
-*.log
-*.backup
-backend
-frontend
