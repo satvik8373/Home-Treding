@@ -23,6 +23,7 @@ const Register: React.FC = () => {
     confirmPassword: ''
   });
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,6 +36,7 @@ const Register: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
     // Validation
     if (formData.password !== formData.confirmPassword) {
@@ -56,9 +58,23 @@ const Register: React.FC = () => {
         phone: formData.phone,
         password: formData.password
       });
-      navigate('/dashboard');
+      
+      setSuccess('Registration successful! Redirecting to dashboard...');
+      
+      // Redirect after a short delay to show success message
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1500);
     } catch (err: any) {
-      setError(err.message || 'Registration failed');
+      const errorMessage = err.message || 'Registration failed';
+      setError(errorMessage);
+      
+      // If email already exists, suggest login
+      if (errorMessage.includes('already registered')) {
+        setTimeout(() => {
+          navigate('/login', { state: { email: formData.email } });
+        }, 3000);
+      }
     } finally {
       setLoading(false);
     }
@@ -85,6 +101,17 @@ const Register: React.FC = () => {
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
+              {error.includes('already registered') && (
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  Redirecting to login page...
+                </Typography>
+              )}
+            </Alert>
+          )}
+
+          {success && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {success}
             </Alert>
           )}
 

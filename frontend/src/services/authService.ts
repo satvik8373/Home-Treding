@@ -61,7 +61,31 @@ class AuthService {
 
       return userCredential.user;
     } catch (error: any) {
-      throw new Error(error.message || 'Registration failed');
+      // Provide user-friendly error messages
+      const errorCode = error.code;
+      let errorMessage = 'Registration failed';
+
+      switch (errorCode) {
+        case 'auth/email-already-in-use':
+          errorMessage = 'This email is already registered. Please login or use a different email.';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Invalid email address format.';
+          break;
+        case 'auth/operation-not-allowed':
+          errorMessage = 'Email/password accounts are not enabled. Please contact support.';
+          break;
+        case 'auth/weak-password':
+          errorMessage = 'Password is too weak. Please use at least 6 characters.';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'Network error. Please check your internet connection.';
+          break;
+        default:
+          errorMessage = error.message || 'Registration failed. Please try again.';
+      }
+
+      throw new Error(errorMessage);
     }
   }
 
@@ -82,7 +106,37 @@ class AuthService {
 
       return userCredential.user;
     } catch (error: any) {
-      throw new Error(error.message || 'Login failed');
+      // Provide user-friendly error messages
+      const errorCode = error.code;
+      let errorMessage = 'Login failed';
+
+      switch (errorCode) {
+        case 'auth/invalid-email':
+          errorMessage = 'Invalid email address format.';
+          break;
+        case 'auth/user-disabled':
+          errorMessage = 'This account has been disabled. Please contact support.';
+          break;
+        case 'auth/user-not-found':
+          errorMessage = 'No account found with this email. Please register first.';
+          break;
+        case 'auth/wrong-password':
+          errorMessage = 'Incorrect password. Please try again.';
+          break;
+        case 'auth/invalid-credential':
+          errorMessage = 'Invalid email or password. Please check your credentials.';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'Too many failed login attempts. Please try again later.';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'Network error. Please check your internet connection.';
+          break;
+        default:
+          errorMessage = error.message || 'Login failed. Please try again.';
+      }
+
+      throw new Error(errorMessage);
     }
   }
 
@@ -100,7 +154,25 @@ class AuthService {
     try {
       await sendPasswordResetEmail(auth, email);
     } catch (error: any) {
-      throw new Error(error.message || 'Password reset failed');
+      // Provide user-friendly error messages
+      const errorCode = error.code;
+      let errorMessage = 'Password reset failed';
+
+      switch (errorCode) {
+        case 'auth/invalid-email':
+          errorMessage = 'Invalid email address format.';
+          break;
+        case 'auth/user-not-found':
+          errorMessage = 'No account found with this email.';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'Network error. Please check your internet connection.';
+          break;
+        default:
+          errorMessage = error.message || 'Password reset failed. Please try again.';
+      }
+
+      throw new Error(errorMessage);
     }
   }
 
