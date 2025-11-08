@@ -17,7 +17,8 @@ from origin 'https://home-treding.vercel.app' has been blocked by CORS policy
 - **Allowed origin: `https://home-treding.vercel.app`**
 - Also allows localhost for development
 - Created modular route handlers
-- All routes now properly handled
+- **Fixed 404 errors** - Added root `/` handler
+- All routes now properly handled (/, /api, /api/*)
 
 #### Created Route Files
 - `backend/api/routes/auth.js` - Authentication endpoints
@@ -28,7 +29,9 @@ from origin 'https://home-treding.vercel.app' has been blocked by CORS policy
 
 #### Updated `backend/vercel.json`
 - Added explicit CORS headers in routes
+- **Restricted to specific origin: `https://home-treding.vercel.app`**
 - Configured proper HTTP methods
+- Enabled credentials support
 
 ### 2. Frontend Changes (frontend/)
 
@@ -125,6 +128,51 @@ Check browser console - CORS errors should be gone!
 - GET `/api/portfolio/positions?userId=xxx` - Get positions
 - GET `/api/portfolio/holdings?userId=xxx` - Get holdings
 
+## Testing Locally Before Deployment
+
+### Start the test server:
+
+```bash
+cd backend
+node test-cors.js
+```
+
+### Test the routes (Windows PowerShell):
+
+```powershell
+cd backend
+.\test-routes.ps1
+```
+
+### Test the routes (Linux/Mac):
+
+```bash
+cd backend
+chmod +x test-routes.sh
+./test-routes.sh
+```
+
+### Manual tests:
+
+```bash
+# Test root
+curl http://localhost:3001/
+
+# Test API info
+curl http://localhost:3001/api
+
+# Test health
+curl http://localhost:3001/api/health
+
+# Test broker list
+curl http://localhost:3001/api/broker/list?userId=test
+
+# Test market data
+curl http://localhost:3001/api/market/all
+```
+
+All should return JSON responses (no 404 errors).
+
 ## Troubleshooting
 
 ### If CORS errors persist:
@@ -155,10 +203,26 @@ Check browser console - CORS errors should be gone!
 ## Notes
 
 - The backend now uses Express for better routing and middleware support
-- All routes have CORS enabled with `Access-Control-Allow-Origin: *`
-- In production, you may want to restrict CORS to specific origins
+- **CORS is restricted to: `https://home-treding.vercel.app`** (secure for production)
+- Localhost origins are allowed for local development
 - The route handlers are modular and easy to extend
 - Mock data is used for now - replace with real database in production
+- If you need to add more allowed origins, update the `allowedOrigins` array in `backend/api/index.js`
+
+## Adding More Allowed Domains
+
+If you need to allow additional domains (e.g., staging environment), update `backend/api/index.js`:
+
+```javascript
+const allowedOrigins = [
+  'https://home-treding.vercel.app',        // Production
+  'https://staging-home-treding.vercel.app', // Staging (example)
+  'http://localhost:3000',                   // Local dev
+  'http://localhost:3001'                    // Local dev
+];
+```
+
+And update `backend/vercel.json` if you want to set a default origin in the headers.
 
 ## Next Steps
 
@@ -166,4 +230,4 @@ Check browser console - CORS errors should be gone!
 2. Test all endpoints
 3. Replace mock data with real database (MongoDB, PostgreSQL, etc.)
 4. Add proper authentication middleware
-5. Restrict CORS to specific origins for security
+5. ✅ CORS is now restricted to your specific domain (secure!)

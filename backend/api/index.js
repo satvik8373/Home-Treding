@@ -38,15 +38,24 @@ const marketRoutes = require('./routes/market');
 const strategyRoutes = require('./routes/strategies');
 const portfolioRoutes = require('./routes/portfolio');
 
-// Health check
-app.get('/api/health', (req, res) => {
+// Root endpoint (handles both / and /api)
+app.get('/', (req, res) => {
   res.status(200).json({
-    status: 'OK',
-    timestamp: new Date().toISOString()
+    success: true,
+    message: 'AlgoRooms Trading API',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth/*',
+      brokers: '/api/broker/*',
+      market: '/api/market/*',
+      strategies: '/api/strategies/*',
+      portfolio: '/api/portfolio/*'
+    }
   });
 });
 
-// Root endpoint
 app.get('/api', (req, res) => {
   res.status(200).json({
     success: true,
@@ -61,6 +70,14 @@ app.get('/api', (req, res) => {
       strategies: '/api/strategies/*',
       portfolio: '/api/portfolio/*'
     }
+  });
+});
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString()
   });
 });
 

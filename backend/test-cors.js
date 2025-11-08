@@ -8,10 +8,13 @@ const server = http.createServer(app);
 server.listen(PORT, () => {
   console.log(`\n🧪 Test server running on http://localhost:${PORT}`);
   console.log('\n📋 Test these endpoints:');
+  console.log(`   GET  http://localhost:${PORT}/`);
+  console.log(`   GET  http://localhost:${PORT}/api`);
   console.log(`   GET  http://localhost:${PORT}/api/health`);
   console.log(`   GET  http://localhost:${PORT}/api/broker/list?userId=test`);
   console.log(`   GET  http://localhost:${PORT}/api/market/all`);
   console.log(`   POST http://localhost:${PORT}/api/auth/login`);
-  console.log('\n✅ CORS is enabled for all origins');
+  console.log('\n✅ CORS is enabled for: https://home-treding.vercel.app');
+  console.log('✅ Also allowed: localhost:3000, localhost:3001');
   console.log('🛑 Press Ctrl+C to stop\n');
 });
