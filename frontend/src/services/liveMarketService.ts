@@ -88,7 +88,7 @@ class LiveMarketService {
       const response = await axios.get<MarketDataResponse>(
         `${API_CONFIG.BASE_URL}/api/market/all`,
         {
-          timeout: 2000, // 2 second timeout for faster response
+          timeout: 10000,
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
@@ -97,12 +97,12 @@ class LiveMarketService {
         }
       );
 
-      if (response.data.success) {
+      if (response.data.success && response.data.data) {
         return response.data.data;
       }
+      
       return [];
-    } catch (error) {
-      console.error('Failed to fetch market data:', error);
+    } catch (error: any) {
       return [];
     }
   }
@@ -116,7 +116,7 @@ class LiveMarketService {
         `${API_CONFIG.BASE_URL}/api/market/live`,
         {
           params: { symbols: symbols.join(',') },
-          timeout: 2000,
+          timeout: 10000,
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
@@ -124,12 +124,12 @@ class LiveMarketService {
         }
       );
 
-      if (response.data.success) {
+      if (response.data.success && response.data.data) {
         return response.data.data;
       }
+      
       return [];
-    } catch (error) {
-      console.error('Failed to fetch live data:', error);
+    } catch (error: any) {
       return [];
     }
   }
@@ -138,7 +138,6 @@ class LiveMarketService {
    * Internal polling function (Optimized to prevent overlapping requests)
    */
   private async poll(): Promise<void> {
-    // Skip if previous request still in progress
     if (this.requestInProgress) {
       return;
     }
@@ -151,17 +150,16 @@ class LiveMarketService {
       if (data.length > 0) {
         this.lastData = data;
         
-        // Notify all subscribers
         this.subscribers.forEach(callback => {
           try {
             callback(data);
           } catch (error) {
-            console.error('Error in subscriber callback:', error);
+            // Silent error handling
           }
         });
       }
     } catch (error) {
-      console.error('Polling error:', error);
+      // Silent error handling
     } finally {
       this.requestInProgress = false;
     }

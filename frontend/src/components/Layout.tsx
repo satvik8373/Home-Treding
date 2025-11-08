@@ -22,7 +22,8 @@ import {
   MenuItem,
   Divider,
   Badge,
-  Tooltip
+  Tooltip,
+  CircularProgress
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -36,11 +37,115 @@ import {
   Logout as LogoutIcon,
   Person as PersonIcon,
   Notifications as NotificationsIcon,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  OpenInNew as OpenInNewIcon,
+  TrendingDown
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { auth } from '../config/firebase';
 import authService from '../services/authService';
+import { useLiveMarketData } from '../hooks/useLiveMarketData';
+
+// Live Indices Sidebar Component
+const LiveIndicesSidebar: React.FC = () => {
+  const { data: marketData, loading } = useLiveMarketData({ 
+    interval: 3000,
+    autoStart: true 
+  });
+
+  // Show 3 indices + 2 stocks
+  const indices = marketData.filter(item => 
+    ['NIFTY', 'BANKNIFTY', 'SENSEX', 'RELIANCE', 'TCS'].includes(item.symbol)
+  ).slice(0, 5);
+
+  if (loading && indices.length === 0) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
+        <CircularProgress size={16} />
+      </Box>
+    );
+  }
+
+  if (indices.length === 0) {
+    return null;
+  }
+
+  return (
+    <Paper 
+      sx={{ 
+        p: 0.75,
+        bgcolor: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: 1.5,
+        boxShadow: 'none'
+      }}
+    >
+      {indices.map((index, idx) => {
+        const isPositive = parseFloat(index.change) >= 0;
+        const displaySymbol = index.symbol === 'BANKNIFTY' ? 'BNF' 
+          : index.symbol === 'SENSEX' ? 'FN' 
+          : index.symbol === 'RELIANCE' ? 'RIL'
+          : index.symbol === 'TCS' ? 'TCS'
+          : index.symbol;
+        
+        return (
+          <Box 
+            key={index.symbol}
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              py: 0.5,
+              px: 0.5,
+              borderBottom: idx !== indices.length - 1 ? '1px solid #f1f5f9' : 'none'
+            }}
+          >
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  fontWeight: 600, 
+                  color: '#0f172a', 
+                  fontSize: '0.75rem',
+                  lineHeight: 1.1,
+                  mb: 0.25
+                }}
+              >
+                {displaySymbol}
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
+                <Typography 
+                  variant="caption" 
+                  sx={{ 
+                    fontWeight: 600,
+                    color: isPositive ? '#10b981' : '#ef4444',
+                    fontSize: '0.625rem',
+                    lineHeight: 1
+                  }}
+                >
+                  {parseFloat(index.ltp).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                </Typography>
+                <Typography 
+                  variant="caption" 
+                  sx={{ 
+                    color: isPositive ? '#10b981' : '#ef4444',
+                    fontSize: '0.5625rem',
+                    lineHeight: 1
+                  }}
+                >
+                  ({isPositive ? '+' : ''}{parseFloat(index.changePercent).toFixed(2)}%)
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton size="small" sx={{ color: '#e2e8f0', p: 0.25, ml: 0.25 }}>
+              <OpenInNewIcon sx={{ fontSize: 10 }} />
+            </IconButton>
+          </Box>
+        );
+      })}
+    </Paper>
+  );
+};
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -129,15 +234,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         )}
       </Toolbar>
       
-      <List sx={{ px: 2, py: 3, flex: 1 }}>
+      <List sx={{ px: 2, py: 2 }}>
         {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
+          <ListItem key={item.text} disablePadding sx={{ mb: 0.75 }}>
             <ListItemButton
               selected={location.pathname === item.path}
               onClick={() => handleNavigation(item.path)}
               sx={{
-                borderRadius: 2.5,
-                py: 1.5,
+                borderRadius: 2,
+                py: 1.25,
                 px: 2,
                 transition: 'all 0.2s',
                 '&.Mui-selected': {
@@ -156,12 +261,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 }
               }}
             >
-              <ListItemIcon sx={{ minWidth: 40, color: '#64748b' }}>{item.icon}</ListItemIcon>
+              <ListItemIcon sx={{ minWidth: 36, color: '#64748b' }}>{item.icon}</ListItemIcon>
               <ListItemText 
                 primary={item.text} 
                 primaryTypographyProps={{ 
                   fontWeight: location.pathname === item.path ? 600 : 500,
-                  fontSize: '0.9375rem'
+                  fontSize: '0.875rem'
                 }} 
               />
             </ListItemButton>
@@ -169,22 +274,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         ))}
       </List>
 
-      <Box sx={{ p: 2, borderTop: '1px solid #f1f5f9' }}>
-        <Paper 
-          sx={{ 
-            p: 2, 
-            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
-            border: '1px solid #e2e8f0',
-            borderRadius: 2
-          }}
-        >
-          <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>
-            Need Help?
-          </Typography>
-          <Typography variant="body2" sx={{ color: '#475569', fontSize: '0.8125rem' }}>
-            Check our documentation
-          </Typography>
-        </Paper>
+      {/* Live Indices Section - Desktop Only */}
+      <Box sx={{ px: 2, pb: 1.5, mt: 'auto', display: { xs: 'none', md: 'block' } }}>
+        <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600, px: 0.75, display: 'block', mb: 0.75, fontSize: '0.625rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          Indices
+        </Typography>
+        <LiveIndicesSidebar />
       </Box>
     </Box>
   );

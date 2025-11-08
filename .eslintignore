@@ -1,0 +1,10 @@
+node_modules/
+build/
+dist/
+*.config.js
+*.config.ts
+public/
+backend/
+api/
+.vercel/
+.git/

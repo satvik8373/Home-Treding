@@ -15,14 +15,14 @@ import {
 import {
   Add,
   TrendingUp,
-  TrendingDown,
   AccountBalance,
-  ShowChart,
   Assessment,
   Refresh,
   ArrowUpward,
   PlayArrow,
-  Stop
+  Stop,
+  ShowChart,
+  TrendingDown
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -31,16 +31,7 @@ import authService, { UserProfile } from '../services/authService';
 import firestoreService, { Strategy } from '../services/firestoreService';
 import axios from 'axios';
 import Layout from '../components/Layout';
-import apiService from '../services/apiService';
-
-interface Stock {
-  symbol: string;
-  name: string;
-  price: number;
-  change: number;
-  changePercent: number;
-  volume?: number;
-}
+import { useLiveMarketData } from '../hooks/useLiveMarketData';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -49,7 +40,16 @@ const Dashboard: React.FC = () => {
   const [algoRoomsBrokers, setAlgoRoomsBrokers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [marketData, setMarketData] = useState<Stock[]>([]);
+  
+  // Live market data for mobile view
+  const { data: marketData } = useLiveMarketData({ 
+    interval: 3000,
+    autoStart: true 
+  });
+
+  const mobileIndices = marketData.filter(item => 
+    ['NIFTY', 'BANKNIFTY', 'SENSEX', 'RELIANCE', 'TCS'].includes(item.symbol)
+  ).slice(0, 5);
 
   const loadAlgoRoomsBrokers = async () => {
     try {
@@ -64,21 +64,12 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const loadMarketData = async () => {
-    try {
-      const response = await apiService.get<{ success: boolean; data: { stocks: Stock[]; indices: Stock[] } }>('/api/market/all');
-      if (response.success) {
-        const allData = [...(response.data.indices || []), ...(response.data.stocks || [])];
-        setMarketData(allData.slice(0, 4)); // Top 4 for 2x2 grid
-      }
-    } catch (error) {
-      console.error('Failed to load market data:', error);
-    }
-  };
+  // No longer needed - using live market data hook instead
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadAlgoRoomsBrokers(), loadMarketData()]);
+    await loadAlgoRoomsBrokers();
+    // Market data refreshes automatically via live hook
     setRefreshing(false);
   };
 
@@ -91,7 +82,8 @@ const Dashboard: React.FC = () => {
 
           const strategiesData = await firestoreService.getStrategies(firebaseUser.uid);
           setStrategies(strategiesData);
-          await Promise.all([loadAlgoRoomsBrokers(), loadMarketData()]);
+          await loadAlgoRoomsBrokers();
+          // Market data loads automatically via live hook
         } catch (error) {
           console.error('Failed to load data:', error);
         }
@@ -108,8 +100,8 @@ const Dashboard: React.FC = () => {
     if (!loading && user) {
       const interval = setInterval(() => {
         loadAlgoRoomsBrokers();
-        loadMarketData();
-      }, 5000); // Refresh every 5 seconds
+        // Market data updates automatically via live hook (every 1 second)
+      }, 5000); // Refresh brokers every 5 seconds
 
       return () => clearInterval(interval);
     }
@@ -171,98 +163,66 @@ const Dashboard: React.FC = () => {
           )}
         </Box>
 
-        {/* Live Market Data - 2x2 Grid in One Row */}
-        <Paper sx={{ p: 1.5, mb: 2, borderRadius: 2, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', overflow: 'hidden' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, px: 0.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-              <ShowChart sx={{ color: 'white', fontSize: 18 }} />
-              <Typography variant="caption" sx={{ fontWeight: 700, color: 'white', letterSpacing: '0.5px', fontSize: '0.75rem' }}>
-                LIVE MARKET
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#10b981', animation: 'pulse 2s infinite' }} />
-              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.65rem' }}>
-                Real-time
-              </Typography>
-            </Box>
-          </Box>
 
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 1 }}>
-            {marketData.length > 0 ? marketData.map((stock) => (
-              <Card 
-                key={stock.symbol}
-                sx={{ 
-                  bgcolor: 'rgba(255,255,255,0.95)',
-                  backdropFilter: 'blur(10px)',
-                  transition: 'all 0.2s',
-                  '&:hover': { 
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 6px 12px rgba(0,0,0,0.15)'
-                  }
-                }}
-              >
-                <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
-                  {/* Name on Top */}
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
-                      color: '#64748b', 
-                      fontSize: '0.65rem',
-                      display: 'block',
-                      mb: 0.25,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {stock.name}
-                  </Typography>
-                  
-                  {/* Symbol and Trend Icon */}
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.8125rem' }}>
-                      {stock.symbol}
-                    </Typography>
-                    {stock.change >= 0 ? (
-                      <TrendingUp sx={{ fontSize: 16, color: '#10b981' }} />
-                    ) : (
-                      <TrendingDown sx={{ fontSize: 16, color: '#ef4444' }} />
-                    )}
-                  </Box>
-                  
-                  {/* Price */}
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1.125rem', mb: 0.5, lineHeight: 1 }}>
-                    ₹{stock.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </Typography>
-                  
-                  {/* Change Chip */}
-                  <Chip
-                    label={`${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)} (${stock.changePercent.toFixed(2)}%)`}
-                    size="small"
-                    sx={{
-                      height: 18,
-                      fontSize: '0.65rem',
-                      fontWeight: 600,
-                      bgcolor: stock.change >= 0 ? '#dcfce7' : '#fee2e2',
-                      color: stock.change >= 0 ? '#10b981' : '#ef4444',
-                      border: 'none',
-                      '& .MuiChip-label': {
-                        px: 0.75
-                      }
-                    }}
-                  />
-                </CardContent>
-              </Card>
-            )) : (
-              <Box sx={{ gridColumn: '1 / -1', textAlign: 'center', py: 2 }}>
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.75rem' }}>
-                  No market data available
-                </Typography>
-              </Box>
-            )}
-          </Box>
-        </Paper>
+
+        {/* Mobile Indices - Show only on mobile */}
+        <Box sx={{ display: { xs: 'block', md: 'none' }, mb: 2 }}>
+          <Paper sx={{ p: 1.5, borderRadius: 2 }}>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 1, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Live Market
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1 }}>
+              {mobileIndices.map((index) => {
+                const isPositive = parseFloat(index.change) >= 0;
+                const displaySymbol = index.symbol === 'BANKNIFTY' ? 'BNF' 
+                  : index.symbol === 'SENSEX' ? 'FN' 
+                  : index.symbol === 'RELIANCE' ? 'RIL'
+                  : index.symbol === 'TCS' ? 'TCS'
+                  : index.symbol;
+                
+                return (
+                  <Card key={index.symbol} variant="outlined" sx={{ bgcolor: '#fafafa' }}>
+                    <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.8125rem' }}>
+                          {displaySymbol}
+                        </Typography>
+                        {isPositive ? (
+                          <TrendingUp sx={{ fontSize: 14, color: '#10b981' }} />
+                        ) : (
+                          <TrendingDown sx={{ fontSize: 14, color: '#ef4444' }} />
+                        )}
+                      </Box>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontWeight: 700, 
+                          color: '#0f172a', 
+                          fontSize: '0.875rem',
+                          mb: 0.25
+                        }}
+                      >
+                        ₹{parseFloat(index.ltp).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                      </Typography>
+                      <Chip
+                        label={`${isPositive ? '+' : ''}${parseFloat(index.changePercent).toFixed(2)}%`}
+                        size="small"
+                        sx={{
+                          height: 16,
+                          fontSize: '0.625rem',
+                          fontWeight: 600,
+                          bgcolor: isPositive ? '#dcfce7' : '#fee2e2',
+                          color: isPositive ? '#10b981' : '#ef4444',
+                          '& .MuiChip-label': { px: 0.5 }
+                        }}
+                      />
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </Box>
+          </Paper>
+        </Box>
 
         {/* Compact Stats Grid */}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 2 }}>
