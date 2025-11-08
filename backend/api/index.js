@@ -37,6 +37,7 @@ const brokerRoutes = require('./routes/brokers');
 const marketRoutes = require('./routes/market');
 const strategyRoutes = require('./routes/strategies');
 const portfolioRoutes = require('./routes/portfolio');
+const tradingRoutes = require('./routes/trading');
 
 // Root endpoint (handles both / and /api)
 app.get('/', (req, res) => {
@@ -87,6 +88,7 @@ app.use('/api/broker', brokerRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/strategies', strategyRoutes);
 app.use('/api/portfolio', portfolioRoutes);
+app.use('/api/trading', tradingRoutes);
 
 // 404 handler
 app.use((req, res) => {
