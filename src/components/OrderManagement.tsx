@@ -103,7 +103,7 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
       }
     });
 
-    newSocket.on('connect_error', (error) => {
+    newSocket.on('connect_error', (error: Error) => {
       console.log('📡 WebSocket connection failed (expected in demo mode)');
     });
 
