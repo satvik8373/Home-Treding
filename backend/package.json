@@ -1,6 +1,6 @@
 {
   "name": "algorooms-backend",
-  "version": "1.0.0",
+  "version": "3.0.0",
   "description": "AlgoRooms Trading Backend API",
   "main": "api/index.js",
   "scripts": {
