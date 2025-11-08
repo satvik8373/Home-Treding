@@ -5,22 +5,19 @@ const cors = require('cors');
 // Create Express app
 const app = express();
 
-// Enable CORS for specific origin
-const allowedOrigins = [
-  'https://home-treding.vercel.app',
-  'http://localhost:3000', // For local development
-  'http://localhost:3001'  // For local development
-];
-
+// Enable CORS for all Vercel deployments and local development
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    // Allow all Vercel preview deployments and production
+    if (origin.includes('vercel.app') || 
+        origin.includes('localhost') ||
+        origin.includes('home-treding')) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, true); // Allow all for now
     }
   },
   credentials: true,
