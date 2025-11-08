@@ -1,26 +1,50 @@
 // Vercel Serverless Function - Main Entry Point
-const express = require('express');
-const cors = require('cors');
+module.exports = async (req, res) => {
+  // Enable CORS
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+  );
 
-const app = express();
+  // Handle OPTIONS request
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+  // Route handling
+  const { url, method } = req;
 
-// Import routes
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
-});
+  // Health check
+  if (url === '/api/health' || url === '/health') {
+    return res.status(200).json({
+      status: 'OK',
+      timestamp: new Date().toISOString()
+    });
+  }
 
-app.get('/api', (req, res) => {
-  res.json({
-    success: true,
-    message: 'AlgoRooms Trading API',
-    version: '1.0.0',
-    timestamp: new Date().toISOString()
+  // Root endpoint
+  if (url === '/' || url === '/api') {
+    return res.status(200).json({
+      success: true,
+      message: 'AlgoRooms Trading API',
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      endpoints: {
+        health: '/api/health',
+        brokers: '/api/brokers',
+        market: '/api/market'
+      }
+    });
+  }
+
+  // 404 for unknown routes
+  res.status(404).json({
+    success: false,
+    message: 'Endpoint not found',
+    path: url
   });
-});
-
-// Export for Vercel
-module.exports = app;
+};
