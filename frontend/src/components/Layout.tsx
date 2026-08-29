@@ -239,7 +239,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const user = auth.currentUser;
+  const user = auth.currentUser || authService.getCurrentUser();
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);

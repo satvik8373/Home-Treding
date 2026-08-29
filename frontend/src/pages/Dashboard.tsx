@@ -85,10 +85,10 @@ const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
+    const unsubscribe = authService.onAuthStateChanged(async (currentUser) => {
+      if (currentUser) {
         try {
-          const profile = await authService.getUserProfile(firebaseUser.uid);
+          const profile = await authService.getUserProfile(currentUser.uid);
           setUser(profile);
           await loadData();
         } catch (error) {
