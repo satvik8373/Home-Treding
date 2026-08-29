@@ -1,7 +1,6 @@
 ﻿{
   "version": 2,
-  "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/build",
+  "outputDirectory": "build",
   "routes": [
     {
       "src": "/static/(.*)",

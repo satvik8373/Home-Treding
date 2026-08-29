@@ -32,7 +32,8 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "node build.js",
+    "vercel-build": "node build.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
