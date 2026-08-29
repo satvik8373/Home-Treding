@@ -1,4 +1,4 @@
-﻿import { 
+import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signOut, 
