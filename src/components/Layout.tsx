@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Drawer,
@@ -20,7 +20,9 @@ import {
   Avatar,
   Menu,
   MenuItem,
-  Divider
+  Divider,
+  Badge,
+  Tooltip
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -32,188 +34,13 @@ import {
   Menu as MenuIcon,
   Close as CloseIcon,
   Logout as LogoutIcon,
-  Security as SecurityIcon,
-  PlayArrow as LiveIcon,
-  Help as HelpIcon
+  Person as PersonIcon,
+  Notifications as NotificationsIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { auth } from '../config/firebase';
 import authService from '../services/authService';
-import { EmergencyStopButton } from './common/EmergencyStopButton';
-import axios from 'axios';
-import { io } from 'socket.io-client';
-
-// Live Indices Sidebar Component with Guaranteed Streaming & Fallbacks
-const defaultIndices = [
-  { symbol: 'NIFTY 50', name: 'NIFTY', ltp: 24100.70, change: 76.50, changePercent: 0.32 },
-  { symbol: 'BANKNIFTY', name: 'BANKNIFTY', ltp: 57336.50, change: 254.20, changePercent: 0.45 },
-  { symbol: 'FINNIFTY', name: 'FINNIFTY', ltp: 26204.10, change: 72.80, changePercent: 0.28 },
-  { symbol: 'RELIANCE', name: 'RELIANCE', ltp: 1284.24, change: 6.90, changePercent: 0.54 },
-  { symbol: 'TCS', name: 'TCS', ltp: 2340.27, change: -4.30, changePercent: -0.18 }
-];
-
-const LiveIndicesSidebar: React.FC = () => {
-  const [indices, setIndices] = useState(defaultIndices);
-  const [isMarketOpen, setIsMarketOpen] = useState(true);
-  const [marketStatusMsg, setMarketStatusMsg] = useState('Live');
-
-  useEffect(() => {
-    let isMounted = true;
-
-    // 1. Initial REST fetch
-    axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/market/all`)
-      .then(res => {
-        if (res.data?.success && isMounted) {
-          if (typeof res.data.isMarketOpen === 'boolean') {
-            setIsMarketOpen(res.data.isMarketOpen);
-            setMarketStatusMsg(res.data.isMarketOpen ? 'LIVE' : (res.data.marketStatus?.status || 'CLOSED'));
-          }
-
-          if (res.data.data) {
-            const fetchedMap = new Map();
-            res.data.data.forEach((d: any) => fetchedMap.set(d.symbol, d));
-
-            setIndices(prev => prev.map(item => {
-              const found = fetchedMap.get(item.symbol) || fetchedMap.get(item.name);
-              if (found) {
-                return {
-                  ...item,
-                  ltp: Number(found.price || found.ltp) || item.ltp,
-                  change: Number(found.change) || item.change,
-                  changePercent: Number(found.changePercent) || item.changePercent
-                };
-              }
-              return item;
-            }));
-          }
-        }
-      })
-      .catch(() => {});
-
-    // 2. Real-time WebSocket Updates
-    const wsUrl = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:5000';
-    const socket = io(wsUrl);
-
-    socket.on('market_tick', (tick: any) => {
-      if (!isMounted || !tick || !tick.symbol) return;
-
-      if (typeof tick.isOpen === 'boolean') {
-        setIsMarketOpen(tick.isOpen);
-        setMarketStatusMsg(tick.isOpen ? 'LIVE' : (tick.marketStatus || 'CLOSED'));
-      }
-
-      setIndices(prev => prev.map(item => {
-        if (item.symbol === tick.symbol || item.name === tick.symbol || (tick.symbol.includes('NIFTY') && item.symbol.includes('NIFTY'))) {
-          const ltp = Number(tick.ltp || tick.price || item.ltp);
-          const prevClose = Number(tick.prevClose || (ltp - item.change));
-          const change = Number((ltp - prevClose).toFixed(2));
-          const changePercent = prevClose > 0 ? Number(((change / prevClose) * 100).toFixed(2)) : item.changePercent;
-          return { ...item, ltp, change, changePercent };
-        }
-        return item;
-      }));
-    });
-
-    return () => {
-      isMounted = false;
-      socket.disconnect();
-    };
-  }, []);
-
-  return (
-    <Paper 
-      sx={{ 
-        p: 1,
-        bgcolor: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: 2,
-        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 0.8, mb: 0.5, borderBottom: '1px solid #f1f5f9' }}>
-        <Typography variant="caption" sx={{ fontWeight: 700, color: '#64748b', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          Market Feed
-        </Typography>
-        <Box 
-          sx={{ 
-            display: 'inline-flex', 
-            alignItems: 'center', 
-            gap: 0.4, 
-            px: 0.8, 
-            py: 0.2, 
-            borderRadius: '12px', 
-            bgcolor: isMarketOpen ? '#dcfce7' : '#fef3c7',
-            color: isMarketOpen ? '#166534' : '#92400e',
-            fontSize: '0.62rem',
-            fontWeight: 700
-          }}
-        >
-          <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: isMarketOpen ? '#22c55e' : '#f59e0b' }} />
-          {isMarketOpen ? 'LIVE' : 'CLOSED'}
-        </Box>
-      </Box>
-      {indices.map((index, idx) => {
-        const isPositive = index.change >= 0;
-        const displaySymbol = index.name || index.symbol;
-        
-        return (
-          <Box 
-            key={index.symbol}
-            sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between',
-              py: 0.6,
-              px: 0.5,
-              borderBottom: idx !== indices.length - 1 ? '1px solid #f8fafc' : 'none'
-            }}
-          >
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography 
-                variant="body2" 
-                sx={{ 
-                  fontWeight: 700, 
-                  color: '#0f172a', 
-                  fontSize: '0.74rem',
-                  lineHeight: 1.1,
-                  mb: 0.2
-                }}
-              >
-                {displaySymbol}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.6 }}>
-                <Typography 
-                  variant="caption" 
-                  sx={{ 
-                    fontWeight: 700,
-                    color: '#0f172a',
-                    fontFamily: 'monospace',
-                    fontSize: '0.68rem',
-                    lineHeight: 1
-                  }}
-                >
-                  ₹{index.ltp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </Typography>
-                <Typography 
-                  variant="caption" 
-                  sx={{ 
-                    color: isPositive ? '#16a34a' : '#dc2626',
-                    fontWeight: 600,
-                    fontFamily: 'monospace',
-                    fontSize: '0.62rem',
-                    lineHeight: 1
-                  }}
-                >
-                  {isPositive ? '+' : ''}{index.changePercent.toFixed(2)}%
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
-        );
-      })}
-    </Paper>
-  );
-};
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -224,10 +51,8 @@ const drawerWidth = 280;
 const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Trading', icon: <ShowChart />, path: '/trading-dashboard' },
-  { text: 'Option Chain', icon: <ShowChart />, path: '/option-chain' },
   { text: 'Brokers', icon: <LinkIcon />, path: '/brokers' },
   { text: 'Strategies', icon: <TrendingUp />, path: '/strategies' },
-  { text: 'Backtest', icon: <Assessment />, path: '/backtest' },
   { text: 'Portfolio', icon: <AccountBalance />, path: '/portfolio' },
   { text: 'Reports', icon: <Assessment />, path: '/reports' }
 ];
@@ -239,7 +64,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const user = auth.currentUser || authService.getCurrentUser();
+  const user = auth.currentUser;
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -280,28 +105,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Box sx={{
-            width: 36,
-            height: 36,
+            width: 40,
+            height: 40,
             borderRadius: 2,
-            bgcolor: '#0f172a',
+            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            fontWeight: 800,
-            fontSize: '1rem',
-            letterSpacing: '-0.02em'
+            fontWeight: 700,
+            fontSize: '1.25rem'
           }}>
-            M
+            A
           </Box>
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1.05rem', lineHeight: 1.1 }}>
-              Mavrix Trading
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem', fontWeight: 600 }}>
-              DhanHQ v2 Powered
-            </Typography>
-          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1.25rem' }}>
+            AlgoRooms
+          </Typography>
         </Box>
         {isMobile && (
           <IconButton onClick={handleDrawerToggle} size="small">
@@ -310,25 +129,26 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         )}
       </Toolbar>
       
-      <List sx={{ px: 1.5, py: 2 }}>
+      <List sx={{ px: 2, py: 3, flex: 1 }}>
         {menuItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
+          <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
             <ListItemButton
               selected={location.pathname === item.path}
               onClick={() => handleNavigation(item.path)}
               sx={{
-                borderRadius: 2,
-                py: 1,
-                px: 1.8,
-                transition: 'all 0.15s ease',
+                borderRadius: 2.5,
+                py: 1.5,
+                px: 2,
+                transition: 'all 0.2s',
                 '&.Mui-selected': {
-                  bgcolor: '#0f172a',
-                  color: '#ffffff',
+                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  color: 'white',
+                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
                   '& .MuiListItemIcon-root': {
-                    color: '#ffffff'
+                    color: 'white'
                   },
                   '&:hover': {
-                    bgcolor: '#1e293b',
+                    background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
                   }
                 },
                 '&:hover': {
@@ -336,12 +156,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 }
               }}
             >
-              <ListItemIcon sx={{ minWidth: 34, color: '#64748b' }}>{item.icon}</ListItemIcon>
+              <ListItemIcon sx={{ minWidth: 40, color: '#64748b' }}>{item.icon}</ListItemIcon>
               <ListItemText 
                 primary={item.text} 
                 primaryTypographyProps={{ 
-                  fontWeight: location.pathname === item.path ? 700 : 500,
-                  fontSize: '0.82rem'
+                  fontWeight: location.pathname === item.path ? 600 : 500,
+                  fontSize: '0.9375rem'
                 }} 
               />
             </ListItemButton>
@@ -349,105 +169,97 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         ))}
       </List>
 
-      {/* Live Indices Section - Desktop Only */}
-      <Box sx={{ px: 2, pb: 1.5, mt: 'auto', display: { xs: 'none', md: 'block' } }}>
-        <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600, px: 0.75, display: 'block', mb: 0.75, fontSize: '0.625rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          Indices
-        </Typography>
-        <LiveIndicesSidebar />
+      <Box sx={{ p: 2, borderTop: '1px solid #f1f5f9' }}>
+        <Paper 
+          sx={{ 
+            p: 2, 
+            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+            border: '1px solid #e2e8f0',
+            borderRadius: 2
+          }}
+        >
+          <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>
+            Need Help?
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#475569', fontSize: '0.8125rem' }}>
+            Check our documentation
+          </Typography>
+        </Paper>
       </Box>
     </Box>
   );
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f8fafc' }}>
-      {/* Sleek Minimalist Top Header */}
+      {/* App Bar */}
       <AppBar
         position="fixed"
         elevation={0}
         sx={{
           width: { md: `calc(100% - ${drawerWidth}px)` },
           ml: { md: `${drawerWidth}px` },
-          bgcolor: 'rgba(255, 255, 255, 0.96)',
-          backdropFilter: 'blur(8px)',
+          bgcolor: '#ffffff',
           color: '#0f172a',
-          borderBottom: '1px solid #e2e8f0',
+          borderBottom: '1px solid #f1f5f9',
           top: 0,
-          zIndex: 1100,
-          boxShadow: 'none'
+          pt: 'env(safe-area-inset-top)',
         }}
       >
-        <Toolbar sx={{ height: 56, minHeight: '56px !important', px: { xs: 2, sm: 3 }, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          {/* Left Breadcrumb & Route Title */}
-          <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
-            {isMobile && (
-              <IconButton
-                edge="start"
-                onClick={handleDrawerToggle}
-                sx={{ mr: 1.5, color: '#64748b', p: 0.5 }}
-              >
-                <MenuIcon sx={{ fontSize: 20 }} />
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 }, px: { xs: 1.5, sm: 3 } }}>
+          {isMobile && (
+            <IconButton
+              edge="start"
+              onClick={handleDrawerToggle}
+              sx={{ mr: 1.5, color: '#64748b', p: 0.75 }}
+            >
+              <MenuIcon sx={{ fontSize: 22 }} />
+            </IconButton>
+          )}
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 600, color: '#0f172a', fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+            {menuItems.find(item => item.path === location.pathname)?.text || 'AlgoRooms'}
+          </Typography>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1 } }}>
+            <Tooltip title="Notifications">
+              <IconButton size="small" sx={{ color: '#64748b', p: { xs: 0.5, sm: 1 } }}>
+                <Badge badgeContent={3} color="error">
+                  <NotificationsIcon sx={{ fontSize: { xs: 20, sm: 24 } }} />
+                </Badge>
               </IconButton>
-            )}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="body2" sx={{ color: '#94a3b8', fontWeight: 600, fontSize: '0.8rem', display: { xs: 'none', sm: 'block' } }}>
-                Mavrix
+            </Tooltip>
+            
+            <Tooltip title="Settings">
+              <IconButton size="small" sx={{ color: '#64748b', display: { xs: 'none', sm: 'inline-flex' }, p: 1 }}>
+                <SettingsIcon sx={{ fontSize: 24 }} />
+              </IconButton>
+            </Tooltip>
+
+            <Divider orientation="vertical" flexItem sx={{ mx: 1, display: { xs: 'none', sm: 'block' } }} />
+
+            <Box sx={{ display: { xs: 'none', sm: 'flex' }, flexDirection: 'column', alignItems: 'flex-end', mr: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', lineHeight: 1.2, fontSize: '0.875rem' }}>
+                {user?.displayName || 'User'}
               </Typography>
-              <Typography variant="body2" sx={{ color: '#cbd5e1', fontWeight: 400, display: { xs: 'none', sm: 'block' } }}>
-                /
-              </Typography>
-              <Typography
-                variant="subtitle2"
-                noWrap
-                sx={{
-                  fontWeight: 700,
-                  color: '#0f172a',
-                  fontSize: '0.88rem',
-                  letterSpacing: '-0.01em'
-                }}
-              >
-                {menuItems.find(item => item.path === location.pathname)?.text || 'Dashboard'}
+              <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.75rem' }}>
+                {user?.email}
               </Typography>
             </Box>
-          </Box>
-          
-          {/* Right Header Controls */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
-            <EmergencyStopButton />
 
-            {/* Clean User Profile Trigger */}
-            <Box
-              onClick={handleMenuOpen}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                cursor: 'pointer',
-                p: 0.5,
-                borderRadius: 2,
-                '&:hover': { bgcolor: '#f8fafc' },
-                transition: 'all 0.15s ease'
-              }}
-            >
+            <IconButton onClick={handleMenuOpen} sx={{ p: { xs: 0.25, sm: 0.5 } }}>
               <Avatar 
                 sx={{ 
-                  width: 28, 
-                  height: 28,
-                  bgcolor: '#0f172a',
-                  color: '#ffffff',
-                  fontWeight: 700,
-                  fontSize: '0.75rem'
+                  width: { xs: 32, sm: 36 }, 
+                  height: { xs: 32, sm: 36 },
+                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  fontWeight: 600,
+                  fontSize: { xs: '0.875rem', sm: '1rem' }
                 }}
               >
-                {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'T'}
+                {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
               </Avatar>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.8rem', display: { xs: 'none', sm: 'block' } }}>
-                {user?.displayName || 'Trader'}
-              </Typography>
-            </Box>
+            </IconButton>
           </Box>
 
-          {/* User Menu Popover */}
           <Menu
             anchorEl={anchorEl}
             open={Boolean(anchorEl)}
@@ -457,43 +269,42 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             slotProps={{
               paper: {
                 sx: {
-                  mt: 1,
-                  minWidth: 200,
+                  mt: 1.5,
+                  minWidth: 220,
                   borderRadius: 2.5,
-                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.02)',
-                  border: '1px solid #e2e8f0',
-                  p: 0.5
+                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+                  border: '1px solid #f1f5f9'
                 }
               }
             }}
           >
-            <Box sx={{ px: 2, py: 1.5 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.82rem' }}>
-                {user?.displayName || 'Active Trader'}
+            <Box sx={{ px: 2.5, py: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#0f172a' }}>
+                {user?.displayName || 'User'}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.72rem' }}>
-                {user?.email || 'dhan-live-connected'}
+              <Typography variant="caption" sx={{ color: '#64748b' }}>
+                {user?.email}
               </Typography>
             </Box>
-            <Divider sx={{ my: 0.5, borderColor: '#f1f5f9' }} />
-            <MenuItem onClick={() => { handleMenuClose(); navigate('/brokers'); }} sx={{ py: 1, px: 2, borderRadius: 1.5, fontSize: '0.8rem', fontWeight: 600 }}>
-              <ListItemIcon sx={{ minWidth: 28, color: '#64748b' }}>
-                <LinkIcon sx={{ fontSize: 16 }} />
+            <Divider />
+            <MenuItem onClick={() => { handleMenuClose(); navigate('/profile'); }} sx={{ py: 1.5, px: 2.5 }}>
+              <ListItemIcon>
+                <PersonIcon fontSize="small" />
               </ListItemIcon>
-              <ListItemText primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }}>Dhan Broker</ListItemText>
+              <ListItemText>Profile</ListItemText>
             </MenuItem>
-            <MenuItem onClick={() => { handleMenuClose(); navigate('/reports'); }} sx={{ py: 1, px: 2, borderRadius: 1.5, fontSize: '0.8rem', fontWeight: 600 }}>
-              <ListItemIcon sx={{ minWidth: 28, color: '#64748b' }}>
-                <Assessment sx={{ fontSize: 16 }} />
+            <MenuItem onClick={() => { handleMenuClose(); }} sx={{ py: 1.5, px: 2.5 }}>
+              <ListItemIcon>
+                <SettingsIcon fontSize="small" />
               </ListItemIcon>
-              <ListItemText primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }}>Performance</ListItemText>
+              <ListItemText>Settings</ListItemText>
             </MenuItem>
-            <Divider sx={{ my: 0.5, borderColor: '#f1f5f9' }} />
-            <MenuItem onClick={() => { handleMenuClose(); handleLogout(); }} sx={{ py: 1, px: 2, borderRadius: 1.5, color: '#dc2626', fontSize: '0.8rem', fontWeight: 600 }}>
-              <ListItemIcon sx={{ minWidth: 28, color: '#dc2626' }}>
-                <LogoutIcon sx={{ fontSize: 16 }} />
+            <Divider />
+            <MenuItem onClick={() => { handleMenuClose(); handleLogout(); }} sx={{ py: 1.5, px: 2.5, color: '#ef4444' }}>
+              <ListItemIcon>
+                <LogoutIcon fontSize="small" sx={{ color: '#ef4444' }} />
               </ListItemIcon>
-              <ListItemText primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }}>Log Out</ListItemText>
+              <ListItemText>Logout</ListItemText>
             </MenuItem>
           </Menu>
         </Toolbar>
@@ -539,24 +350,27 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         component="main"
         sx={{
           flexGrow: 1,
-          minWidth: 0,
           bgcolor: '#f8fafc',
           minHeight: '100vh',
-          pt: { xs: '68px', sm: '76px', md: '84px' },
-          pb: { xs: '80px', md: 4 },
-          px: { xs: 1.5, sm: 2.5, md: 3.5 },
-          width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` },
-          maxWidth: '100%',
-          boxSizing: 'border-box'
+          pb: { 
+            xs: 'calc(48px + env(safe-area-inset-bottom))', 
+            md: 3 
+          },
+          pt: { xs: 'calc(56px + env(safe-area-inset-top))', sm: 'calc(64px + env(safe-area-inset-top))', md: 3 },
+          px: { xs: 0, sm: 2, md: 3 },
+          width: '100%',
+          maxWidth: '100vw',
+          overflowX: 'hidden',
         }}
       >
+        <Box sx={{ height: { xs: 2, sm: 2.5, md: 3 }, width: '100%' }} />
         <Container 
           maxWidth="xl" 
-          disableGutters
           sx={{ 
+            px: { xs: 2, sm: 3 },
             width: '100%',
             maxWidth: '100%',
-            boxSizing: 'border-box'
+            overflowX: 'hidden'
           }}
         >
           {children}
@@ -597,30 +411,29 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 minWidth: 'auto',
                 padding: '2px 4px',
                 color: '#64748b',
-                transition: 'all 0.15s ease',
-                minHeight: 52,
-                maxHeight: 52,
+                transition: 'all 0.2s',
+                minHeight: 48,
+                maxHeight: 48,
                 '&.Mui-selected': {
-                  color: '#0f172a',
-                  fontWeight: 700
+                  color: '#6366f1',
+                  fontWeight: 600
                 }
               },
               '& .MuiBottomNavigationAction-label': {
-                fontSize: '0.65rem',
-                marginTop: '2px',
+                fontSize: '0.625rem',
+                marginTop: '1px',
                 lineHeight: 1,
                 '&.Mui-selected': {
-                  fontSize: '0.65rem',
-                  fontWeight: 700
+                  fontSize: '0.625rem'
                 }
               },
               '& .MuiSvgIcon-root': {
-                fontSize: '1.2rem',
+                fontSize: '1.125rem',
                 marginBottom: '1px'
               }
             }}
           >
-            {menuItems.slice(0, 5).map((item) => (
+            {menuItems.slice(0, 4).map((item) => (
               <BottomNavigationAction
                 key={item.path}
                 label={item.text}
