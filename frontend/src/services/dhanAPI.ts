@@ -54,6 +54,7 @@ class DhanAPIService {
         body: JSON.stringify({ symbol })
       });
 
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       return data.previousClose;
     } catch (error) {
@@ -76,6 +77,7 @@ class DhanAPIService {
         body: JSON.stringify({ symbol })
       });
 
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       return data.openingPrice;
     } catch (error) {
@@ -98,6 +100,7 @@ class DhanAPIService {
         body: JSON.stringify({ symbol, startTime, endTime })
       });
 
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       return data.close;
     } catch (error) {
@@ -147,8 +150,9 @@ class DhanAPIService {
         })
       });
 
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
-      console.log(`✅ ${type} option bought:`, data);
+      console.log(`${type} option bought:`, data);
       return data;
     } catch (error) {
       console.error(`Error buying ${type} option:`, error);
@@ -177,8 +181,9 @@ class DhanAPIService {
         })
       });
 
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
-      console.log(`✅ Added ${lots} more lot(s):`, data);
+      console.log(`Added ${lots} more lot(s):`, data);
       return data;
     } catch (error) {
       console.error('Error buying more lots:', error);
@@ -202,8 +207,9 @@ class DhanAPIService {
         })
       });
 
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
-      console.log(`✅ Exited all ${type} positions:`, data);
+      console.log(`Exited all ${type} positions:`, data);
     } catch (error) {
       console.error('Error exiting positions:', error);
       throw error;
@@ -224,6 +230,7 @@ class DhanAPIService {
         body: JSON.stringify({ symbol })
       });
 
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       return data.price;
     } catch (error) {
@@ -246,6 +253,7 @@ class DhanAPIService {
         body: JSON.stringify({ symbol })
       });
 
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       return data.dayHigh;
     } catch (error) {
@@ -268,6 +276,7 @@ class DhanAPIService {
         body: JSON.stringify({ symbol })
       });
 
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
       return data.dayLow;
     } catch (error) {

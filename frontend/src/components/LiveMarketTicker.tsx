@@ -3,17 +3,17 @@ import { useLiveMarketData } from '../hooks/useLiveMarketData';
 import './LiveMarketTicker.css';
 
 interface LiveMarketTickerProps {
-  /** Update interval in milliseconds (default: 250ms for ultra-fast updates) */
+  /** Update interval in milliseconds */
   interval?: number;
   /** Show only specific symbols */
   symbols?: string[];
 }
 
 export const LiveMarketTicker: React.FC<LiveMarketTickerProps> = ({ 
-  interval = 250, // Ultra-fast: 4 updates per second
+  interval = 3000,
   symbols 
 }) => {
-  const { data, loading, isPolling } = useLiveMarketData({ 
+  const { data, loading, isPolling, isMarketOpen, marketStatus } = useLiveMarketData({ 
     interval,
     symbols,
     autoStart: true 
@@ -22,7 +22,7 @@ export const LiveMarketTicker: React.FC<LiveMarketTickerProps> = ({
   if (loading && data.length === 0) {
     return (
       <div className="live-ticker loading">
-        <div className="ticker-item skeleton">Loading live data...</div>
+        <div className="ticker-item skeleton">Loading market data...</div>
       </div>
     );
   }
@@ -30,15 +30,21 @@ export const LiveMarketTicker: React.FC<LiveMarketTickerProps> = ({
   return (
     <div className="live-ticker">
       <div className="ticker-status">
-        <span className={`status-indicator ${isPolling ? 'live' : 'paused'}`}>
-          {isPolling ? '🔴 LIVE' : '⏸️ PAUSED'}
+        <span className={`status-indicator ${isMarketOpen ? (isPolling ? 'live' : 'paused') : 'closed'}`}>
+          {isMarketOpen ? (isPolling ? '🔴 LIVE' : '⏸️ PAUSED') : '⏸️ MARKET CLOSED'}
         </span>
-        <span className="update-rate">{interval}ms updates</span>
+        <span className="update-rate">
+          {isMarketOpen ? `${interval / 1000}s updates` : (marketStatus?.nextOpen || 'NSE/BSE Closing Prices')}
+        </span>
+        {marketStatus?.istTime && (
+          <span className="ticker-ist-time">IST: {marketStatus.istTime}</span>
+        )}
       </div>
       
       <div className="ticker-scroll">
         {data.map((item) => {
-          const isPositive = parseFloat(item.change) >= 0;
+          const changeVal = parseFloat(item.change);
+          const isPositive = !isNaN(changeVal) && changeVal >= 0;
           
           return (
             <div key={item.symbol} className="ticker-item">

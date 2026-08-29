@@ -88,11 +88,12 @@ export function getMarketStatus(): {
   
   // After market close
   if (timeInMinutes > marketClose) {
+    const isFriday = day === 5;
     return {
       isOpen: false,
       status: 'CLOSED',
       message: 'Market closed for the day',
-      nextOpen: 'Opens tomorrow at 9:15 AM IST'
+      nextOpen: isFriday ? 'Opens Monday at 9:15 AM IST' : 'Opens tomorrow at 9:15 AM IST'
     };
   }
   

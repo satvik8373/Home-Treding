@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { liveMarketService, MarketData } from '../services/liveMarketService';
+import { liveMarketService, MarketData, MarketStatusInfo } from '../services/liveMarketService';
 
 interface UseLiveMarketDataOptions {
-  /** Polling interval in milliseconds (default: 250ms for ultra-fast updates) */
+  /** Polling interval in milliseconds (default: 3000ms) */
   interval?: number;
   /** Auto-start polling on mount (default: true) */
   autoStart?: boolean;
@@ -13,6 +13,9 @@ interface UseLiveMarketDataOptions {
 interface UseLiveMarketDataReturn {
   /** Current market data */
   data: MarketData[];
+  /** Market open / closed status */
+  marketStatus: MarketStatusInfo | null;
+  isMarketOpen: boolean;
   /** Loading state */
   loading: boolean;
   /** Error state */
@@ -28,23 +31,19 @@ interface UseLiveMarketDataReturn {
 }
 
 /**
- * React hook for live market data with automatic polling
- * 
- * @example
- * ```tsx
- * const { data, loading, isPolling } = useLiveMarketData({ interval: 500 });
- * ```
+ * React hook for live market data with automatic polling and market hours awareness
  */
 export function useLiveMarketData(
   options: UseLiveMarketDataOptions = {}
 ): UseLiveMarketDataReturn {
   const {
-    interval = 250, // Ultra-fast: 250ms = 4 updates per second
+    interval = 3000,
     autoStart = true,
     symbols
   } = options;
 
   const [data, setData] = useState<MarketData[]>([]);
+  const [marketStatus, setMarketStatus] = useState<MarketStatusInfo | null>(liveMarketService.getMarketStatus());
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
   const [isPolling, setIsPolling] = useState<boolean>(false);
@@ -53,10 +52,13 @@ export function useLiveMarketData(
   const isMountedRef = useRef<boolean>(true);
 
   // Callback for market data updates
-  const handleDataUpdate = useCallback((newData: MarketData[]) => {
+  const handleDataUpdate = useCallback((newData: MarketData[], newStatus?: MarketStatusInfo) => {
     if (!isMountedRef.current) return;
     
     setData(newData);
+    if (newStatus) {
+      setMarketStatus(newStatus);
+    }
     setLoading(false);
     setError(null);
   }, []);
@@ -89,17 +91,23 @@ export function useLiveMarketData(
       setLoading(true);
       setError(null);
       
-      const newData = symbols && symbols.length > 0
-        ? await liveMarketService.fetchLiveData(symbols)
-        : await liveMarketService.fetchMarketData();
+      const res = await liveMarketService.fetchMarketData();
       
       if (isMountedRef.current) {
-        setData(newData);
-        setLoading(false);
+        if (symbols && symbols.length > 0) {
+          const filtered = res.data.filter(d => symbols.includes(d.symbol));
+          setData(filtered);
+        } else {
+          setData(res.data);
+        }
+        setMarketStatus(res.status);
       }
     } catch (err) {
       if (isMountedRef.current) {
         setError(err as Error);
+      }
+    } finally {
+      if (isMountedRef.current) {
         setLoading(false);
       }
     }
@@ -107,6 +115,7 @@ export function useLiveMarketData(
 
   // Auto-start on mount
   useEffect(() => {
+    isMountedRef.current = true;
     if (autoStart) {
       start();
     }
@@ -126,6 +135,8 @@ export function useLiveMarketData(
 
   return {
     data,
+    marketStatus,
+    isMarketOpen: marketStatus ? marketStatus.isOpen : true,
     loading,
     error,
     start,
@@ -136,16 +147,16 @@ export function useLiveMarketData(
 }
 
 /**
- * Hook for watching specific symbols only (Ultra-fast updates)
+ * Hook for watching specific symbols only
  */
-export function useWatchlist(symbols: string[], interval: number = 250) {
+export function useWatchlist(symbols: string[], interval: number = 3000) {
   return useLiveMarketData({ symbols, interval });
 }
 
 /**
- * Hook for single symbol (Ultra-fast updates)
+ * Hook for single symbol
  */
-export function useSymbol(symbol: string, interval: number = 250) {
+export function useSymbol(symbol: string, interval: number = 3000) {
   const { data, ...rest } = useLiveMarketData({ 
     symbols: [symbol], 
     interval 

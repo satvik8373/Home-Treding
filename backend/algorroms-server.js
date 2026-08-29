@@ -1628,9 +1628,15 @@ app.get('/api/trading/orders', (req, res) => {
 });
 
 app.post('/api/trading/orders', (req, res) => {
+    const { symbol, side, quantity, price, orderType, productType } = req.body || {};
     const order = {
         id: `order_${Date.now()}`,
-        ...req.body,
+        symbol: typeof symbol === 'string' ? symbol : '',
+        side: side === 'SELL' ? 'SELL' : 'BUY',
+        quantity: Number(quantity) || 0,
+        price: Number(price) || 0,
+        orderType: typeof orderType === 'string' ? orderType : 'MARKET',
+        productType: typeof productType === 'string' ? productType : 'INTRADAY',
         status: 'PLACED',
         timestamp: new Date().toISOString()
     };

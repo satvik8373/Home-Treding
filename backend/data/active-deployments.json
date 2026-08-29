@@ -1,0 +1,64 @@
+[
+  {
+    "deploymentId": "dep_1787983705968_z8i1a5",
+    "strategyId": "strat_1_percent_sl_strangle_bnf",
+    "name": "1 % SL strangle BNF",
+    "symbol": "NIFTY BANK",
+    "templateType": "strat_1_percent_sl_strangle_bnf",
+    "mode": "paper",
+    "status": "RUNNING",
+    "qtyMultiplier": 1,
+    "maxProfit": 0,
+    "maxLoss": 2500,
+    "deployedAt": "2026-08-29T06:08:25.968Z",
+    "tradesExecuted": 4,
+    "pnl": 0,
+    "config": {
+      "broker": "paper",
+      "squareOff": "15:15",
+      "type": "paper"
+    },
+    "lastTriggerAt": "2026-08-29T08:02:09.530Z"
+  },
+  {
+    "deploymentId": "dep_1787990608868_xiyvt5",
+    "strategyId": "1 % SL strangle BNF Copy",
+    "name": "1 % SL strangle BNF Copy",
+    "symbol": "BANKNIFTY",
+    "templateType": "dhokiya_009",
+    "mode": "paper",
+    "status": "RUNNING",
+    "qtyMultiplier": 1,
+    "maxProfit": 0,
+    "maxLoss": 2500,
+    "deployedAt": "2026-08-29T08:03:28.868Z",
+    "tradesExecuted": 0,
+    "pnl": 0,
+    "config": {
+      "broker": "paper",
+      "squareOff": "15:15",
+      "type": "paper"
+    }
+  },
+  {
+    "deploymentId": "dep_1787990629832_1vdxod",
+    "strategyId": "bnf-strangle-algo",
+    "name": "BankNifty 1% SL Strangle Live",
+    "symbol": "BANKNIFTY",
+    "templateType": "time_based_options",
+    "mode": "paper",
+    "status": "RUNNING",
+    "qtyMultiplier": 1,
+    "maxProfit": 2200,
+    "maxLoss": 2200,
+    "deployedAt": "2026-08-29T08:03:49.832Z",
+    "tradesExecuted": 1,
+    "pnl": 0,
+    "config": {
+      "broker": "dhan",
+      "squareOff": "15:15",
+      "type": "paper"
+    },
+    "lastTriggerAt": "2026-08-29T08:03:49.847Z"
+  }
+]

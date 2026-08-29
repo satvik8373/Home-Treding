@@ -1,0 +1,345 @@
+[
+  {
+    "id": "1_percent_sl_strangle_bnf",
+    "name": "1 % SL strangle BNF",
+    "category": "Options Selling Strangle",
+    "description": "Intraday BankNIFTY ATM Strangle (CE + PE Sell) entered at 09:16 with 1% fixed stop loss on each leg, profit trailing, and 15:10 auto-exit.",
+    "timeframe": "5m",
+    "symbols": [
+      "BANKNIFTY"
+    ],
+    "margin": "₹1,40,000",
+    "maxDrawdown": "₹-6,600.3",
+    "winRate": "65.22%",
+    "rules": [
+      "Enter at 09:16 IST: Sell ATM Call + Sell ATM Put",
+      "Stop Loss: 1% on each option leg independently",
+      "Target Profit / Trailing: Automated trailing stop loss per leg",
+      "Auto Square-Off at 15:10 IST",
+      "Backtested across 23 trading days with 65.22% win rate"
+    ],
+    "symbol": "NIFTY BANK",
+    "startTime": "09:16",
+    "endTime": "15:10",
+    "segmentType": "OPTION",
+    "strategyType": "Time Based",
+    "tradingDays": [
+      "MON",
+      "TUE",
+      "WED",
+      "THU",
+      "FRI"
+    ],
+    "legs": [
+      {
+        "id": "leg-1",
+        "action": "SELL",
+        "symbol": "NIFTY BANK",
+        "strike": "ATM 0",
+        "optionType": "CE",
+        "quantity": 35,
+        "slType": "percentage",
+        "slValue": 1,
+        "targetType": "percentage",
+        "targetValue": 0
+      },
+      {
+        "id": "leg-2",
+        "action": "SELL",
+        "symbol": "NIFTY BANK",
+        "strike": "ATM 0",
+        "optionType": "PE",
+        "quantity": 35,
+        "slType": "percentage",
+        "slValue": 1,
+        "targetType": "percentage",
+        "targetValue": 0
+      }
+    ],
+    "maxProfit": 2200,
+    "maxLoss": 2200.1,
+    "trailingSl": "Trail Profit (1200/200)",
+    "status": "active"
+  },
+  {
+    "id": "nifty-009-atm-breakout",
+    "name": "NIFTY 0.09% ATM Full-Day Breakout",
+    "category": "Index Options Breakout",
+    "description": "Full-day NIFTY 50 5-minute candle breakout strategy with ±0.09% fixed trigger levels, 09:20 locked ATM strike, CE/PE state machine, and auto square-off at 15:10 IST.",
+    "timeframe": "5m",
+    "symbols": [
+      "NIFTY 50"
+    ],
+    "margin": "₹50,000",
+    "maxDrawdown": "₹2,500",
+    "winRate": "68.4%",
+    "rules": [
+      "09:15 - 09:20 5-min reference candle close determines Upper (+0.09%) & Lower (-0.09%) levels",
+      "At 09:20, ATM strike is selected and locked for the entire day (CE & PE contracts)",
+      "Completed 5-min candle CLOSE > Upper Level triggers BUY ATM CE",
+      "Completed 5-min candle CLOSE < Lower Level triggers BUY ATM PE",
+      "Active CE exits on 5-min candle CLOSE < Lower Level; Active PE exits on 5-min candle CLOSE > Upper Level",
+      "Full-day re-entry enabled up to 3 trades/day. Maximum concurrent position = 1",
+      "Automatic force square-off at 15:10:00 IST"
+    ],
+    "symbol": "NIFTY 50",
+    "startTime": "09:20",
+    "endTime": "15:10",
+    "segmentType": "OPTION",
+    "strategyType": "Indicator Based",
+    "tradingDays": [
+      "MON",
+      "TUE",
+      "WED",
+      "THU",
+      "FRI"
+    ],
+    "legs": [
+      {
+        "id": "leg-1",
+        "action": "BUY",
+        "symbol": "NIFTY 50",
+        "strike": "ATM 0",
+        "optionType": "CE",
+        "quantity": 65,
+        "slType": "percentage",
+        "slValue": 15,
+        "targetType": "percentage",
+        "targetValue": 30
+      }
+    ],
+    "maxProfit": 5000,
+    "maxLoss": 2500,
+    "status": "active"
+  },
+  {
+    "id": "nifty-920-short-straddle",
+    "name": "NIFTY 9:20 Short Straddle (25% SL)",
+    "category": "Delta Neutral Straddle",
+    "description": "Time-tested 09:20 AM intraday NIFTY 50 ATM Short Straddle with 25% individual stop-loss per leg, delta decay harvest, and 15:15 exit.",
+    "timeframe": "5m",
+    "symbols": [
+      "NIFTY 50"
+    ],
+    "margin": "₹1,20,000",
+    "maxDrawdown": "₹4,200",
+    "winRate": "64.5%",
+    "rules": [
+      "Entry at 09:20 IST sharp: Sell NIFTY ATM CE + Sell NIFTY ATM PE",
+      "Stop Loss: 25% on entry premium of each individual leg",
+      "If one leg SL hits, the other leg remains open with profit trailing",
+      "Over-all strategy profit target: ₹3,500 per lot",
+      "Auto Square-off at 15:15 IST"
+    ],
+    "symbol": "NIFTY 50",
+    "startTime": "09:20",
+    "endTime": "15:15",
+    "segmentType": "OPTION",
+    "strategyType": "Time Based",
+    "tradingDays": [
+      "MON",
+      "TUE",
+      "WED",
+      "THU",
+      "FRI"
+    ],
+    "legs": [
+      {
+        "id": "leg-1",
+        "action": "SELL",
+        "symbol": "NIFTY 50",
+        "strike": "ATM 0",
+        "optionType": "CE",
+        "quantity": 65,
+        "slType": "percentage",
+        "slValue": 25,
+        "targetType": "percentage",
+        "targetValue": 0
+      },
+      {
+        "id": "leg-2",
+        "action": "SELL",
+        "symbol": "NIFTY 50",
+        "strike": "ATM 0",
+        "optionType": "PE",
+        "quantity": 65,
+        "slType": "percentage",
+        "slValue": 25,
+        "targetType": "percentage",
+        "targetValue": 0
+      }
+    ],
+    "maxProfit": 3500,
+    "maxLoss": 2500,
+    "status": "active"
+  },
+  {
+    "id": "bnf-weekly-iron-condor",
+    "name": "BANKNIFTY Weekly Iron Condor",
+    "category": "Range Bound Hedged",
+    "description": "Defined-risk 4-leg Iron Condor selling OTM 15-Delta options with protective 5-Delta wings for margin optimization and range-bound decay.",
+    "timeframe": "15m",
+    "symbols": [
+      "BANKNIFTY"
+    ],
+    "margin": "₹65,000",
+    "maxDrawdown": "₹3,100",
+    "winRate": "72.0%",
+    "rules": [
+      "Sell OTM CE (Delta ~0.20) + Buy Far OTM CE (Delta ~0.05)",
+      "Sell OTM PE (Delta ~0.20) + Buy Far OTM PE (Delta ~0.05)",
+      "Defined maximum loss capped by long wings",
+      "Target: 50% max profit decay or expiry day exit"
+    ],
+    "symbol": "NIFTY BANK",
+    "startTime": "09:30",
+    "endTime": "15:15",
+    "segmentType": "OPTION",
+    "strategyType": "Time Based",
+    "tradingDays": [
+      "MON",
+      "TUE",
+      "WED",
+      "THU",
+      "FRI"
+    ],
+    "legs": [
+      {
+        "id": "leg-1",
+        "action": "SELL",
+        "symbol": "NIFTY BANK",
+        "strike": "ATM +400",
+        "optionType": "CE",
+        "quantity": 35,
+        "slType": "percentage",
+        "slValue": 50
+      },
+      {
+        "id": "leg-2",
+        "action": "BUY",
+        "symbol": "NIFTY BANK",
+        "strike": "ATM +800",
+        "optionType": "CE",
+        "quantity": 35,
+        "slType": "percentage",
+        "slValue": 100
+      },
+      {
+        "id": "leg-3",
+        "action": "SELL",
+        "symbol": "NIFTY BANK",
+        "strike": "ATM -400",
+        "optionType": "PE",
+        "quantity": 35,
+        "slType": "percentage",
+        "slValue": 50
+      },
+      {
+        "id": "leg-4",
+        "action": "BUY",
+        "symbol": "NIFTY BANK",
+        "strike": "ATM -800",
+        "optionType": "PE",
+        "quantity": 35,
+        "slType": "percentage",
+        "slValue": 100
+      }
+    ],
+    "maxProfit": 4500,
+    "maxLoss": 3000,
+    "status": "active"
+  },
+  {
+    "id": "finnifty-hero-zero-momentum",
+    "name": "FINNIFTY Expiry Zero-to-Hero Scalp",
+    "category": "Expiry Day Momentum",
+    "description": "High-speed breakout momentum buying deep discount OTM options between 13:30 and 15:00 on weekly expiry days with 1:3 risk-to-reward.",
+    "timeframe": "1m",
+    "symbols": [
+      "FINNIFTY"
+    ],
+    "margin": "₹15,000",
+    "maxDrawdown": "₹1,800",
+    "winRate": "58.0%",
+    "rules": [
+      "Active only on FINNIFTY Tuesday weekly expiry from 13:30 IST",
+      "5-minute consolidation range breakout triggers Long Option trade",
+      "Fixed risk: ₹500/lot with 1:3 reward target (₹1,500+)"
+    ],
+    "symbol": "FINNIFTY",
+    "startTime": "13:30",
+    "endTime": "15:15",
+    "segmentType": "OPTION",
+    "strategyType": "Indicator Based",
+    "tradingDays": [
+      "TUE"
+    ],
+    "legs": [
+      {
+        "id": "leg-1",
+        "action": "BUY",
+        "symbol": "FINNIFTY",
+        "strike": "ATM +100",
+        "optionType": "CE",
+        "quantity": 60,
+        "slType": "percentage",
+        "slValue": 50,
+        "targetType": "percentage",
+        "targetValue": 150
+      }
+    ],
+    "maxProfit": 3000,
+    "maxLoss": 1000,
+    "status": "active"
+  },
+  {
+    "id": "equity-vwap-pullback-trend",
+    "name": "Equity Intraday VWAP Pullback",
+    "category": "Trend Following Equity",
+    "description": "Trend-following strategy for heavyweight stocks (RELIANCE, HDFCBANK, TCS) entering on VWAP pullbacks during established morning momentum.",
+    "timeframe": "5m",
+    "symbols": [
+      "RELIANCE",
+      "HDFCBANK",
+      "TCS"
+    ],
+    "margin": "₹35,000",
+    "maxDrawdown": "₹1,900",
+    "winRate": "66.8%",
+    "rules": [
+      "Stock must be above 20 EMA and VWAP on 15m chart",
+      "5-minute pullback touching VWAP with bullish reversal candle triggers BUY",
+      "Stop Loss: Below the pullback swing low (0.4%)",
+      "Target: 1.2% intraday gain or 15:15 square-off"
+    ],
+    "symbol": "RELIANCE",
+    "startTime": "09:45",
+    "endTime": "15:15",
+    "segmentType": "EQUITY",
+    "strategyType": "Indicator Based",
+    "tradingDays": [
+      "MON",
+      "TUE",
+      "WED",
+      "THU",
+      "FRI"
+    ],
+    "legs": [
+      {
+        "id": "leg-1",
+        "action": "BUY",
+        "symbol": "RELIANCE",
+        "strike": "ATM 0",
+        "optionType": "CE",
+        "quantity": 50,
+        "slType": "percentage",
+        "slValue": 0.5,
+        "targetType": "percentage",
+        "targetValue": 1.5
+      }
+    ],
+    "maxProfit": 2500,
+    "maxLoss": 1200,
+    "status": "active"
+  }
+]

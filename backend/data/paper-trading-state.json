@@ -1,0 +1,829 @@
+{
+  "initialCapital": 100000,
+  "availableCash": 1785876.44,
+  "realizedPnl": 0,
+  "totalBrokerage": 379.01,
+  "totalSlippageCost": 876.5500000001678,
+  "winCount": 0,
+  "lossCount": 0,
+  "peakCapital": 3538063.79,
+  "maxDrawdown": 144.11000000000058,
+  "orders": [
+    [
+      "paper_ord_1787907238229_q0g9k7",
+      {
+        "orderId": "paper_ord_1787907238229_q0g9k7",
+        "brokerOrderId": "virt_paper_ord_1787907238229_q0g9k7",
+        "symbol": "RELIANCE",
+        "exchange": "NSE",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 10,
+        "filledQuantity": 10,
+        "pendingQuantity": 0,
+        "price": 1284.24,
+        "averagePrice": 1284.24,
+        "status": "FILLED",
+        "orderTimestamp": "2026-08-28T08:53:58.229Z",
+        "executionTimestamp": "2026-08-28T08:53:58.229Z"
+      }
+    ],
+    [
+      "paper_ord_1787907238234_5h2xrj",
+      {
+        "orderId": "paper_ord_1787907238234_5h2xrj",
+        "brokerOrderId": "virt_paper_ord_1787907238234_5h2xrj",
+        "symbol": "TCS",
+        "exchange": "NSE",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 5,
+        "filledQuantity": 5,
+        "pendingQuantity": 0,
+        "price": 2340.27,
+        "averagePrice": 2340.27,
+        "status": "FILLED",
+        "orderTimestamp": "2026-08-28T08:53:58.234Z",
+        "executionTimestamp": "2026-08-28T08:53:58.234Z"
+      }
+    ],
+    [
+      "paper_ord_1787907571429_whgxtg",
+      {
+        "orderId": "paper_ord_1787907571429_whgxtg",
+        "brokerOrderId": "virt_paper_ord_1787907571429_whgxtg",
+        "symbol": "NIFTY 50",
+        "exchange": "NSE",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 10,
+        "filledQuantity": 0,
+        "pendingQuantity": 10,
+        "price": 24112.75,
+        "averagePrice": 0,
+        "status": "REJECTED",
+        "statusMessage": "Insufficient virtual cash. Required: ₹241177.64, Available: ₹75413.18",
+        "orderTimestamp": "2026-08-28T08:59:31.429Z",
+        "strategyId": "dhokiya_009"
+      }
+    ],
+    [
+      "paper_ord_1787907586643_x63hwn",
+      {
+        "orderId": "paper_ord_1787907586643_x63hwn",
+        "brokerOrderId": "virt_paper_ord_1787907586643_x63hwn",
+        "symbol": "RELIANCE",
+        "exchange": "NSE",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 5,
+        "filledQuantity": 5,
+        "pendingQuantity": 0,
+        "price": 1284.24,
+        "averagePrice": 1284.24,
+        "status": "FILLED",
+        "orderTimestamp": "2026-08-28T08:59:46.643Z",
+        "executionTimestamp": "2026-08-28T08:59:46.643Z",
+        "strategyId": "dhokiya_009"
+      }
+    ],
+    [
+      "paper_ord_1787907690130_0tj3pd",
+      {
+        "orderId": "paper_ord_1787907690130_0tj3pd",
+        "brokerOrderId": "virt_paper_ord_1787907690130_0tj3pd",
+        "symbol": "NIFTY 50",
+        "exchange": "NSE",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 5,
+        "filledQuantity": 0,
+        "pendingQuantity": 5,
+        "price": 24112.75,
+        "averagePrice": 0,
+        "status": "REJECTED",
+        "statusMessage": "Insufficient virtual cash. Required: ₹120598.82, Available: ₹68971.18",
+        "orderTimestamp": "2026-08-28T09:01:30.130Z",
+        "strategyId": "dhokiya_009"
+      }
+    ],
+    [
+      "paper_ord_1787907783983_xbfxug",
+      {
+        "orderId": "paper_ord_1787907783983_xbfxug",
+        "brokerOrderId": "virt_paper_ord_1787907783983_xbfxug",
+        "symbol": "NIFTY 50",
+        "exchange": "NSE",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 5,
+        "filledQuantity": 0,
+        "pendingQuantity": 5,
+        "price": 24112.75,
+        "averagePrice": 0,
+        "status": "REJECTED",
+        "statusMessage": "Insufficient virtual cash. Required: ₹120598.82, Available: ₹68971.18",
+        "orderTimestamp": "2026-08-28T09:03:03.983Z",
+        "strategyId": "dhokiya_009"
+      }
+    ],
+    [
+      "paper_ord_1787907791234_kenr9s",
+      {
+        "orderId": "paper_ord_1787907791234_kenr9s",
+        "brokerOrderId": "virt_paper_ord_1787907791234_kenr9s",
+        "symbol": "NIFTY 50",
+        "exchange": "NSE",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 5,
+        "filledQuantity": 0,
+        "pendingQuantity": 5,
+        "price": 24112.75,
+        "averagePrice": 0,
+        "status": "REJECTED",
+        "statusMessage": "Insufficient virtual cash. Required: ₹120598.82, Available: ₹68971.18",
+        "orderTimestamp": "2026-08-28T09:03:11.234Z",
+        "strategyId": "dhokiya_009"
+      }
+    ],
+    [
+      "paper_ord_1787914859901_pjwoxc",
+      {
+        "orderId": "paper_ord_1787914859901_pjwoxc",
+        "brokerOrderId": "virt_paper_ord_1787914859901_pjwoxc",
+        "symbol": "NIFTY 50",
+        "exchange": "NSE",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 5,
+        "filledQuantity": 0,
+        "pendingQuantity": 5,
+        "price": 24112.75,
+        "averagePrice": 0,
+        "status": "REJECTED",
+        "statusMessage": "Insufficient virtual cash. Required: ₹120598.82, Available: ₹68971.18",
+        "orderTimestamp": "2026-08-28T11:00:59.901Z",
+        "strategyId": "dhokiya_009"
+      }
+    ],
+    [
+      "paper_ord_1787990527297_kb0gop",
+      {
+        "orderId": "paper_ord_1787990527297_kb0gop",
+        "brokerOrderId": "virt_paper_ord_1787990527297_kb0gop",
+        "symbol": "NIFTY BANK",
+        "exchange": "NSE",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 5,
+        "filledQuantity": 5,
+        "pendingQuantity": 0,
+        "price": 100.05,
+        "averagePrice": 100.05,
+        "status": "FILLED",
+        "orderTimestamp": "2026-08-29T08:02:07.297Z",
+        "executionTimestamp": "2026-08-29T08:02:07.297Z",
+        "strategyId": "strat_1_percent_sl_strangle_bnf"
+      }
+    ],
+    [
+      "paper_ord_1787990528528_0pbt41",
+      {
+        "orderId": "paper_ord_1787990528528_0pbt41",
+        "brokerOrderId": "virt_paper_ord_1787990528528_0pbt41",
+        "symbol": "NIFTY BANK",
+        "exchange": "NSE",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 5,
+        "filledQuantity": 5,
+        "pendingQuantity": 0,
+        "price": 100.05,
+        "averagePrice": 100.05,
+        "status": "FILLED",
+        "orderTimestamp": "2026-08-29T08:02:08.528Z",
+        "executionTimestamp": "2026-08-29T08:02:08.528Z",
+        "strategyId": "strat_1_percent_sl_strangle_bnf"
+      }
+    ],
+    [
+      "paper_ord_1787990529384_03zzko",
+      {
+        "orderId": "paper_ord_1787990529384_03zzko",
+        "brokerOrderId": "virt_paper_ord_1787990529384_03zzko",
+        "symbol": "NIFTY BANK",
+        "exchange": "NSE",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 5,
+        "filledQuantity": 5,
+        "pendingQuantity": 0,
+        "price": 100.05,
+        "averagePrice": 100.05,
+        "status": "FILLED",
+        "orderTimestamp": "2026-08-29T08:02:09.384Z",
+        "executionTimestamp": "2026-08-29T08:02:09.384Z",
+        "strategyId": "strat_1_percent_sl_strangle_bnf"
+      }
+    ],
+    [
+      "paper_ord_1787990529528_4t5yr1",
+      {
+        "orderId": "paper_ord_1787990529528_4t5yr1",
+        "brokerOrderId": "virt_paper_ord_1787990529528_4t5yr1",
+        "symbol": "NIFTY BANK",
+        "exchange": "NSE",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 5,
+        "filledQuantity": 5,
+        "pendingQuantity": 0,
+        "price": 100.05,
+        "averagePrice": 100.05,
+        "status": "FILLED",
+        "orderTimestamp": "2026-08-29T08:02:09.528Z",
+        "executionTimestamp": "2026-08-29T08:02:09.528Z",
+        "strategyId": "strat_1_percent_sl_strangle_bnf"
+      }
+    ],
+    [
+      "paper_ord_1787990629835_rrcbve",
+      {
+        "orderId": "paper_ord_1787990629835_rrcbve",
+        "brokerOrderId": "virt_paper_ord_1787990629835_rrcbve",
+        "symbol": "BANKNIFTY",
+        "exchange": "NSE",
+        "side": "SELL",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 30,
+        "filledQuantity": 30,
+        "pendingQuantity": 0,
+        "price": 57307.38,
+        "averagePrice": 57307.38,
+        "status": "FILLED",
+        "orderTimestamp": "2026-08-29T08:03:49.835Z",
+        "executionTimestamp": "2026-08-29T08:03:49.835Z",
+        "strategyId": "bnf-strangle-algo"
+      }
+    ]
+  ],
+  "positions": [
+    [
+      "RELIANCE",
+      {
+        "positionId": "paper_pos_RELIANCE",
+        "symbol": "RELIANCE",
+        "exchange": "NSE",
+        "segment": "EQ",
+        "productType": "INTRADAY",
+        "quantity": 15,
+        "buyQuantity": 15,
+        "sellQuantity": 0,
+        "buyAvgPrice": 0,
+        "sellAvgPrice": 0,
+        "netAvgPrice": 1284.24,
+        "ltp": 1284.24,
+        "realizedPnl": 0,
+        "unrealizedPnl": 0,
+        "totalPnl": 0
+      }
+    ],
+    [
+      "TCS",
+      {
+        "positionId": "paper_pos_TCS",
+        "symbol": "TCS",
+        "exchange": "NSE",
+        "segment": "EQ",
+        "productType": "INTRADAY",
+        "quantity": 5,
+        "buyQuantity": 5,
+        "sellQuantity": 0,
+        "buyAvgPrice": 0,
+        "sellAvgPrice": 0,
+        "netAvgPrice": 2340.27,
+        "ltp": 2340.27,
+        "realizedPnl": 0,
+        "unrealizedPnl": 0,
+        "totalPnl": 0
+      }
+    ],
+    [
+      "NIFTY BANK",
+      {
+        "positionId": "paper_pos_NIFTY BANK",
+        "symbol": "NIFTY BANK",
+        "exchange": "NSE",
+        "segment": "EQ",
+        "productType": "INTRADAY",
+        "quantity": 20,
+        "buyQuantity": 20,
+        "sellQuantity": 0,
+        "buyAvgPrice": 0,
+        "sellAvgPrice": 0,
+        "netAvgPrice": 100.05,
+        "ltp": 100.05,
+        "realizedPnl": 0,
+        "unrealizedPnl": 0,
+        "totalPnl": 0
+      }
+    ],
+    [
+      "BANKNIFTY",
+      {
+        "positionId": "paper_pos_BANKNIFTY",
+        "symbol": "BANKNIFTY",
+        "exchange": "NSE",
+        "segment": "EQ",
+        "productType": "INTRADAY",
+        "quantity": -30,
+        "buyQuantity": 0,
+        "sellQuantity": 30,
+        "buyAvgPrice": 0,
+        "sellAvgPrice": 0,
+        "netAvgPrice": 57307.38,
+        "ltp": 57307.38,
+        "realizedPnl": 0,
+        "unrealizedPnl": 0,
+        "totalPnl": 0
+      }
+    ]
+  ],
+  "trades": [
+    {
+      "tradeId": "trade_1787907238230",
+      "orderId": "paper_ord_1787907238229_q0g9k7",
+      "symbol": "RELIANCE",
+      "side": "BUY",
+      "quantity": 10,
+      "price": 1284.24,
+      "timestamp": "2026-08-28T08:53:58.230Z"
+    },
+    {
+      "tradeId": "trade_1787907238242",
+      "orderId": "paper_ord_1787907238234_5h2xrj",
+      "symbol": "TCS",
+      "side": "BUY",
+      "quantity": 5,
+      "price": 2340.27,
+      "timestamp": "2026-08-28T08:53:58.242Z"
+    },
+    {
+      "tradeId": "trade_1787907586645",
+      "orderId": "paper_ord_1787907586643_x63hwn",
+      "symbol": "RELIANCE",
+      "side": "BUY",
+      "quantity": 5,
+      "price": 1284.24,
+      "timestamp": "2026-08-28T08:59:46.645Z",
+      "strategyId": "dhokiya_009"
+    },
+    {
+      "tradeId": "trade_1787990527299",
+      "orderId": "paper_ord_1787990527297_kb0gop",
+      "symbol": "NIFTY BANK",
+      "side": "BUY",
+      "quantity": 5,
+      "price": 100.05,
+      "timestamp": "2026-08-29T08:02:07.299Z",
+      "strategyId": "strat_1_percent_sl_strangle_bnf"
+    },
+    {
+      "tradeId": "trade_1787990528529",
+      "orderId": "paper_ord_1787990528528_0pbt41",
+      "symbol": "NIFTY BANK",
+      "side": "BUY",
+      "quantity": 5,
+      "price": 100.05,
+      "timestamp": "2026-08-29T08:02:08.529Z",
+      "strategyId": "strat_1_percent_sl_strangle_bnf"
+    },
+    {
+      "tradeId": "trade_1787990529385",
+      "orderId": "paper_ord_1787990529384_03zzko",
+      "symbol": "NIFTY BANK",
+      "side": "BUY",
+      "quantity": 5,
+      "price": 100.05,
+      "timestamp": "2026-08-29T08:02:09.385Z",
+      "strategyId": "strat_1_percent_sl_strangle_bnf"
+    },
+    {
+      "tradeId": "trade_1787990529529",
+      "orderId": "paper_ord_1787990529528_4t5yr1",
+      "symbol": "NIFTY BANK",
+      "side": "BUY",
+      "quantity": 5,
+      "price": 100.05,
+      "timestamp": "2026-08-29T08:02:09.529Z",
+      "strategyId": "strat_1_percent_sl_strangle_bnf"
+    },
+    {
+      "tradeId": "trade_1787990629837",
+      "orderId": "paper_ord_1787990629835_rrcbve",
+      "symbol": "BANKNIFTY",
+      "side": "SELL",
+      "quantity": 30,
+      "price": 57307.38,
+      "timestamp": "2026-08-29T08:03:49.837Z",
+      "strategyId": "bnf-strangle-algo"
+    }
+  ],
+  "auditLogs": [
+    {
+      "id": "audit_1787907238230_y7lb5q",
+      "timestamp": "2026-08-28T08:53:58.230Z",
+      "eventType": "ORDER_FILLED",
+      "symbol": "RELIANCE",
+      "details": {
+        "side": "BUY",
+        "qty": 10,
+        "price": 1284.24,
+        "brokerage": 21.61,
+        "slippageCost": 6.4000000000010004
+      }
+    },
+    {
+      "id": "audit_1787907238242_pcfvm7",
+      "timestamp": "2026-08-28T08:53:58.242Z",
+      "eventType": "ORDER_FILLED",
+      "symbol": "TCS",
+      "details": {
+        "side": "BUY",
+        "qty": 5,
+        "price": 2340.27,
+        "brokerage": 21.46,
+        "slippageCost": 5.850000000000364
+      }
+    },
+    {
+      "id": "audit_1787907571424_kyw78t",
+      "timestamp": "2026-08-28T08:59:31.424Z",
+      "eventType": "STRATEGY_SIGNAL",
+      "symbol": "NIFTY 50",
+      "details": {
+        "action": "DEPLOYED",
+        "deploymentId": "dep_1787907571423_o2euwx",
+        "strategyName": "0.09% Dhokiya Breakout Strategy",
+        "mode": "paper"
+      }
+    },
+    {
+      "id": "audit_1787907571429_a37j5l",
+      "timestamp": "2026-08-28T08:59:31.429Z",
+      "eventType": "ORDER_REJECTED",
+      "symbol": "NIFTY 50",
+      "details": {
+        "reason": "Insufficient virtual cash. Required: ₹241177.64, Available: ₹75413.18",
+        "order": {
+          "orderId": "paper_ord_1787907571429_whgxtg",
+          "brokerOrderId": "virt_paper_ord_1787907571429_whgxtg",
+          "symbol": "NIFTY 50",
+          "exchange": "NSE",
+          "side": "BUY",
+          "orderType": "MARKET",
+          "productType": "INTRADAY",
+          "validity": "DAY",
+          "quantity": 10,
+          "filledQuantity": 0,
+          "pendingQuantity": 10,
+          "price": 24112.75,
+          "averagePrice": 0,
+          "status": "REJECTED",
+          "statusMessage": "Insufficient virtual cash. Required: ₹241177.64, Available: ₹75413.18",
+          "orderTimestamp": "2026-08-28T08:59:31.429Z",
+          "strategyId": "dhokiya_009"
+        }
+      }
+    },
+    {
+      "id": "audit_1787907576204_1waqxk",
+      "timestamp": "2026-08-28T08:59:36.204Z",
+      "eventType": "STRATEGY_SIGNAL",
+      "symbol": "NIFTY 50",
+      "details": {
+        "action": "DEPLOYED",
+        "deploymentId": "dep_1787907576204_wzqch0",
+        "strategyName": "0.09% Dhokiya Breakout Strategy",
+        "mode": "paper"
+      }
+    },
+    {
+      "id": "audit_1787907580079_gh4scx",
+      "timestamp": "2026-08-28T08:59:40.079Z",
+      "eventType": "STRATEGY_SIGNAL",
+      "symbol": "NIFTY 50",
+      "details": {
+        "action": "STOPPED",
+        "deploymentId": "dep_1787907576204_wzqch0"
+      }
+    },
+    {
+      "id": "audit_1787907586631_yad5o9",
+      "timestamp": "2026-08-28T08:59:46.631Z",
+      "eventType": "STRATEGY_SIGNAL",
+      "symbol": "RELIANCE",
+      "details": {
+        "action": "DEPLOYED",
+        "deploymentId": "dep_1787907586631_c57cbi",
+        "strategyName": "0.09% Dhokiya Breakout Strategy",
+        "mode": "paper"
+      }
+    },
+    {
+      "id": "audit_1787907586645_wpvdbd",
+      "timestamp": "2026-08-28T08:59:46.645Z",
+      "eventType": "ORDER_FILLED",
+      "symbol": "RELIANCE",
+      "details": {
+        "side": "BUY",
+        "qty": 5,
+        "price": 1284.24,
+        "brokerage": 20.8,
+        "slippageCost": 3.2000000000005002
+      }
+    },
+    {
+      "id": "audit_1787907682397_n73yk2",
+      "timestamp": "2026-08-28T09:01:22.397Z",
+      "eventType": "STRATEGY_SIGNAL",
+      "symbol": "RELIANCE",
+      "details": {
+        "action": "STOPPED",
+        "deploymentId": "dep_1787907586631_c57cbi"
+      }
+    },
+    {
+      "id": "audit_1787907690130_wq5ysa",
+      "timestamp": "2026-08-28T09:01:30.130Z",
+      "eventType": "ORDER_REJECTED",
+      "symbol": "NIFTY 50",
+      "details": {
+        "reason": "Insufficient virtual cash. Required: ₹120598.82, Available: ₹68971.18",
+        "order": {
+          "orderId": "paper_ord_1787907690130_0tj3pd",
+          "brokerOrderId": "virt_paper_ord_1787907690130_0tj3pd",
+          "symbol": "NIFTY 50",
+          "exchange": "NSE",
+          "side": "BUY",
+          "orderType": "MARKET",
+          "productType": "INTRADAY",
+          "validity": "DAY",
+          "quantity": 5,
+          "filledQuantity": 0,
+          "pendingQuantity": 5,
+          "price": 24112.75,
+          "averagePrice": 0,
+          "status": "REJECTED",
+          "statusMessage": "Insufficient virtual cash. Required: ₹120598.82, Available: ₹68971.18",
+          "orderTimestamp": "2026-08-28T09:01:30.130Z",
+          "strategyId": "dhokiya_009"
+        }
+      }
+    },
+    {
+      "id": "audit_1787907714517_vpv59e",
+      "timestamp": "2026-08-28T09:01:54.517Z",
+      "eventType": "STRATEGY_SIGNAL",
+      "symbol": "RELIANCE",
+      "details": {
+        "action": "DEPLOYED",
+        "deploymentId": "dep_1787907714516_2uw5rc",
+        "strategyName": "0.09% Dhokiya Breakout Strategy",
+        "mode": "paper"
+      }
+    },
+    {
+      "id": "audit_1787907783983_xuozr9",
+      "timestamp": "2026-08-28T09:03:03.983Z",
+      "eventType": "ORDER_REJECTED",
+      "symbol": "NIFTY 50",
+      "details": {
+        "reason": "Insufficient virtual cash. Required: ₹120598.82, Available: ₹68971.18",
+        "order": {
+          "orderId": "paper_ord_1787907783983_xbfxug",
+          "brokerOrderId": "virt_paper_ord_1787907783983_xbfxug",
+          "symbol": "NIFTY 50",
+          "exchange": "NSE",
+          "side": "BUY",
+          "orderType": "MARKET",
+          "productType": "INTRADAY",
+          "validity": "DAY",
+          "quantity": 5,
+          "filledQuantity": 0,
+          "pendingQuantity": 5,
+          "price": 24112.75,
+          "averagePrice": 0,
+          "status": "REJECTED",
+          "statusMessage": "Insufficient virtual cash. Required: ₹120598.82, Available: ₹68971.18",
+          "orderTimestamp": "2026-08-28T09:03:03.983Z",
+          "strategyId": "dhokiya_009"
+        }
+      }
+    },
+    {
+      "id": "audit_1787907787760_x4fklc",
+      "timestamp": "2026-08-28T09:03:07.760Z",
+      "eventType": "STRATEGY_SIGNAL",
+      "symbol": "RELIANCE",
+      "details": {
+        "action": "STOPPED",
+        "deploymentId": "dep_1787907714516_2uw5rc"
+      }
+    },
+    {
+      "id": "audit_1787907791234_k6ysca",
+      "timestamp": "2026-08-28T09:03:11.234Z",
+      "eventType": "ORDER_REJECTED",
+      "symbol": "NIFTY 50",
+      "details": {
+        "reason": "Insufficient virtual cash. Required: ₹120598.82, Available: ₹68971.18",
+        "order": {
+          "orderId": "paper_ord_1787907791234_kenr9s",
+          "brokerOrderId": "virt_paper_ord_1787907791234_kenr9s",
+          "symbol": "NIFTY 50",
+          "exchange": "NSE",
+          "side": "BUY",
+          "orderType": "MARKET",
+          "productType": "INTRADAY",
+          "validity": "DAY",
+          "quantity": 5,
+          "filledQuantity": 0,
+          "pendingQuantity": 5,
+          "price": 24112.75,
+          "averagePrice": 0,
+          "status": "REJECTED",
+          "statusMessage": "Insufficient virtual cash. Required: ₹120598.82, Available: ₹68971.18",
+          "orderTimestamp": "2026-08-28T09:03:11.234Z",
+          "strategyId": "dhokiya_009"
+        }
+      }
+    },
+    {
+      "id": "audit_1787914859901_7zfs48",
+      "timestamp": "2026-08-28T11:00:59.901Z",
+      "eventType": "ORDER_REJECTED",
+      "symbol": "NIFTY 50",
+      "details": {
+        "reason": "Insufficient virtual cash. Required: ₹120598.82, Available: ₹68971.18",
+        "order": {
+          "orderId": "paper_ord_1787914859901_pjwoxc",
+          "brokerOrderId": "virt_paper_ord_1787914859901_pjwoxc",
+          "symbol": "NIFTY 50",
+          "exchange": "NSE",
+          "side": "BUY",
+          "orderType": "MARKET",
+          "productType": "INTRADAY",
+          "validity": "DAY",
+          "quantity": 5,
+          "filledQuantity": 0,
+          "pendingQuantity": 5,
+          "price": 24112.75,
+          "averagePrice": 0,
+          "status": "REJECTED",
+          "statusMessage": "Insufficient virtual cash. Required: ₹120598.82, Available: ₹68971.18",
+          "orderTimestamp": "2026-08-28T11:00:59.901Z",
+          "strategyId": "dhokiya_009"
+        }
+      }
+    },
+    {
+      "id": "audit_1787990522074_k0iq6u",
+      "timestamp": "2026-08-29T08:02:02.074Z",
+      "eventType": "STRATEGY_SIGNAL",
+      "symbol": "NIFTY BANK",
+      "details": {
+        "action": "DEPLOYED",
+        "deploymentId": "dep_1787990522073_uewdyk",
+        "strategyName": "1 % SL strangle BNF Copy",
+        "mode": "paper"
+      }
+    },
+    {
+      "id": "audit_1787990525401_nco20k",
+      "timestamp": "2026-08-29T08:02:05.401Z",
+      "eventType": "STRATEGY_SIGNAL",
+      "symbol": "NIFTY BANK",
+      "details": {
+        "action": "STOPPED",
+        "deploymentId": "dep_1787990522073_uewdyk"
+      }
+    },
+    {
+      "id": "audit_1787990527299_wmfg25",
+      "timestamp": "2026-08-29T08:02:07.299Z",
+      "eventType": "ORDER_FILLED",
+      "symbol": "NIFTY BANK",
+      "details": {
+        "side": "BUY",
+        "qty": 5,
+        "price": 100.05,
+        "brokerage": 20.06,
+        "slippageCost": 0.2499999999999858
+      }
+    },
+    {
+      "id": "audit_1787990528529_negf3f",
+      "timestamp": "2026-08-29T08:02:08.529Z",
+      "eventType": "ORDER_FILLED",
+      "symbol": "NIFTY BANK",
+      "details": {
+        "side": "BUY",
+        "qty": 5,
+        "price": 100.05,
+        "brokerage": 20.06,
+        "slippageCost": 0.2499999999999858
+      }
+    },
+    {
+      "id": "audit_1787990529385_0zq3jo",
+      "timestamp": "2026-08-29T08:02:09.385Z",
+      "eventType": "ORDER_FILLED",
+      "symbol": "NIFTY BANK",
+      "details": {
+        "side": "BUY",
+        "qty": 5,
+        "price": 100.05,
+        "brokerage": 20.06,
+        "slippageCost": 0.2499999999999858
+      }
+    },
+    {
+      "id": "audit_1787990529529_g1n0ti",
+      "timestamp": "2026-08-29T08:02:09.529Z",
+      "eventType": "ORDER_FILLED",
+      "symbol": "NIFTY BANK",
+      "details": {
+        "side": "BUY",
+        "qty": 5,
+        "price": 100.05,
+        "brokerage": 20.06,
+        "slippageCost": 0.2499999999999858
+      }
+    },
+    {
+      "id": "audit_1787990608869_0gg3d5",
+      "timestamp": "2026-08-29T08:03:28.869Z",
+      "eventType": "STRATEGY_SIGNAL",
+      "symbol": "BANKNIFTY",
+      "details": {
+        "action": "DEPLOYED",
+        "deploymentId": "dep_1787990608868_xiyvt5",
+        "strategyName": "1 % SL strangle BNF Copy",
+        "mode": "paper"
+      }
+    },
+    {
+      "id": "audit_1787990629833_b3vtdd",
+      "timestamp": "2026-08-29T08:03:49.833Z",
+      "eventType": "STRATEGY_SIGNAL",
+      "symbol": "BANKNIFTY",
+      "details": {
+        "action": "DEPLOYED",
+        "deploymentId": "dep_1787990629832_1vdxod",
+        "strategyName": "BankNifty 1% SL Strangle Live",
+        "mode": "paper"
+      }
+    },
+    {
+      "id": "audit_1787990629837_nbm54i",
+      "timestamp": "2026-08-29T08:03:49.837Z",
+      "eventType": "ORDER_FILLED",
+      "symbol": "BANKNIFTY",
+      "details": {
+        "side": "SELL",
+        "qty": 30,
+        "price": 57307.38,
+        "brokerage": 234.9,
+        "slippageCost": 860.1000000001659
+      }
+    }
+  ]
+}

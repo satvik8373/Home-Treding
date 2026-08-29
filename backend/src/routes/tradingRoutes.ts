@@ -1,101 +1,135 @@
-import express from 'express';
-import { tradingEngine } from '../services/tradingEngine';
-import { orderManagement } from '../services/orderManagement';
-import { portfolioService } from '../services/portfolioService';
+import { Router, Request, Response } from 'express';
+import { asyncHandler } from '../middleware/errorHandler';
+import { brokerRegistry } from '../brokers/BrokerRegistry';
+import { paperExecutor } from '../execution/PaperExecutor';
+import { riskEngine } from '../risk/RiskEngine';
+import { killSwitch } from '../risk/KillSwitch';
+import { logger } from '../utils/logger';
 
-const router = express.Router();
+const router = Router();
 
-// Trading Engine Routes
-router.get('/engine/status', (req, res) => {
-  try {
-    const status = tradingEngine.getStatus();
-    res.json({
-      success: true,
-      status
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get engine status',
-      error: error.message
-    });
-  }
-});
+let isEngineRunning = true;
 
-router.post('/engine/start', async (req, res) => {
-  try {
-    await tradingEngine.start();
-    res.json({
-      success: true,
-      message: 'Trading engine started successfully'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to start trading engine',
-      error: error.message
-    });
-  }
-});
+/**
+ * GET /api/trading/orders
+ */
+router.get('/orders', asyncHandler(async (req: Request, res: Response) => {
+  const brokerId = req.query.brokerId as string | undefined;
+  const adapter = brokerId ? brokerRegistry.getAdapterById(brokerId) : brokerRegistry.getPrimaryAdapter();
 
-router.post('/engine/stop', async (req, res) => {
-  try {
-    await tradingEngine.stop();
-    res.json({
-      success: true,
-      message: 'Trading engine stopped successfully'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to stop trading engine',
-      error: error.message
-    });
-  }
-});
-
-// Order Management Routes
-router.post('/orders', async (req, res) => {
-  try {
-    const order = await orderManagement.placeOrder(req.body);
-    res.json({
-      success: true,
-      message: 'Order placed successfully',
-      order
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: 'Failed to place order',
-      error: error.message
-    });
-  }
-});
-
-router.get('/orders', (req, res) => {
-  try {
-    const { brokerId, status } = req.query;
-    let orders;
-    
-    if (brokerId) {
-      orders = orderManagement.getOrdersByBroker(brokerId as string);
-    } else if (status) {
-      orders = orderManagement.getOrdersByStatus(status as string);
-    } else {
-      orders = orderManagement.getOrdersByBroker(''); // Get all orders
+  if (adapter && process.env.TRADING_MODE === 'live') {
+    try {
+      const orders = await adapter.getOrders();
+      return res.json({ success: true, orders, source: 'DhanHQ' });
+    } catch (e) {
+      // fallback to paper orders
     }
+  }
 
-    res.json({
-      success: true,
-      orders
-    });
-  } catch (error) {
-    res.status(500).json({
+  const paperOrders = await paperExecutor.getOrders();
+  res.json({
+    success: true,
+    orders: paperOrders,
+    source: 'Paper Execution Engine'
+  });
+}));
+
+/**
+ * POST /api/trading/orders
+ */
+router.post('/orders', asyncHandler(async (req: Request, res: Response) => {
+  const { symbol, side, quantity, price, orderType = 'MARKET', productType = 'INTRADAY', brokerId } = req.body;
+
+  if (!symbol || !side || !quantity) {
+    return res.status(400).json({ success: false, message: 'Symbol, side, and quantity are required' });
+  }
+
+  const orderReq = {
+    symbol,
+    side,
+    quantity: Number(quantity),
+    price: price ? Number(price) : undefined,
+    orderType,
+    productType,
+    validity: 'DAY' as const,
+    exchange: 'NSE' as const,
+    isPaper: process.env.TRADING_MODE !== 'live'
+  };
+
+  // Pre-trade risk check
+  const positions = await paperExecutor.getPositions();
+  const currentPos = positions.find(p => p.symbol === symbol)?.quantity || 0;
+  const riskCheck = riskEngine.validateOrder(orderReq, currentPos);
+
+  if (!riskCheck.passed) {
+    return res.status(400).json({
       success: false,
-      message: 'Failed to get orders',
-      error: error.message
+      message: `Risk check rejected order: ${riskCheck.reason}`,
+      ruleViolated: riskCheck.ruleViolated
     });
   }
-});
+
+  // Execute on Paper
+  const result = await paperExecutor.executeOrder(orderReq);
+  res.json({
+    success: result.success,
+    order: result,
+    message: 'Paper order executed successfully'
+  });
+}));
+
+/**
+ * DELETE /api/trading/orders/:orderId
+ */
+router.delete('/orders/:orderId', asyncHandler(async (req: Request, res: Response) => {
+  const orderId = String(req.params.orderId);
+  const success = await paperExecutor.cancelOrder(orderId);
+  res.json({ success, message: success ? 'Order cancelled' : 'Failed to cancel order' });
+}));
+
+/**
+ * GET /api/trading/engine/status
+ */
+router.get('/engine/status', asyncHandler(async (_req: Request, res: Response) => {
+  const primary = brokerRegistry.getPrimaryAdapter();
+  let accountName = 'None (Paper Mode Active)';
+  if (primary) {
+    try {
+      const profile = await primary.getProfile();
+      accountName = profile.accountName || 'Dhan Trader';
+    } catch (e) {
+      accountName = 'Dhan Connected';
+    }
+  }
+
+  res.json({
+    success: true,
+    status: isEngineRunning ? 'RUNNING' : 'STOPPED',
+    isRunning: isEngineRunning,
+    mode: process.env.TRADING_MODE || 'paper',
+    liveTradingEnabled: process.env.LIVE_TRADING_ENABLED === 'true',
+    connectedBroker: accountName,
+    killSwitch: killSwitch.getStatus(),
+    timestamp: new Date().toISOString()
+  });
+}));
+
+/**
+ * POST /api/trading/engine/start
+ */
+router.post('/engine/start', asyncHandler(async (_req: Request, res: Response) => {
+  isEngineRunning = true;
+  logger.info('▶️ [Trading Engine] Started');
+  res.json({ success: true, isRunning: true, message: 'Trading engine started' });
+}));
+
+/**
+ * POST /api/trading/engine/stop
+ */
+router.post('/engine/stop', asyncHandler(async (_req: Request, res: Response) => {
+  isEngineRunning = false;
+  logger.info('⏹️ [Trading Engine] Stopped');
+  res.json({ success: true, isRunning: false, message: 'Trading engine stopped' });
+}));
 
 export default router;

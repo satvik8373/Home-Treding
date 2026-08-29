@@ -37,6 +37,19 @@
   color: #9ca3af;
 }
 
+.status-indicator.closed {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.ticker-ist-time {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-left: auto;
+  font-family: 'Courier New', monospace;
+}
+
 @keyframes pulse {
   0%, 100% {
     opacity: 1;

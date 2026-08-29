@@ -91,9 +91,16 @@ router.put('/:id', (req, res) => {
       });
     }
 
+    const { name, symbol, timeframe, stopLossPercent, targetPercent, status, params } = req.body || {};
     const updatedStrategy = {
       ...strategy,
-      ...req.body,
+      name: name !== undefined ? name : strategy.name,
+      symbol: symbol !== undefined ? symbol : strategy.symbol,
+      timeframe: timeframe !== undefined ? timeframe : strategy.timeframe,
+      stopLossPercent: stopLossPercent !== undefined ? stopLossPercent : strategy.stopLossPercent,
+      targetPercent: targetPercent !== undefined ? targetPercent : strategy.targetPercent,
+      status: status !== undefined ? status : strategy.status,
+      params: params !== undefined ? params : strategy.params,
       updatedAt: new Date().toISOString()
     };
 

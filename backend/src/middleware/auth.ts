@@ -1,24 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
-import admin from 'firebase-admin';
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { AppError } from './errorHandler';
 import { logger } from '../utils/logger';
 
-// Initialize Firebase Admin (you'll need to add service account)
-// For now, we'll use a simple approach
-let firebaseAdmin: admin.app.App;
-
+// Initialize Firebase Admin
 try {
-  // In production, use service account JSON
-  // For development, we'll initialize without credentials
-  if (!admin.apps.length) {
-    firebaseAdmin = admin.initializeApp({
-      projectId: 'mine-treding',
+  if (getApps().length === 0) {
+    initializeApp({
+      projectId: process.env.FIREBASE_PROJECT_ID || 'mine-treding',
     });
-  } else {
-    firebaseAdmin = admin.app();
   }
-} catch (error) {
-  logger.error('Firebase Admin initialization error:', error);
+} catch (error: any) {
+  logger.warn('Firebase Admin initialization note:', error.message);
 }
 
 export interface AuthRequest extends Request {
@@ -32,7 +26,7 @@ export interface AuthRequest extends Request {
 
 export const authenticate = async (
   req: AuthRequest,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) => {
   try {
@@ -45,13 +39,12 @@ export const authenticate = async (
     const token = authHeader.split('Bearer ')[1];
 
     try {
-      // Verify Firebase token
-      const decodedToken = await admin.auth().verifyIdToken(token);
+      const decodedToken = await getAuth().verifyIdToken(token);
       
       req.user = {
         uid: decodedToken.uid,
         email: decodedToken.email,
-        name: decodedToken.name,
+        name: (decodedToken as any).name,
       };
       req.userId = decodedToken.uid;
 
@@ -67,7 +60,7 @@ export const authenticate = async (
 
 export const optionalAuth = async (
   req: AuthRequest,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) => {
   try {
@@ -77,15 +70,14 @@ export const optionalAuth = async (
       const token = authHeader.split('Bearer ')[1];
       
       try {
-        const decodedToken = await admin.auth().verifyIdToken(token);
+        const decodedToken = await getAuth().verifyIdToken(token);
         req.user = {
           uid: decodedToken.uid,
           email: decodedToken.email,
-          name: decodedToken.name,
+          name: (decodedToken as any).name,
         };
         req.userId = decodedToken.uid;
       } catch (error) {
-        // Token invalid but continue anyway
         logger.warn('Optional auth token invalid:', error);
       }
     }

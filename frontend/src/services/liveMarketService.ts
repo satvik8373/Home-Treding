@@ -3,6 +3,8 @@ import { API_CONFIG } from '../config/api';
 
 interface MarketData {
   symbol: string;
+  name?: string;
+  price?: number;
   ltp: string;
   change: string;
   changePercent: string;
@@ -11,32 +13,50 @@ interface MarketData {
   low: string;
   open: string;
   prevClose: string;
-  timestamp: number;
-  lastUpdate: string;
+  timestamp: number | string;
+  lastUpdate?: string;
+}
+
+interface MarketStatusInfo {
+  isOpen: boolean;
+  status: 'LIVE' | 'CLOSED' | 'WEEKEND' | 'PRE_OPEN';
+  message: string;
+  nextOpen?: string;
+  istTime?: string;
 }
 
 interface MarketDataResponse {
   success: boolean;
+  isMarketOpen?: boolean;
+  marketStatus?: MarketStatusInfo;
+  istTime?: string;
   data: MarketData[];
-  serverTime: number;
+  stocks?: MarketData[];
+  indices?: MarketData[];
+  serverTime?: number;
   timestamp?: string;
 }
 
 class LiveMarketService {
-  private pollingInterval: number = 250; // 250ms = 4 updates per second (ultra-fast)
+  private pollingInterval: number = 3000; // 3 seconds default
   private intervalId: NodeJS.Timeout | null = null;
-  private subscribers: Map<string, (data: MarketData[]) => void> = new Map();
+  private subscribers: Map<string, (data: MarketData[], status?: MarketStatusInfo) => void> = new Map();
   private lastData: MarketData[] = [];
+  private lastMarketStatus: MarketStatusInfo = {
+    isOpen: true,
+    status: 'LIVE',
+    message: 'Market is open'
+  };
   private isPolling: boolean = false;
   private requestInProgress: boolean = false;
 
   /**
-   * Start live market data polling (Optimized for ultra-fast updates)
-   * @param callback Function to call with updated data
-   * @param interval Polling interval in milliseconds (default: 250ms for 4 updates/sec)
+   * Start live market data polling
+   * @param callback Function to call with updated data & status
+   * @param interval Polling interval in milliseconds (default: 3000ms)
    */
-  startPolling(callback: (data: MarketData[]) => void, interval: number = 250): string {
-    const subscriberId = `sub_${Date.now()}_${Math.random()}`;
+  startPolling(callback: (data: MarketData[], status?: MarketStatusInfo) => void, interval: number = 3000): string {
+    const subscriberId = `sub_${Date.now()}_${Math.random().toString(36).substr(2, 7)}`;
     this.subscribers.set(subscriberId, callback);
     this.pollingInterval = interval;
 
@@ -48,7 +68,7 @@ class LiveMarketService {
 
     // Return last data immediately if available
     if (this.lastData.length > 0) {
-      callback(this.lastData);
+      callback(this.lastData, this.lastMarketStatus);
     }
 
     return subscriberId;
@@ -81,34 +101,38 @@ class LiveMarketService {
   }
 
   /**
-   * Fetch market data once (Optimized for speed)
+   * Fetch market data once
    */
-  async fetchMarketData(): Promise<MarketData[]> {
+  async fetchMarketData(): Promise<{ data: MarketData[]; status: MarketStatusInfo }> {
     try {
       const response = await axios.get<MarketDataResponse>(
         `${API_CONFIG.BASE_URL}/api/market/all`,
         {
           timeout: 10000,
           headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
+            'Cache-Control': 'no-cache'
           }
         }
       );
 
       if (response.data.success && response.data.data) {
-        return response.data.data;
+        if (response.data.marketStatus) {
+          this.lastMarketStatus = response.data.marketStatus;
+        }
+        return {
+          data: response.data.data,
+          status: this.lastMarketStatus
+        };
       }
       
-      return [];
+      return { data: [], status: this.lastMarketStatus };
     } catch (error: any) {
-      return [];
+      return { data: [], status: this.lastMarketStatus };
     }
   }
 
   /**
-   * Fetch live data for specific symbols (faster)
+   * Fetch live data for specific symbols
    */
   async fetchLiveData(symbols: string[]): Promise<MarketData[]> {
     try {
@@ -118,13 +142,15 @@ class LiveMarketService {
           params: { symbols: symbols.join(',') },
           timeout: 10000,
           headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
+            'Cache-Control': 'no-cache'
           }
         }
       );
 
       if (response.data.success && response.data.data) {
+        if (response.data.marketStatus) {
+          this.lastMarketStatus = response.data.marketStatus;
+        }
         return response.data.data;
       }
       
@@ -135,7 +161,7 @@ class LiveMarketService {
   }
 
   /**
-   * Internal polling function (Optimized to prevent overlapping requests)
+   * Internal polling function
    */
   private async poll(): Promise<void> {
     if (this.requestInProgress) {
@@ -145,18 +171,26 @@ class LiveMarketService {
     this.requestInProgress = true;
 
     try {
-      const data = await this.fetchMarketData();
+      const result = await this.fetchMarketData();
       
-      if (data.length > 0) {
-        this.lastData = data;
+      if (result.data.length > 0) {
+        this.lastData = result.data;
+        this.lastMarketStatus = result.status;
         
         this.subscribers.forEach(callback => {
           try {
-            callback(data);
+            callback(result.data, result.status);
           } catch (error) {
             // Silent error handling
           }
         });
+      }
+
+      // If market is closed, automatically slow down polling interval to 30 seconds
+      if (result.status && !result.status.isOpen && this.pollingInterval < 30000) {
+        this.setPollingInterval(30000);
+      } else if (result.status && result.status.isOpen && this.pollingInterval > 5000) {
+        this.setPollingInterval(3000);
       }
     } catch (error) {
       // Silent error handling
@@ -173,9 +207,17 @@ class LiveMarketService {
   }
 
   /**
+   * Get current market status
+   */
+  getMarketStatus(): MarketStatusInfo {
+    return this.lastMarketStatus;
+  }
+
+  /**
    * Change polling interval
    */
   setPollingInterval(interval: number): void {
+    if (this.pollingInterval === interval) return;
     this.pollingInterval = interval;
     
     // Restart polling with new interval if currently polling
@@ -188,4 +230,4 @@ class LiveMarketService {
 
 // Export singleton instance
 export const liveMarketService = new LiveMarketService();
-export type { MarketData, MarketDataResponse };
+export type { MarketData, MarketDataResponse, MarketStatusInfo };

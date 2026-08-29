@@ -13,6 +13,8 @@ import Portfolio from './pages/Portfolio';
 import Reports from './pages/Reports';
 import TradingDashboard from './pages/TradingDashboard';
 import TestLiveTrading from './pages/TestLiveTrading';
+import OptionChain from './pages/OptionChain';
+import BacktestPage from './pages/BacktestPage';
 
 function App() {
   return (
@@ -36,6 +38,8 @@ function App() {
             <Route path="/strategies/create" element={<CreateStrategy />} />
             <Route path="/strategies/edit/:id" element={<CreateStrategy />} />
             <Route path="/strategies/templates" element={<StrategyTemplate />} />
+            <Route path="/backtest" element={<BacktestPage />} />
+            <Route path="/option-chain" element={<OptionChain />} />
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/dhan-callback" element={<DhanCallback />} />

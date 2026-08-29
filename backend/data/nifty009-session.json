@@ -1,0 +1,42 @@
+{
+  "isRunning": false,
+  "isPaused": false,
+  "isHalted": false,
+  "sessionDate": "2026-08-29",
+  "state": "WAITING_FOR_MARKET",
+  "niftyLtp": 24850,
+  "firstCandleClose": null,
+  "upperLevel": null,
+  "lowerLevel": null,
+  "lockedAtm": null,
+  "activePosition": null,
+  "candles": 0,
+  "tradesCount": 0,
+  "sessionPnl": 0,
+  "squareOffTime": "15:10",
+  "events": [
+    {
+      "time": "2026-08-29T04:39:11.110Z",
+      "event": "STRATEGY_STOPPED",
+      "detail": {
+        "reason": "Manual stop via API"
+      }
+    },
+    {
+      "time": "2026-08-29T04:39:11.101Z",
+      "event": "STRATEGY_STARTED",
+      "detail": {
+        "config": {
+          "lotSize": 1,
+          "capitalAllocation": 100000,
+          "squareOffTime": "15:10",
+          "maxTradesPerDay": 3,
+          "maxDailyLoss": 5000,
+          "enableReEntry": true
+        },
+        "mode": "PAPER"
+      }
+    }
+  ],
+  "lastUpdated": "2026-08-29T04:39:11.111Z"
+}

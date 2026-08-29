@@ -1,14 +1,12 @@
 import { Router } from 'express';
-import { getAllMarketData } from '../controllers/marketController';
+import { getAllMarketData, getMarketDepth, getMarketStatusController } from '../controllers/marketController';
 
 const router = Router();
 
-// ONE ENDPOINT - Get everything
+// Live Market Data & Status Endpoints
+router.get('/status', getMarketStatusController);
 router.get('/all', getAllMarketData);
-
-// Test endpoint
-router.get('/test', (req, res) => {
-  res.json({ message: 'Market route is working!' });
-});
+router.get('/live', getAllMarketData);
+router.get('/depth/:symbol', getMarketDepth);
 
 export default router;

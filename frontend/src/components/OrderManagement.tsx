@@ -9,51 +9,34 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
   Button,
   Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   TextField,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Alert,
-  IconButton,
-  Tooltip
+  IconButton
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  Cancel as CancelIcon,
-  Edit as EditIcon,
-  Refresh as RefreshIcon
-} from '@mui/icons-material';
+import { Add as AddIcon, Refresh as RefreshIcon, Close } from '@mui/icons-material';
+import { StatusBadge } from './ui';
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
 
 interface Order {
   id: string;
+  orderId?: string;
+  brokerOrderId?: string;
   symbol: string;
   side: 'BUY' | 'SELL';
   quantity: number;
   price?: number;
-  orderType: 'MARKET' | 'LIMIT' | 'STOP_LOSS';
-  status: 'PENDING' | 'PLACED' | 'FILLED' | 'CANCELLED' | 'REJECTED';
-  timestamp: string;
-  fillPrice?: number;
-  fillQuantity?: number;
-  strategyId?: string;
-}
-
-interface OrderFormData {
-  symbol: string;
-  side: 'BUY' | 'SELL';
-  quantity: number;
-  price: number;
-  orderType: 'MARKET' | 'LIMIT' | 'STOP_LOSS';
-  brokerId: string;
+  averagePrice?: number;
+  orderType: string;
+  productType?: string;
+  status: string;
+  timestamp?: string;
+  orderTimestamp?: string;
 }
 
 interface OrderManagementProps {
@@ -63,313 +46,253 @@ interface OrderManagementProps {
 const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showOrderForm, setShowOrderForm] = useState(false);
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [orderForm, setOrderForm] = useState<OrderFormData>({
+  const [orderForm, setOrderForm] = useState({
     symbol: '',
     side: 'BUY',
-    quantity: 1,
+    quantity: 10,
     price: 0,
     orderType: 'MARKET',
-    brokerId: brokerId || ''
+    productType: 'INTRADAY'
   });
 
-  useEffect(() => {
-    loadOrders();
-  }, [brokerId]);
-
-  useEffect(() => {
-    setupWebSocket();
-
-    return () => {
-      if (socket) {
-        socket.disconnect();
-      }
-    };
-  }, []);
-
-  const setupWebSocket = () => {
-    if (socket) return; // Prevent multiple connections
-
-    const newSocket = io((process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'), {
-      autoConnect: false // Don't auto-connect to prevent errors
-    });
-
-    newSocket.on('connect', () => {
-      console.log('📡 Connected to order updates');
-      if (brokerId) {
-        newSocket.emit('subscribe_orders', brokerId);
-      }
-    });
-
-    newSocket.on('connect_error', (error) => {
-      console.log('📡 WebSocket connection failed (expected in demo mode)');
-    });
-
-    newSocket.on('order_update', (update) => {
-      console.log('📋 Order update received:', update);
-      setOrders(prev => {
-        const updated = [...prev];
-        const index = updated.findIndex(o => o.id === update.order.id);
-        if (index >= 0) {
-          updated[index] = update.order;
-        } else {
-          updated.unshift(update.order);
-        }
-        return updated;
-      });
-    });
-
-    // Only try to connect if backend is likely available
-    // newSocket.connect();
-    setSocket(newSocket);
-  };
-
-  const loadOrders = async () => {
+  const loadOrders = React.useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/trading/orders`, {
-        params: brokerId ? { brokerId } : {}
-      });
-
-      if (response.data.success) {
-        setOrders(response.data.orders || []);
+      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/trading/orders`);
+      if (res.data?.success && res.data?.orders) {
+        setOrders(res.data.orders);
       }
-    } catch (error) {
-      console.error('Failed to load orders:', error);
-      setError('Failed to load orders');
+    } catch (err) {
+      // Handled
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadOrders();
+
+    const wsUrl = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:5000';
+    const socket: Socket = io(wsUrl);
+
+    socket.on('paper_order_filled', (order: Order) => {
+      setOrders(prev => [order, ...prev.filter(o => (o.id || o.orderId) !== (order.id || order.orderId))]);
+    });
+
+    const interval = setInterval(loadOrders, 10000);
+
+    return () => {
+      socket.disconnect();
+      clearInterval(interval);
+    };
+  }, [loadOrders]);
 
   const handlePlaceOrder = async () => {
     try {
-      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/trading/orders`, orderForm);
+      const res = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/trading/orders`, {
+        symbol: orderForm.symbol.toUpperCase(),
+        side: orderForm.side,
+        quantity: Number(orderForm.quantity),
+        price: orderForm.price,
+        orderType: orderForm.orderType,
+        productType: orderForm.productType
+      });
 
-      if (response.data.success) {
+      if (res.data?.success) {
         setShowOrderForm(false);
-        setOrderForm({
-          symbol: '',
-          side: 'BUY',
-          quantity: 1,
-          price: 0,
-          orderType: 'MARKET',
-          brokerId: brokerId || ''
-        });
+        setOrderForm({ symbol: '', side: 'BUY', quantity: 10, price: 0, orderType: 'MARKET', productType: 'INTRADAY' });
         await loadOrders();
       }
-    } catch (error: any) {
-      console.error('Failed to place order:', error);
-      setError(error.response?.data?.message || 'Failed to place order');
+    } catch (e) {
+      // Handled
     }
   };
 
-  const handleCancelOrder = async (orderId: string) => {
-    try {
-      await axios.delete(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/trading/orders/${orderId}`);
-      await loadOrders();
-    } catch (error: any) {
-      console.error('Failed to cancel order:', error);
-      setError(error.response?.data?.message || 'Failed to cancel order');
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'FILLED': return 'success';
-      case 'PLACED': return 'info';
-      case 'CANCELLED': return 'default';
-      case 'REJECTED': return 'error';
-      default: return 'warning';
-    }
-  };
-
-  const getSideColor = (side: string) => {
-    return side === 'BUY' ? 'success' : 'error';
+  const formatPrice = (val: number = 0) => {
+    return val.toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   };
 
   return (
     <Box>
-      <Paper sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h6">
-            Order Management
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5 }}>
+        <Box>
+          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a' }}>
+            Orderbook & Execution Management
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Tooltip title="Refresh Orders">
-              <IconButton onClick={loadOrders} disabled={loading}>
-                <RefreshIcon />
-              </IconButton>
-            </Tooltip>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setShowOrderForm(true)}
-              disabled={!brokerId}
-            >
-              Place Order
-            </Button>
-          </Box>
+          <Typography variant="caption" sx={{ color: '#64748b' }}>
+            Live Dhan orders and virtual paper trading fills
+          </Typography>
         </Box>
+        <Box sx={{ display: 'flex', gap: 1.5 }}>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon sx={{ fontSize: 16 }} />}
+            onClick={loadOrders}
+            disabled={loading}
+            size="small"
+            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, fontSize: '0.8rem', borderColor: '#e2e8f0', color: '#475569' }}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon sx={{ fontSize: 16 }} />}
+            onClick={() => setShowOrderForm(true)}
+            size="small"
+            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, fontSize: '0.8rem', bgcolor: '#0f172a', color: '#fff', '&:hover': { bgcolor: '#1e293b' } }}
+          >
+            Place Order
+          </Button>
+        </Box>
+      </Box>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-
+      {/* Orders Table */}
+      <Paper sx={{ borderRadius: 2.5, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', overflow: 'hidden' }}>
         <TableContainer>
-          <Table>
+          <Table size="small">
             <TableHead>
-              <TableRow>
+              <TableRow sx={{ '& th': { bgcolor: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: '0.75rem', py: 1.2, borderBottom: '1px solid #e2e8f0' } }}>
+                <TableCell sx={{ pl: 2.5 }}>Order ID</TableCell>
                 <TableCell>Symbol</TableCell>
                 <TableCell>Side</TableCell>
-                <TableCell align="right">Quantity</TableCell>
-                <TableCell align="right">Price</TableCell>
+                <TableCell align="right">Qty</TableCell>
+                <TableCell align="right">Fill Price (₹)</TableCell>
                 <TableCell>Type</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell>Time</TableCell>
-                <TableCell align="center">Actions</TableCell>
+                <TableCell align="right" sx={{ pr: 2.5 }}>Time</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {orders.map((order) => (
-                <TableRow key={order.id} hover>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight="medium">
-                      {order.symbol}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={order.side}
-                      color={getSideColor(order.side)}
-                      size="small"
-                      variant="outlined"
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    {order.fillQuantity ? `${order.fillQuantity}/${order.quantity}` : order.quantity}
-                  </TableCell>
-                  <TableCell align="right">
-                    {order.orderType === 'MARKET' ? 'Market' : `₹${order.price?.toFixed(2)}`}
-                    {order.fillPrice && (
-                      <Typography variant="caption" display="block" color="textSecondary">
-                        Filled: ₹{order.fillPrice.toFixed(2)}
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>{order.orderType}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={order.status}
-                      color={getStatusColor(order.status)}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="caption">
-                      {new Date(order.timestamp).toLocaleString()}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="center">
-                    {order.status === 'PLACED' && (
-                      <Tooltip title="Cancel Order">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleCancelOrder(order.id)}
-                        >
-                          <CancelIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
+              {orders.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6, color: '#94a3b8', fontSize: '0.85rem' }}>
+                    No orders in the book.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                orders.map((o) => {
+                  const id = o.orderId || o.id || o.brokerOrderId;
+                  const time = o.orderTimestamp || o.timestamp || new Date().toISOString();
+                  const price = o.averagePrice || o.price || 0;
+
+                  return (
+                    <TableRow key={id} hover sx={{ '& td': { py: 1.2, borderBottom: '1px solid #f8fafc' } }}>
+                      <TableCell sx={{ pl: 2.5, fontFamily: 'monospace', color: '#64748b', fontSize: '0.75rem' }}>
+                        {id}
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
+                        {o.symbol}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={o.side === 'BUY' ? 'live' : 'halted'} label={o.side} />
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                        {o.quantity}
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '0.85rem', color: '#0f172a' }}>
+                        ₹{formatPrice(price)}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                        {o.orderType}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge
+                          status={o.status === 'FILLED' ? 'live' : o.status === 'CANCELLED' ? 'halted' : 'paper'}
+                          label={o.status}
+                        />
+                      </TableCell>
+                      <TableCell align="right" sx={{ pr: 2.5, color: '#64748b', fontSize: '0.75rem' }}>
+                        {new Date(time).toLocaleTimeString()}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
         </TableContainer>
-
-        {orders.length === 0 && !loading && (
-          <Box sx={{ textAlign: 'center', py: 4 }}>
-            <Typography color="textSecondary">
-              No orders found
-            </Typography>
-          </Box>
-        )}
       </Paper>
 
-      {/* Place Order Dialog */}
-      <Dialog open={showOrderForm} onClose={() => setShowOrderForm(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Place New Order</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            <TextField
-              label="Symbol"
-              value={orderForm.symbol}
-              onChange={(e) => setOrderForm({ ...orderForm, symbol: e.target.value.toUpperCase() })}
-              placeholder="e.g., RELIANCE"
-              fullWidth
-            />
-            
-            <FormControl fullWidth>
+      {/* Sleek Place Order Modal */}
+      <Dialog
+        open={showOrderForm}
+        onClose={() => setShowOrderForm(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, p: 0, overflow: 'hidden' } }}
+      >
+        <Box sx={{ p: 2.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9' }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a' }}>
+            Place Trading Order
+          </Typography>
+          <IconButton size="small" onClick={() => setShowOrderForm(false)} sx={{ color: '#94a3b8' }}>
+            <Close sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Box>
+        <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <TextField
+            label="Symbol"
+            value={orderForm.symbol}
+            onChange={(e) => setOrderForm({ ...orderForm, symbol: e.target.value.toUpperCase() })}
+            placeholder="e.g. RELIANCE, TCS, INFY"
+            size="small"
+            fullWidth
+          />
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+            <FormControl size="small" fullWidth>
               <InputLabel>Side</InputLabel>
               <Select
                 value={orderForm.side}
-                onChange={(e) => setOrderForm({ ...orderForm, side: e.target.value as 'BUY' | 'SELL' })}
+                label="Side"
+                onChange={(e) => setOrderForm({ ...orderForm, side: e.target.value as any })}
               >
                 <MenuItem value="BUY">BUY</MenuItem>
                 <MenuItem value="SELL">SELL</MenuItem>
               </Select>
             </FormControl>
-
             <TextField
               label="Quantity"
               type="number"
               value={orderForm.quantity}
-              onChange={(e) => setOrderForm({ ...orderForm, quantity: parseInt(e.target.value) || 0 })}
+              onChange={(e) => setOrderForm({ ...orderForm, quantity: Number(e.target.value) })}
+              size="small"
               fullWidth
             />
-
-            <FormControl fullWidth>
-              <InputLabel>Order Type</InputLabel>
-              <Select
-                value={orderForm.orderType}
-                onChange={(e) => setOrderForm({ ...orderForm, orderType: e.target.value as any })}
-              >
-                <MenuItem value="MARKET">MARKET</MenuItem>
-                <MenuItem value="LIMIT">LIMIT</MenuItem>
-                <MenuItem value="STOP_LOSS">STOP LOSS</MenuItem>
-              </Select>
-            </FormControl>
-
-            {orderForm.orderType !== 'MARKET' && (
-              <TextField
-                label="Price"
-                type="number"
-                value={orderForm.price}
-                onChange={(e) => setOrderForm({ ...orderForm, price: parseFloat(e.target.value) || 0 })}
-                fullWidth
-                InputProps={{
-                  startAdornment: '₹'
-                }}
-              />
-            )}
           </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowOrderForm(false)}>Cancel</Button>
+          <FormControl size="small" fullWidth>
+            <InputLabel>Order Type</InputLabel>
+            <Select
+              value={orderForm.orderType}
+              label="Order Type"
+              onChange={(e) => setOrderForm({ ...orderForm, orderType: e.target.value as any })}
+            >
+              <MenuItem value="MARKET">MARKET</MenuItem>
+              <MenuItem value="LIMIT">LIMIT</MenuItem>
+            </Select>
+          </FormControl>
           <Button
+            fullWidth
             variant="contained"
             onClick={handlePlaceOrder}
-            disabled={!orderForm.symbol || !orderForm.quantity}
+            disabled={!orderForm.symbol || orderForm.quantity <= 0}
+            sx={{
+              bgcolor: orderForm.side === 'BUY' ? '#16a34a' : '#dc2626',
+              color: '#fff',
+              fontWeight: 700,
+              textTransform: 'none',
+              py: 1,
+              borderRadius: 2,
+              '&:hover': { bgcolor: orderForm.side === 'BUY' ? '#15803d' : '#b91c1c' }
+            }}
           >
-            Place Order
+            Execute {orderForm.side} Order
           </Button>
-        </DialogActions>
+        </Box>
       </Dialog>
     </Box>
   );

@@ -1,152 +1,168 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Box,
-    Container,
-    Typography,
-    Card,
-    CardContent,
-    Button
+  Box,
+  Typography,
+  Button,
+  CircularProgress
 } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon, Refresh, Shield, AccountBalance } from '@mui/icons-material';
 import Layout from '../components/Layout';
-import BrokerCard from '../components/BrokerCard';
-import AddBrokerForm from '../components/AddBrokerForm';
-import axios from 'axios';
-
-interface Broker {
-    id: string;
-    broker: string;
-    clientId: string;
-    status: 'Connected' | 'Disconnected';
-    accountName?: string;
-    strategyPerformance?: string;
-    terminalEnabled: boolean;
-    tradingEngineEnabled: boolean;
-    lastActivity?: string;
-    totalOrders?: number;
-    activePositions?: number;
-    connectedAt?: string;
-    lastValidated?: string;
-}
+import { DhanConnectionCard } from '../components/brokers/DhanConnectionCard';
+import { ConnectDhanModal } from '../components/brokers/ConnectDhanModal';
+import { brokerApi, BrokerSummary } from '../services/brokerApi';
+import { PageHeader, StatCard, SectionCard, StatusBadge } from '../components/ui';
 
 const Brokers: React.FC = () => {
-    const [brokers, setBrokers] = useState<Broker[]>([]);
-    const [showAddForm, setShowAddForm] = useState(false);
+  const [brokers, setBrokers] = useState<BrokerSummary[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        fetchBrokers();
-        
-        // Auto-refresh broker status every 30 seconds
-        const interval = setInterval(() => {
-            fetchBrokers();
-        }, 30000);
-        
-        return () => clearInterval(interval);
-    }, []);
+  useEffect(() => {
+    fetchBrokers();
+    const interval = setInterval(fetchBrokers, 20000);
+    return () => clearInterval(interval);
+  }, []);
 
-    const fetchBrokers = async () => {
-        try {
-            // Get current user ID
-            const { auth } = await import('../config/firebase');
-            const userId = auth.currentUser?.uid;
-            
-            // Fetch only user's brokers
-            const response = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/list${userId ? `?userId=${userId}` : ''}`);
-            setBrokers(response.data.brokers || []);
-        } catch (error) {
-            console.error('Failed to fetch brokers:', error);
-        }
-    };
+  const fetchBrokers = async () => {
+    try {
+      const list = await brokerApi.getBrokers();
+      setBrokers(list);
+    } catch (error) {
+      console.error('Failed to fetch brokers:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const handleBrokerAdded = (newBroker: BrokerSummary) => {
+    setBrokers((prev) => {
+      const exists = prev.some(b => b.id === newBroker.id);
+      if (exists) {
+        return prev.map(b => b.id === newBroker.id ? newBroker : b);
+      }
+      return [...prev, newBroker];
+    });
+    setShowAddModal(false);
+  };
 
+  const handleBrokerDeleted = (brokerId: string) => {
+    setBrokers((prev) => prev.filter(b => b.id !== brokerId));
+  };
 
-    const handleBrokerUpdate = (updatedBroker: Broker) => {
-        setBrokers(brokers.map(broker =>
-            broker.id === updatedBroker.id ? updatedBroker : broker
-        ));
-    };
+  const connectedCount = brokers.filter(b => b.status === 'Connected').length;
 
-    const handleBrokerDelete = (brokerId: string) => {
-        setBrokers(brokers.filter(broker => broker.id !== brokerId));
-    };
+  return (
+    <Layout>
+      <Box sx={{ maxWidth: '100%' }}>
+        {/* Unified Page Header */}
+        <PageHeader
+          title="Broker Integrations"
+          subtitle="Connect and manage live DhanHQ v2 broker accounts and execution gateways"
+          badge={<StatusBadge status={connectedCount > 0 ? 'live' : 'paper'} dot pulse label={connectedCount > 0 ? 'DHAN CONNECTED' : 'STANDBY'} />}
+          action={
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<Refresh sx={{ fontSize: 16 }} />}
+                onClick={fetchBrokers}
+                disabled={loading}
+                sx={{ textTransform: 'none', fontWeight: 600, fontSize: '0.8rem', borderRadius: 2, borderColor: '#e2e8f0', color: '#475569' }}
+              >
+                Refresh
+              </Button>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<AddIcon sx={{ fontSize: 16 }} />}
+                onClick={() => setShowAddModal(true)}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  px: 2,
+                  borderRadius: 2,
+                  bgcolor: '#0f172a',
+                  color: '#ffffff',
+                  '&:hover': { bgcolor: '#1e293b' }
+                }}
+              >
+                Connect Dhan
+              </Button>
+            </Box>
+          }
+        />
 
-    const handleBrokerAdded = (newBroker: Broker) => {
-        setBrokers([...brokers, newBroker]);
-        setShowAddForm(false);
-    };
+        {/* Minimal Metric Cards */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2, mb: 3 }}>
+          <StatCard
+            label="Connected Accounts"
+            value={`${connectedCount} Active`}
+            subtext="DhanHQ v2 Feed"
+            icon={<AccountBalance sx={{ fontSize: 18 }} />}
+          />
 
-    return (
-        <Layout>
-            <Container maxWidth="xl">
-                <Box sx={{ py: 4 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-                        <Typography variant="h4" component="h1">
-                            🔗 Broker Connections
-                        </Typography>
-                        <Button
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            onClick={() => setShowAddForm(true)}
-                            sx={{ px: 3 }}
-                        >
-                            Add Broker
-                        </Button>
-                    </Box>
+          <StatCard
+            label="API Token Security"
+            value="AES-256-GCM"
+            subtext="Encrypted At Rest"
+            color="#16a34a"
+            icon={<Shield sx={{ fontSize: 18 }} />}
+          />
 
+          <StatCard
+            label="Execution Status"
+            value={connectedCount > 0 ? 'Ready' : 'Paper Mode'}
+            subtext="Live / Virtual Gateway"
+            color={connectedCount > 0 ? '#16a34a' : '#b45309'}
+            icon={<AccountBalance sx={{ fontSize: 18 }} />}
+          />
+        </Box>
 
+        {/* Broker Connection Cards Grid */}
+        <SectionCard title="Configured Broker Accounts" subtitle="Active DhanHQ API credentials and terminal gateways">
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+              <CircularProgress size={32} sx={{ color: '#0f172a' }} />
+            </Box>
+          ) : brokers.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 6 }}>
+              <Typography variant="body2" sx={{ color: '#64748b', mb: 1.5, fontWeight: 600 }}>
+                No broker account connected yet
+              </Typography>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={() => setShowAddModal(true)}
+                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, bgcolor: '#0f172a' }}
+              >
+                Connect Dhan Account
+              </Button>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2.5 }}>
+              {brokers.map((broker) => (
+                <DhanConnectionCard
+                  key={broker.id}
+                  broker={broker}
+                  onDisconnect={handleBrokerDeleted}
+                  onRefresh={fetchBrokers}
+                />
+              ))}
+            </Box>
+          )}
+        </SectionCard>
 
-                    {brokers.length === 0 && (
-                        <Card sx={{ textAlign: 'center', py: 6 }}>
-                            <CardContent>
-                                <Typography variant="h6" color="textSecondary" gutterBottom>
-                                    No Brokers Connected
-                                </Typography>
-                                <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-                                    Connect your broker account to start live trading
-                                </Typography>
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<AddIcon />}
-                                    onClick={() => setShowAddForm(true)}
-                                    size="large"
-                                >
-                                    Add Your First Broker
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {brokers.length > 0 && (
-                        <Box sx={{
-                            display: 'grid',
-                            gridTemplateColumns: {
-                                xs: '1fr',
-                                md: 'repeat(2, 1fr)',
-                                lg: 'repeat(3, 1fr)'
-                            },
-                            gap: 3
-                        }}>
-                            {brokers.map((broker) => (
-                                <BrokerCard
-                                    key={broker.id}
-                                    broker={broker}
-                                    onUpdate={handleBrokerUpdate}
-                                    onDelete={handleBrokerDelete}
-                                />
-                            ))}
-                        </Box>
-                    )}
-
-                    {/* Add Broker Form Dialog */}
-                    <AddBrokerForm
-                        open={showAddForm}
-                        onClose={() => setShowAddForm(false)}
-                        onBrokerAdded={handleBrokerAdded}
-                    />
-                </Box>
-            </Container>
-        </Layout>
-    );
+        {/* Connect Dhan Modal */}
+        <ConnectDhanModal
+          open={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onSuccess={handleBrokerAdded}
+        />
+      </Box>
+    </Layout>
+  );
 };
 
 export default Brokers;

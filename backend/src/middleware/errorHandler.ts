@@ -14,42 +14,39 @@ export class AppError extends Error {
 }
 
 export const errorHandler = (
-  err: Error | AppError,
+  err: any,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) => {
   let statusCode = 500;
   let message = 'Internal Server Error';
-  let isOperational = false;
 
   if (err instanceof AppError) {
     statusCode = err.statusCode;
     message = err.message;
-    isOperational = err.isOperational;
+  } else if (err instanceof SyntaxError && 'body' in err) {
+    statusCode = 400;
+    message = 'Invalid JSON request payload';
+  } else if (err.statusCode) {
+    statusCode = err.statusCode;
+    message = err.message;
   }
 
   // Log error
-  logger.error('Error occurred:', {
+  logger.error(err.message || 'Error occurred', {
     message: err.message,
-    stack: err.stack,
     statusCode,
     path: req.path,
     method: req.method,
-    ip: req.ip,
   });
 
   // Send error response
   res.status(statusCode).json({
+    success: false,
     error: message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+    ...(process.env.NODE_ENV === 'development' && { details: err.message }),
   });
-
-  // If error is not operational, exit process
-  if (!isOperational) {
-    logger.error('Non-operational error detected. Shutting down...');
-    process.exit(1);
-  }
 };
 
 export const asyncHandler = (fn: Function) => {

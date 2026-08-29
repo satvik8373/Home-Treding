@@ -1,13 +1,8 @@
-/**
- * Strategy Testing Routes
- */
-
 import express from 'express';
 import {
   backtestStrategy,
-  generateSampleData,
-  testSingleCandle,
   quickBacktest,
+  testSingleCandle,
   validateStrategy
 } from '../controllers/strategyTestController';
 
@@ -15,27 +10,21 @@ const router = express.Router();
 
 /**
  * POST /api/strategy-test/backtest
- * Backtest strategy with historical data
+ * Backtest strategy with historical candles or Dhan API
  */
 router.post('/backtest', backtestStrategy);
 
 /**
- * GET /api/strategy-test/sample-data
- * Generate sample historical data
+ * GET /api/strategy-test/quick-backtest
+ * Quick backtest on recent Dhan market candles
  */
-router.get('/sample-data', generateSampleData);
+router.get('/quick-backtest', quickBacktest);
 
 /**
  * POST /api/strategy-test/test-candle
- * Test strategy with single candle
+ * Test strategy with single candle in real-time
  */
 router.post('/test-candle', testSingleCandle);
-
-/**
- * GET /api/strategy-test/quick-backtest
- * Quick backtest with sample data
- */
-router.get('/quick-backtest', quickBacktest);
 
 /**
  * POST /api/strategy-test/validate

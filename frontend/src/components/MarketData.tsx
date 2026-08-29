@@ -16,24 +16,41 @@ interface Stock {
 const MarketData: React.FC = () => {
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [indices, setIndices] = useState<Stock[]>([]);
+  const [isMarketOpen, setIsMarketOpen] = useState(true);
+  const [marketStatusMsg, setMarketStatusMsg] = useState('Live');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   useEffect(() => {
+    let timer: NodeJS.Timeout;
+
     const fetchData = async () => {
       try {
         setError(null);
-        const response = await apiService.get<{ success: boolean; data: { stocks: Stock[]; indices: Stock[] } }>(
+        const response = await apiService.get<{ 
+          success: boolean; 
+          isMarketOpen?: boolean;
+          marketStatus?: { status: string; message: string; nextOpen?: string };
+          data?: any;
+          stocks?: Stock[]; 
+          indices?: Stock[] 
+        }>(
           '/api/market/all'
         );
         
         if (response.success) {
-          setStocks(response.data.stocks || []);
-          setIndices(response.data.indices || []);
+          const s = response.stocks || (response.data && response.data.stocks) || [];
+          const ind = response.indices || (response.data && response.data.indices) || [];
+          setStocks(s);
+          setIndices(ind);
+          if (typeof response.isMarketOpen === 'boolean') {
+            setIsMarketOpen(response.isMarketOpen);
+            setMarketStatusMsg(response.isMarketOpen ? 'Live' : (response.marketStatus?.status || 'Closed'));
+          }
           setLastUpdate(new Date());
         } else {
-          setError('Failed to fetch live market data');
+          setError('Failed to fetch market data');
         }
       } catch (error: any) {
         console.error('Failed to fetch market data:', error);
@@ -43,14 +60,12 @@ const MarketData: React.FC = () => {
       }
     };
 
-    // Initial fetch
     fetchData();
+    // Refresh every 5s if live, 30s if market closed
+    timer = setInterval(fetchData, isMarketOpen ? 5000 : 30000);
     
-    // REAL-TIME: Auto-refresh every 2 seconds for minimal delay
-    const interval = setInterval(fetchData, 2000);
-    
-    return () => clearInterval(interval);
-  }, []);
+    return () => clearInterval(timer);
+  }, [isMarketOpen]);
 
   const renderCard = (item: Stock) => (
     <Box key={item.symbol}>

@@ -1,6 +1,8 @@
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut,
   sendPasswordResetEmail,
   updateProfile,
@@ -35,33 +37,40 @@ class AuthService {
   // Register new user
   async register(data: RegisterData): Promise<User> {
     try {
-      // Create Firebase user
+      // 1. Create Firebase Auth user
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         data.email,
         data.password
       );
 
-      // Update profile with name
-      await updateProfile(userCredential.user, {
-        displayName: data.name
-      });
+      // 2. Update Auth profile with name
+      try {
+        await updateProfile(userCredential.user, {
+          displayName: data.name
+        });
+      } catch (e) {
+        console.warn('Could not update profile displayName:', e);
+      }
 
-      // Create user document in Firestore
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
-        uid: userCredential.user.uid,
-        name: data.name,
-        email: data.email,
-        phone: data.phone || '',
-        subscriptionPlan: 'free',
-        isActive: true,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
+      // 3. Create user document in Firestore (non-blocking if rules are restricted)
+      try {
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          uid: userCredential.user.uid,
+          name: data.name,
+          email: data.email,
+          phone: data.phone || '',
+          subscriptionPlan: 'free',
+          isActive: true,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      } catch (firestoreErr) {
+        console.warn('Firestore user profile sync note (check security rules):', firestoreErr);
+      }
 
       return userCredential.user;
     } catch (error: any) {
-      // Provide user-friendly error messages
       const errorCode = error.code;
       let errorMessage = 'Registration failed';
 
@@ -73,7 +82,7 @@ class AuthService {
           errorMessage = 'Invalid email address format.';
           break;
         case 'auth/operation-not-allowed':
-          errorMessage = 'Email/password accounts are not enabled. Please contact support.';
+          errorMessage = 'Email/password accounts are not enabled in Firebase Console. Please enable Email/Password provider.';
           break;
         case 'auth/weak-password':
           errorMessage = 'Password is too weak. Please use at least 6 characters.';
@@ -89,7 +98,7 @@ class AuthService {
     }
   }
 
-  // Login user
+  // Login user with email/password
   async login(data: LoginData): Promise<User> {
     try {
       const userCredential = await signInWithEmailAndPassword(
@@ -98,15 +107,18 @@ class AuthService {
         data.password
       );
 
-      // Update last login
-      const userRef = doc(db, 'users', userCredential.user.uid);
-      await setDoc(userRef, {
-        updatedAt: serverTimestamp()
-      }, { merge: true });
+      // Try updating last login in Firestore (non-blocking)
+      try {
+        const userRef = doc(db, 'users', userCredential.user.uid);
+        await setDoc(userRef, {
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (e) {
+        console.warn('Firestore update last login note:', e);
+      }
 
       return userCredential.user;
     } catch (error: any) {
-      // Provide user-friendly error messages
       const errorCode = error.code;
       let errorMessage = 'Login failed';
 
@@ -140,6 +152,75 @@ class AuthService {
     }
   }
 
+  // Sign In with Google
+  async loginWithGoogle(): Promise<User> {
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+
+      const userCredential = await signInWithPopup(auth, provider);
+      const user = userCredential.user;
+
+      // Sync Firestore profile (non-blocking if Firestore rules block writes)
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userRef);
+
+        if (!userSnap.exists()) {
+          await setDoc(userRef, {
+            uid: user.uid,
+            name: user.displayName || 'Google Trader',
+            email: user.email || '',
+            phone: user.phoneNumber || '',
+            subscriptionPlan: 'free',
+            isActive: true,
+            photoURL: user.photoURL || '',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+        } else {
+          await setDoc(userRef, {
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        }
+      } catch (firestoreErr) {
+        console.warn('Firestore profile sync note (check security rules):', firestoreErr);
+      }
+
+      return user;
+    } catch (error: any) {
+      const errorCode = error.code;
+      let errorMessage = 'Google Sign-In failed';
+
+      switch (errorCode) {
+        case 'auth/popup-closed-by-user':
+          errorMessage = 'Sign-in cancelled by user.';
+          break;
+        case 'auth/popup-blocked':
+          errorMessage = 'Pop-up blocked by browser. Please allow pop-ups for this site.';
+          break;
+        case 'auth/cancelled-popup-request':
+          errorMessage = 'Sign-in request cancelled.';
+          break;
+        case 'auth/account-exists-with-different-credential':
+          errorMessage = 'An account already exists with the same email address using different sign-in credentials.';
+          break;
+        case 'auth/operation-not-allowed':
+          errorMessage = 'Google Sign-In is not enabled in Firebase Console. Please enable Google provider under Authentication -> Sign-in method.';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'Network error. Please check your internet connection.';
+          break;
+        default:
+          errorMessage = error.message || 'Google Sign-In failed. Please try again.';
+      }
+
+      throw new Error(errorMessage);
+    }
+  }
+
   // Logout user
   async logout(): Promise<void> {
     try {
@@ -154,7 +235,6 @@ class AuthService {
     try {
       await sendPasswordResetEmail(auth, email);
     } catch (error: any) {
-      // Provide user-friendly error messages
       const errorCode = error.code;
       let errorMessage = 'Password reset failed';
 
@@ -181,17 +261,33 @@ class AuthService {
     return auth.currentUser;
   }
 
-  // Get user profile from Firestore
+  // Get user profile from Firestore (with automatic fallback to Auth profile)
   async getUserProfile(uid: string): Promise<UserProfile | null> {
+    const currentUser = auth.currentUser;
+
     try {
       const userDoc = await getDoc(doc(db, 'users', uid));
       if (userDoc.exists()) {
         return userDoc.data() as UserProfile;
       }
-      return null;
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to get user profile');
+      console.warn('Could not read user profile from Firestore, using Auth profile:', error.message);
     }
+
+    // Fallback to Firebase Auth user metadata
+    if (currentUser && currentUser.uid === uid) {
+      return {
+        uid: currentUser.uid,
+        name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Trader',
+        email: currentUser.email || '',
+        phone: currentUser.phoneNumber || undefined,
+        subscriptionPlan: 'free',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+    }
+
+    return null;
   }
 
   // Update user profile
@@ -203,7 +299,7 @@ class AuthService {
         updatedAt: serverTimestamp()
       }, { merge: true });
     } catch (error: any) {
-      throw new Error(error.message || 'Failed to update profile');
+      console.warn('Firestore updateProfile warning:', error.message);
     }
   }
 

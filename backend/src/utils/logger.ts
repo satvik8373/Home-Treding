@@ -12,7 +12,7 @@ const logFormat = winston.format.combine(
 const consoleFormat = winston.format.combine(
   winston.format.colorize(),
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-  winston.format.printf(({ timestamp, level, message, ...meta }) => {
+  winston.format.printf(({ timestamp, level, message, ...meta }: any) => {
     let msg = `${timestamp} [${level}]: ${message}`;
     if (Object.keys(meta).length > 0) {
       msg += ` ${JSON.stringify(meta)}`;

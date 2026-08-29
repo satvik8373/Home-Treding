@@ -1,0 +1,15 @@
+{
+  "provider": "Synthetic Engine",
+  "endpoint": "synthetic",
+  "securityId": "25",
+  "symbol": "BANKNIFTY",
+  "exchangeSegment": "IDX_I",
+  "instrument": "INDEX",
+  "interval": "5",
+  "fromDate": "2026-07-30",
+  "toDate": "2026-08-28",
+  "fetchedAt": "2026-08-29T05:57:43.951Z",
+  "timezone": "Asia/Kolkata",
+  "candleCount": 1650,
+  "source": "DEMO_SYNTHETIC"
+}

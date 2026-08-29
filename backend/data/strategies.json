@@ -1,1 +1,51 @@
-[]
+[
+  {
+    "id": "strat_1787985840532_jpe96o",
+    "name": "1 % SL strangle BNF Copy",
+    "author": "AR427232",
+    "description": "",
+    "segmentType": "OPTION",
+    "strategyType": "Time Based",
+    "symbol": "NIFTY BANK",
+    "startTime": "09:16",
+    "endTime": "15:10",
+    "tradingDays": [
+      "MON",
+      "TUE",
+      "WED",
+      "THU",
+      "FRI"
+    ],
+    "legs": [
+      {
+        "id": "leg-1",
+        "action": "SELL",
+        "symbol": "NIFTY BANK",
+        "strike": "ATM -100",
+        "optionType": "CE",
+        "quantity": 120,
+        "slType": "percentage",
+        "slValue": 0,
+        "targetType": "percentage",
+        "targetValue": 0
+      },
+      {
+        "id": "leg-2",
+        "action": "SELL",
+        "symbol": "NIFTY BANK",
+        "strike": "ATM -100",
+        "optionType": "PE",
+        "quantity": 30,
+        "slType": "percentage",
+        "slValue": 1,
+        "targetType": "percentage",
+        "targetValue": 0
+      }
+    ],
+    "maxLoss": 2199.9,
+    "maxProfit": 2200,
+    "trailingSl": "Trail Profit (1200/200)",
+    "createdAt": "2026-08-29T06:44:00.532Z",
+    "status": "active"
+  }
+]

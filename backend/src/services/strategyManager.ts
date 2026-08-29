@@ -147,11 +147,28 @@ export class StrategyManager extends EventEmitter {
 
       this.strategies.set(strategyId, strategy);
       this.emit('strategyStopped', strategy);
-      
-      console.log(`🛑 Strategy stopped: ${strategy.name}`);
       return true;
     } catch (error) {
       console.error(`❌ Failed to stop strategy ${strategyId}:`, error);
       throw error;
     }
   }
+
+  private processMarketTick(_tick: any): void {
+    // Market tick handler
+  }
+
+  private updateStrategyPerformance(_strategyId: any, _order: any): void {
+    // Performance calculation handler
+  }
+
+  private startStrategyExecution(_strategy: any): void {
+    // Strategy execution handler
+  }
+
+  private stopStrategyExecution(_strategyId: any): void {
+    // Strategy stop handler
+  }
+}
+
+export const strategyManager = new StrategyManager();
