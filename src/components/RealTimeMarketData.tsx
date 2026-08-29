@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -9,16 +9,24 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
   CircularProgress,
-  Alert
+  Dialog,
+  IconButton,
+  LinearProgress
 } from '@mui/material';
-import { TrendingUp, TrendingDown, TrendingFlat } from '@mui/icons-material';
+import { TrendingUp, TrendingDown, Close, ChevronRight, FiberManualRecord } from '@mui/icons-material';
 import { io, Socket } from 'socket.io-client';
+import axios from 'axios';
 
 interface MarketTick {
   symbol: string;
+  name?: string;
   price: number;
+  open?: number;
+  high?: number;
+  low?: number;
+  close?: number;
+  prevClose?: number;
   volume: number;
   change: {
     absolute: number;
@@ -27,198 +35,366 @@ interface MarketTick {
   timestamp: string;
 }
 
+interface DepthLevel {
+  price: number;
+  quantity: number;
+  orders: number;
+}
+
+interface DepthData {
+  symbol: string;
+  name: string;
+  exchange: string;
+  ltp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  prevClose: number;
+  change: number;
+  changePercent: number;
+  volume: number;
+  buyDepth: DepthLevel[];
+  sellDepth: DepthLevel[];
+  totalBuyQty: number;
+  totalSellQty: number;
+  timestamp: string;
+  source: string;
+}
+
 interface MarketDataProps {
   symbols?: string[];
   autoRefresh?: boolean;
 }
 
 const RealTimeMarketData: React.FC<MarketDataProps> = ({ 
-  symbols = ['RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'NIFTY50'], 
+  symbols = ['NIFTY 50', 'BANKNIFTY', 'FINNIFTY', 'RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'BHARTIARTL'], 
   autoRefresh = true 
 }) => {
   const [marketData, setMarketData] = useState<Map<string, MarketTick>>(new Map());
+  const [flashStates, setFlashStates] = useState<Map<string, 'up' | 'down'>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+  const [isMarketOpen, setIsMarketOpen] = useState(true);
+  const [marketStatus, setMarketStatus] = useState<{ status?: string; message?: string; nextOpen?: string; istTime?: string } | null>(null);
+  const [selectedDepth, setSelectedDepth] = useState<DepthData | null>(null);
+  const prevPricesRef = useRef<Map<string, number>>(new Map());
+
+  const symbolsKey = symbols.join(',');
 
   useEffect(() => {
     if (!autoRefresh) return;
+    let isMounted = true;
 
-    // For demo mode, simulate market data instead of WebSocket
-    setConnectionStatus('connected');
-    setLoading(false);
-    
-    // Simulate market data updates
-    const interval = setInterval(() => {
-      const simulatedData = new Map();
-      symbols.forEach(symbol => {
-        const basePrice = 100 + Math.random() * 2000;
-        const change = (Math.random() - 0.5) * 20;
-        simulatedData.set(symbol, {
-          symbol,
-          price: basePrice,
-          volume: Math.floor(Math.random() * 100000),
-          change: {
-            absolute: change,
-            percentage: (change / basePrice) * 100
-          },
-          timestamp: new Date().toISOString()
-        });
-      });
-      setMarketData(simulatedData);
-    }, 2000);
+    // 1. Initial REST fetch
+    const fetchInitialData = async () => {
+      try {
+        const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/market/all`);
+        if (res.data?.success && isMounted) {
+          if (typeof res.data.isMarketOpen === 'boolean') {
+            setIsMarketOpen(res.data.isMarketOpen);
+          }
+          if (res.data.marketStatus) {
+            setMarketStatus({ ...res.data.marketStatus, istTime: res.data.istTime });
+          }
 
-    // Try WebSocket connection (will fail gracefully in demo mode)
+          const newMap = new Map<string, MarketTick>();
+          (res.data.data || []).forEach((item: any) => {
+            const price = parseFloat(item.price || item.ltp) || 0;
+            const changeAbs = parseFloat(item.change) || 0;
+            const changePct = parseFloat(item.changePercent) || 0;
+
+            prevPricesRef.current.set(item.symbol, price);
+
+            newMap.set(item.symbol, {
+              symbol: item.symbol,
+              name: item.name || item.symbol,
+              price,
+              open: item.open,
+              high: item.high,
+              low: item.low,
+              close: item.close,
+              prevClose: item.prevClose,
+              volume: item.volume || 0,
+              change: {
+                absolute: changeAbs,
+                percentage: changePct
+              },
+              timestamp: item.timestamp || new Date().toISOString()
+            });
+          });
+          setMarketData(newMap);
+        }
+      } catch (err) {
+        // Ignored
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchInitialData();
+
+    // 2. High-Frequency Real-Time WebSocket Connection
     const wsUrl = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:5000';
-    const newSocket = io(wsUrl, {
-      autoConnect: false // Don't auto-connect to prevent console errors
-    });
+    const newSocket: Socket = io(wsUrl);
 
     newSocket.on('connect', () => {
-      console.log('📡 Connected to real-time market data');
-      setConnectionStatus('connected');
-      setError(null);
-      newSocket.emit('subscribe_market_data', symbols);
+      if (isMounted) {
+        setConnectionStatus('connected');
+        newSocket.emit('subscribe_market_data', symbols);
+      }
     });
 
     newSocket.on('connect_error', () => {
-      console.log('📡 WebSocket unavailable, using simulated data');
-      setConnectionStatus('connected'); // Show as connected with simulated data
+      if (isMounted) {
+        setConnectionStatus('disconnected');
+      }
     });
 
-    newSocket.on('market_tick', (tick: MarketTick) => {
+    newSocket.on('market_tick', (tick: any) => {
+      if (!isMounted || !tick || !tick.symbol) return;
+
+      if (typeof tick.isOpen === 'boolean') {
+        setIsMarketOpen(tick.isOpen);
+      }
+
+      const newPrice = Number(tick.ltp || tick.price || 0);
+      const oldPrice = prevPricesRef.current.get(tick.symbol) || newPrice;
+
+      // Only trigger flashing animation if market is actively open and price truly moved
+      if (tick.isOpen !== false && isMarketOpen && newPrice !== oldPrice) {
+        if (newPrice > oldPrice) {
+          setFlashStates(prev => new Map(prev).set(tick.symbol, 'up'));
+          setTimeout(() => {
+            if (isMounted) {
+              setFlashStates(prev => {
+                const m = new Map(prev);
+                m.delete(tick.symbol);
+                return m;
+              });
+            }
+          }, 400);
+        } else if (newPrice < oldPrice) {
+          setFlashStates(prev => new Map(prev).set(tick.symbol, 'down'));
+          setTimeout(() => {
+            if (isMounted) {
+              setFlashStates(prev => {
+                const m = new Map(prev);
+                m.delete(tick.symbol);
+                return m;
+              });
+            }
+          }, 400);
+        }
+      }
+
+      prevPricesRef.current.set(tick.symbol, newPrice);
+
       setMarketData(prev => {
         const updated = new Map(prev);
-        updated.set(tick.symbol, tick);
+        const existing: MarketTick = updated.get(tick.symbol) || {
+          symbol: tick.symbol,
+          name: tick.name || tick.symbol,
+          price: newPrice,
+          open: newPrice,
+          high: newPrice,
+          low: newPrice,
+          volume: tick.volume || 0,
+          prevClose: tick.prevClose || newPrice,
+          change: { absolute: 0, percentage: 0 },
+          timestamp: new Date().toISOString()
+        };
+
+        const prevClose = tick.prevClose || existing.prevClose || newPrice;
+        const changeAbs = Number((newPrice - prevClose).toFixed(2));
+        const changePct = prevClose > 0 ? Number(((changeAbs / prevClose) * 100).toFixed(2)) : 0;
+
+        updated.set(tick.symbol, {
+          ...existing,
+          name: tick.name || existing.name,
+          price: newPrice,
+          open: tick.open || existing.open,
+          high: Math.max(existing.high || newPrice, newPrice),
+          low: Math.min(existing.low || newPrice, newPrice),
+          prevClose,
+          volume: tick.volume || existing.volume,
+          change: {
+            absolute: changeAbs,
+            percentage: changePct
+          },
+          timestamp: new Date().toISOString()
+        });
+
         return updated;
       });
     });
 
-    setSocket(newSocket);
-
-    // Cleanup
     return () => {
-      clearInterval(interval);
-      if (newSocket) {
-        newSocket.disconnect();
-      }
+      isMounted = false;
+      newSocket.disconnect();
     };
-  }, [symbols.join(','), autoRefresh]); // Use symbols.join(',') to prevent infinite loops
+  }, [symbolsKey, autoRefresh, isMarketOpen]);
 
-  const formatPrice = (price: number): string => {
+  const openMarketDepth = async (symbol: string) => {
+    try {
+      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/market/depth/${encodeURIComponent(symbol)}`);
+      if (res.data?.success && res.data?.depth) {
+        setSelectedDepth(res.data.depth);
+      }
+    } catch (e) {
+      // Handled
+    }
+  };
+
+  const formatPrice = (price: number = 0): string => {
     return price.toLocaleString('en-IN', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
   };
 
-  const formatChange = (change: number): string => {
-    const sign = change >= 0 ? '+' : '';
-    return `${sign}${change.toFixed(2)}`;
-  };
-
-  const getChangeColor = (change: number): 'success' | 'error' | 'default' => {
-    if (change > 0) return 'success';
-    if (change < 0) return 'error';
-    return 'default';
-  };
-
-  const getChangeIcon = (change: number) => {
-    if (change > 0) return <TrendingUp fontSize="small" />;
-    if (change < 0) return <TrendingDown fontSize="small" />;
-    return <TrendingFlat fontSize="small" />;
-  };
-
-  if (error) {
+  if (loading && marketData.size === 0) {
     return (
-      <Alert severity="error" sx={{ mb: 2 }}>
-        {error}
-      </Alert>
+      <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 2, border: '1px solid #f1f5f9', boxShadow: 'none' }}>
+        <CircularProgress size={28} sx={{ color: '#0f172a' }} />
+        <Typography variant="body2" sx={{ mt: 1.5, color: '#64748b', fontSize: '0.85rem' }}>
+          Connecting to market feed...
+        </Typography>
+      </Paper>
     );
   }
 
   return (
-    <Paper sx={{ p: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">
-          Live Market Data
-        </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Chip
-            label={connectionStatus}
-            color={connectionStatus === 'connected' ? 'success' : 'default'}
-            size="small"
-          />
-          {loading && <CircularProgress size={16} />}
+    <Paper sx={{ p: 0, borderRadius: 2.5, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', overflow: 'hidden' }}>
+      {/* Sleek Minimalist Header */}
+      <Box sx={{ px: 2.5, py: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em' }}>
+            Market Feed
+          </Typography>
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 0.6, 
+              bgcolor: isMarketOpen ? '#f0fdf4' : '#fef3c7', 
+              px: 1, 
+              py: 0.3, 
+              borderRadius: 4, 
+              border: isMarketOpen ? '1px solid #dcfce7' : '1px solid #fde68a' 
+            }}
+          >
+            <FiberManualRecord sx={{ fontSize: 8, color: isMarketOpen ? '#16a34a' : '#d97706' }} />
+            <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: isMarketOpen ? '#15803d' : '#92400e' }}>
+              {isMarketOpen ? (connectionStatus === 'connected' ? 'LIVE' : 'SYNCING') : 'MARKET CLOSED'}
+            </Typography>
+          </Box>
         </Box>
+        <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+          {isMarketOpen ? 'NSE & DhanHQ Live' : (marketStatus?.nextOpen || 'NSE Close Prices Fixed')}
+        </Typography>
       </Box>
 
-      <TableContainer>
-        <Table size="small">
+      {/* Clean Minimalist Table */}
+      <TableContainer sx={{ maxHeight: 520 }}>
+        <Table size="small" stickyHeader>
           <TableHead>
-            <TableRow>
-              <TableCell><strong>Symbol</strong></TableCell>
-              <TableCell align="right"><strong>Price</strong></TableCell>
-              <TableCell align="right"><strong>Change</strong></TableCell>
-              <TableCell align="right"><strong>Change %</strong></TableCell>
-              <TableCell align="right"><strong>Volume</strong></TableCell>
-              <TableCell align="right"><strong>Time</strong></TableCell>
+            <TableRow sx={{ '& th': { bgcolor: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: '0.75rem', py: 1.2, borderBottom: '1px solid #e2e8f0' } }}>
+              <TableCell sx={{ pl: 2.5 }}>Instrument</TableCell>
+              <TableCell align="right">LTP (₹)</TableCell>
+              <TableCell align="right">Change</TableCell>
+              <TableCell align="right">Range (H / L)</TableCell>
+              <TableCell align="right">Volume</TableCell>
+              <TableCell align="center" sx={{ pr: 2.5 }}>Depth</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {symbols.map((symbol) => {
               const data = marketData.get(symbol);
-              
+              const flash = flashStates.get(symbol);
+              const isPositive = data ? data.change.absolute >= 0 : true;
+
               return (
-                <TableRow key={symbol} hover>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight="medium">
+                <TableRow 
+                  key={symbol} 
+                  hover
+                  sx={{
+                    bgcolor: flash === 'up' ? 'rgba(22, 163, 74, 0.08)' : flash === 'down' ? 'rgba(220, 38, 38, 0.08)' : 'transparent',
+                    transition: 'background-color 0.3s ease',
+                    '& td': { py: 1.2, borderBottom: '1px solid #f8fafc' }
+                  }}
+                >
+                  {/* Symbol */}
+                  <TableCell sx={{ pl: 2.5 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
                       {symbol}
                     </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2" fontWeight="medium">
-                      ₹{data ? formatPrice(data.price) : '--'}
+                    <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.7rem' }}>
+                      {data?.name || 'NSE'}
                     </Typography>
                   </TableCell>
+
+                  {/* LTP */}
+                  <TableCell align="right">
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        fontWeight: 700, 
+                        fontFamily: 'monospace',
+                        fontSize: '0.88rem',
+                        color: isPositive ? '#16a34a' : '#dc2626'
+                      }}
+                    >
+                      {data ? `₹${formatPrice(data.price)}` : '--'}
+                    </Typography>
+                  </TableCell>
+
+                  {/* Change */}
                   <TableCell align="right">
                     {data ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
-                        {getChangeIcon(data.change.absolute)}
-                        <Typography
-                          variant="body2"
-                          color={getChangeColor(data.change.absolute)}
-                          fontWeight="medium"
-                        >
-                          {formatChange(data.change.absolute)}
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                          {isPositive ? <TrendingUp sx={{ fontSize: 13, color: '#16a34a' }} /> : <TrendingDown sx={{ fontSize: 13, color: '#dc2626' }} />}
+                          <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: isPositive ? '#16a34a' : '#dc2626', fontFamily: 'monospace' }}>
+                            {isPositive ? '+' : ''}{data.change.absolute.toFixed(2)}
+                          </Typography>
+                        </Box>
+                        <Typography sx={{ fontSize: '0.7rem', color: isPositive ? '#15803d' : '#b91c1c', fontWeight: 500 }}>
+                          ({isPositive ? '+' : ''}{data.change.percentage.toFixed(2)}%)
                         </Typography>
                       </Box>
                     ) : (
-                      <Typography variant="body2" color="textSecondary">--</Typography>
+                      <Typography variant="caption" color="textSecondary">--</Typography>
                     )}
                   </TableCell>
+
+                  {/* Day Range */}
                   <TableCell align="right">
-                    {data ? (
-                      <Chip
-                        label={`${formatChange(data.change.percentage)}%`}
-                        color={getChangeColor(data.change.percentage)}
-                        size="small"
-                        variant="outlined"
-                      />
+                    {data && data.high ? (
+                      <Typography sx={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#475569' }}>
+                        {formatPrice(data.high)} / {formatPrice(data.low || data.price)}
+                      </Typography>
                     ) : (
-                      <Typography variant="body2" color="textSecondary">--</Typography>
+                      <Typography variant="caption" color="textSecondary">--</Typography>
                     )}
                   </TableCell>
+
+                  {/* Volume */}
                   <TableCell align="right">
-                    <Typography variant="body2" color="textSecondary">
-                      {data ? data.volume.toLocaleString() : '--'}
+                    <Typography sx={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>
+                      {data && data.volume > 0 ? data.volume.toLocaleString('en-IN') : '--'}
                     </Typography>
                   </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="caption" color="textSecondary">
-                      {data ? new Date(data.timestamp).toLocaleTimeString() : '--'}
-                    </Typography>
+
+                  {/* Depth Action */}
+                  <TableCell align="center" sx={{ pr: 2.5 }}>
+                    <IconButton
+                      size="small"
+                      onClick={() => openMarketDepth(symbol)}
+                      sx={{ color: '#64748b', '&:hover': { color: '#0f172a', bgcolor: '#f1f5f9' }, p: 0.6 }}
+                    >
+                      <ChevronRight sx={{ fontSize: 18 }} />
+                    </IconButton>
                   </TableCell>
                 </TableRow>
               );
@@ -227,13 +403,128 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
         </Table>
       </TableContainer>
 
-      {marketData.size === 0 && !loading && (
-        <Box sx={{ textAlign: 'center', py: 3 }}>
-          <Typography color="textSecondary">
-            No market data available
-          </Typography>
-        </Box>
-      )}
+      {/* Minimalist Depth Modal */}
+      <Dialog
+        open={Boolean(selectedDepth)}
+        onClose={() => setSelectedDepth(null)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            p: 0,
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        {selectedDepth && (
+          <Box>
+            {/* Modal Header */}
+            <Box sx={{ p: 2.5, pb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9' }}>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1.05rem' }}>
+                  {selectedDepth.symbol}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.75rem' }}>
+                  {selectedDepth.name} • {selectedDepth.exchange}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box sx={{ textAlign: 'right' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 800, color: selectedDepth.change >= 0 ? '#16a34a' : '#dc2626', fontFamily: 'monospace' }}>
+                    ₹{formatPrice(selectedDepth.ltp)}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: selectedDepth.change >= 0 ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                    {selectedDepth.change >= 0 ? '+' : ''}{selectedDepth.change.toFixed(2)} ({selectedDepth.changePercent.toFixed(2)}%)
+                  </Typography>
+                </Box>
+                <IconButton size="small" onClick={() => setSelectedDepth(null)} sx={{ color: '#94a3b8' }}>
+                  <Close sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Box>
+            </Box>
+
+            <Box sx={{ p: 2.5 }}>
+              {/* Clean Volume Pressure */}
+              <Box sx={{ mb: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.6 }}>
+                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: '#16a34a' }}>
+                    Buy: {selectedDepth.totalBuyQty.toLocaleString('en-IN')} (
+                    {((selectedDepth.totalBuyQty / (selectedDepth.totalBuyQty + selectedDepth.totalSellQty || 1)) * 100).toFixed(0)}%)
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: '#dc2626' }}>
+                    Sell: {selectedDepth.totalSellQty.toLocaleString('en-IN')} (
+                    {((selectedDepth.totalSellQty / (selectedDepth.totalBuyQty + selectedDepth.totalSellQty || 1)) * 100).toFixed(0)}%)
+                  </Typography>
+                </Box>
+                <LinearProgress
+                  variant="determinate"
+                  value={(selectedDepth.totalBuyQty / (selectedDepth.totalBuyQty + selectedDepth.totalSellQty || 1)) * 100}
+                  sx={{
+                    height: 4,
+                    borderRadius: 2,
+                    bgcolor: '#fee2e2',
+                    '& .MuiLinearProgress-bar': { bgcolor: '#16a34a' }
+                  }}
+                />
+              </Box>
+
+              {/* Orderbook Columns */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+                {/* Bids */}
+                <Box sx={{ bgcolor: '#f8fafc', p: 1.5, borderRadius: 2, border: '1px solid #f1f5f9' }}>
+                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#16a34a', mb: 1 }}>
+                    BIDS (BUYERS)
+                  </Typography>
+                  {selectedDepth.buyDepth.map((b, i) => (
+                    <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.3 }}>
+                      <Typography sx={{ fontSize: '0.72rem', color: '#94a3b8' }}>{b.orders}</Typography>
+                      <Typography sx={{ fontSize: '0.72rem', color: '#475569', fontFamily: 'monospace' }}>{b.quantity}</Typography>
+                      <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>₹{formatPrice(b.price)}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+
+                {/* Asks */}
+                <Box sx={{ bgcolor: '#f8fafc', p: 1.5, borderRadius: 2, border: '1px solid #f1f5f9' }}>
+                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#dc2626', mb: 1 }}>
+                    ASKS (SELLERS)
+                  </Typography>
+                  {selectedDepth.sellDepth.map((a, i) => (
+                    <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.3 }}>
+                      <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#dc2626', fontFamily: 'monospace' }}>₹{formatPrice(a.price)}</Typography>
+                      <Typography sx={{ fontSize: '0.72rem', color: '#475569', fontFamily: 'monospace' }}>{a.quantity}</Typography>
+                      <Typography sx={{ fontSize: '0.72rem', color: '#94a3b8' }}>{a.orders}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+
+              {/* Day Stats Row */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, pt: 1.5, borderTop: '1px solid #f1f5f9', textAlign: 'center' }}>
+                <Box>
+                  <Typography sx={{ fontSize: '0.68rem', color: '#94a3b8' }}>Open</Typography>
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#0f172a' }}>₹{formatPrice(selectedDepth.open)}</Typography>
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: '0.68rem', color: '#94a3b8' }}>High</Typography>
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#16a34a' }}>₹{formatPrice(selectedDepth.high)}</Typography>
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: '0.68rem', color: '#94a3b8' }}>Low</Typography>
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#dc2626' }}>₹{formatPrice(selectedDepth.low)}</Typography>
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: '0.68rem', color: '#94a3b8' }}>Prev Close</Typography>
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#0f172a' }}>₹{formatPrice(selectedDepth.prevClose)}</Typography>
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+        )}
+      </Dialog>
     </Paper>
   );
 };

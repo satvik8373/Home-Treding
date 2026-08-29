@@ -53,7 +53,7 @@ class MarketDataStreamService {
       this.emit('connected');
     });
 
-    this.socket.on('disconnect', (reason: string) => {
+    this.socket.on('disconnect', (reason) => {
       console.log('Disconnected from market data stream:', reason);
       this.isConnected = false;
       this.emit('disconnected', reason);
@@ -64,7 +64,7 @@ class MarketDataStreamService {
       }
     });
 
-    this.socket.on('connect_error', (error: Error) => {
+    this.socket.on('connect_error', (error) => {
       console.error('Connection error:', error);
       this.isConnected = false;
       this.emit('error', error);

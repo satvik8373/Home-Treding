@@ -5,15 +5,15 @@ export const theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#6366f1', // Indigo
-      light: '#818cf8',
-      dark: '#4f46e5',
+      main: '#2563eb', // Royal Blue
+      light: '#3b82f6',
+      dark: '#1d4ed8',
       contrastText: '#ffffff',
     },
     secondary: {
-      main: '#8b5cf6', // Purple
-      light: '#a78bfa',
-      dark: '#7c3aed',
+      main: '#0f172a', // Slate Dark
+      light: '#334155',
+      dark: '#020617',
       contrastText: '#ffffff',
     },
     error: {
@@ -184,36 +184,41 @@ export const theme = createTheme({
         root: {
           textTransform: 'none',
           fontWeight: 600,
-          borderRadius: 10,
-          padding: '10px 24px',
+          borderRadius: 8,
+          padding: '8px 18px',
           boxShadow: 'none',
-          transition: 'all 0.2s ease-in-out',
+          transition: 'all 0.15s ease-in-out',
           '@media (max-width:640px)': {
-            padding: '8px 16px',
-            fontSize: '0.875rem',
+            padding: '6px 14px',
+            fontSize: '0.8125rem',
           },
         },
         contained: {
-          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          backgroundColor: '#2563eb',
+          color: '#ffffff',
+          boxShadow: 'none',
           '&:hover': {
-            background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-            boxShadow: '0 10px 15px -3px rgb(99 102 241 / 0.3)',
-            transform: 'translateY(-1px)',
+            backgroundColor: '#1d4ed8',
+            boxShadow: 'none',
           },
           '&:active': {
-            transform: 'translateY(0)',
+            backgroundColor: '#1e40af',
+            boxShadow: 'none',
           },
         },
         outlined: {
-          borderWidth: '2px',
+          borderColor: '#e2e8f0',
+          borderWidth: '1px',
+          color: '#334155',
           '&:hover': {
-            borderWidth: '2px',
-            backgroundColor: 'rgba(99, 102, 241, 0.04)',
+            borderColor: '#cbd5e1',
+            borderWidth: '1px',
+            backgroundColor: '#f8fafc',
           },
         },
         text: {
           '&:hover': {
-            backgroundColor: 'rgba(99, 102, 241, 0.04)',
+            backgroundColor: '#f1f5f9',
           },
         },
       },

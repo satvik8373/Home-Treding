@@ -10,6 +10,9 @@ const DhanCallback: React.FC = () => {
   const [message, setMessage] = useState('Processing Dhan OAuth login...');
 
   useEffect(() => {
+    let isMounted = true;
+    let timer: NodeJS.Timeout | null = null;
+
     const handleCallback = async () => {
       try {
         const urlParams = new URLSearchParams(location.search);
@@ -17,23 +20,27 @@ const DhanCallback: React.FC = () => {
         const state = urlParams.get('state');
         const error = urlParams.get('error');
 
-        console.log('🔄 Dhan OAuth Callback received:', { code: code?.substring(0, 10) + '...', state, error });
-
         if (error) {
-          setStatus('error');
-          setMessage(`❌ Dhan OAuth failed: ${error}`);
+          if (isMounted) {
+            setStatus('error');
+            setMessage(`Dhan OAuth failed: ${error}`);
+          }
           return;
         }
 
         if (code && state) {
-          setMessage('🔄 Processing Dhan Partner OAuth callback...');
+          if (isMounted) {
+            setMessage('Processing Dhan Partner OAuth callback...');
+          }
 
           // Get connection ID from localStorage
           const connectionId = localStorage.getItem('dhan_connection_id');
           
           if (!connectionId) {
-            setStatus('error');
-            setMessage('❌ Connection session not found. Please try connecting again.');
+            if (isMounted) {
+              setStatus('error');
+              setMessage('Connection session not found. Please try connecting again.');
+            }
             return;
           }
 
@@ -45,8 +52,10 @@ const DhanCallback: React.FC = () => {
           });
 
           if (response.data.success) {
-            setStatus('success');
-            setMessage('✅ Dhan Partner connected successfully! Terminal activated.');
+            if (isMounted) {
+              setStatus('success');
+              setMessage('Dhan Partner connected successfully. Terminal activated.');
+            }
             
             // Notify parent window about successful Dhan Partner connection
             if (window.opener) {
@@ -57,26 +66,36 @@ const DhanCallback: React.FC = () => {
             }
             
             // Close this popup window after 3 seconds
-            setTimeout(() => {
+            timer = setTimeout(() => {
               window.close();
             }, 3000);
           } else {
-            setStatus('error');
-            setMessage(`❌ Dhan Partner connection failed: ${response.data.message}`);
+            if (isMounted) {
+              setStatus('error');
+              setMessage(`Dhan Partner connection failed: ${response.data.message}`);
+            }
           }
         } else {
-          setStatus('error');
-          setMessage('❌ Missing authorization code or state parameter');
+          if (isMounted) {
+            setStatus('error');
+            setMessage('Missing authorization code or state parameter');
+          }
         }
       } catch (error: any) {
-        console.error('Dhan OAuth callback error:', error);
-        setStatus('error');
-        setMessage(`❌ OAuth processing failed: ${error.response?.data?.message || error.message}`);
+        if (isMounted) {
+          setStatus('error');
+          setMessage(`OAuth processing failed: ${error.response?.data?.message || error.message}`);
+        }
       }
     };
 
     handleCallback();
-  }, [location]);
+
+    return () => {
+      isMounted = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [location.search]);
 
   return (
     <Box sx={{ 
