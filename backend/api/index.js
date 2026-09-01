@@ -5,21 +5,9 @@ const cors = require('cors');
 // Create Express app
 const app = express();
 
-// Enable CORS for all Vercel deployments and local development
+// Enable CORS for all origins & headers
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Allow all Vercel preview deployments and production
-    if (origin.includes('vercel.app') || 
-        origin.includes('localhost') ||
-        origin.includes('home-treding')) {
-      callback(null, true);
-    } else {
-      callback(null, true); // Allow all for now
-    }
-  },
+  origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Cache-Control', 'Pragma', 'Expires']
@@ -35,21 +23,23 @@ const marketRoutes = require('./routes/market');
 const strategyRoutes = require('./routes/strategies');
 const portfolioRoutes = require('./routes/portfolio');
 const tradingRoutes = require('./routes/trading');
+const paperRoutes = require('./routes/paper');
+const riskRoutes = require('./routes/risk');
 
-// Root endpoint (handles both / and /api)
+// Root endpoint
 app.get('/', (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'AlgoRooms Trading API',
-    version: '1.0.0',
+    message: 'Mavrix AlgoRooms Trading API',
+    version: '2.0.0',
     timestamp: new Date().toISOString(),
     endpoints: {
       health: '/api/health',
-      auth: '/api/auth/*',
-      brokers: '/api/broker/*',
-      market: '/api/market/*',
-      strategies: '/api/strategies/*',
-      portfolio: '/api/portfolio/*'
+      market: '/api/market/all',
+      trading: '/api/trading/engine/status',
+      paper: '/api/paper/portfolio',
+      risk: '/api/risk/status',
+      brokers: '/api/brokers/list'
     }
   });
 });
@@ -57,17 +47,9 @@ app.get('/', (req, res) => {
 app.get('/api', (req, res) => {
   res.status(200).json({
     success: true,
-    message: 'AlgoRooms Trading API',
-    version: '1.0.0',
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      health: '/api/health',
-      auth: '/api/auth/*',
-      brokers: '/api/broker/*',
-      market: '/api/market/*',
-      strategies: '/api/strategies/*',
-      portfolio: '/api/portfolio/*'
-    }
+    message: 'Mavrix AlgoRooms Trading API',
+    version: '2.0.0',
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -75,6 +57,7 @@ app.get('/api', (req, res) => {
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'OK',
+    server: 'Mavrix Trading Production API',
     timestamp: new Date().toISOString()
   });
 });
@@ -82,10 +65,13 @@ app.get('/api/health', (req, res) => {
 // Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api/broker', brokerRoutes);
+app.use('/api/brokers', brokerRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/strategies', strategyRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/trading', tradingRoutes);
+app.use('/api/paper', paperRoutes);
+app.use('/api/risk', riskRoutes);
 
 // 404 handler
 app.use((req, res) => {

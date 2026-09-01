@@ -22,6 +22,7 @@ import { Add as AddIcon, Refresh as RefreshIcon, Close } from '@mui/icons-materi
 import { StatusBadge } from './ui';
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
+import { API_CONFIG } from '../config/api';
 
 interface Order {
   id: string;
@@ -59,7 +60,7 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
   const loadOrders = React.useCallback(async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/trading/orders`);
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/trading/orders`);
       if (res.data?.success && res.data?.orders) {
         setOrders(res.data.orders);
       }
@@ -73,14 +74,16 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
   useEffect(() => {
     loadOrders();
 
-    const wsUrl = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:5000';
-    const socket: Socket = io(wsUrl);
+    const socket: Socket = io(API_CONFIG.WS_URL, {
+      transports: ['websocket', 'polling'],
+      timeout: 5000
+    });
 
     socket.on('paper_order_filled', (order: Order) => {
       setOrders(prev => [order, ...prev.filter(o => (o.id || o.orderId) !== (order.id || order.orderId))]);
     });
 
-    const interval = setInterval(loadOrders, 10000);
+    const interval = setInterval(loadOrders, 5000);
 
     return () => {
       socket.disconnect();
@@ -90,7 +93,7 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
 
   const handlePlaceOrder = async () => {
     try {
-      const res = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/trading/orders`, {
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/trading/orders`, {
         symbol: orderForm.symbol.toUpperCase(),
         side: orderForm.side,
         quantity: Number(orderForm.quantity),

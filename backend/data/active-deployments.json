@@ -11,14 +11,14 @@
     "maxProfit": 0,
     "maxLoss": 2500,
     "deployedAt": "2026-08-29T06:08:25.968Z",
-    "tradesExecuted": 4,
+    "tradesExecuted": 5,
     "pnl": 0,
     "config": {
       "broker": "paper",
       "squareOff": "15:15",
       "type": "paper"
     },
-    "lastTriggerAt": "2026-08-29T08:02:09.530Z"
+    "lastTriggerAt": "2026-09-01T08:33:52.387Z"
   },
   {
     "deploymentId": "dep_1787990608868_xiyvt5",

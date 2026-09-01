@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+const getBaseUrl = () => API_CONFIG.BASE_URL;
 
 export interface BrokerSummary {
   id: string;
@@ -84,12 +85,12 @@ export interface KillSwitchStatus {
 export const brokerApi = {
   // --- Broker Connections ---
   async getBrokers(userId?: string): Promise<BrokerSummary[]> {
-    const res = await axios.get(`${API_BASE}/api/brokers/list${userId ? `?userId=${userId}` : ''}`);
+    const res = await axios.get(`${getBaseUrl()}/api/brokers/list${userId ? `?userId=${userId}` : ''}`);
     return res.data.brokers || [];
   },
 
   async connectDhan(params: { clientId: string; accessToken: string; userId?: string }): Promise<any> {
-    const res = await axios.post(`${API_BASE}/api/brokers/connect`, {
+    const res = await axios.post(`${getBaseUrl()}/api/brokers/connect`, {
       broker: 'dhan',
       ...params
     });
@@ -97,18 +98,18 @@ export const brokerApi = {
   },
 
   async getDhanLoginUrl(clientId?: string): Promise<{ loginUrl: string; state: string }> {
-    const res = await axios.post(`${API_BASE}/api/brokers/dhan-login-url`, { clientId });
+    const res = await axios.post(`${getBaseUrl()}/api/brokers/dhan-login-url`, { clientId });
     return res.data;
   },
 
   async disconnectBroker(brokerId: string): Promise<boolean> {
-    const res = await axios.delete(`${API_BASE}/api/brokers/${brokerId}`);
+    const res = await axios.delete(`${getBaseUrl()}/api/brokers/${brokerId}`);
     return res.data.success;
   },
 
   async getFunds(brokerId?: string): Promise<BrokerFunds | null> {
     try {
-      const url = brokerId ? `${API_BASE}/api/brokers/funds/${brokerId}` : `${API_BASE}/api/brokers/funds`;
+      const url = brokerId ? `${getBaseUrl()}/api/brokers/funds/${brokerId}` : `${getBaseUrl()}/api/brokers/funds`;
       const res = await axios.get(url);
       return res.data.funds;
     } catch {
@@ -118,7 +119,7 @@ export const brokerApi = {
 
   async getPositions(brokerId?: string): Promise<BrokerPosition[]> {
     try {
-      const url = brokerId ? `${API_BASE}/api/brokers/positions/${brokerId}` : `${API_BASE}/api/brokers/positions`;
+      const url = brokerId ? `${getBaseUrl()}/api/brokers/positions/${brokerId}` : `${getBaseUrl()}/api/brokers/positions`;
       const res = await axios.get(url);
       return res.data.positions || [];
     } catch {
@@ -128,7 +129,7 @@ export const brokerApi = {
 
   async getOrders(brokerId?: string): Promise<BrokerOrder[]> {
     try {
-      const url = brokerId ? `${API_BASE}/api/brokers/orders/${brokerId}` : `${API_BASE}/api/brokers/orders`;
+      const url = brokerId ? `${getBaseUrl()}/api/brokers/orders/${brokerId}` : `${getBaseUrl()}/api/brokers/orders`;
       const res = await axios.get(url);
       return res.data.orders || [];
     } catch {
@@ -146,43 +147,43 @@ export const brokerApi = {
     productType?: 'INTRADAY' | 'CNC';
     strategyId?: string;
   }): Promise<any> {
-    const res = await axios.post(`${API_BASE}/api/paper/order`, order);
+    const res = await axios.post(`${getBaseUrl()}/api/paper/order`, order);
     return res.data;
   },
 
   async getPaperPortfolio(): Promise<PaperPortfolio> {
-    const res = await axios.get(`${API_BASE}/api/paper/portfolio`);
+    const res = await axios.get(`${getBaseUrl()}/api/paper/portfolio`);
     return res.data.portfolio;
   },
 
   async getPaperPositions(): Promise<BrokerPosition[]> {
-    const res = await axios.get(`${API_BASE}/api/paper/positions`);
+    const res = await axios.get(`${getBaseUrl()}/api/paper/positions`);
     return res.data.positions || [];
   },
 
   async getPaperOrders(): Promise<BrokerOrder[]> {
-    const res = await axios.get(`${API_BASE}/api/paper/orders`);
+    const res = await axios.get(`${getBaseUrl()}/api/paper/orders`);
     return res.data.orders || [];
   },
 
   async resetPaperPortfolio(initialCapital: number = 100000): Promise<any> {
-    const res = await axios.post(`${API_BASE}/api/paper/reset`, { initialCapital });
+    const res = await axios.post(`${getBaseUrl()}/api/paper/reset`, { initialCapital });
     return res.data;
   },
 
   // --- Risk & Emergency Stop ---
   async getRiskStatus(): Promise<{ config: any; killSwitch: KillSwitchStatus }> {
-    const res = await axios.get(`${API_BASE}/api/risk/status`);
+    const res = await axios.get(`${getBaseUrl()}/api/risk/status`);
     return res.data;
   },
 
   async triggerEmergencyStop(reason?: string): Promise<KillSwitchStatus> {
-    const res = await axios.post(`${API_BASE}/api/risk/kill-switch/activate`, { reason });
+    const res = await axios.post(`${getBaseUrl()}/api/risk/kill-switch/activate`, { reason });
     return res.data.killSwitch;
   },
 
   async resetEmergencyStop(): Promise<KillSwitchStatus> {
-    const res = await axios.post(`${API_BASE}/api/risk/kill-switch/reset`);
+    const res = await axios.post(`${getBaseUrl()}/api/risk/kill-switch/reset`);
     return res.data.killSwitch;
   }
 };

@@ -20,6 +20,7 @@ import OrderManagement from '../components/OrderManagement';
 import PortfolioDashboard from '../components/PortfolioDashboard';
 import { PageHeader, StatCard, StatusBadge } from '../components/ui';
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
 const TradingDashboard: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
@@ -35,8 +36,8 @@ const TradingDashboard: React.FC = () => {
   const loadDashboardData = async () => {
     try {
       const [engineRes, brokersRes] = await Promise.all([
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/trading/engine/status`).catch(() => ({ data: { success: false } })),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/brokers/list`).catch(() => ({ data: { success: false, brokers: [] } }))
+        axios.get(`${API_CONFIG.BASE_URL}/api/trading/engine/status`).catch(() => ({ data: { success: false } })),
+        axios.get(`${API_CONFIG.BASE_URL}/api/brokers/list`).catch(() => ({ data: { success: false, brokers: [] } }))
       ]);
 
       if (engineRes.data?.success) {
@@ -53,7 +54,7 @@ const TradingDashboard: React.FC = () => {
   const handleEngineToggle = async () => {
     try {
       const action = engineStatus?.isRunning ? 'stop' : 'start';
-      const res = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/trading/engine/${action}`);
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/trading/engine/${action}`);
       if (res.data?.success) {
         await loadDashboardData();
       }

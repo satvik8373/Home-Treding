@@ -1,9 +1,9 @@
 {
   "initialCapital": 100000,
-  "availableCash": 1785876.44,
+  "availableCash": 1785356.13,
   "realizedPnl": 0,
-  "totalBrokerage": 379.01,
-  "totalSlippageCost": 876.5500000001678,
+  "totalBrokerage": 399.07,
+  "totalSlippageCost": 876.8000000001678,
   "winCount": 0,
   "lossCount": 0,
   "peakCapital": 3538063.79,
@@ -292,6 +292,28 @@
         "executionTimestamp": "2026-08-29T08:03:49.835Z",
         "strategyId": "bnf-strangle-algo"
       }
+    ],
+    [
+      "paper_ord_1788251632385_xixwfd",
+      {
+        "orderId": "paper_ord_1788251632385_xixwfd",
+        "brokerOrderId": "virt_paper_ord_1788251632385_xixwfd",
+        "symbol": "NIFTY BANK",
+        "exchange": "NSE",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 5,
+        "filledQuantity": 5,
+        "pendingQuantity": 0,
+        "price": 100.05,
+        "averagePrice": 100.05,
+        "status": "FILLED",
+        "orderTimestamp": "2026-09-01T08:33:52.385Z",
+        "executionTimestamp": "2026-09-01T08:33:52.385Z",
+        "strategyId": "strat_1_percent_sl_strangle_bnf"
+      }
     ]
   ],
   "positions": [
@@ -343,8 +365,8 @@
         "exchange": "NSE",
         "segment": "EQ",
         "productType": "INTRADAY",
-        "quantity": 20,
-        "buyQuantity": 20,
+        "quantity": 25,
+        "buyQuantity": 25,
         "sellQuantity": 0,
         "buyAvgPrice": 0,
         "sellAvgPrice": 0,
@@ -454,6 +476,16 @@
       "price": 57307.38,
       "timestamp": "2026-08-29T08:03:49.837Z",
       "strategyId": "bnf-strangle-algo"
+    },
+    {
+      "tradeId": "trade_1788251632386",
+      "orderId": "paper_ord_1788251632385_xixwfd",
+      "symbol": "NIFTY BANK",
+      "side": "BUY",
+      "quantity": 5,
+      "price": 100.05,
+      "timestamp": "2026-09-01T08:33:52.386Z",
+      "strategyId": "strat_1_percent_sl_strangle_bnf"
     }
   ],
   "auditLogs": [
@@ -823,6 +855,19 @@
         "price": 57307.38,
         "brokerage": 234.9,
         "slippageCost": 860.1000000001659
+      }
+    },
+    {
+      "id": "audit_1788251632386_mz3fx1",
+      "timestamp": "2026-09-01T08:33:52.386Z",
+      "eventType": "ORDER_FILLED",
+      "symbol": "NIFTY BANK",
+      "details": {
+        "side": "BUY",
+        "qty": 5,
+        "price": 100.05,
+        "brokerage": 20.06,
+        "slippageCost": 0.2499999999999858
       }
     }
   ]

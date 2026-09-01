@@ -22,6 +22,7 @@ import {
 import { brokerApi, BrokerPosition, PaperPortfolio } from '../services/brokerApi';
 import { StatCard, StatusBadge } from './ui';
 import { io, Socket } from 'socket.io-client';
+import { API_CONFIG } from '../config/api';
 
 const PortfolioDashboard: React.FC = () => {
   const [positions, setPositions] = useState<BrokerPosition[]>([]);
@@ -49,8 +50,10 @@ const PortfolioDashboard: React.FC = () => {
     loadPortfolioData();
 
     // WebSocket real-time updates
-    const wsUrl = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:5000';
-    const socket: Socket = io(wsUrl);
+    const socket: Socket = io(API_CONFIG.WS_URL, {
+      transports: ['websocket', 'polling'],
+      timeout: 5000
+    });
 
     socket.on('paper_position_updated', (updatedPos: BrokerPosition) => {
       setPositions(prev => {
@@ -68,7 +71,7 @@ const PortfolioDashboard: React.FC = () => {
       setPortfolio(updatedPort);
     });
 
-    const interval = setInterval(loadPortfolioData, 10000);
+    const interval = setInterval(loadPortfolioData, 5000);
 
     return () => {
       socket.disconnect();

@@ -17,6 +17,7 @@ import {
 import { TrendingUp, TrendingDown, Close, ChevronRight, FiberManualRecord } from '@mui/icons-material';
 import { io, Socket } from 'socket.io-client';
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
 interface MarketTick {
   symbol: string;
@@ -86,10 +87,10 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
     if (!autoRefresh) return;
     let isMounted = true;
 
-    // 1. Initial REST fetch
-    const fetchInitialData = async () => {
+    // 1. REST Data Fetch
+    const fetchMarketFeed = async () => {
       try {
-        const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/market/all`);
+        const res = await axios.get(`${API_CONFIG.BASE_URL}/api/market/all`);
         if (res.data?.success && isMounted) {
           if (typeof res.data.isMarketOpen === 'boolean') {
             setIsMarketOpen(res.data.isMarketOpen);
@@ -101,8 +102,23 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
           const newMap = new Map<string, MarketTick>();
           (res.data.data || []).forEach((item: any) => {
             const price = parseFloat(item.price || item.ltp) || 0;
+            const oldPrice = prevPricesRef.current.get(item.symbol);
             const changeAbs = parseFloat(item.change) || 0;
             const changePct = parseFloat(item.changePercent) || 0;
+
+            if (oldPrice !== undefined && oldPrice !== price) {
+              const dir = price > oldPrice ? 'up' : 'down';
+              setFlashStates(prev => new Map(prev).set(item.symbol, dir));
+              setTimeout(() => {
+                if (isMounted) {
+                  setFlashStates(prev => {
+                    const m = new Map(prev);
+                    m.delete(item.symbol);
+                    return m;
+                  });
+                }
+              }, 400);
+            }
 
             prevPricesRef.current.set(item.symbol, price);
 
@@ -124,6 +140,7 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
             });
           });
           setMarketData(newMap);
+          setConnectionStatus('connected');
         }
       } catch (err) {
         // Ignored
@@ -132,11 +149,16 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
       }
     };
 
-    fetchInitialData();
+    fetchMarketFeed();
 
-    // 2. High-Frequency Real-Time WebSocket Connection
-    const wsUrl = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:5000';
-    const newSocket: Socket = io(wsUrl);
+    // Polling interval for resilient continuous ticks
+    const pollInterval = setInterval(fetchMarketFeed, 2000);
+
+    // 2. High-Frequency WebSocket Connection
+    const newSocket: Socket = io(API_CONFIG.WS_URL, {
+      transports: ['websocket', 'polling'],
+      timeout: 5000
+    });
 
     newSocket.on('connect', () => {
       if (isMounted) {
@@ -146,9 +168,7 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
     });
 
     newSocket.on('connect_error', () => {
-      if (isMounted) {
-        setConnectionStatus('disconnected');
-      }
+      // In serverless, fallback polling takes over cleanly
     });
 
     newSocket.on('market_tick', (tick: any) => {
@@ -161,31 +181,18 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
       const newPrice = Number(tick.ltp || tick.price || 0);
       const oldPrice = prevPricesRef.current.get(tick.symbol) || newPrice;
 
-      // Only trigger flashing animation if market is actively open and price truly moved
-      if (tick.isOpen !== false && isMarketOpen && newPrice !== oldPrice) {
-        if (newPrice > oldPrice) {
-          setFlashStates(prev => new Map(prev).set(tick.symbol, 'up'));
-          setTimeout(() => {
-            if (isMounted) {
-              setFlashStates(prev => {
-                const m = new Map(prev);
-                m.delete(tick.symbol);
-                return m;
-              });
-            }
-          }, 400);
-        } else if (newPrice < oldPrice) {
-          setFlashStates(prev => new Map(prev).set(tick.symbol, 'down'));
-          setTimeout(() => {
-            if (isMounted) {
-              setFlashStates(prev => {
-                const m = new Map(prev);
-                m.delete(tick.symbol);
-                return m;
-              });
-            }
-          }, 400);
-        }
+      if (newPrice !== oldPrice) {
+        const dir = newPrice > oldPrice ? 'up' : 'down';
+        setFlashStates(prev => new Map(prev).set(tick.symbol, dir));
+        setTimeout(() => {
+          if (isMounted) {
+            setFlashStates(prev => {
+              const m = new Map(prev);
+              m.delete(tick.symbol);
+              return m;
+            });
+          }
+        }, 400);
       }
 
       prevPricesRef.current.set(tick.symbol, newPrice);
@@ -231,13 +238,14 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
 
     return () => {
       isMounted = false;
+      clearInterval(pollInterval);
       newSocket.disconnect();
     };
-  }, [symbolsKey, autoRefresh, isMarketOpen]);
+  }, [symbolsKey, autoRefresh]);
 
   const openMarketDepth = async (symbol: string) => {
     try {
-      const res = await axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/market/depth/${encodeURIComponent(symbol)}`);
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/market/depth/${encodeURIComponent(symbol)}`);
       if (res.data?.success && res.data?.depth) {
         setSelectedDepth(res.data.depth);
       }

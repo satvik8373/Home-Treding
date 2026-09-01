@@ -21,6 +21,8 @@ export interface MarketDataStream {
   timestamp: string;
 }
 
+import { API_CONFIG } from '../config/api';
+
 class MarketDataStreamService {
   private socket: Socket | null = null;
   private isConnected = false;
@@ -38,7 +40,7 @@ class MarketDataStreamService {
   }
 
   private connect() {
-    const serverUrl = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:5000';
+    const serverUrl = API_CONFIG.WS_URL;
     
     this.socket = io(serverUrl, {
       transports: ['websocket', 'polling'],

@@ -2,34 +2,43 @@ const express = require('express');
 const router = express.Router();
 const realMarketData = require('../services/realMarketData');
 
-// Default symbols to fetch
-const DEFAULT_SYMBOLS = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'RELIANCE', 'TCS', 'INFY', 'HDFC', 'ICICIBANK', 'SBIN'];
+// Default symbols for market overview
+const DEFAULT_SYMBOLS = [
+  'NIFTY 50',
+  'BANKNIFTY',
+  'FINNIFTY',
+  'RELIANCE',
+  'TCS',
+  'INFY',
+  'HDFCBANK',
+  'ICICIBANK',
+  'SBIN',
+  'BHARTIARTL'
+];
 
-// Get all market data (REAL LIVE DATA from APIs)
+// Get all market data
 router.get('/all', async (req, res) => {
   try {
-    // Set headers for fast response and no caching
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    
-    // Fetch real market data
+
+    const marketStatus = realMarketData.getMarketStatus();
     const marketData = await realMarketData.fetchLiveData(DEFAULT_SYMBOLS);
-    
-    if (marketData.length === 0) {
-      return res.status(503).json({
-        success: false,
-        message: 'Market data temporarily unavailable. Please try again.',
-        data: []
-      });
-    }
-    
+
     res.json({
       success: true,
       data: marketData,
+      isMarketOpen: marketStatus.isOpen,
+      marketStatus: {
+        status: marketStatus.status,
+        message: marketStatus.message,
+        nextOpen: marketStatus.nextOpen
+      },
+      istTime: marketStatus.istTime,
       serverTime: Date.now(),
       timestamp: new Date().toISOString(),
-      source: marketData[0]?.source || 'Unknown'
+      source: marketData[0]?.source || 'NSE'
     });
   } catch (error) {
     console.error('Market data error:', error);
@@ -41,26 +50,22 @@ router.get('/all', async (req, res) => {
   }
 });
 
-// Get live updates for specific symbols (REAL LIVE DATA)
+// Get live updates for specific symbols
 router.get('/live', async (req, res) => {
   try {
     const { symbols } = req.query;
-    
-    // Set headers for fast response
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    
-    let symbolList = symbols ? symbols.split(',').map(s => s.trim().toUpperCase()) : ['NIFTY', 'BANKNIFTY', 'SENSEX'];
-    
-    // Fetch real market data for specific symbols
+
+    let symbolList = symbols ? symbols.split(',').map(s => s.trim()) : DEFAULT_SYMBOLS;
     const marketData = await realMarketData.fetchLiveData(symbolList);
-    
+    const marketStatus = realMarketData.getMarketStatus();
+
     res.json({
       success: true,
       data: marketData,
+      isMarketOpen: marketStatus.isOpen,
       serverTime: Date.now(),
-      source: marketData[0]?.source || 'Unknown'
+      source: marketData[0]?.source || 'NSE'
     });
   } catch (error) {
     console.error('Live data error:', error);
@@ -72,16 +77,36 @@ router.get('/live', async (req, res) => {
   }
 });
 
-// Get indices only (NIFTY, BANKNIFTY, SENSEX)
+// Get market depth (Level 2 orderbook)
+router.get('/depth/:symbol', async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+
+    const depth = await realMarketData.getMarketDepth(symbol);
+    res.json({
+      success: true,
+      depth
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// Get indices
 router.get('/indices', async (req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-    
     const indices = await realMarketData.getIndices();
-    
+    const marketStatus = realMarketData.getMarketStatus();
+
     res.json({
       success: true,
       data: indices,
+      isMarketOpen: marketStatus.isOpen,
       serverTime: Date.now()
     });
   } catch (error) {
@@ -92,19 +117,17 @@ router.get('/indices', async (req, res) => {
   }
 });
 
-// Get specific symbol data (REAL LIVE DATA)
+// Get specific symbol quote
 router.get('/quote/:symbol', async (req, res) => {
   try {
     const { symbol } = req.params;
-    
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-    
-    const data = await realMarketData.fetchLiveData([symbol.toUpperCase()]);
-    
+
+    const data = await realMarketData.fetchLiveData([symbol]);
     if (data.length === 0) {
       return res.status(404).json({
         success: false,
-        message: `Symbol ${symbol} not found or data unavailable`
+        message: `Symbol ${symbol} not found`
       });
     }
 
@@ -124,11 +147,14 @@ router.get('/quote/:symbol', async (req, res) => {
 router.get('/search', (req, res) => {
   try {
     const { query } = req.query;
-    
-    const allSymbols = ['NIFTY', 'BANKNIFTY', 'SENSEX', 'RELIANCE', 'TCS', 'INFY', 'HDFC', 'ICICIBANK', 'SBIN', 'HDFCBANK'];
-    
-    const results = query 
-      ? allSymbols.filter(s => s.includes(query.toUpperCase()))
+    const allSymbols = [
+      'NIFTY 50', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 
+      'RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 
+      'SBIN', 'BHARTIARTL', 'ITC', 'KOTAKBANK', 'LT', 'AXISBANK', 'WIPRO', 'TATAMOTORS'
+    ];
+
+    const results = query
+      ? allSymbols.filter(s => s.toLowerCase().includes(query.toLowerCase()))
       : allSymbols;
 
     res.json({
