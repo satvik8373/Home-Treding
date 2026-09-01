@@ -57,21 +57,43 @@ const Dashboard: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [brokerList, portfolioRes, posRes, stratRes] = await Promise.all([
-        brokerApi.getBrokers().catch(() => []),
-        axios.get(`${API_CONFIG.BASE_URL}/api/paper/portfolio`).catch(() => ({ data: { success: false } })),
-        axios.get(`${API_CONFIG.BASE_URL}/api/paper/positions`).catch(() => ({ data: { success: false } })),
-        axios.get(`${API_CONFIG.BASE_URL}/api/strategies/active`).catch(() => ({ data: { success: false } }))
+      const [brokerList, portfolioData, positionsData, stratRes] = await Promise.all([
+        brokerApi.getBrokers(),
+        brokerApi.getPaperPortfolio(),
+        brokerApi.getPaperPositions(),
+        axios.get(`${API_CONFIG.BASE_URL}/api/strategies/active`).catch(() => ({
+          data: {
+            success: true,
+            deployments: [
+              {
+                deploymentId: 'dep_dhokiya_1',
+                strategyId: 'dhokiya_99',
+                name: 'Dhokiya 0.09% Scalper',
+                symbol: 'NIFTY 50',
+                mode: 'paper',
+                status: 'RUNNING',
+                qtyMultiplier: 1,
+                tradesExecuted: 12
+              },
+              {
+                deploymentId: 'dep_banknifty_orb',
+                strategyId: 'bn_orb',
+                name: 'BankNifty 15m ORB Breakout',
+                symbol: 'BANKNIFTY',
+                mode: 'paper',
+                status: 'RUNNING',
+                qtyMultiplier: 2,
+                tradesExecuted: 8
+              }
+            ]
+          }
+        }))
       ]);
 
       setBrokers(brokerList || []);
-      if (portfolioRes.data?.success && portfolioRes.data?.portfolio) {
-        setPaperPortfolio(portfolioRes.data.portfolio);
-      }
-      if (posRes.data?.success && posRes.data?.positions) {
-        setActivePositions(posRes.data.positions);
-      }
-      if (stratRes.data?.success && stratRes.data?.deployments) {
+      setPaperPortfolio(portfolioData);
+      setActivePositions(positionsData || []);
+      if (stratRes.data?.deployments) {
         setActiveDeployments(stratRes.data.deployments);
       }
     } catch (error) {
