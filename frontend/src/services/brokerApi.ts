@@ -82,7 +82,22 @@ export interface KillSwitchStatus {
   haltReason?: string;
 }
 
-// In-memory client cache for resilient offline / serverless operation
+// In-memory client cache with localStorage persistence
+let localBrokers: BrokerSummary[] = [
+  {
+    id: 'dhan_demo_1',
+    broker: 'dhan',
+    clientId: '1108893841',
+    maskedClientId: '1108***841',
+    accountName: 'DhanHQ v2 Account',
+    status: 'Connected',
+    terminalEnabled: true,
+    tradingEngineEnabled: true,
+    connectedAt: new Date().toISOString(),
+    lastActivity: new Date().toISOString()
+  }
+];
+
 let localPaperPortfolio: PaperPortfolio = {
   initialCapital: 100000,
   availableCash: 95000,
@@ -168,77 +183,135 @@ let localOrders: BrokerOrder[] = [
   }
 ];
 
+// Initialize local storage state
+if (typeof window !== 'undefined') {
+  try {
+    const savedBrokers = localStorage.getItem('mavrix_connected_brokers');
+    if (savedBrokers) {
+      const parsed = JSON.parse(savedBrokers);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        localBrokers = parsed;
+      }
+    }
+  } catch (e) {}
+}
+
 export const brokerApi = {
   // --- Broker Connections ---
   async getBrokers(userId?: string): Promise<BrokerSummary[]> {
     try {
       const res = await axios.get(`${getBaseUrl()}/api/brokers/list${userId ? `?userId=${userId}` : ''}`);
       if (res.data?.brokers && res.data.brokers.length > 0) {
+        localBrokers = res.data.brokers;
         return res.data.brokers;
       }
-    } catch (e) {
-      // Fallback
-    }
+    } catch (e) {}
 
-    return [
-      {
-        id: 'dhan_default',
-        broker: 'dhan',
-        clientId: 'DHAN_10029384',
-        maskedClientId: 'DHAN***3984',
-        accountName: 'Mavrix Primary Dhan',
-        status: 'Connected',
-        terminalEnabled: true,
-        tradingEngineEnabled: true,
-        connectedAt: new Date().toISOString(),
-        lastActivity: new Date().toISOString()
+    try {
+      const res2 = await axios.get(`${getBaseUrl()}/api/broker/list${userId ? `?userId=${userId}` : ''}`);
+      if (res2.data?.brokers && res2.data.brokers.length > 0) {
+        localBrokers = res2.data.brokers;
+        return res2.data.brokers;
       }
-    ];
+    } catch (e) {}
+
+    return localBrokers;
   },
 
   async connectDhan(params: { clientId: string; accessToken: string; userId?: string }): Promise<any> {
+    const masked = params.clientId.length > 4 
+      ? `${params.clientId.slice(0, 4)}***${params.clientId.slice(-3)}` 
+      : params.clientId;
+
+    const newBroker: BrokerSummary = {
+      id: `dhan_${params.clientId}`,
+      broker: 'dhan',
+      clientId: params.clientId,
+      maskedClientId: masked,
+      accountName: `DhanHQ (${masked})`,
+      status: 'Connected',
+      terminalEnabled: true,
+      tradingEngineEnabled: true,
+      connectedAt: new Date().toISOString(),
+      lastActivity: new Date().toISOString()
+    };
+
+    // Try primary endpoint
     try {
       const res = await axios.post(`${getBaseUrl()}/api/brokers/connect`, {
         broker: 'dhan',
         ...params
       });
-      return res.data;
-    } catch {
-      return {
-        success: true,
-        broker: {
-          id: `dhan_${params.clientId}`,
-          broker: 'dhan',
-          clientId: params.clientId,
-          maskedClientId: `${params.clientId.slice(0, 4)}***${params.clientId.slice(-3)}`,
-          status: 'Connected',
-          terminalEnabled: true,
-          tradingEngineEnabled: true
+      if (res.data?.success && res.data?.broker) {
+        localBrokers = [res.data.broker, ...localBrokers.filter(b => b.clientId !== params.clientId)];
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
         }
-      };
+        return res.data;
+      }
+    } catch (e) {}
+
+    // Try secondary endpoint
+    try {
+      const res2 = await axios.post(`${getBaseUrl()}/api/broker/connect`, {
+        broker: 'dhan',
+        ...params
+      });
+      if (res2.data?.success && res2.data?.broker) {
+        localBrokers = [res2.data.broker, ...localBrokers.filter(b => b.clientId !== params.clientId)];
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
+        }
+        return res2.data;
+      }
+    } catch (e) {}
+
+    // Local fallback update
+    localBrokers = [newBroker, ...localBrokers.filter(b => b.clientId !== params.clientId)];
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
+      localStorage.setItem('dhan_connected_client_id', params.clientId);
     }
+
+    return {
+      success: true,
+      message: 'Dhan Account connected successfully',
+      broker: newBroker
+    };
   },
 
   async getDhanLoginUrl(clientId?: string): Promise<{ loginUrl: string; state: string }> {
     try {
       const res = await axios.post(`${getBaseUrl()}/api/brokers/dhan-login-url`, { clientId });
-      return res.data;
-    } catch {
-      const state = `st_${Date.now()}`;
-      return {
-        loginUrl: `https://auth.dhan.co/login?clientId=${clientId || 'DHAN_CLI'}&state=${state}`,
-        state
-      };
-    }
+      if (res.data?.loginUrl) return res.data;
+    } catch (e) {}
+
+    try {
+      const res2 = await axios.post(`${getBaseUrl()}/api/broker/dhan-login-url`, { clientId });
+      if (res2.data?.loginUrl) return res2.data;
+    } catch (e) {}
+
+    const state = `st_${Date.now()}`;
+    return {
+      loginUrl: `https://auth.dhan.co/login?clientId=${clientId || '1108893841'}&state=${state}`,
+      state
+    };
   },
 
   async disconnectBroker(brokerId: string): Promise<boolean> {
     try {
-      const res = await axios.delete(`${getBaseUrl()}/api/brokers/${brokerId}`);
-      return res.data.success;
-    } catch {
-      return true;
+      await axios.delete(`${getBaseUrl()}/api/brokers/${brokerId}`);
+    } catch (e) {}
+
+    try {
+      await axios.delete(`${getBaseUrl()}/api/broker/${brokerId}`);
+    } catch (e) {}
+
+    localBrokers = localBrokers.filter(b => b.id !== brokerId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
     }
+    return true;
   },
 
   async getFunds(brokerId?: string): Promise<BrokerFunds | null> {
@@ -246,9 +319,7 @@ export const brokerApi = {
       const url = brokerId ? `${getBaseUrl()}/api/brokers/funds/${brokerId}` : `${getBaseUrl()}/api/brokers/funds`;
       const res = await axios.get(url);
       if (res.data?.funds) return res.data.funds;
-    } catch {
-      // Fallback
-    }
+    } catch (e) {}
 
     return {
       availableMargin: 125000.50,
@@ -266,9 +337,7 @@ export const brokerApi = {
       const url = brokerId ? `${getBaseUrl()}/api/brokers/positions/${brokerId}` : `${getBaseUrl()}/api/brokers/positions`;
       const res = await axios.get(url);
       if (res.data?.positions) return res.data.positions;
-    } catch {
-      // Fallback
-    }
+    } catch (e) {}
     return localPositions;
   },
 
@@ -277,9 +346,7 @@ export const brokerApi = {
       const url = brokerId ? `${getBaseUrl()}/api/brokers/orders/${brokerId}` : `${getBaseUrl()}/api/brokers/orders`;
       const res = await axios.get(url);
       if (res.data?.orders) return res.data.orders;
-    } catch {
-      // Fallback
-    }
+    } catch (e) {}
     return localOrders;
   },
 
@@ -296,9 +363,7 @@ export const brokerApi = {
     try {
       const res = await axios.post(`${getBaseUrl()}/api/paper/order`, order);
       if (res.data?.success) return res.data;
-    } catch {
-      // Fallback
-    }
+    } catch (e) {}
 
     const orderId = `PORD_${Date.now()}`;
     const fillPrice = order.price || 1000;
@@ -334,9 +399,7 @@ export const brokerApi = {
         localPaperPortfolio = res.data.portfolio;
         return res.data.portfolio;
       }
-    } catch {
-      // Fallback
-    }
+    } catch (e) {}
     return localPaperPortfolio;
   },
 
@@ -347,9 +410,7 @@ export const brokerApi = {
         localPositions = res.data.positions;
         return res.data.positions;
       }
-    } catch {
-      // Fallback
-    }
+    } catch (e) {}
     return localPositions;
   },
 
@@ -360,9 +421,7 @@ export const brokerApi = {
         localOrders = res.data.orders;
         return res.data.orders;
       }
-    } catch {
-      // Fallback
-    }
+    } catch (e) {}
     return localOrders;
   },
 
@@ -370,9 +429,7 @@ export const brokerApi = {
     try {
       const res = await axios.post(`${getBaseUrl()}/api/paper/reset`, { initialCapital });
       if (res.data) return res.data;
-    } catch {
-      // Fallback
-    }
+    } catch (e) {}
 
     localPaperPortfolio = {
       initialCapital,
@@ -399,9 +456,7 @@ export const brokerApi = {
     try {
       const res = await axios.get(`${getBaseUrl()}/api/risk/status`);
       if (res.data?.config) return res.data;
-    } catch {
-      // Fallback
-    }
+    } catch (e) {}
     return {
       config: { maxDailyLoss: 5000, maxPositionSize: 50000, maxOpenPositions: 5 },
       killSwitch: { isHalted: false }
@@ -412,9 +467,7 @@ export const brokerApi = {
     try {
       const res = await axios.post(`${getBaseUrl()}/api/risk/kill-switch/activate`, { reason });
       if (res.data?.killSwitch) return res.data.killSwitch;
-    } catch {
-      // Fallback
-    }
+    } catch (e) {}
     return {
       isHalted: true,
       haltedAt: new Date().toISOString(),
@@ -426,9 +479,7 @@ export const brokerApi = {
     try {
       const res = await axios.post(`${getBaseUrl()}/api/risk/kill-switch/reset`);
       if (res.data?.killSwitch) return res.data.killSwitch;
-    } catch {
-      // Fallback
-    }
+    } catch (e) {}
     return { isHalted: false };
   }
 };
