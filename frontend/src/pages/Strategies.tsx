@@ -69,6 +69,7 @@ import {
 import Layout from '../components/Layout';
 import { PageHeader, StatCard, StatusBadge } from '../components/ui';
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
 export interface StrategyLeg {
   id: string;
@@ -235,9 +236,9 @@ const Strategies: React.FC = () => {
     try {
       setLoading(true);
       const [customRes, templatesRes, activeRes] = await Promise.all([
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies`).catch(() => ({ data: { success: false } })),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/templates`).catch(() => ({ data: { success: false } })),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/active`).catch(() => ({ data: { success: false } }))
+        axios.get(`${API_CONFIG.BASE_URL}/api/strategies`).catch(() => ({ data: { success: false } })),
+        axios.get(`${API_CONFIG.BASE_URL}/api/strategies/templates`).catch(() => ({ data: { success: false } })),
+        axios.get(`${API_CONFIG.BASE_URL}/api/strategies/active`).catch(() => ({ data: { success: false } }))
       ]);
 
       if (customRes.data?.success && customRes.data?.strategies) {
@@ -278,14 +279,14 @@ const Strategies: React.FC = () => {
     try {
       setActionLoading(true);
       if (editingStrategyId) {
-        const res = await axios.put(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/${editingStrategyId}`, formData);
+        const res = await axios.put(`${API_CONFIG.BASE_URL}/api/strategies/${editingStrategyId}`, formData);
         if (res.data?.success) {
           setStatusMessage({ type: 'success', text: `Strategy "${formData.name}" updated successfully!` });
           setCreateModalOpen(false);
           await loadData();
         }
       } else {
-        const res = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies`, formData);
+        const res = await axios.post(`${API_CONFIG.BASE_URL}/api/strategies`, formData);
         if (res.data?.success) {
           setStatusMessage({ type: 'success', text: `Strategy "${formData.name}" created successfully!` });
           setCreateModalOpen(false);
@@ -303,7 +304,7 @@ const Strategies: React.FC = () => {
   const handleDuplicateStrategy = async (strat: CustomStrategy) => {
     try {
       setActionLoading(true);
-      const res = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/duplicate/${strat.id}`);
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/strategies/duplicate/${strat.id}`);
       if (res.data?.success) {
         setStatusMessage({ type: 'success', text: `Duplicated "${strat.name}" as "${res.data.strategy.name}"` });
         await loadData();
@@ -321,7 +322,7 @@ const Strategies: React.FC = () => {
 
     try {
       setActionLoading(true);
-      const res = await axios.delete(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/${strat.id}`);
+      const res = await axios.delete(`${API_CONFIG.BASE_URL}/api/strategies/${strat.id}`);
       if (res.data?.success) {
         setStatusMessage({ type: 'success', text: `Strategy "${strat.name}" deleted.` });
         await loadData();
@@ -397,14 +398,14 @@ const Strategies: React.FC = () => {
     try {
       setActionLoading(true);
       if (editingTemplateId) {
-        const res = await axios.put(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/templates/${editingTemplateId}`, templateFormData);
+        const res = await axios.put(`${API_CONFIG.BASE_URL}/api/strategies/templates/${editingTemplateId}`, templateFormData);
         if (res.data?.success) {
           setStatusMessage({ type: 'success', text: `Template "${templateFormData.name}" updated successfully!` });
           setTemplateModalOpen(false);
           await loadData();
         }
       } else {
-        const res = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/templates`, templateFormData);
+        const res = await axios.post(`${API_CONFIG.BASE_URL}/api/strategies/templates`, templateFormData);
         if (res.data?.success) {
           setStatusMessage({ type: 'success', text: `Template "${templateFormData.name}" created successfully!` });
           setTemplateModalOpen(false);
@@ -421,7 +422,7 @@ const Strategies: React.FC = () => {
   const handleDuplicateTemplate = async (template: StrategyTemplate) => {
     try {
       setActionLoading(true);
-      const res = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/templates/duplicate/${template.id}`);
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/strategies/templates/duplicate/${template.id}`);
       if (res.data?.success) {
         setStatusMessage({ type: 'success', text: `Template duplicated as "${res.data.template.name}"` });
         await loadData();
@@ -439,7 +440,7 @@ const Strategies: React.FC = () => {
 
     try {
       setActionLoading(true);
-      const res = await axios.delete(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/templates/${template.id}`);
+      const res = await axios.delete(`${API_CONFIG.BASE_URL}/api/strategies/templates/${template.id}`);
       if (res.data?.success) {
         setStatusMessage({ type: 'success', text: `Template "${template.name}" deleted.` });
         await loadData();
@@ -517,7 +518,7 @@ const Strategies: React.FC = () => {
 
     try {
       setActionLoading(true);
-      const res = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/deploy`, {
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/strategies/deploy`, {
         strategyId: stratId,
         name,
         symbol: selectedSymbol,
@@ -543,7 +544,7 @@ const Strategies: React.FC = () => {
   const handleTestTrigger = async (deployment: DeployedStrategy) => {
     try {
       setActionLoading(true);
-      const res = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/test-trigger`, {
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/strategies/test-trigger`, {
         deploymentId: deployment.deploymentId,
         symbol: deployment.symbol,
         side: 'BUY',
@@ -567,7 +568,7 @@ const Strategies: React.FC = () => {
   const handleStopStrategy = async (deploymentId: string) => {
     try {
       setActionLoading(true);
-      await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/stop`, { deploymentId });
+      await axios.post(`${API_CONFIG.BASE_URL}/api/strategies/stop`, { deploymentId });
       setStatusMessage({ type: 'success', text: 'Strategy automation stopped.' });
       await loadData();
     } catch (err) {
@@ -580,7 +581,7 @@ const Strategies: React.FC = () => {
   const handleDeleteDeployment = async (deploymentId: string) => {
     try {
       setActionLoading(true);
-      await axios.delete(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/deployment/${deploymentId}`);
+      await axios.delete(`${API_CONFIG.BASE_URL}/api/strategies/deployment/${deploymentId}`);
       setStatusMessage({ type: 'success', text: 'Deployment record removed.' });
       await loadData();
     } catch (err) {
@@ -599,7 +600,7 @@ const Strategies: React.FC = () => {
     try {
       setBacktesting(true);
       const res = await axios.post(
-        `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/backtest/run`,
+        `${API_CONFIG.BASE_URL}/api/backtest/run`,
         {
           strategyId: strategy,
           symbol,
@@ -1290,7 +1291,7 @@ const Strategies: React.FC = () => {
                   loading={backtesting}
                   onRunBacktest={() => runQuickBacktest(btStrategy, btSymbol, btDays, btCapital)}
                   onExportTrades={(format) => {
-                    window.open(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/backtest/export?strategyId=${btStrategy}&format=${format}`);
+                    window.open(`${API_CONFIG.BASE_URL}/api/backtest/export?strategyId=${btStrategy}&format=${format}`);
                   }}
                 />
 

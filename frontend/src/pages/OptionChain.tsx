@@ -24,6 +24,7 @@ import { Refresh, Close } from '@mui/icons-material';
 import Layout from '../components/Layout';
 import { PageHeader, StatusBadge } from '../components/ui';
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
 interface StrikeData {
   strikePrice: number;
@@ -175,7 +176,7 @@ const OptionChainPage: React.FC = () => {
 
   const executeOptionOrder = async () => {
     try {
-      const res = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/trading/orders`, {
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/trading/orders`, {
         symbol: orderModal.symbol,
         side: orderModal.side,
         quantity: orderModal.quantity,

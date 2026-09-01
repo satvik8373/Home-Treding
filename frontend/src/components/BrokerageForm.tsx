@@ -16,6 +16,7 @@ import {
 } from '@mui/material';
 import { Security, TrendingUp } from '@mui/icons-material';
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
 interface BrokerageFormProps {
   onBrokerAdded: (broker: any) => void;
@@ -52,7 +53,7 @@ const BrokerageForm: React.FC<BrokerageFormProps> = ({ onBrokerAdded, onCancel }
     setError('');
 
     try {
-      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/connect`, {
+      const response = await axios.post(`${API_CONFIG.BASE_URL}/api/broker/connect`, {
         broker: formData.broker,
         clientId: formData.clientId.trim(),
         accessToken: formData.accessToken.trim()

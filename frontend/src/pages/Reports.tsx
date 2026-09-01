@@ -18,6 +18,7 @@ import { Refresh, ReceiptLong, History, AccountBalanceWallet } from '@mui/icons-
 import Layout from '../components/Layout';
 import { PageHeader, StatCard, StatusBadge } from '../components/ui';
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
 interface PaperDailyReport {
   date: string;
@@ -59,9 +60,9 @@ const Reports: React.FC = () => {
     try {
       setLoading(true);
       const [reportRes, logsRes, posRes] = await Promise.all([
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/paper/report`).catch(() => ({ data: { success: false } })),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/paper/audit-logs`).catch(() => ({ data: { success: false } })),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/paper/positions`).catch(() => ({ data: { success: false } }))
+        axios.get(`${API_CONFIG.BASE_URL}/api/paper/report`).catch(() => ({ data: { success: false } })),
+        axios.get(`${API_CONFIG.BASE_URL}/api/paper/audit-logs`).catch(() => ({ data: { success: false } })),
+        axios.get(`${API_CONFIG.BASE_URL}/api/paper/positions`).catch(() => ({ data: { success: false } }))
       ]);
 
       if (reportRes.data?.success && reportRes.data?.report) {

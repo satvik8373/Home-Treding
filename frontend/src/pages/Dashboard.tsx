@@ -32,6 +32,7 @@ import Layout from '../components/Layout';
 import { brokerApi, BrokerSummary, PaperPortfolio } from '../services/brokerApi';
 import { PageHeader, StatCard, SectionCard, StatusBadge } from '../components/ui';
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
 interface DeployedStrategy {
   deploymentId: string;
@@ -58,9 +59,9 @@ const Dashboard: React.FC = () => {
     try {
       const [brokerList, portfolioRes, posRes, stratRes] = await Promise.all([
         brokerApi.getBrokers().catch(() => []),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/paper/portfolio`).catch(() => ({ data: { success: false } })),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/paper/positions`).catch(() => ({ data: { success: false } })),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/active`).catch(() => ({ data: { success: false } }))
+        axios.get(`${API_CONFIG.BASE_URL}/api/paper/portfolio`).catch(() => ({ data: { success: false } })),
+        axios.get(`${API_CONFIG.BASE_URL}/api/paper/positions`).catch(() => ({ data: { success: false } })),
+        axios.get(`${API_CONFIG.BASE_URL}/api/strategies/active`).catch(() => ({ data: { success: false } }))
       ]);
 
       setBrokers(brokerList || []);

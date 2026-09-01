@@ -42,57 +42,68 @@ import authService from '../services/authService';
 import { EmergencyStopButton } from './common/EmergencyStopButton';
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import { API_CONFIG } from '../config/api';
 
 // Live Indices Sidebar Component with Guaranteed Streaming & Fallbacks
 const defaultIndices = [
-  { symbol: 'NIFTY 50', name: 'NIFTY', ltp: 24100.70, change: 76.50, changePercent: 0.32 },
-  { symbol: 'BANKNIFTY', name: 'BANKNIFTY', ltp: 57336.50, change: 254.20, changePercent: 0.45 },
-  { symbol: 'FINNIFTY', name: 'FINNIFTY', ltp: 26204.10, change: 72.80, changePercent: 0.28 },
-  { symbol: 'RELIANCE', name: 'RELIANCE', ltp: 1284.24, change: 6.90, changePercent: 0.54 },
-  { symbol: 'TCS', name: 'TCS', ltp: 2340.27, change: -4.30, changePercent: -0.18 }
+  { symbol: 'NIFTY 50', name: 'NIFTY', ltp: 24535.80, change: 76.50, changePercent: 0.32 },
+  { symbol: 'BANKNIFTY', name: 'BANKNIFTY', ltp: 52140.25, change: 254.20, changePercent: 0.45 },
+  { symbol: 'FINNIFTY', name: 'FINNIFTY', ltp: 23410.60, change: 72.80, changePercent: 0.28 },
+  { symbol: 'RELIANCE', name: 'RELIANCE', ltp: 2985.50, change: 16.90, changePercent: 0.54 },
+  { symbol: 'TCS', name: 'TCS', ltp: 4120.00, change: -14.30, changePercent: -0.18 }
 ];
 
 const LiveIndicesSidebar: React.FC = () => {
   const [indices, setIndices] = useState(defaultIndices);
   const [isMarketOpen, setIsMarketOpen] = useState(true);
-  const [marketStatusMsg, setMarketStatusMsg] = useState('Live');
+  const [marketStatusMsg, setMarketStatusMsg] = useState('LIVE');
 
   useEffect(() => {
     let isMounted = true;
 
-    // 1. Initial REST fetch
-    axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/market/all`)
-      .then(res => {
-        if (res.data?.success && isMounted) {
-          if (typeof res.data.isMarketOpen === 'boolean') {
-            setIsMarketOpen(res.data.isMarketOpen);
-            setMarketStatusMsg(res.data.isMarketOpen ? 'LIVE' : (res.data.marketStatus?.status || 'CLOSED'));
-          }
+    // 1. Fetch live market quotes
+    const fetchQuotes = () => {
+      axios.get(`${API_CONFIG.BASE_URL}/api/market/all`)
+        .then(res => {
+          if (res.data?.success && isMounted) {
+            if (typeof res.data.isMarketOpen === 'boolean') {
+              setIsMarketOpen(res.data.isMarketOpen);
+              setMarketStatusMsg(res.data.isMarketOpen ? 'LIVE' : (res.data.marketStatus?.status || 'CLOSED'));
+            }
 
-          if (res.data.data) {
-            const fetchedMap = new Map();
-            res.data.data.forEach((d: any) => fetchedMap.set(d.symbol, d));
+            if (res.data.data) {
+              const fetchedMap = new Map();
+              res.data.data.forEach((d: any) => {
+                fetchedMap.set(d.symbol, d);
+                if (d.name) fetchedMap.set(d.name, d);
+              });
 
-            setIndices(prev => prev.map(item => {
-              const found = fetchedMap.get(item.symbol) || fetchedMap.get(item.name);
-              if (found) {
-                return {
-                  ...item,
-                  ltp: Number(found.price || found.ltp) || item.ltp,
-                  change: Number(found.change) || item.change,
-                  changePercent: Number(found.changePercent) || item.changePercent
-                };
-              }
-              return item;
-            }));
+              setIndices(prev => prev.map(item => {
+                const found = fetchedMap.get(item.symbol) || fetchedMap.get(item.name);
+                if (found) {
+                  return {
+                    ...item,
+                    ltp: Number(found.price || found.ltp) || item.ltp,
+                    change: Number(found.change) || item.change,
+                    changePercent: Number(found.changePercent) || item.changePercent
+                  };
+                }
+                return item;
+              }));
+            }
           }
-        }
-      })
-      .catch(() => {});
+        })
+        .catch(() => {});
+    };
+
+    fetchQuotes();
+    const interval = setInterval(fetchQuotes, 3000);
 
     // 2. Real-time WebSocket Updates
-    const wsUrl = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:5000';
-    const socket = io(wsUrl);
+    const socket = io(API_CONFIG.WS_URL, {
+      transports: ['websocket', 'polling'],
+      timeout: 5000
+    });
 
     socket.on('market_tick', (tick: any) => {
       if (!isMounted || !tick || !tick.symbol) return;
@@ -103,7 +114,7 @@ const LiveIndicesSidebar: React.FC = () => {
       }
 
       setIndices(prev => prev.map(item => {
-        if (item.symbol === tick.symbol || item.name === tick.symbol || (tick.symbol.includes('NIFTY') && item.symbol.includes('NIFTY'))) {
+        if (item.symbol === tick.symbol || item.name === tick.symbol) {
           const ltp = Number(tick.ltp || tick.price || item.ltp);
           const prevClose = Number(tick.prevClose || (ltp - item.change));
           const change = Number((ltp - prevClose).toFixed(2));
@@ -116,6 +127,7 @@ const LiveIndicesSidebar: React.FC = () => {
 
     return () => {
       isMounted = false;
+      clearInterval(interval);
       socket.disconnect();
     };
   }, []);

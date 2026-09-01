@@ -29,6 +29,7 @@ import {
   ShowChart
 } from '@mui/icons-material';
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
 interface DhanTerminalProps {
   open: boolean;
@@ -92,8 +93,8 @@ const DhanTerminal: React.FC<DhanTerminalProps> = ({ open, onClose, broker }) =>
     try {
       // Get real-time data from Dhan API
       const [positionsRes, ordersRes] = await Promise.all([
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/positions/${broker.id}`),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/orders/${broker.id}`)
+        axios.get(`${API_CONFIG.BASE_URL}/api/broker/positions/${broker.id}`),
+        axios.get(`${API_CONFIG.BASE_URL}/api/broker/orders/${broker.id}`)
       ]);
 
       // Use only real data from Dhan API
