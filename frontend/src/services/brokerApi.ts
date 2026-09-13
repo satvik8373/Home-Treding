@@ -83,20 +83,23 @@ export interface KillSwitchStatus {
 }
 
 // In-memory client cache with localStorage persistence
-let localBrokers: BrokerSummary[] = [
-  {
-    id: 'dhan_demo_1',
-    broker: 'dhan',
-    clientId: '1108893841',
-    maskedClientId: '1108***841',
-    accountName: 'DhanHQ v2 Account',
-    status: 'Connected',
-    terminalEnabled: true,
-    tradingEngineEnabled: true,
-    connectedAt: new Date().toISOString(),
-    lastActivity: new Date().toISOString()
+const loadPersistedBrokers = (): BrokerSummary[] => {
+  if (typeof window !== 'undefined') {
+    try {
+      const savedBrokers = localStorage.getItem('mavrix_connected_brokers');
+      if (savedBrokers) {
+        const parsed = JSON.parse(savedBrokers);
+        if (Array.isArray(parsed)) {
+          // Filter out legacy demo/fake brokers
+          return parsed.filter((b: any) => b && b.id !== 'dhan_demo_1' && b.clientId !== 'DHAN_10029384' && b.clientId !== '1108893841');
+        }
+      }
+    } catch (_) {}
   }
-];
+  return [];
+};
+
+let localBrokers: BrokerSummary[] = loadPersistedBrokers();
 
 let localPaperPortfolio: PaperPortfolio = {
   initialCapital: 100000,
@@ -113,96 +116,20 @@ let localPaperPortfolio: PaperPortfolio = {
   winRate: 80
 };
 
-let localPositions: BrokerPosition[] = [
-  {
-    positionId: 'pos_1',
-    symbol: 'RELIANCE',
-    exchange: 'NSE',
-    segment: 'EQ',
-    productType: 'INTRADAY',
-    quantity: 10,
-    buyQuantity: 10,
-    sellQuantity: 0,
-    buyAvgPrice: 2960.00,
-    sellAvgPrice: 0,
-    netAvgPrice: 2960.00,
-    ltp: 2985.50,
-    realizedPnl: 0,
-    unrealizedPnl: 255.00,
-    totalPnl: 255.00
-  },
-  {
-    positionId: 'pos_2',
-    symbol: 'TCS',
-    exchange: 'NSE',
-    segment: 'EQ',
-    productType: 'INTRADAY',
-    quantity: 5,
-    buyQuantity: 5,
-    sellQuantity: 0,
-    buyAvgPrice: 4090.00,
-    sellAvgPrice: 0,
-    netAvgPrice: 4090.00,
-    ltp: 4120.00,
-    realizedPnl: 0,
-    unrealizedPnl: 150.00,
-    totalPnl: 150.00
-  }
-];
+let localPositions: BrokerPosition[] = [];
 
-let localOrders: BrokerOrder[] = [
-  {
-    orderId: 'PORD_101',
-    brokerOrderId: 'PORD_101',
-    symbol: 'RELIANCE',
-    side: 'BUY',
-    orderType: 'MARKET',
-    productType: 'INTRADAY',
-    quantity: 10,
-    filledQuantity: 10,
-    pendingQuantity: 0,
-    price: 2960.00,
-    averagePrice: 2960.00,
-    status: 'FILLED',
-    orderTimestamp: new Date(Date.now() - 3600000).toISOString()
-  },
-  {
-    orderId: 'PORD_102',
-    brokerOrderId: 'PORD_102',
-    symbol: 'TCS',
-    side: 'BUY',
-    orderType: 'MARKET',
-    productType: 'INTRADAY',
-    quantity: 5,
-    filledQuantity: 5,
-    pendingQuantity: 0,
-    price: 4090.00,
-    averagePrice: 4090.00,
-    status: 'FILLED',
-    orderTimestamp: new Date(Date.now() - 1800000).toISOString()
-  }
-];
-
-// Initialize local storage state
-if (typeof window !== 'undefined') {
-  try {
-    const savedBrokers = localStorage.getItem('mavrix_connected_brokers');
-    if (savedBrokers) {
-      const parsed = JSON.parse(savedBrokers);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        localBrokers = parsed;
-      }
-    }
-  } catch (e) {}
-}
+let localOrders: BrokerOrder[] = [];
 
 export const brokerApi = {
   // --- Broker Connections ---
   async getBrokers(userId?: string): Promise<BrokerSummary[]> {
     try {
       const res = await axios.get(`${getBaseUrl()}/api/brokers/list${userId ? `?userId=${userId}` : ''}`, { timeout: 6000 });
-      if (res.data?.brokers && Array.isArray(res.data.brokers) && res.data.brokers.length > 0) {
+      if (res.data?.brokers && Array.isArray(res.data.brokers)) {
         localBrokers = res.data.brokers;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
+        }
         return res.data.brokers;
       }
     } catch (_) {}
@@ -211,49 +138,35 @@ export const brokerApi = {
   },
 
   async connectDhan(params: { clientId: string; accessToken: string; userId?: string }): Promise<any> {
-    const masked = params.clientId.length > 4 
-      ? `${params.clientId.slice(0, 4)}***${params.clientId.slice(-3)}` 
-      : params.clientId;
-
-    const newBroker: BrokerSummary = {
-      id: `dhan_${params.clientId}`,
-      broker: 'dhan',
-      clientId: params.clientId,
-      maskedClientId: masked,
-      accountName: `DhanHQ (${masked})`,
-      status: 'Connected',
-      terminalEnabled: true,
-      tradingEngineEnabled: true,
-      connectedAt: new Date().toISOString(),
-      lastActivity: new Date().toISOString()
-    };
-
     try {
       const res = await axios.post(`${getBaseUrl()}/api/brokers/connect`, {
         broker: 'dhan',
-        ...params
-      }, { timeout: 8000 });
+        clientId: params.clientId.trim(),
+        accessToken: params.accessToken.trim(),
+        userId: params.userId
+      }, { timeout: 15000 });
+
       if (res.data?.success && res.data?.broker) {
-        localBrokers = [res.data.broker, ...localBrokers.filter(b => b.clientId !== params.clientId)];
+        localBrokers = [res.data.broker, ...localBrokers.filter(b => b.clientId !== params.clientId.trim())];
         if (typeof window !== 'undefined') {
           localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
+          localStorage.setItem('dhan_connected_client_id', params.clientId.trim());
         }
         return res.data;
       }
-    } catch (_) {}
 
-    // Clean local fallback update
-    localBrokers = [newBroker, ...localBrokers.filter(b => b.clientId !== params.clientId)];
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
-      localStorage.setItem('dhan_connected_client_id', params.clientId);
+      return {
+        success: false,
+        message: res.data?.message || 'Failed to authenticate with Dhan API'
+      };
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to authenticate with Dhan API';
+      return {
+        success: false,
+        message: errorMsg,
+        error: err.response?.data
+      };
     }
-
-    return {
-      success: true,
-      message: 'Dhan Account connected successfully',
-      broker: newBroker
-    };
   },
 
   async getDhanLoginUrl(clientId?: string): Promise<{ loginUrl: string; state: string }> {
@@ -264,7 +177,7 @@ export const brokerApi = {
 
     const state = `st_${Date.now()}`;
     return {
-      loginUrl: `https://auth.dhan.co/login?clientId=${clientId || '1108893841'}&state=${state}`,
+      loginUrl: `https://auth.dhan.co/login?clientId=${clientId || ''}&state=${state}`,
       state
     };
   },
@@ -274,9 +187,10 @@ export const brokerApi = {
       await axios.delete(`${getBaseUrl()}/api/brokers/${brokerId}`, { timeout: 6000 });
     } catch (_) {}
 
-    localBrokers = localBrokers.filter(b => b.id !== brokerId);
+    localBrokers = localBrokers.filter(b => b.id !== brokerId && b.clientId !== brokerId);
     if (typeof window !== 'undefined') {
       localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
+      localStorage.removeItem('dhan_connected_client_id');
     }
     return true;
   },
@@ -284,26 +198,25 @@ export const brokerApi = {
   async getFunds(brokerId?: string): Promise<BrokerFunds | null> {
     try {
       const url = brokerId ? `${getBaseUrl()}/api/brokers/funds/${brokerId}` : `${getBaseUrl()}/api/brokers/funds`;
-      const res = await axios.get(url);
-      if (res.data?.funds) return res.data.funds;
-    } catch (e) {}
+      const res = await axios.get(url, { timeout: 8000 });
+      if (res.data?.success && res.data?.funds) return res.data.funds;
+      if (res.data?.status === 'Expired') {
+        throw new Error('Token expired');
+      }
+    } catch (e: any) {
+      if (e.response?.status === 401 || e.message?.includes('expired')) {
+        throw e;
+      }
+    }
 
-    return {
-      availableMargin: 125000.50,
-      usedMargin: 15400.00,
-      totalAccountBalance: 140400.50,
-      collateralMargin: 25000.00,
-      cashBalance: 115400.50,
-      currency: 'INR',
-      timestamp: new Date().toISOString()
-    };
+    return null;
   },
 
   async getPositions(brokerId?: string): Promise<BrokerPosition[]> {
     try {
       const url = brokerId ? `${getBaseUrl()}/api/brokers/positions/${brokerId}` : `${getBaseUrl()}/api/brokers/positions`;
-      const res = await axios.get(url);
-      if (res.data?.positions) return res.data.positions;
+      const res = await axios.get(url, { timeout: 8000 });
+      if (res.data?.positions && Array.isArray(res.data.positions)) return res.data.positions;
     } catch (e) {}
     return localPositions;
   },
@@ -311,8 +224,8 @@ export const brokerApi = {
   async getOrders(brokerId?: string): Promise<BrokerOrder[]> {
     try {
       const url = brokerId ? `${getBaseUrl()}/api/brokers/orders/${brokerId}` : `${getBaseUrl()}/api/brokers/orders`;
-      const res = await axios.get(url);
-      if (res.data?.orders) return res.data.orders;
+      const res = await axios.get(url, { timeout: 8000 });
+      if (res.data?.orders && Array.isArray(res.data.orders)) return res.data.orders;
     } catch (e) {}
     return localOrders;
   },
