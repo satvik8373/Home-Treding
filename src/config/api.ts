@@ -2,7 +2,7 @@
 const stripTrailingSlash = (url: string) => (url || '').replace(/\/$/, '');
 
 // Production API URL
-export const PRODUCTION_API_URL = 'https://home-treding-api-satvik8373s-projects.vercel.app';
+export const PRODUCTION_API_URL = 'https://home-treding-api.vercel.app';
 export const LOCAL_API_URL = 'http://localhost:5000';
 
 // Resolve appropriate API URL dynamically
