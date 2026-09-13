@@ -34,7 +34,20 @@ router.get('/status', (req, res) => {
 // Update risk config
 router.post('/config', (req, res) => {
   try {
-    riskConfig = { ...riskConfig, ...req.body };
+    const {
+      maxDailyLoss,
+      maxPositionSize,
+      maxOpenPositions,
+      trailingStopLoss,
+      killSwitchEnabled
+    } = req.body || {};
+
+    if (maxDailyLoss !== undefined) riskConfig.maxDailyLoss = Number(maxDailyLoss);
+    if (maxPositionSize !== undefined) riskConfig.maxPositionSize = Number(maxPositionSize);
+    if (maxOpenPositions !== undefined) riskConfig.maxOpenPositions = Number(maxOpenPositions);
+    if (trailingStopLoss !== undefined) riskConfig.trailingStopLoss = Number(trailingStopLoss);
+    if (killSwitchEnabled !== undefined) riskConfig.killSwitchEnabled = Boolean(killSwitchEnabled);
+
     res.json({
       success: true,
       config: riskConfig,

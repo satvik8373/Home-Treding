@@ -3,6 +3,7 @@ import { Box, Typography, CircularProgress, Alert, Card, CardContent } from '@mu
 import { CheckCircle, Error } from '@mui/icons-material';
 import { useLocation } from 'react-router-dom';
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
 const DhanCallback: React.FC = () => {
   const location = useLocation();
@@ -45,7 +46,7 @@ const DhanCallback: React.FC = () => {
           }
 
           // Send code and connection ID to Dhan Partner callback endpoint
-          const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/dhan-partner/callback`, {
+          const response = await axios.post(`${API_CONFIG.BASE_URL}/api/dhan-partner/callback`, {
             code,
             state,
             connectionId

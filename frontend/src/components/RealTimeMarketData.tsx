@@ -86,9 +86,16 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
   useEffect(() => {
     if (!autoRefresh) return;
     let isMounted = true;
+    let pollInterval: NodeJS.Timeout | null = null;
+    let newSocket: Socket | null = null;
 
     // 1. REST Data Fetch
     const fetchMarketFeed = async () => {
+      // Don't fetch if tab is in background to save CPU and network
+      if (typeof document !== 'undefined' && document.hidden) {
+        return;
+      }
+
       try {
         const res = await axios.get(`${API_CONFIG.BASE_URL}/api/market/all`);
         if (res.data?.success && isMounted) {
@@ -122,7 +129,7 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
 
             prevPricesRef.current.set(item.symbol, price);
 
-            newMap.set(item.symbol, {
+            const tickData: MarketTick = {
               symbol: item.symbol,
               name: item.name || item.symbol,
               price,
@@ -137,13 +144,20 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
                 percentage: changePct
               },
               timestamp: item.timestamp || new Date().toISOString()
-            });
+            };
+
+            newMap.set(item.symbol, tickData);
+            // Also map common alias symbols so lookups never fail
+            if (item.symbol === 'NIFTY') newMap.set('NIFTY 50', { ...tickData, symbol: 'NIFTY 50' });
+            if (item.symbol === 'NIFTY 50') newMap.set('NIFTY', { ...tickData, symbol: 'NIFTY' });
+            if (item.symbol === 'HDFC') newMap.set('HDFCBANK', { ...tickData, symbol: 'HDFCBANK' });
+            if (item.symbol === 'HDFCBANK') newMap.set('HDFC', { ...tickData, symbol: 'HDFC' });
           });
           setMarketData(newMap);
           setConnectionStatus('connected');
         }
       } catch (err) {
-        // Ignored
+        // Handled
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -151,95 +165,105 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
 
     fetchMarketFeed();
 
-    // Polling interval for resilient continuous ticks
-    const pollInterval = setInterval(fetchMarketFeed, 2000);
+    // Standardized visibility-aware polling interval (4s)
+    pollInterval = setInterval(fetchMarketFeed, 4000);
 
-    // 2. High-Frequency WebSocket Connection
-    const newSocket: Socket = io(API_CONFIG.WS_URL, {
-      transports: ['websocket', 'polling'],
-      timeout: 5000
-    });
-
-    newSocket.on('connect', () => {
-      if (isMounted) {
-        setConnectionStatus('connected');
-        newSocket.emit('subscribe_market_data', symbols);
-      }
-    });
-
-    newSocket.on('connect_error', () => {
-      // In serverless, fallback polling takes over cleanly
-    });
-
-    newSocket.on('market_tick', (tick: any) => {
-      if (!isMounted || !tick || !tick.symbol) return;
-
-      if (typeof tick.isOpen === 'boolean') {
-        setIsMarketOpen(tick.isOpen);
-      }
-
-      const newPrice = Number(tick.ltp || tick.price || 0);
-      const oldPrice = prevPricesRef.current.get(tick.symbol) || newPrice;
-
-      if (newPrice !== oldPrice) {
-        const dir = newPrice > oldPrice ? 'up' : 'down';
-        setFlashStates(prev => new Map(prev).set(tick.symbol, dir));
-        setTimeout(() => {
-          if (isMounted) {
-            setFlashStates(prev => {
-              const m = new Map(prev);
-              m.delete(tick.symbol);
-              return m;
-            });
-          }
-        }, 400);
-      }
-
-      prevPricesRef.current.set(tick.symbol, newPrice);
-
-      setMarketData(prev => {
-        const updated = new Map(prev);
-        const existing: MarketTick = updated.get(tick.symbol) || {
-          symbol: tick.symbol,
-          name: tick.name || tick.symbol,
-          price: newPrice,
-          open: newPrice,
-          high: newPrice,
-          low: newPrice,
-          volume: tick.volume || 0,
-          prevClose: tick.prevClose || newPrice,
-          change: { absolute: 0, percentage: 0 },
-          timestamp: new Date().toISOString()
-        };
-
-        const prevClose = tick.prevClose || existing.prevClose || newPrice;
-        const changeAbs = Number((newPrice - prevClose).toFixed(2));
-        const changePct = prevClose > 0 ? Number(((changeAbs / prevClose) * 100).toFixed(2)) : 0;
-
-        updated.set(tick.symbol, {
-          ...existing,
-          name: tick.name || existing.name,
-          price: newPrice,
-          open: tick.open || existing.open,
-          high: Math.max(existing.high || newPrice, newPrice),
-          low: Math.min(existing.low || newPrice, newPrice),
-          prevClose,
-          volume: tick.volume || existing.volume,
-          change: {
-            absolute: changeAbs,
-            percentage: changePct
-          },
-          timestamp: new Date().toISOString()
+    // 2. High-Frequency WebSocket Connection (Only when supported & enabled)
+    if (API_CONFIG.ENABLE_WEBSOCKETS) {
+      try {
+        newSocket = io(API_CONFIG.WS_URL, {
+          transports: ['websocket'],
+          timeout: 5000,
+          reconnectionAttempts: 3
         });
 
-        return updated;
-      });
-    });
+        newSocket.on('connect', () => {
+          if (isMounted) {
+            setConnectionStatus('connected');
+            newSocket?.emit('subscribe_market_data', symbols);
+          }
+        });
+
+        newSocket.on('connect_error', () => {
+          // Graceful fallback to REST polling
+        });
+
+        newSocket.on('market_tick', (tick: any) => {
+          if (!isMounted || !tick || !tick.symbol) return;
+
+          if (typeof tick.isOpen === 'boolean') {
+            setIsMarketOpen(tick.isOpen);
+          }
+
+          const newPrice = Number(tick.ltp || tick.price || 0);
+          const oldPrice = prevPricesRef.current.get(tick.symbol) || newPrice;
+
+          if (newPrice !== oldPrice) {
+            const dir = newPrice > oldPrice ? 'up' : 'down';
+            setFlashStates(prev => new Map(prev).set(tick.symbol, dir));
+            setTimeout(() => {
+              if (isMounted) {
+                setFlashStates(prev => {
+                  const m = new Map(prev);
+                  m.delete(tick.symbol);
+                  return m;
+                });
+              }
+            }, 400);
+          }
+
+          prevPricesRef.current.set(tick.symbol, newPrice);
+
+          setMarketData(prev => {
+            const updated = new Map(prev);
+            const existing: MarketTick = updated.get(tick.symbol) || {
+              symbol: tick.symbol,
+              name: tick.name || tick.symbol,
+              price: newPrice,
+              open: newPrice,
+              high: newPrice,
+              low: newPrice,
+              volume: tick.volume || 0,
+              prevClose: tick.prevClose || newPrice,
+              change: { absolute: 0, percentage: 0 },
+              timestamp: new Date().toISOString()
+            };
+
+            const prevClose = tick.prevClose || existing.prevClose || newPrice;
+            const changeAbs = Number((newPrice - prevClose).toFixed(2));
+            const changePct = prevClose > 0 ? Number(((changeAbs / prevClose) * 100).toFixed(2)) : 0;
+
+            const updatedTick = {
+              ...existing,
+              name: tick.name || existing.name,
+              price: newPrice,
+              open: tick.open || existing.open,
+              high: Math.max(existing.high || newPrice, newPrice),
+              low: Math.min(existing.low || newPrice, newPrice),
+              prevClose,
+              volume: tick.volume || existing.volume,
+              change: {
+                absolute: changeAbs,
+                percentage: changePct
+              },
+              timestamp: new Date().toISOString()
+            };
+
+            updated.set(tick.symbol, updatedTick);
+            if (tick.symbol === 'NIFTY') updated.set('NIFTY 50', { ...updatedTick, symbol: 'NIFTY 50' });
+            if (tick.symbol === 'NIFTY 50') updated.set('NIFTY', { ...updatedTick, symbol: 'NIFTY' });
+            return updated;
+          });
+        });
+      } catch (e) {
+        // Fallback to REST polling cleanly
+      }
+    }
 
     return () => {
       isMounted = false;
-      clearInterval(pollInterval);
-      newSocket.disconnect();
+      if (pollInterval) clearInterval(pollInterval);
+      if (newSocket) newSocket.disconnect();
     };
   }, [symbolsKey, autoRefresh]);
 

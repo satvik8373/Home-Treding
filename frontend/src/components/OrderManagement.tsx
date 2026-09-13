@@ -73,20 +73,29 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
 
   useEffect(() => {
     loadOrders();
+    let socket: Socket | null = null;
 
-    const socket: Socket = io(API_CONFIG.WS_URL, {
-      transports: ['websocket', 'polling'],
-      timeout: 5000
-    });
+    if (API_CONFIG.ENABLE_WEBSOCKETS) {
+      try {
+        socket = io(API_CONFIG.WS_URL, {
+          transports: ['websocket'],
+          timeout: 5000,
+          reconnectionAttempts: 2
+        });
 
-    socket.on('paper_order_filled', (order: Order) => {
-      setOrders(prev => [order, ...prev.filter(o => (o.id || o.orderId) !== (order.id || order.orderId))]);
-    });
+        socket.on('paper_order_filled', (order: Order) => {
+          setOrders(prev => [order, ...prev.filter(o => (o.id || o.orderId) !== (order.id || order.orderId))]);
+        });
+      } catch (_) {}
+    }
 
-    const interval = setInterval(loadOrders, 5000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      loadOrders();
+    }, 10000);
 
     return () => {
-      socket.disconnect();
+      if (socket) socket.disconnect();
       clearInterval(interval);
     };
   }, [loadOrders]);

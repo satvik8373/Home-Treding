@@ -23,6 +23,7 @@ import {
   Refresh
 } from '@mui/icons-material';
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
 interface Broker {
   id: string;
@@ -56,7 +57,7 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
     setError('');
 
     try {
-      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/${toggle}`, {
+      const response = await axios.post(`${API_CONFIG.BASE_URL}/api/broker/${toggle}`, {
         brokerId: broker.id,
         enabled
       });
@@ -93,7 +94,7 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
       if (confirmRedirect) {
         try {
           // Get Dhan OAuth login URL from backend
-          const loginUrlResponse = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/dhan-login-url`, {
+          const loginUrlResponse = await axios.post(`${API_CONFIG.BASE_URL}/api/broker/dhan-login-url`, {
             brokerId: broker.id
           });
 
@@ -191,7 +192,7 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
                 // If window closed without success message, check status
                 setTimeout(async () => {
                   try {
-                    const recheckResponse = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/terminal-status`, {
+                    const recheckResponse = await axios.post(`${API_CONFIG.BASE_URL}/api/broker/terminal-status`, {
                       brokerId: broker.id
                     });
                     
@@ -250,7 +251,7 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
     setError('');
 
     try {
-      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/reconnect`, {
+      const response = await axios.post(`${API_CONFIG.BASE_URL}/api/broker/reconnect`, {
         brokerId: broker.id
       });
 
@@ -268,7 +269,7 @@ const BrokerCard: React.FC<BrokerCardProps> = ({ broker, onUpdate, onDelete }) =
 
   const handleDelete = async () => {
     try {
-      await axios.delete(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/${broker.id}`);
+      await axios.delete(`${API_CONFIG.BASE_URL}/api/broker/${broker.id}`);
       onDelete(broker.id);
       setDeleteDialog(false);
     } catch (error) {

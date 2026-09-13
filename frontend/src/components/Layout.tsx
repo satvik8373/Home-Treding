@@ -63,6 +63,10 @@ const LiveIndicesSidebar: React.FC = () => {
 
     // 1. Fetch live market quotes
     const fetchQuotes = () => {
+      if (typeof document !== 'undefined' && document.hidden) {
+        return;
+      }
+
       axios.get(`${API_CONFIG.BASE_URL}/api/market/all`)
         .then(res => {
           if (res.data?.success && isMounted) {
@@ -76,6 +80,10 @@ const LiveIndicesSidebar: React.FC = () => {
               res.data.data.forEach((d: any) => {
                 fetchedMap.set(d.symbol, d);
                 if (d.name) fetchedMap.set(d.name, d);
+                if (d.symbol === 'NIFTY') fetchedMap.set('NIFTY 50', d);
+                if (d.symbol === 'NIFTY 50') fetchedMap.set('NIFTY', d);
+                if (d.symbol === 'HDFC') fetchedMap.set('HDFCBANK', d);
+                if (d.symbol === 'HDFCBANK') fetchedMap.set('HDFC', d);
               });
 
               setIndices(prev => prev.map(item => {
@@ -97,38 +105,11 @@ const LiveIndicesSidebar: React.FC = () => {
     };
 
     fetchQuotes();
-    const interval = setInterval(fetchQuotes, 3000);
-
-    // 2. Real-time WebSocket Updates
-    const socket = io(API_CONFIG.WS_URL, {
-      transports: ['websocket', 'polling'],
-      timeout: 5000
-    });
-
-    socket.on('market_tick', (tick: any) => {
-      if (!isMounted || !tick || !tick.symbol) return;
-
-      if (typeof tick.isOpen === 'boolean') {
-        setIsMarketOpen(tick.isOpen);
-        setMarketStatusMsg(tick.isOpen ? 'LIVE' : (tick.marketStatus || 'CLOSED'));
-      }
-
-      setIndices(prev => prev.map(item => {
-        if (item.symbol === tick.symbol || item.name === tick.symbol) {
-          const ltp = Number(tick.ltp || tick.price || item.ltp);
-          const prevClose = Number(tick.prevClose || (ltp - item.change));
-          const change = Number((ltp - prevClose).toFixed(2));
-          const changePercent = prevClose > 0 ? Number(((change / prevClose) * 100).toFixed(2)) : item.changePercent;
-          return { ...item, ltp, change, changePercent };
-        }
-        return item;
-      }));
-    });
+    const interval = setInterval(fetchQuotes, 8000);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
-      socket.disconnect();
     };
   }, []);
 

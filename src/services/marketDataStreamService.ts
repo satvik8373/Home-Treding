@@ -21,6 +21,8 @@ export interface MarketDataStream {
   timestamp: string;
 }
 
+import { API_CONFIG } from '../config/api';
+
 class MarketDataStreamService {
   private socket: Socket | null = null;
   private isConnected = false;
@@ -34,17 +36,24 @@ class MarketDataStreamService {
   } = {};
 
   constructor() {
-    this.connect();
+    if (API_CONFIG.ENABLE_WEBSOCKETS) {
+      this.connect();
+    }
   }
 
   private connect() {
-    const serverUrl = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:5000';
+    if (!API_CONFIG.ENABLE_WEBSOCKETS) return;
+    const serverUrl = API_CONFIG.WS_URL;
     
-    this.socket = io(serverUrl, {
-      transports: ['websocket', 'polling'],
-      timeout: 20000,
-      forceNew: true
-    });
+    try {
+      this.socket = io(serverUrl, {
+        transports: ['websocket'],
+        timeout: 10000,
+        forceNew: true
+      });
+    } catch (_) {
+      return;
+    }
 
     this.socket.on('connect', () => {
       console.log('Connected to market data stream');

@@ -48,33 +48,42 @@ const PortfolioDashboard: React.FC = () => {
 
   useEffect(() => {
     loadPortfolioData();
+    let socket: Socket | null = null;
 
-    // WebSocket real-time updates
-    const socket: Socket = io(API_CONFIG.WS_URL, {
-      transports: ['websocket', 'polling'],
-      timeout: 5000
-    });
+    // WebSocket real-time updates (only if enabled)
+    if (API_CONFIG.ENABLE_WEBSOCKETS) {
+      try {
+        socket = io(API_CONFIG.WS_URL, {
+          transports: ['websocket'],
+          timeout: 5000,
+          reconnectionAttempts: 2
+        });
 
-    socket.on('paper_position_updated', (updatedPos: BrokerPosition) => {
-      setPositions(prev => {
-        const index = prev.findIndex(p => p.symbol === updatedPos.symbol);
-        if (index >= 0) {
-          const next = [...prev];
-          next[index] = updatedPos;
-          return next;
-        }
-        return [...prev, updatedPos];
-      });
-    });
+        socket.on('paper_position_updated', (updatedPos: BrokerPosition) => {
+          setPositions(prev => {
+            const index = prev.findIndex(p => p.symbol === updatedPos.symbol);
+            if (index >= 0) {
+              const next = [...prev];
+              next[index] = updatedPos;
+              return next;
+            }
+            return [...prev, updatedPos];
+          });
+        });
 
-    socket.on('portfolioUpdated', (updatedPort: PaperPortfolio) => {
-      setPortfolio(updatedPort);
-    });
+        socket.on('portfolioUpdated', (updatedPort: PaperPortfolio) => {
+          setPortfolio(updatedPort);
+        });
+      } catch (_) {}
+    }
 
-    const interval = setInterval(loadPortfolioData, 5000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      loadPortfolioData();
+    }, 10000);
 
     return () => {
-      socket.disconnect();
+      if (socket) socket.disconnect();
       clearInterval(interval);
     };
   }, [loadPortfolioData]);

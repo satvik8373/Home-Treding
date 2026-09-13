@@ -52,7 +52,7 @@ const BASELINE_DATA = {
 class RealMarketDataService {
   constructor() {
     this.cache = new Map();
-    this.cacheTimeout = 1000; // 1s cache
+    this.cacheTimeout = 5000; // 5s cache to prevent rate-limiting and accelerate response times
     this.lastFetchTime = 0;
   }
 

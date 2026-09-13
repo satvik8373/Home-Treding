@@ -41,9 +41,21 @@ export const getWsUrl = (): string => {
   return process.env.NODE_ENV === 'production' ? PRODUCTION_API_URL : LOCAL_API_URL;
 };
 
+const isServerlessEnvironment = (): boolean => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname.includes('vercel.app')) return true;
+  }
+  const apiUrl = getApiUrl();
+  return apiUrl.includes('vercel.app');
+};
+
 export const API_CONFIG = {
   BASE_URL: stripTrailingSlash(getApiUrl()),
   WS_URL: stripTrailingSlash(getWsUrl()),
+  // Vercel serverless functions do not support persistent WebSockets
+  ENABLE_WEBSOCKETS: !isServerlessEnvironment() && process.env.REACT_APP_ENABLE_WEBSOCKETS === 'true',
+  IS_SERVERLESS: isServerlessEnvironment()
 };
 
 // Log configuration on load
@@ -51,7 +63,8 @@ if (typeof window !== 'undefined') {
   console.log('🔧 Mavrix API Config:', {
     NODE_ENV: process.env.NODE_ENV,
     BASE_URL: API_CONFIG.BASE_URL,
-    HOSTNAME: window.location.hostname
+    HOSTNAME: window.location.hostname,
+    ENABLE_WEBSOCKETS: API_CONFIG.ENABLE_WEBSOCKETS
   });
 }
 

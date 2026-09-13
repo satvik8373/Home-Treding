@@ -15,7 +15,7 @@
     "@types/node": "^16.18.126",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "axios": "^1.12.2",
+    "axios": "^1.20.0",
     "chart.js": "^4.5.1",
     "date-fns": "^4.1.0",
     "firebase": "^12.4.0",
@@ -31,8 +31,8 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "start": "node build.js",
+    "build": "node build.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

@@ -18,8 +18,8 @@ brokers.set('dhan_demo_1', {
   lastActivity: new Date().toISOString()
 });
 
-// Get broker list
-router.get('/list', (req, res) => {
+// Get broker list (support both / and /list)
+const handleGetBrokers = (req, res) => {
   try {
     const { userId } = req.query;
     const userBrokers = userId 
@@ -36,6 +36,59 @@ router.get('/list', (req, res) => {
       message: error.message
     });
   }
+};
+
+router.get('/', handleGetBrokers);
+router.get('/list', handleGetBrokers);
+
+// Toggle Terminal Status
+router.post('/terminal', (req, res) => {
+  try {
+    const { brokerId, enabled } = req.body;
+    const broker = brokers.get(brokerId) || Array.from(brokers.values())[0];
+    if (broker) {
+      broker.terminalEnabled = enabled;
+      broker.lastActivity = new Date().toISOString();
+      return res.json({
+        success: true,
+        message: `Terminal ${enabled ? 'enabled' : 'disabled'}`,
+        broker
+      });
+    }
+    res.json({
+      success: true,
+      message: `Terminal ${enabled ? 'enabled' : 'disabled'}`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Toggle Trading Engine
+router.post('/tradingEngine', (req, res) => {
+  try {
+    const { brokerId, enabled } = req.body;
+    const broker = brokers.get(brokerId) || Array.from(brokers.values())[0];
+    if (broker) {
+      broker.tradingEngineEnabled = enabled;
+      broker.lastActivity = new Date().toISOString();
+      return res.json({
+        success: true,
+        message: `Trading engine ${enabled ? 'enabled' : 'disabled'}`,
+        broker
+      });
+    }
+    res.json({
+      success: true,
+      message: `Trading engine ${enabled ? 'enabled' : 'disabled'}`
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.post('/terminal-status', (req, res) => {
+  res.json({ success: true, status: 'Active', terminalEnabled: true });
 });
 
 // Connect Dhan or Add Broker

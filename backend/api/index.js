@@ -73,6 +73,14 @@ app.use('/api/trading', tradingRoutes);
 app.use('/api/paper', paperRoutes);
 app.use('/api/risk', riskRoutes);
 
+// Graceful socket.io stub for serverless environments (prevents 404 polling errors)
+app.all(['/socket.io', '/socket.io/*'], (req, res) => {
+  res.status(200).json({
+    status: 'serverless_mode',
+    message: 'WebSockets not supported in serverless mode, using REST feed'
+  });
+});
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({

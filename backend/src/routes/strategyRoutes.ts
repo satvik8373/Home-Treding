@@ -465,10 +465,40 @@ router.put('/:id', (req: Request, res: Response) => {
       }
     }
 
+    const {
+      name,
+      author,
+      description,
+      segmentType,
+      strategyType,
+      symbol,
+      startTime,
+      endTime,
+      tradingDays,
+      legs,
+      maxLoss,
+      maxProfit,
+      trailingSl,
+      status
+    } = req.body || {};
+
     const updated: CustomStrategy = {
       ...existing,
-      ...req.body,
-      id
+      id,
+      ...(name !== undefined && { name }),
+      ...(author !== undefined && { author }),
+      ...(description !== undefined && { description }),
+      ...(segmentType !== undefined && { segmentType }),
+      ...(strategyType !== undefined && { strategyType }),
+      ...(symbol !== undefined && { symbol }),
+      ...(startTime !== undefined && { startTime }),
+      ...(endTime !== undefined && { endTime }),
+      ...(tradingDays !== undefined && { tradingDays }),
+      ...(legs !== undefined && { legs }),
+      ...(maxLoss !== undefined && { maxLoss }),
+      ...(maxProfit !== undefined && { maxProfit }),
+      ...(trailingSl !== undefined && { trailingSl }),
+      ...(status !== undefined && { status })
     };
 
     customStrategies.set(id, updated);
@@ -621,10 +651,30 @@ router.put('/templates/:id', (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: 'Template not found' });
     }
 
+    const {
+      name,
+      category,
+      description,
+      timeframe,
+      symbols,
+      margin,
+      maxDrawdown,
+      winRate,
+      rules
+    } = req.body || {};
+
     const updated: StrategyTemplate = {
       ...existing,
-      ...req.body,
-      id // preserve original id
+      id, // preserve original id
+      ...(name !== undefined && { name }),
+      ...(category !== undefined && { category }),
+      ...(description !== undefined && { description }),
+      ...(timeframe !== undefined && { timeframe }),
+      ...(symbols !== undefined && { symbols }),
+      ...(margin !== undefined && { margin }),
+      ...(maxDrawdown !== undefined && { maxDrawdown }),
+      ...(winRate !== undefined && { winRate }),
+      ...(rules !== undefined && { rules })
     };
 
     strategyTemplates.set(id, updated);

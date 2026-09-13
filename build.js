@@ -47,8 +47,15 @@ try {
     stdio: 'inherit' 
   });
   
+  const srcBuild = path.join(frontendPath, 'build');
+  const destBuild = path.join(__dirname, 'build');
+  if (srcBuild !== destBuild && fs.existsSync(srcBuild)) {
+    console.log('📋 Copying build output to root build directory...');
+    fs.cpSync(srcBuild, destBuild, { recursive: true, force: true });
+  }
+
   console.log('✅ Build completed successfully!');
-  console.log(`📁 Output directory: ${path.join(frontendPath, 'build')}`);
+  console.log(`📁 Output directory: ${destBuild}`);
   
 } catch (error) {
   console.error('❌ Build failed:', error.message);

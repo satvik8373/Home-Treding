@@ -29,7 +29,10 @@ const TradingDashboard: React.FC = () => {
 
   useEffect(() => {
     loadDashboardData();
-    const interval = setInterval(loadDashboardData, 10000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      loadDashboardData();
+    }, 12000);
     return () => clearInterval(interval);
   }, []);
 

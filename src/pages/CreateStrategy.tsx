@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import Layout from '../components/Layout';
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
 interface StrategyLegForm {
   id: string;
@@ -145,8 +146,8 @@ export const CreateStrategy: React.FC = () => {
         setFetchingExisting(true);
         // Try strategy first, then template
         const [stratRes, tmplRes] = await Promise.all([
-          axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/${editId}`).catch(() => null),
-          axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/templates/${editId}`).catch(() => null)
+          axios.get(`${API_CONFIG.BASE_URL}/api/strategies/${editId}`).catch(() => null),
+          axios.get(`${API_CONFIG.BASE_URL}/api/strategies/templates/${editId}`).catch(() => null)
         ]);
 
         const data = stratRes?.data?.strategy || tmplRes?.data?.template;
@@ -281,18 +282,18 @@ export const CreateStrategy: React.FC = () => {
 
       if (editId) {
         await axios.put(
-          `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/${editId}`,
+          `${API_CONFIG.BASE_URL}/api/strategies/${editId}`,
           payload
         ).catch(async () => {
           // If not in custom strategies, update template
           await axios.put(
-            `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/templates/${editId}`,
+            `${API_CONFIG.BASE_URL}/api/strategies/templates/${editId}`,
             payload
           );
         });
       } else {
         await axios.post(
-          `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies`,
+          `${API_CONFIG.BASE_URL}/api/strategies`,
           payload
         );
       }

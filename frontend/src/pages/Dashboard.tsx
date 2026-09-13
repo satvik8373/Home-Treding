@@ -25,8 +25,6 @@ import {
   ArrowForward
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../config/firebase';
 import authService, { UserProfile } from '../services/authService';
 import Layout from '../components/Layout';
 import { brokerApi, BrokerSummary, PaperPortfolio } from '../services/brokerApi';
@@ -108,10 +106,10 @@ const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
+    const unsubscribe = authService.onAuthStateChange(async (currentUser) => {
+      if (currentUser) {
         try {
-          const profile = await authService.getUserProfile(firebaseUser.uid);
+          const profile = await authService.getUserProfile(currentUser.uid);
           setUser(profile);
           await loadData();
         } catch (error) {

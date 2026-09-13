@@ -38,7 +38,7 @@ interface MarketDataResponse {
 }
 
 class LiveMarketService {
-  private pollingInterval: number = 3000; // 3 seconds default
+  private pollingInterval: number = 5000; // 5 seconds default
   private intervalId: NodeJS.Timeout | null = null;
   private subscribers: Map<string, (data: MarketData[], status?: MarketStatusInfo) => void> = new Map();
   private lastData: MarketData[] = [];
@@ -53,9 +53,9 @@ class LiveMarketService {
   /**
    * Start live market data polling
    * @param callback Function to call with updated data & status
-   * @param interval Polling interval in milliseconds (default: 3000ms)
+   * @param interval Polling interval in milliseconds (default: 5000ms)
    */
-  startPolling(callback: (data: MarketData[], status?: MarketStatusInfo) => void, interval: number = 3000): string {
+  startPolling(callback: (data: MarketData[], status?: MarketStatusInfo) => void, interval: number = 5000): string {
     const subscriberId = `sub_${Date.now()}_${Math.random().toString(36).substr(2, 7)}`;
     this.subscribers.set(subscriberId, callback);
     this.pollingInterval = interval;
@@ -165,6 +165,10 @@ class LiveMarketService {
    */
   private async poll(): Promise<void> {
     if (this.requestInProgress) {
+      return;
+    }
+
+    if (typeof document !== 'undefined' && document.hidden) {
       return;
     }
 

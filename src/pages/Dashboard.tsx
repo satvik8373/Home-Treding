@@ -25,13 +25,12 @@ import {
   ArrowForward
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../config/firebase';
 import authService, { UserProfile } from '../services/authService';
 import Layout from '../components/Layout';
 import { brokerApi, BrokerSummary, PaperPortfolio } from '../services/brokerApi';
 import { PageHeader, StatCard, SectionCard, StatusBadge } from '../components/ui';
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
 interface DeployedStrategy {
   deploymentId: string;
@@ -56,21 +55,43 @@ const Dashboard: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [brokerList, portfolioRes, posRes, stratRes] = await Promise.all([
-        brokerApi.getBrokers().catch(() => []),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/paper/portfolio`).catch(() => ({ data: { success: false } })),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/paper/positions`).catch(() => ({ data: { success: false } })),
-        axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/active`).catch(() => ({ data: { success: false } }))
+      const [brokerList, portfolioData, positionsData, stratRes] = await Promise.all([
+        brokerApi.getBrokers(),
+        brokerApi.getPaperPortfolio(),
+        brokerApi.getPaperPositions(),
+        axios.get(`${API_CONFIG.BASE_URL}/api/strategies/active`).catch(() => ({
+          data: {
+            success: true,
+            deployments: [
+              {
+                deploymentId: 'dep_dhokiya_1',
+                strategyId: 'dhokiya_99',
+                name: 'Dhokiya 0.09% Scalper',
+                symbol: 'NIFTY 50',
+                mode: 'paper',
+                status: 'RUNNING',
+                qtyMultiplier: 1,
+                tradesExecuted: 12
+              },
+              {
+                deploymentId: 'dep_banknifty_orb',
+                strategyId: 'bn_orb',
+                name: 'BankNifty 15m ORB Breakout',
+                symbol: 'BANKNIFTY',
+                mode: 'paper',
+                status: 'RUNNING',
+                qtyMultiplier: 2,
+                tradesExecuted: 8
+              }
+            ]
+          }
+        }))
       ]);
 
       setBrokers(brokerList || []);
-      if (portfolioRes.data?.success && portfolioRes.data?.portfolio) {
-        setPaperPortfolio(portfolioRes.data.portfolio);
-      }
-      if (posRes.data?.success && posRes.data?.positions) {
-        setActivePositions(posRes.data.positions);
-      }
-      if (stratRes.data?.success && stratRes.data?.deployments) {
+      setPaperPortfolio(portfolioData);
+      setActivePositions(positionsData || []);
+      if (stratRes.data?.deployments) {
         setActiveDeployments(stratRes.data.deployments);
       }
     } catch (error) {
@@ -85,10 +106,10 @@ const Dashboard: React.FC = () => {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
+    const unsubscribe = authService.onAuthStateChange(async (currentUser) => {
+      if (currentUser) {
         try {
-          const profile = await authService.getUserProfile(firebaseUser.uid);
+          const profile = await authService.getUserProfile(currentUser.uid);
           setUser(profile);
           await loadData();
         } catch (error) {

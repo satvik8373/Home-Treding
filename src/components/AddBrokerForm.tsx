@@ -22,6 +22,7 @@ import {
   Close as CloseIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
 interface Broker {
   id: string;
@@ -76,7 +77,7 @@ const AddBrokerForm: React.FC<AddBrokerFormProps> = ({ open, onClose, onBrokerAd
       const userId = auth.currentUser?.uid;
 
       // Call backend to connect broker with user-provided credentials
-      const response = await axios.post(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/broker/connect-manual`, {
+      const response = await axios.post(`${API_CONFIG.BASE_URL}/api/broker/connect-manual`, {
         broker: 'Dhan',
         clientId: formData.clientId,
         accessToken: formData.accessToken,

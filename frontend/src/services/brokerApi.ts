@@ -200,20 +200,12 @@ export const brokerApi = {
   // --- Broker Connections ---
   async getBrokers(userId?: string): Promise<BrokerSummary[]> {
     try {
-      const res = await axios.get(`${getBaseUrl()}/api/brokers/list${userId ? `?userId=${userId}` : ''}`);
-      if (res.data?.brokers && res.data.brokers.length > 0) {
+      const res = await axios.get(`${getBaseUrl()}/api/brokers/list${userId ? `?userId=${userId}` : ''}`, { timeout: 6000 });
+      if (res.data?.brokers && Array.isArray(res.data.brokers) && res.data.brokers.length > 0) {
         localBrokers = res.data.brokers;
         return res.data.brokers;
       }
-    } catch (e) {}
-
-    try {
-      const res2 = await axios.get(`${getBaseUrl()}/api/broker/list${userId ? `?userId=${userId}` : ''}`);
-      if (res2.data?.brokers && res2.data.brokers.length > 0) {
-        localBrokers = res2.data.brokers;
-        return res2.data.brokers;
-      }
-    } catch (e) {}
+    } catch (_) {}
 
     return localBrokers;
   },
@@ -236,12 +228,11 @@ export const brokerApi = {
       lastActivity: new Date().toISOString()
     };
 
-    // Try primary endpoint
     try {
       const res = await axios.post(`${getBaseUrl()}/api/brokers/connect`, {
         broker: 'dhan',
         ...params
-      });
+      }, { timeout: 8000 });
       if (res.data?.success && res.data?.broker) {
         localBrokers = [res.data.broker, ...localBrokers.filter(b => b.clientId !== params.clientId)];
         if (typeof window !== 'undefined') {
@@ -249,24 +240,9 @@ export const brokerApi = {
         }
         return res.data;
       }
-    } catch (e) {}
+    } catch (_) {}
 
-    // Try secondary endpoint
-    try {
-      const res2 = await axios.post(`${getBaseUrl()}/api/broker/connect`, {
-        broker: 'dhan',
-        ...params
-      });
-      if (res2.data?.success && res2.data?.broker) {
-        localBrokers = [res2.data.broker, ...localBrokers.filter(b => b.clientId !== params.clientId)];
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
-        }
-        return res2.data;
-      }
-    } catch (e) {}
-
-    // Local fallback update
+    // Clean local fallback update
     localBrokers = [newBroker, ...localBrokers.filter(b => b.clientId !== params.clientId)];
     if (typeof window !== 'undefined') {
       localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
@@ -282,14 +258,9 @@ export const brokerApi = {
 
   async getDhanLoginUrl(clientId?: string): Promise<{ loginUrl: string; state: string }> {
     try {
-      const res = await axios.post(`${getBaseUrl()}/api/brokers/dhan-login-url`, { clientId });
+      const res = await axios.post(`${getBaseUrl()}/api/brokers/dhan-login-url`, { clientId }, { timeout: 6000 });
       if (res.data?.loginUrl) return res.data;
-    } catch (e) {}
-
-    try {
-      const res2 = await axios.post(`${getBaseUrl()}/api/broker/dhan-login-url`, { clientId });
-      if (res2.data?.loginUrl) return res2.data;
-    } catch (e) {}
+    } catch (_) {}
 
     const state = `st_${Date.now()}`;
     return {
@@ -300,12 +271,8 @@ export const brokerApi = {
 
   async disconnectBroker(brokerId: string): Promise<boolean> {
     try {
-      await axios.delete(`${getBaseUrl()}/api/brokers/${brokerId}`);
-    } catch (e) {}
-
-    try {
-      await axios.delete(`${getBaseUrl()}/api/broker/${brokerId}`);
-    } catch (e) {}
+      await axios.delete(`${getBaseUrl()}/api/brokers/${brokerId}`, { timeout: 6000 });
+    } catch (_) {}
 
     localBrokers = localBrokers.filter(b => b.id !== brokerId);
     if (typeof window !== 'undefined') {

@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import Layout from '../components/Layout';
+import { API_CONFIG } from '../config/api';
 import { BacktestControls } from '../components/backtest/BacktestControls';
 import { BacktestSummaryCards } from '../components/backtest/BacktestSummaryCards';
 import { MaxProfitLossChart } from '../components/backtest/MaxProfitLossChart';
@@ -46,8 +47,8 @@ export const BacktestPage: React.FC = () => {
     const fetchStrategies = async () => {
       try {
         const [templatesRes, customRes] = await Promise.all([
-          axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies/templates`).catch(() => ({ data: { templates: [] } })),
-          axios.get(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/strategies`).catch(() => ({ data: { strategies: [] } }))
+          axios.get(`${API_CONFIG.BASE_URL}/api/strategies/templates`).catch(() => ({ data: { templates: [] } })),
+          axios.get(`${API_CONFIG.BASE_URL}/api/strategies`).catch(() => ({ data: { strategies: [] } }))
         ]);
 
         const combined: Array<{ id: string; name: string }> = [];
@@ -81,7 +82,7 @@ export const BacktestPage: React.FC = () => {
       const symbol = strategyId.toLowerCase().includes('bnf') || strategyId.toLowerCase().includes('bank') ? 'BANKNIFTY' : 'NIFTY 50';
 
       const res = await axios.post(
-        `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000'}/api/backtest/run`,
+        `${API_CONFIG.BASE_URL}/api/backtest/run`,
         {
           strategyId,
           symbol,
@@ -200,10 +201,10 @@ export const BacktestPage: React.FC = () => {
       }
 
       // Fallback to API direct export
-      const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+      const baseUrl = API_CONFIG.BASE_URL;
       window.open(`${baseUrl}/api/backtest/export?strategyId=${selectedStrategyId}&days=${selectedDays}&format=${format}`, '_blank');
     } catch (e) {
-      const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+      const baseUrl = API_CONFIG.BASE_URL;
       window.open(`${baseUrl}/api/backtest/export?strategyId=${selectedStrategyId}&days=${selectedDays}&format=${format}`, '_blank');
     }
   };
