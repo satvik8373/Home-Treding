@@ -31,17 +31,13 @@ import {
   Link as LinkIcon,
   Menu as MenuIcon,
   Close as CloseIcon,
-  Logout as LogoutIcon,
-  Security as SecurityIcon,
-  PlayArrow as LiveIcon,
-  Help as HelpIcon
+  Logout as LogoutIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { auth } from '../config/firebase';
 import authService from '../services/authService';
 import { EmergencyStopButton } from './common/EmergencyStopButton';
 import axios from 'axios';
-import { io } from 'socket.io-client';
 import { API_CONFIG } from '../config/api';
 
 // Live Indices Sidebar Component with Guaranteed Streaming & Fallbacks
@@ -56,7 +52,6 @@ const defaultIndices = [
 const LiveIndicesSidebar: React.FC = () => {
   const [indices, setIndices] = useState(defaultIndices);
   const [isMarketOpen, setIsMarketOpen] = useState(true);
-  const [marketStatusMsg, setMarketStatusMsg] = useState('LIVE');
 
   useEffect(() => {
     let isMounted = true;
@@ -72,7 +67,6 @@ const LiveIndicesSidebar: React.FC = () => {
           if (res.data?.success && isMounted) {
             if (typeof res.data.isMarketOpen === 'boolean') {
               setIsMarketOpen(res.data.isMarketOpen);
-              setMarketStatusMsg(res.data.isMarketOpen ? 'LIVE' : (res.data.marketStatus?.status || 'CLOSED'));
             }
 
             if (res.data.data) {

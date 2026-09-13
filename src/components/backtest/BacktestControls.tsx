@@ -4,7 +4,6 @@ import {
   Typography,
   Paper,
   Button,
-  ButtonGroup,
   Chip,
   Menu,
   MenuItem,
@@ -14,18 +13,8 @@ import {
 import {
   KeyboardArrowDown,
   ArrowBack,
-  Download,
-  PlayArrow,
-  Check
+  PlayArrow
 } from '@mui/icons-material';
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip
-} from 'recharts';
 
 interface EquityPoint {
   date: string;
@@ -80,44 +69,6 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
     { label: '2 Years', days: 500 },
     { label: 'Custom Range', days: 45 }
   ];
-
-  const formatYAxis = (val: number) => {
-    if (val === 0) return '0k';
-    const abs = Math.abs(val);
-    if (abs >= 1000) {
-      return `${(abs / 1000).toFixed(0)}k`;
-    }
-    return `${abs}`;
-  };
-
-  const CustomEquityTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <Paper
-          elevation={3}
-          sx={{
-            p: 1.5,
-            bgcolor: '#0f172a',
-            color: '#ffffff',
-            borderRadius: 2,
-            border: '1px solid rgba(255,255,255,0.1)'
-          }}
-        >
-          <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block' }}>
-            {data.date}
-          </Typography>
-          <Typography variant="body2" sx={{ fontWeight: 700, color: '#38bdf8' }}>
-            Equity: ₹{data.equity.toLocaleString('en-IN')}
-          </Typography>
-          <Typography variant="caption" sx={{ color: data.pnl >= 0 ? '#4ade80' : '#f87171' }}>
-            P&L: ₹{data.pnl.toLocaleString('en-IN')}
-          </Typography>
-        </Paper>
-      );
-    }
-    return null;
-  };
 
   return (
     <Paper

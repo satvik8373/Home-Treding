@@ -7,16 +7,6 @@ import {
   FormControlLabel,
   Radio
 } from '@mui/material';
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Cell,
-  ReferenceLine
-} from 'recharts';
 
 interface DailyPnlBar {
   date: string;
@@ -46,48 +36,6 @@ export const MaxProfitLossChart: React.FC<MaxProfitLossChartProps> = ({
   } else if (filter === 'top30') {
     displayedBars = displayedBars.slice(-30);
   }
-
-  const formatYAxis = (val: number) => {
-    if (val === 0) return '0.00';
-    const sign = val < 0 ? '-' : '';
-    const abs = Math.abs(val);
-    if (abs >= 1000) {
-      return `${sign}${(abs / 1000).toFixed(0)}k`;
-    }
-    return `${sign}${abs}`;
-  };
-
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <Paper
-          elevation={3}
-          sx={{
-            p: 1.5,
-            bgcolor: '#0f172a',
-            color: '#ffffff',
-            borderRadius: 2,
-            border: '1px solid rgba(255,255,255,0.1)'
-          }}
-        >
-          <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block' }}>
-            {data.date}
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              fontWeight: 700,
-              color: data.pnl >= 0 ? '#4ade80' : '#f87171'
-            }}
-          >
-            P&L: ₹{data.pnl.toLocaleString('en-IN')}
-          </Typography>
-        </Paper>
-      );
-    }
-    return null;
-  };
 
   return (
     <Paper

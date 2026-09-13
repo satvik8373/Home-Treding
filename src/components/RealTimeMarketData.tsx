@@ -265,7 +265,7 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
       if (pollInterval) clearInterval(pollInterval);
       if (newSocket) newSocket.disconnect();
     };
-  }, [symbolsKey, autoRefresh]);
+  }, [symbols, symbolsKey, autoRefresh]);
 
   const openMarketDepth = async (symbol: string) => {
     try {

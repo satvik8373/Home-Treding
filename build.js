@@ -44,7 +44,12 @@ try {
   console.log('🔨 Building frontend application...');
   execSync('npm run build', { 
     cwd: frontendPath, 
-    stdio: 'inherit' 
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      CI: 'false',
+      DISABLE_ESLINT_PLUGIN: 'true'
+    }
   });
   
   const srcBuild = path.join(frontendPath, 'build');

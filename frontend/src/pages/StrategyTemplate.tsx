@@ -13,23 +13,20 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Divider,
   Stack,
-  useMediaQuery,
-  useTheme,
-  Alert,
   CircularProgress
 } from '@mui/material';
 import {
   TrendingUp,
   ContentCopy,
   Add,
-  LayersClear
+  LayersClear,
+  InfoOutlined
 } from '@mui/icons-material';
 import Layout from '../components/Layout';
 import axios from 'axios';
 
-interface StrategyTemplate {
+interface TemplateItem {
   id: string;
   name: string;
   description: string;
@@ -44,11 +41,9 @@ interface StrategyTemplate {
 
 const StrategyTemplate: React.FC = () => {
   const navigate = useNavigate();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const [templates, setTemplates] = useState<StrategyTemplate[]>([]);
+  const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTemplate, setSelectedTemplate] = useState<StrategyTemplate | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -71,7 +66,7 @@ const StrategyTemplate: React.FC = () => {
     }
   };
 
-  const handleViewDetails = (template: StrategyTemplate) => {
+  const handleViewDetails = (template: TemplateItem) => {
     setSelectedTemplate(template);
     setDialogOpen(true);
   };
@@ -81,7 +76,7 @@ const StrategyTemplate: React.FC = () => {
     setSelectedTemplate(null);
   };
 
-  const handleAddToMyStrategy = (template: StrategyTemplate) => {
+  const handleAddToMyStrategy = (template: TemplateItem) => {
     navigate('/strategies/create', {
       state: {
         fromTemplate: true,
@@ -213,7 +208,16 @@ const StrategyTemplate: React.FC = () => {
                     </Box>
                   )}
                 </CardContent>
-                <CardActions sx={{ p: 2, pt: 0, gap: 1 }}>
+                <CardActions sx={{ p: 2, pt: 0, gap: 1, flexWrap: 'wrap' }}>
+                  <Button
+                    size="small"
+                    variant="text"
+                    startIcon={<InfoOutlined sx={{ fontSize: 16 }} />}
+                    onClick={() => handleViewDetails(tpl)}
+                    sx={{ textTransform: 'none', fontWeight: 600, color: '#64748b' }}
+                  >
+                    Rules
+                  </Button>
                   <Button
                     size="small"
                     variant="outlined"

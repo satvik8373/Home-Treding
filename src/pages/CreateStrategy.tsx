@@ -55,7 +55,6 @@ export const CreateStrategy: React.FC = () => {
   const editId = params.id || searchParams.get('edit') || null;
 
   const [loading, setLoading] = useState(false);
-  const [fetchingExisting, setFetchingExisting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
@@ -143,7 +142,6 @@ export const CreateStrategy: React.FC = () => {
       }
 
       try {
-        setFetchingExisting(true);
         // Try strategy first, then template
         const [stratRes, tmplRes] = await Promise.all([
           axios.get(`${API_CONFIG.BASE_URL}/api/strategies/${editId}`).catch(() => null),
@@ -183,13 +181,11 @@ export const CreateStrategy: React.FC = () => {
         }
       } catch (e) {
         console.error('Failed to load strategy for edit:', e);
-      } finally {
-        setFetchingExisting(false);
       }
     };
 
     fetchToEdit();
-  }, [editId]);
+  }, [editId, location.state]);
 
   const handleDayToggle = (day: string) => {
     setTradingDays((prev) =>

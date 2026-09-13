@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Container,
@@ -13,8 +13,7 @@ import {
   ListItem,
   ListItemText,
   CircularProgress,
-  Paper,
-  Grid
+  Paper
 } from '@mui/material';
 import {
   CheckCircle as CheckIcon,

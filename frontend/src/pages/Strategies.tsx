@@ -9,7 +9,6 @@ import {
   Button,
   TextField,
   Dialog,
-  DialogTitle,
   DialogContent,
   DialogActions,
   FormControl,
@@ -20,17 +19,8 @@ import {
   Alert,
   Divider,
   IconButton,
-  Tooltip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TablePagination,
   Chip,
-  Menu,
-  Grid
+  Menu
 } from '@mui/material';
 import { BacktestControls } from '../components/backtest/BacktestControls';
 import { BacktestSummaryCards } from '../components/backtest/BacktestSummaryCards';
@@ -38,36 +28,23 @@ import { MaxProfitLossChart } from '../components/backtest/MaxProfitLossChart';
 import { DaywiseBreakdownHeatmap } from '../components/backtest/DaywiseBreakdownHeatmap';
 import { TransactionDetailsAccordion } from '../components/backtest/TransactionDetailsAccordion';
 import {
-  PlayArrow,
   Stop,
   Bolt,
   TrendingUp,
-  TrendingDown,
   AccountTree,
   Assessment,
-  CheckCircle,
   Refresh,
   Close,
   DeleteOutline,
-  Replay,
-  Security,
-  WarningAmber,
-  Timeline,
-  ShowChart,
-  History,
-  Tune,
   Add,
   MoreVert,
   Delete,
   ContentCopy,
   Edit,
-  Layers,
-  AccessTime,
-  AddCircleOutline,
-  RemoveCircleOutline
+  Layers
 } from '@mui/icons-material';
 import Layout from '../components/Layout';
-import { PageHeader, StatCard, StatusBadge } from '../components/ui';
+import { PageHeader, StatusBadge } from '../components/ui';
 import axios from 'axios';
 import { API_CONFIG } from '../config/api';
 
@@ -152,53 +129,6 @@ const Strategies: React.FC = () => {
   const [templateMenuAnchor, setTemplateMenuAnchor] = useState<null | HTMLElement>(null);
   const [menuTemplate, setMenuTemplate] = useState<StrategyTemplate | null>(null);
 
-  // Create / Edit Custom Strategy Modal State
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [editingStrategyId, setEditingStrategyId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<{
-    name: string;
-    author: string;
-    description: string;
-    segmentType: 'OPTION' | 'EQUITY' | 'FUTURES';
-    strategyType: 'Time Based' | 'Indicator Based' | 'Breakout / Trigger';
-    symbol: string;
-    startTime: string;
-    endTime: string;
-    tradingDays: string[];
-    legs: StrategyLeg[];
-    maxLoss: number;
-    maxProfit: number;
-  }>({
-    name: '',
-    author: 'AR427232',
-    description: '',
-    segmentType: 'OPTION',
-    strategyType: 'Time Based',
-    symbol: 'NIFTY BANK',
-    startTime: '09:16',
-    endTime: '15:10',
-    tradingDays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
-    legs: [],
-    maxLoss: 2500,
-    maxProfit: 5000
-  });
-
-  // Create / Edit Template Modal State
-  const [templateModalOpen, setTemplateModalOpen] = useState(false);
-  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
-  const [templateFormData, setTemplateFormData] = useState<StrategyTemplate>({
-    id: '',
-    name: '',
-    category: 'Intraday Options',
-    description: '',
-    timeframe: '5m',
-    symbols: ['NIFTY 50', 'BANKNIFTY'],
-    margin: '₹25,000',
-    maxDrawdown: '₹2,500',
-    winRate: '65.0%',
-    rules: ['']
-  });
-
   // Deploy Dialog State
   const [deployModal, setDeployModal] = useState<{ open: boolean; strategy?: CustomStrategy | null; template?: StrategyTemplate | null }>({
     open: false,
@@ -216,7 +146,7 @@ const Strategies: React.FC = () => {
   const [btStrategy, setBtStrategy] = useState('nifty-009-atm-breakout');
   const [btSymbol, setBtSymbol] = useState('NIFTY 50');
   const [btDays, setBtDays] = useState(23);
-  const [btCapital, setBtCapital] = useState(100000);
+  const [btCapital] = useState(100000);
   const [selectedRangeLabel, setSelectedRangeLabel] = useState('1 Month');
   const [creditsRemaining, setCreditsRemaining] = useState(49);
   const location = useLocation();
@@ -230,6 +160,7 @@ const Strategies: React.FC = () => {
     } else if (location.state?.deployTemplate) {
       setTabValue(1);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]);
 
   const loadData = async () => {
@@ -265,41 +196,6 @@ const Strategies: React.FC = () => {
     navigate('/strategies/create');
   };
 
-  const handleOpenEditModal = (strat: CustomStrategy) => {
-    navigate(`/strategies/edit/${strat.id}`);
-    handleCloseMenu();
-  };
-
-  const handleSaveStrategy = async () => {
-    if (!formData.name.trim()) {
-      setStatusMessage({ type: 'warning', text: 'Strategy name is required.' });
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      if (editingStrategyId) {
-        const res = await axios.put(`${API_CONFIG.BASE_URL}/api/strategies/${editingStrategyId}`, formData);
-        if (res.data?.success) {
-          setStatusMessage({ type: 'success', text: `Strategy "${formData.name}" updated successfully!` });
-          setCreateModalOpen(false);
-          await loadData();
-        }
-      } else {
-        const res = await axios.post(`${API_CONFIG.BASE_URL}/api/strategies`, formData);
-        if (res.data?.success) {
-          setStatusMessage({ type: 'success', text: `Strategy "${formData.name}" created successfully!` });
-          setCreateModalOpen(false);
-          await loadData();
-          setTabValue(0);
-        }
-      }
-    } catch (err: any) {
-      setStatusMessage({ type: 'error', text: err.response?.data?.message || 'Failed to save strategy' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   const handleDuplicateStrategy = async (strat: CustomStrategy) => {
     try {
@@ -335,31 +231,6 @@ const Strategies: React.FC = () => {
     }
   };
 
-  const handleAddLeg = () => {
-    const newLeg: StrategyLeg = {
-      id: `leg_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-      action: 'SELL',
-      symbol: formData.symbol,
-      strike: 'ATM 0',
-      optionType: formData.legs.length % 2 === 0 ? 'CE' : 'PE',
-      quantity: formData.symbol.includes('BANK') ? 35 : 50,
-      slType: 'percentage',
-      slValue: 1
-    };
-    setFormData({ ...formData, legs: [...formData.legs, newLeg] });
-  };
-
-  const handleRemoveLeg = (idx: number) => {
-    const updated = [...formData.legs];
-    updated.splice(idx, 1);
-    setFormData({ ...formData, legs: updated });
-  };
-
-  const handleUpdateLeg = (idx: number, field: keyof StrategyLeg, value: any) => {
-    const updated = [...formData.legs];
-    updated[idx] = { ...updated[idx], [field]: value };
-    setFormData({ ...formData, legs: updated });
-  };
 
   const handleOpenMenu = (event: React.MouseEvent<HTMLElement>, strategy: CustomStrategy) => {
     setMenuAnchor(event.currentTarget);
@@ -389,35 +260,6 @@ const Strategies: React.FC = () => {
     handleCloseTemplateMenu();
   };
 
-  const handleSaveTemplate = async () => {
-    if (!templateFormData.name.trim()) {
-      setStatusMessage({ type: 'warning', text: 'Template name is required.' });
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      if (editingTemplateId) {
-        const res = await axios.put(`${API_CONFIG.BASE_URL}/api/strategies/templates/${editingTemplateId}`, templateFormData);
-        if (res.data?.success) {
-          setStatusMessage({ type: 'success', text: `Template "${templateFormData.name}" updated successfully!` });
-          setTemplateModalOpen(false);
-          await loadData();
-        }
-      } else {
-        const res = await axios.post(`${API_CONFIG.BASE_URL}/api/strategies/templates`, templateFormData);
-        if (res.data?.success) {
-          setStatusMessage({ type: 'success', text: `Template "${templateFormData.name}" created successfully!` });
-          setTemplateModalOpen(false);
-          await loadData();
-        }
-      }
-    } catch (err: any) {
-      setStatusMessage({ type: 'error', text: err.response?.data?.message || 'Failed to save template' });
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   const handleDuplicateTemplate = async (template: StrategyTemplate) => {
     try {
@@ -453,24 +295,6 @@ const Strategies: React.FC = () => {
     }
   };
 
-  const handleAddTemplateRule = () => {
-    setTemplateFormData({
-      ...templateFormData,
-      rules: [...templateFormData.rules, '']
-    });
-  };
-
-  const handleRemoveTemplateRule = (idx: number) => {
-    const updated = [...templateFormData.rules];
-    updated.splice(idx, 1);
-    setTemplateFormData({ ...templateFormData, rules: updated });
-  };
-
-  const handleUpdateTemplateRule = (idx: number, text: string) => {
-    const updated = [...templateFormData.rules];
-    updated[idx] = text;
-    setTemplateFormData({ ...templateFormData, rules: updated });
-  };
 
   const handleOpenTemplateMenu = (event: React.MouseEvent<HTMLElement>, template: StrategyTemplate) => {
     setTemplateMenuAnchor(event.currentTarget);
