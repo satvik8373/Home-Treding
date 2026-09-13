@@ -123,50 +123,83 @@ let localOrders: BrokerOrder[] = [];
 export const brokerApi = {
   // --- Broker Connections ---
   async getBrokers(userId?: string): Promise<BrokerSummary[]> {
-    try {
-      const res = await axios.get(`${getBaseUrl()}/api/brokers/list${userId ? `?userId=${userId}` : ''}`, { timeout: 6000 });
-      if (res.data?.brokers && Array.isArray(res.data.brokers)) {
-        localBrokers = res.data.brokers;
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
+    const urls = [
+      `${getBaseUrl()}/api/brokers/list${userId ? `?userId=${userId}` : ''}`,
+      `/api/brokers/list${userId ? `?userId=${userId}` : ''}`,
+      `${getBaseUrl()}/api/broker/list${userId ? `?userId=${userId}` : ''}`,
+      `/api/broker/list${userId ? `?userId=${userId}` : ''}`
+    ];
+    for (const url of Array.from(new Set(urls))) {
+      try {
+        const res = await axios.get(url, { timeout: 6000 });
+        if (res.data?.brokers && Array.isArray(res.data.brokers)) {
+          localBrokers = res.data.brokers;
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
+          }
+          return res.data.brokers;
         }
-        return res.data.brokers;
+      } catch (err: any) {
+        if (err.response?.status !== 404) break;
       }
-    } catch (_) {}
+    }
 
     return localBrokers;
   },
 
   async connectDhan(params: { clientId: string; accessToken: string; userId?: string }): Promise<any> {
-    try {
-      const res = await axios.post(`${getBaseUrl()}/api/brokers/connect`, {
-        broker: 'dhan',
-        clientId: params.clientId.trim(),
-        accessToken: params.accessToken.trim(),
-        userId: params.userId
-      }, { timeout: 15000 });
+    const urlsToTry = Array.from(new Set([
+      `${getBaseUrl()}/api/brokers/connect`,
+      '/api/brokers/connect',
+      `${getBaseUrl()}/api/broker/connect`,
+      '/api/broker/connect'
+    ]));
 
-      if (res.data?.success && res.data?.broker) {
-        localBrokers = [res.data.broker, ...localBrokers.filter(b => b.clientId !== params.clientId.trim())];
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
-          localStorage.setItem('dhan_connected_client_id', params.clientId.trim());
+    let lastError: any = null;
+    for (const url of urlsToTry) {
+      try {
+        const res = await axios.post(url, {
+          broker: 'dhan',
+          clientId: params.clientId.trim(),
+          accessToken: params.accessToken.trim(),
+          userId: params.userId
+        }, { timeout: 15000 });
+
+        if (res.data?.success && res.data?.broker) {
+          localBrokers = [res.data.broker, ...localBrokers.filter(b => b.clientId !== params.clientId.trim())];
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
+            localStorage.setItem('dhan_connected_client_id', params.clientId.trim());
+          }
+          return res.data;
         }
-        return res.data;
-      }
 
-      return {
-        success: false,
-        message: res.data?.message || 'Failed to authenticate with Dhan API'
-      };
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.message || err.message || 'Failed to authenticate with Dhan API';
-      return {
-        success: false,
-        message: errorMsg,
-        error: err.response?.data
-      };
+        if (res.data && res.data.success === false) {
+          return res.data;
+        }
+      } catch (err: any) {
+        lastError = err;
+        // If Dhan API rejected the credentials with 401/403 or specific validation failure, return the real Dhan error immediately!
+        if (err.response?.status === 401 || err.response?.status === 403) {
+          return {
+            success: false,
+            message: err.response?.data?.message || 'Invalid Dhan Client ID or Access Token. Please verify your credentials in Dhan Developer Portal.',
+            error: err.response?.data
+          };
+        }
+        // Only try next URL if it was a 404 Endpoint Not Found
+        if (err.response?.status !== 404) {
+          break;
+        }
+      }
     }
+
+    const errorMsg = lastError?.response?.data?.message || lastError?.message || 'Failed to authenticate with Dhan API';
+    return {
+      success: false,
+      message: errorMsg,
+      error: lastError?.response?.data
+    };
   },
 
   async getDhanLoginUrl(clientId?: string): Promise<{ loginUrl: string; state: string }> {
@@ -196,16 +229,23 @@ export const brokerApi = {
   },
 
   async getFunds(brokerId?: string): Promise<BrokerFunds | null> {
-    try {
-      const url = brokerId ? `${getBaseUrl()}/api/brokers/funds/${brokerId}` : `${getBaseUrl()}/api/brokers/funds`;
-      const res = await axios.get(url, { timeout: 8000 });
-      if (res.data?.success && res.data?.funds) return res.data.funds;
-      if (res.data?.status === 'Expired') {
-        throw new Error('Token expired');
-      }
-    } catch (e: any) {
-      if (e.response?.status === 401 || e.message?.includes('expired')) {
-        throw e;
+    const urls = [
+      brokerId ? `${getBaseUrl()}/api/brokers/funds/${brokerId}` : `${getBaseUrl()}/api/brokers/funds`,
+      brokerId ? `/api/brokers/funds/${brokerId}` : `/api/brokers/funds`,
+      brokerId ? `${getBaseUrl()}/api/broker/funds/${brokerId}` : `${getBaseUrl()}/api/broker/funds`
+    ];
+    for (const url of Array.from(new Set(urls))) {
+      try {
+        const res = await axios.get(url, { timeout: 8000 });
+        if (res.data?.success && res.data?.funds) return res.data.funds;
+        if (res.data?.status === 'Expired') {
+          throw new Error('Token expired');
+        }
+      } catch (e: any) {
+        if (e.response?.status === 401 || e.message?.includes('expired')) {
+          throw e;
+        }
+        if (e.response?.status !== 404) break;
       }
     }
 
