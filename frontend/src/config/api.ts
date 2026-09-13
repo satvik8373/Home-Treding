@@ -2,15 +2,11 @@
 const stripTrailingSlash = (url: string) => (url || '').replace(/\/$/, '');
 
 // Production API URL
-export const PRODUCTION_API_URL = 'https://home-treding-api.vercel.app';
+export const PRODUCTION_API_URL = 'https://home-treding.vercel.app';
 export const LOCAL_API_URL = 'http://localhost:5000';
 
 // Resolve appropriate API URL dynamically
 export const getApiUrl = (): string => {
-  if (process.env.REACT_APP_API_BASE_URL && !process.env.REACT_APP_API_BASE_URL.includes('localhost')) {
-    return process.env.REACT_APP_API_BASE_URL;
-  }
-
   // If running in browser and not on localhost, use same origin
   if (typeof window !== 'undefined') {
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -19,7 +15,11 @@ export const getApiUrl = (): string => {
     }
   }
 
-  return process.env.NODE_ENV === 'production' ? '' : LOCAL_API_URL;
+  if (process.env.REACT_APP_API_BASE_URL && !process.env.REACT_APP_API_BASE_URL.includes('localhost')) {
+    return stripTrailingSlash(process.env.REACT_APP_API_BASE_URL);
+  }
+
+  return LOCAL_API_URL;
 };
 
 export const getWsUrl = (): string => {
