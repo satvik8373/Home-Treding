@@ -44,6 +44,25 @@ const generatePortfolioData = (userId) => {
   };
 };
 
+// Get portfolio root
+router.get('/', (req, res) => {
+  try {
+    const { userId } = req.query;
+    const portfolio = generatePortfolioData(userId || 'default');
+
+    res.json({
+      success: true,
+      portfolio,
+      data: portfolio
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 // Get portfolio summary
 router.get('/summary', (req, res) => {
   try {

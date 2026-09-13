@@ -25,6 +25,7 @@ import {
 } from '@mui/icons-material';
 import Layout from '../components/Layout';
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
 interface TemplateItem {
   id: string;
@@ -53,7 +54,7 @@ const StrategyTemplate: React.FC = () => {
   const fetchTemplates = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/strategies/templates');
+      const res = await axios.get(`${API_CONFIG.BASE_URL}/api/strategies/templates`);
       if (res.data?.success && Array.isArray(res.data.templates)) {
         setTemplates(res.data.templates);
       } else {

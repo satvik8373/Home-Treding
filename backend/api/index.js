@@ -25,6 +25,7 @@ const portfolioRoutes = require('./routes/portfolio');
 const tradingRoutes = require('./routes/trading');
 const paperRoutes = require('./routes/paper');
 const riskRoutes = require('./routes/risk');
+const backtestRoutes = require('./routes/backtest');
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -71,6 +72,7 @@ app.get(['/api/health', '/health'], (req, res) => {
 ['/api/trading', '/trading'].forEach(p => app.use(p, tradingRoutes));
 ['/api/paper', '/paper'].forEach(p => app.use(p, paperRoutes));
 ['/api/risk', '/risk'].forEach(p => app.use(p, riskRoutes));
+['/api/backtest', '/backtest'].forEach(p => app.use(p, backtestRoutes));
 
 // Graceful socket.io stub for serverless environments (prevents 404 polling errors)
 app.all(['/socket.io', '/socket.io/*'], (req, res) => {
