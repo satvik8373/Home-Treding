@@ -181,6 +181,13 @@ export class AlgoroomsStyleBacktester {
    * Simulate a single trading day bar-by-bar
    */
   private simulateDay(date: string, dayBars: Candle[], strikeStep: number): void {
+    const stratName = (this.config.strategyName || '').toLowerCase();
+    const isBreakout009 = stratName.includes('0.09') || stratName.includes('009') || stratName.includes('breakout');
+    if (isBreakout009) {
+      this.simulate009BreakoutDay(date, dayBars, strikeStep);
+      return;
+    }
+
     const entryBarIndex = dayBars.findIndex((b) => b.time >= this.config.startTime);
     if (entryBarIndex === -1) return;
 
@@ -355,6 +362,165 @@ export class AlgoroomsStyleBacktester {
         spotExitPrice: spotExit,
         spotRefPrice: `₹${spotEntry.toFixed(2)} → ₹${spotExit.toFixed(2)}`,
         fillModel: 'Real Market Bar-by-Bar Fill'
+      });
+    }
+
+    this.balance += dayTotalNetPnL;
+    if (this.balance > this.peakEquity) this.peakEquity = this.balance;
+    const currentDrawdown = this.peakEquity - this.balance;
+    if (currentDrawdown > this.maxDrawdown) this.maxDrawdown = currentDrawdown;
+
+    this.equityCurve.push({
+      date,
+      timestamp: dayBars[squareOffIndex].isoTime,
+      equity: Number(this.balance.toFixed(2)),
+      pnl: Number(dayTotalNetPnL.toFixed(2)),
+      drawdown: Number(currentDrawdown.toFixed(2))
+    });
+  }
+
+  /**
+   * Official NIFTY 0.09% ATM Full-Day Breakout Simulation
+   * Reference: 09:15-09:20 candle close = X.
+   * Upper = X * 1.0009 (+0.09%) | Lower = X * 0.9991 (-0.09%)
+   * Candle close > Upper => BUY CE | Candle close < Lower => BUY PE
+   * Symmetric Reversal on opposite breakout | Force Square-Off at 15:10 IST
+   */
+  private simulate009BreakoutDay(date: string, dayBars: Candle[], strikeStep: number): void {
+    if (dayBars.length < 3) return;
+
+    const firstCandle = dayBars[0];
+    const firstCandleClose = firstCandle.close;
+    const upperTrigger = Number((firstCandleClose * 1.0009).toFixed(2));
+    const lowerTrigger = Number((firstCandleClose * 0.9991).toFixed(2));
+    const atmStrike = Math.round(firstCandleClose / strikeStep) * strikeStep;
+    const quantity = this.config.legs[0]?.quantity || 75;
+
+    const exitBarIndex = dayBars.findIndex((b) => b.time >= this.config.endTime);
+    const squareOffIndex = exitBarIndex !== -1 ? exitBarIndex : dayBars.length - 1;
+
+    const dayPositions: ActivePositionLeg[] = [];
+    let currentOpenPos: ActivePositionLeg | null = null;
+
+    // Start bar-by-bar evaluation from candle 1 (09:20 onwards)
+    for (let i = 1; i <= squareOffIndex; i++) {
+      const currentBar = dayBars[i];
+      const timeProgression = i / Math.max(1, squareOffIndex);
+      const timeToExpiryYears = Math.max(0.001, (5 - timeProgression * 0.35) / 365);
+
+      // Check for Upper Breakout => BUY CALL
+      if (currentBar.close > upperTrigger) {
+        // If holding PE, exit PE on reversal
+        if (currentOpenPos && currentOpenPos.optionType === 'PE') {
+          const exitPrice = this.estimateOptionPrice(currentBar.close, currentOpenPos.strike, 'PE', timeToExpiryYears);
+          this.closePositionLeg(currentOpenPos, exitPrice, currentBar.isoTime, 'REVERSAL_EXIT_TO_CE', currentBar.close);
+          currentOpenPos = null;
+        }
+
+        // If not holding CE, enter CE
+        if (!currentOpenPos) {
+          const entryPrice = this.estimateOptionPrice(currentBar.close, atmStrike, 'CE', timeToExpiryYears);
+          const newPos: ActivePositionLeg = {
+            id: `leg_ce_${i}`,
+            action: 'BUY',
+            optionType: 'CE',
+            strike: atmStrike,
+            quantity,
+            entryPrice,
+            entryTime: currentBar.isoTime,
+            highestPriceObserved: entryPrice,
+            lowestPriceObserved: entryPrice,
+            stopLossPrice: 0,
+            targetPrice: 0,
+            isClosed: false,
+            spotEntryPrice: currentBar.close
+          };
+          dayPositions.push(newPos);
+          currentOpenPos = newPos;
+        }
+      }
+      // Check for Lower Breakout => BUY PUT
+      else if (currentBar.close < lowerTrigger) {
+        // If holding CE, exit CE on reversal
+        if (currentOpenPos && currentOpenPos.optionType === 'CE') {
+          const exitPrice = this.estimateOptionPrice(currentBar.close, currentOpenPos.strike, 'CE', timeToExpiryYears);
+          this.closePositionLeg(currentOpenPos, exitPrice, currentBar.isoTime, 'REVERSAL_EXIT_TO_PE', currentBar.close);
+          currentOpenPos = null;
+        }
+
+        // If not holding PE, enter PE
+        if (!currentOpenPos) {
+          const entryPrice = this.estimateOptionPrice(currentBar.close, atmStrike, 'PE', timeToExpiryYears);
+          const newPos: ActivePositionLeg = {
+            id: `leg_pe_${i}`,
+            action: 'BUY',
+            optionType: 'PE',
+            strike: atmStrike,
+            quantity,
+            entryPrice,
+            entryTime: currentBar.isoTime,
+            highestPriceObserved: entryPrice,
+            lowestPriceObserved: entryPrice,
+            stopLossPrice: 0,
+            targetPrice: 0,
+            isClosed: false,
+            spotEntryPrice: currentBar.close
+          };
+          dayPositions.push(newPos);
+          currentOpenPos = newPos;
+        }
+      }
+
+      // End of Day Squareoff (15:10 IST)
+      if (i === squareOffIndex && currentOpenPos) {
+        const exitPrice = this.estimateOptionPrice(currentBar.close, currentOpenPos.strike, currentOpenPos.optionType, timeToExpiryYears);
+        this.closePositionLeg(currentOpenPos, exitPrice, currentBar.isoTime, 'SQUAREOFF_1510', currentBar.close);
+        currentOpenPos = null;
+      }
+    }
+
+    // Record Day Trades & Equity Curve Point
+    let dayTotalNetPnL = 0;
+    for (const pos of dayPositions) {
+      if (!pos.isClosed) {
+        const lastBar = dayBars[squareOffIndex];
+        const exitPrice = this.estimateOptionPrice(lastBar.close, pos.strike, pos.optionType, 0.001);
+        this.closePositionLeg(pos, exitPrice, lastBar.isoTime, 'SQUAREOFF_1510', lastBar.close);
+      }
+
+      const grossPnl = pos.grossPnl || 0;
+      const charges = pos.charges || 0;
+      const netPnl = pos.netPnl || 0;
+
+      dayTotalNetPnL += netPnl;
+
+      const spotEntry = pos.spotEntryPrice || firstCandleClose;
+      const spotExit = pos.spotExitPrice || dayBars[squareOffIndex].close;
+
+      this.tradeLogs.push({
+        id: `TR-${this.tradeLogs.length + 1}`,
+        date,
+        legId: pos.id,
+        type: pos.action,
+        instrument: `${this.config.symbol} ${pos.strike} ${pos.optionType}`,
+        strike: pos.strike,
+        optionType: pos.optionType,
+        side: pos.action,
+        quantity: pos.quantity,
+        entryPrice: Number(pos.entryPrice.toFixed(2)),
+        exitPrice: Number((pos.exitPrice || pos.entryPrice).toFixed(2)),
+        entryTime: pos.entryTime,
+        exitTime: pos.exitTime || dayBars[squareOffIndex].isoTime,
+        grossPnl: Number(grossPnl.toFixed(2)),
+        brokerage: Number((charges * 0.5).toFixed(2)),
+        charges: Number(charges.toFixed(2)),
+        netPnl: Number(netPnl.toFixed(2)),
+        reason: pos.exitReason || 'SQUAREOFF_1510',
+        status: netPnl >= 0 ? 'WIN' : 'LOSS',
+        spotEntryPrice: spotEntry,
+        spotExitPrice: spotExit,
+        spotRefPrice: `₹${spotEntry.toFixed(2)} → ₹${spotExit.toFixed(2)}`,
+        fillModel: '5m Candle Breakout Execution'
       });
     }
 
