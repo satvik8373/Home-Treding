@@ -80,47 +80,43 @@ export interface KillSwitchStatus {
   isHalted: boolean;
   haltedAt?: string;
   haltReason?: string;
+  killSwitch?: {
+    isHalted: boolean;
+    haltedAt?: string;
+    haltReason?: string;
+  };
 }
 
-// In-memory client cache with localStorage persistence
-const loadPersistedBrokers = (): BrokerSummary[] => {
-  if (typeof window !== 'undefined') {
-    try {
-      const savedBrokers = localStorage.getItem('mavrix_connected_brokers');
-      if (savedBrokers) {
-        const parsed = JSON.parse(savedBrokers);
-        if (Array.isArray(parsed)) {
-          // Filter out legacy demo/fake brokers
-          return parsed.filter((b: any) => b && b.id !== 'dhan_demo_1' && b.clientId !== 'DHAN_10029384' && b.clientId !== '1108893841');
-        }
-      }
-    } catch (_) {}
-  }
-  return [];
-};
+const createFreshPortfolio = (capital: number = 100000): PaperPortfolio => ({
+  initialCapital: capital,
+  availableCash: capital,
+  utilizedMargin: 0,
+  totalPortfolioValue: capital,
+  realizedPnl: 0,
+  unrealizedPnl: 0,
+  totalPnl: 0,
+  dayPnl: 0,
+  winCount: 0,
+  lossCount: 0,
+  totalTrades: 0,
+  winRate: 0
+});
 
-let localBrokers: BrokerSummary[] = loadPersistedBrokers();
-
-let localPaperPortfolio: PaperPortfolio = {
-  initialCapital: 100000,
-  availableCash: 95000,
-  utilizedMargin: 5000,
-  totalPortfolioValue: 102450,
-  realizedPnl: 1250,
-  unrealizedPnl: 1200,
-  totalPnl: 2450,
-  dayPnl: 2450,
-  winCount: 4,
-  lossCount: 1,
-  totalTrades: 5,
-  winRate: 80
-};
-
+// User-scoped in-memory state
+let localBrokers: BrokerSummary[] = [];
+let localPaperPortfolio: PaperPortfolio = createFreshPortfolio(100000);
 let localPositions: BrokerPosition[] = [];
-
 let localOrders: BrokerOrder[] = [];
 
 export const brokerApi = {
+  // Clear in-memory client state on logout or account switch
+  clearClientState() {
+    localBrokers = [];
+    localPaperPortfolio = createFreshPortfolio(100000);
+    localPositions = [];
+    localOrders = [];
+  },
+
   // --- Broker Connections ---
   async getBrokers(userId?: string): Promise<BrokerSummary[]> {
     const urls = [
@@ -129,17 +125,19 @@ export const brokerApi = {
       `${getBaseUrl()}/api/broker/list${userId ? `?userId=${userId}` : ''}`,
       `/api/broker/list${userId ? `?userId=${userId}` : ''}`
     ];
+
     for (const url of Array.from(new Set(urls))) {
       try {
         const res = await axios.get(url, { timeout: 6000 });
         if (res.data?.brokers && Array.isArray(res.data.brokers)) {
           localBrokers = res.data.brokers;
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
-          }
           return res.data.brokers;
         }
       } catch (err: any) {
+        if (err.response?.status === 401) {
+          localBrokers = [];
+          return [];
+        }
         if (err.response?.status !== 404) break;
       }
     }
@@ -167,10 +165,6 @@ export const brokerApi = {
 
         if (res.data?.success && res.data?.broker) {
           localBrokers = [res.data.broker, ...localBrokers.filter(b => b.clientId !== params.clientId.trim())];
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
-            localStorage.setItem('dhan_connected_client_id', params.clientId.trim());
-          }
           return res.data;
         }
 
@@ -179,7 +173,6 @@ export const brokerApi = {
         }
       } catch (err: any) {
         lastError = err;
-        // If Dhan API rejected the credentials with 401/403 or specific validation failure, return the real Dhan error immediately!
         if (err.response?.status === 401 || err.response?.status === 403) {
           return {
             success: false,
@@ -187,7 +180,6 @@ export const brokerApi = {
             error: err.response?.data
           };
         }
-        // Only try next URL if it was a 404 Endpoint Not Found
         if (err.response?.status !== 404) {
           break;
         }
@@ -221,10 +213,6 @@ export const brokerApi = {
     } catch (_) {}
 
     localBrokers = localBrokers.filter(b => b.id !== brokerId && b.clientId !== brokerId);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('mavrix_connected_brokers', JSON.stringify(localBrokers));
-      localStorage.removeItem('dhan_connected_client_id');
-    }
     return true;
   },
 
@@ -234,6 +222,7 @@ export const brokerApi = {
       brokerId ? `/api/brokers/funds/${brokerId}` : `/api/brokers/funds`,
       brokerId ? `${getBaseUrl()}/api/broker/funds/${brokerId}` : `${getBaseUrl()}/api/broker/funds`
     ];
+
     for (const url of Array.from(new Set(urls))) {
       try {
         const res = await axios.get(url, { timeout: 8000 });
@@ -253,153 +242,127 @@ export const brokerApi = {
   },
 
   async getPositions(brokerId?: string): Promise<BrokerPosition[]> {
+    const url = brokerId ? `${getBaseUrl()}/api/brokers/positions/${brokerId}` : `${getBaseUrl()}/api/brokers/positions`;
     try {
-      const url = brokerId ? `${getBaseUrl()}/api/brokers/positions/${brokerId}` : `${getBaseUrl()}/api/brokers/positions`;
       const res = await axios.get(url, { timeout: 8000 });
-      if (res.data?.positions && Array.isArray(res.data.positions)) return res.data.positions;
-    } catch (e) {}
-    return localPositions;
+      if (res.data?.success && res.data?.positions) return res.data.positions;
+    } catch (_) {}
+    return [];
   },
 
   async getOrders(brokerId?: string): Promise<BrokerOrder[]> {
+    const url = brokerId ? `${getBaseUrl()}/api/brokers/orders/${brokerId}` : `${getBaseUrl()}/api/brokers/orders`;
     try {
-      const url = brokerId ? `${getBaseUrl()}/api/brokers/orders/${brokerId}` : `${getBaseUrl()}/api/brokers/orders`;
       const res = await axios.get(url, { timeout: 8000 });
-      if (res.data?.orders && Array.isArray(res.data.orders)) return res.data.orders;
-    } catch (e) {}
-    return localOrders;
+      if (res.data?.success && res.data?.orders) return res.data.orders;
+    } catch (_) {}
+    return [];
   },
 
-  // --- Paper Trading ---
+  // --- Paper Trading Operations ---
   async placePaperOrder(order: {
     symbol: string;
     side: 'BUY' | 'SELL';
     quantity: number;
     price?: number;
-    orderType?: 'MARKET' | 'LIMIT';
-    productType?: 'INTRADAY' | 'CNC';
+    orderType?: string;
+    productType?: string;
     strategyId?: string;
   }): Promise<any> {
     try {
-      const res = await axios.post(`${getBaseUrl()}/api/paper/order`, order);
-      if (res.data?.success) return res.data;
-    } catch (e) {}
-
-    const orderId = `PORD_${Date.now()}`;
-    const fillPrice = order.price || 1000;
-    const newOrd: BrokerOrder = {
-      orderId,
-      brokerOrderId: orderId,
-      symbol: order.symbol.toUpperCase(),
-      side: order.side,
-      orderType: order.orderType || 'MARKET',
-      productType: order.productType || 'INTRADAY',
-      quantity: Number(order.quantity),
-      filledQuantity: Number(order.quantity),
-      pendingQuantity: 0,
-      price: fillPrice,
-      averagePrice: fillPrice,
-      status: 'FILLED',
-      orderTimestamp: new Date().toISOString()
-    };
-    localOrders.unshift(newOrd);
-    localPaperPortfolio.totalTrades += 1;
+      const res = await axios.post(`${getBaseUrl()}/api/paper/order`, order, { timeout: 8000 });
+      if (res.data?.success) {
+        return res.data;
+      }
+    } catch (e: any) {
+      if (e.response?.data) return e.response.data;
+      return { success: false, message: e.message || 'Order failed' };
+    }
 
     return {
-      success: true,
-      order: newOrd,
-      message: 'Paper order executed successfully'
+      success: false,
+      message: 'Failed to place paper order'
     };
   },
 
   async getPaperPortfolio(): Promise<PaperPortfolio> {
     try {
-      const res = await axios.get(`${getBaseUrl()}/api/paper/portfolio`);
+      const res = await axios.get(`${getBaseUrl()}/api/paper/portfolio`, { timeout: 6000 });
       if (res.data?.portfolio) {
         localPaperPortfolio = res.data.portfolio;
         return res.data.portfolio;
       }
-    } catch (e) {}
+    } catch (_) {}
     return localPaperPortfolio;
   },
 
   async getPaperPositions(): Promise<BrokerPosition[]> {
     try {
-      const res = await axios.get(`${getBaseUrl()}/api/paper/positions`);
+      const res = await axios.get(`${getBaseUrl()}/api/paper/positions`, { timeout: 6000 });
       if (res.data?.positions) {
         localPositions = res.data.positions;
         return res.data.positions;
       }
-    } catch (e) {}
+    } catch (_) {}
     return localPositions;
   },
 
   async getPaperOrders(): Promise<BrokerOrder[]> {
     try {
-      const res = await axios.get(`${getBaseUrl()}/api/paper/orders`);
+      const res = await axios.get(`${getBaseUrl()}/api/paper/orders`, { timeout: 6000 });
       if (res.data?.orders) {
         localOrders = res.data.orders;
         return res.data.orders;
       }
-    } catch (e) {}
+    } catch (_) {}
     return localOrders;
   },
 
   async resetPaperPortfolio(initialCapital: number = 100000): Promise<any> {
     try {
-      const res = await axios.post(`${getBaseUrl()}/api/paper/reset`, { initialCapital });
-      if (res.data) return res.data;
-    } catch (e) {}
+      const res = await axios.post(`${getBaseUrl()}/api/paper/reset`, { initialCapital }, { timeout: 6000 });
+      if (res.data?.success) {
+        localPaperPortfolio = createFreshPortfolio(initialCapital);
+        localPositions = [];
+        localOrders = [];
+        return res.data;
+      }
+    } catch (_) {}
 
-    localPaperPortfolio = {
-      initialCapital,
-      availableCash: initialCapital,
-      utilizedMargin: 0,
-      totalPortfolioValue: initialCapital,
-      realizedPnl: 0,
-      unrealizedPnl: 0,
-      totalPnl: 0,
-      dayPnl: 0,
-      winCount: 0,
-      lossCount: 0,
-      totalTrades: 0,
-      winRate: 0
-    };
+    localPaperPortfolio = createFreshPortfolio(initialCapital);
     localPositions = [];
     localOrders = [];
 
-    return { success: true, message: `Paper portfolio reset to ₹${initialCapital.toLocaleString()}` };
-  },
-
-  // --- Risk & Emergency Stop ---
-  async getRiskStatus(): Promise<{ config: any; killSwitch: KillSwitchStatus }> {
-    try {
-      const res = await axios.get(`${getBaseUrl()}/api/risk/status`);
-      if (res.data?.config) return res.data;
-    } catch (e) {}
     return {
-      config: { maxDailyLoss: 5000, maxPositionSize: 50000, maxOpenPositions: 5 },
-      killSwitch: { isHalted: false }
+      success: true,
+      message: `Paper portfolio reset to ₹${initialCapital.toLocaleString()}`
     };
   },
 
-  async triggerEmergencyStop(reason?: string): Promise<KillSwitchStatus> {
+  // --- Risk Engine & Kill Switch ---
+  async getRiskStatus(): Promise<KillSwitchStatus> {
     try {
-      const res = await axios.post(`${getBaseUrl()}/api/risk/kill-switch/activate`, { reason });
-      if (res.data?.killSwitch) return res.data.killSwitch;
-    } catch (e) {}
-    return {
-      isHalted: true,
-      haltedAt: new Date().toISOString(),
-      haltReason: reason || 'Manual Emergency Stop'
-    };
-  },
-
-  async resetEmergencyStop(): Promise<KillSwitchStatus> {
-    try {
-      const res = await axios.post(`${getBaseUrl()}/api/risk/kill-switch/reset`);
-      if (res.data?.killSwitch) return res.data.killSwitch;
-    } catch (e) {}
+      const res = await axios.get(`${getBaseUrl()}/api/risk/status`, { timeout: 6000 });
+      if (res.data) return res.data;
+    } catch (_) {}
     return { isHalted: false };
+  },
+
+  async triggerEmergencyStop(reason: string = 'Manual kill-switch triggered'): Promise<any> {
+    try {
+      const res = await axios.post(`${getBaseUrl()}/api/risk/kill-switch/activate`, { reason }, { timeout: 6000 });
+      return res.data;
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    }
+  },
+
+  async resetEmergencyStop(): Promise<any> {
+    try {
+      const res = await axios.post(`${getBaseUrl()}/api/risk/kill-switch/reset`, {}, { timeout: 6000 });
+      return res.data;
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    }
   }
 };

@@ -15,7 +15,9 @@ import {
   IconButton,
   Tooltip,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   ArrowBack,
@@ -23,7 +25,9 @@ import {
   DeleteOutline,
   ContentCopy,
   InfoOutlined,
-  AccessTime
+  AccessTime,
+  CheckCircleOutline,
+  EditOutlined
 } from '@mui/icons-material';
 import Layout from '../components/Layout';
 import axios from 'axios';
@@ -46,6 +50,16 @@ interface StrategyLegForm {
   isActive: boolean;
 }
 
+const INSTRUMENT_PRESETS = [
+  { name: 'NIFTY 50', lotSize: 65, exchange: 'NSE' },
+  { name: 'NIFTY BANK', lotSize: 30, exchange: 'NSE' },
+  { name: 'FINNIFTY', lotSize: 60, exchange: 'NSE' },
+  { name: 'MIDCPNIFTY', lotSize: 75, exchange: 'NSE' },
+  { name: 'SENSEX', lotSize: 20, exchange: 'BSE' },
+  { name: 'RELIANCE', lotSize: 50, exchange: 'NSE' },
+  { name: 'TCS', lotSize: 50, exchange: 'NSE' }
+];
+
 export const CreateStrategy: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -65,7 +79,7 @@ export const CreateStrategy: React.FC = () => {
   const [underlyingType, setUnderlyingType] = useState<'Spot' | 'Future'>('Spot');
   const [instrumentName, setInstrumentName] = useState('NIFTY BANK');
   const [lotSize, setLotSize] = useState(30);
-  const [exchange] = useState('NSE');
+  const [exchange, setExchange] = useState('NSE');
 
   // 3. Order Type & Timing
   const [orderType, setOrderType] = useState('MIS');
@@ -79,12 +93,12 @@ export const CreateStrategy: React.FC = () => {
       id: 'leg-1',
       action: 'SELL',
       optionType: 'CE',
-      quantity: 35,
+      quantity: 30,
       expiry: 'MONTHLY',
       strikeCriteria: 'ATM pt',
-      strikeType: 'ITM 100',
+      strikeType: 'ATM 0',
       slType: 'SL%',
-      slValue: 0,
+      slValue: 1,
       slOnPrice: 'On Price',
       tpType: 'TP%',
       tpValue: 0,
@@ -95,17 +109,17 @@ export const CreateStrategy: React.FC = () => {
       id: 'leg-2',
       action: 'SELL',
       optionType: 'PE',
-      quantity: 35,
+      quantity: 30,
       expiry: 'MONTHLY',
       strikeCriteria: 'ATM pt',
-      strikeType: 'ITM 100',
+      strikeType: 'ATM 0',
       slType: 'SL%',
-      slValue: 0,
+      slValue: 1,
       slOnPrice: 'On Price',
       tpType: 'TP%',
       tpValue: 0,
       tpOnPrice: 'On Price',
-      isActive: false
+      isActive: true
     }
   ]);
 
@@ -136,56 +150,134 @@ export const CreateStrategy: React.FC = () => {
         const template = (location.state as any)?.template;
         if (template) {
           if (template.name) setStrategyName(template.name);
-          if (template.symbol) setInstrumentName(template.symbol);
+          if (template.symbol) {
+            setInstrumentName(template.symbol);
+            const found = INSTRUMENT_PRESETS.find((p) => p.name === template.symbol);
+            if (found) {
+              setLotSize(found.lotSize);
+              setExchange(found.exchange);
+            }
+          }
         }
         return;
       }
 
       try {
+        setLoading(true);
         // Try strategy first, then template
         const [stratRes, tmplRes] = await Promise.all([
           axios.get(`${API_CONFIG.BASE_URL}/api/strategies/${editId}`).catch(() => null),
           axios.get(`${API_CONFIG.BASE_URL}/api/strategies/templates/${editId}`).catch(() => null)
         ]);
 
-        const data = stratRes?.data?.strategy || tmplRes?.data?.template;
+        const data = stratRes?.data?.strategy || tmplRes?.data?.template || stratRes?.data?.template;
         if (data) {
           if (data.name) setStrategyName(data.name);
-          if (data.symbol) {
-            setInstrumentName(data.symbol);
-            setLotSize(data.symbol.toUpperCase().includes('BANK') ? 35 : 65);
+
+          // Instrument & lot size
+          const targetSymbol = data.symbol || data.symbols?.[0] || 'NIFTY BANK';
+          setInstrumentName(targetSymbol);
+
+          const preset = INSTRUMENT_PRESETS.find(
+            (p) => p.name.toUpperCase() === targetSymbol.toUpperCase()
+          );
+          if (data.lotSize) {
+            setLotSize(Number(data.lotSize));
+          } else if (preset) {
+            setLotSize(preset.lotSize);
+          } else if (targetSymbol.toUpperCase().includes('BANK')) {
+            setLotSize(30);
+          } else {
+            setLotSize(65);
           }
+
+          if (data.underlyingType) setUnderlyingType(data.underlyingType);
+          if (data.strategyType) {
+            if (data.strategyType.includes('Indicator')) {
+              setStrategyType(data.segmentType === 'EQUITY' ? 'Stocks & Futures -Indicator Based' : 'Option Trading-Indicator Based');
+            } else {
+              setStrategyType('Option Trading-Time Based');
+            }
+          }
+          if (data.orderType) setOrderType(data.orderType);
+
+          // Timing & Days
           if (data.startTime) setStartTime(String(data.startTime).replace(/\s*(AM|PM)/gi, '').trim());
-          if (data.endTime || data.squareOffTime) setSquareOffTime(String(data.endTime || data.squareOffTime).replace(/\s*(AM|PM)/gi, '').trim());
+          if (data.endTime || data.squareOffTime) {
+            setSquareOffTime(String(data.endTime || data.squareOffTime).replace(/\s*(AM|PM)/gi, '').trim());
+          }
+          if (data.noTradeAfter) setNoTradeAfter(String(data.noTradeAfter));
           if (data.tradingDays && Array.isArray(data.tradingDays)) setTradingDays(data.tradingDays);
+
+          // Legs
           if (data.legs && Array.isArray(data.legs) && data.legs.length > 0) {
             setLegs(data.legs.map((l: any, idx: number) => ({
               id: l.id || `leg-${idx + 1}`,
               action: l.action || 'SELL',
               optionType: l.optionType || (idx % 2 === 0 ? 'CE' : 'PE'),
-              quantity: Number(l.quantity) || 35,
+              quantity: Number(l.quantity) || data.lotSize || 30,
               expiry: l.expiry || 'MONTHLY',
               strikeCriteria: l.strikeCriteria || 'ATM pt',
-              strikeType: l.strike || l.strikeType || 'ATM 0',
+              strikeType: l.strikeType || l.strike || 'ATM 0',
               slType: l.slType || 'SL%',
               slValue: l.slValue !== undefined ? Number(l.slValue) : 1,
               slOnPrice: l.slOnPrice || 'On Price',
-              tpType: l.targetType || l.tpType || 'TP%',
-              tpValue: l.targetValue !== undefined ? Number(l.targetValue) : (l.tpValue !== undefined ? Number(l.tpValue) : 0),
+              tpType: l.tpType || l.targetType || 'TP%',
+              tpValue: l.tpValue !== undefined ? Number(l.tpValue) : (l.targetValue !== undefined ? Number(l.targetValue) : 0),
               tpOnPrice: l.tpOnPrice || 'On Price',
-              isActive: true
+              isActive: l.isActive !== undefined ? Boolean(l.isActive) : true
             })));
           }
+
+          // Risk
           if (data.maxLoss) setExitOnLoss(String(data.maxLoss));
           if (data.maxProfit) setExitOnProfit(String(data.maxProfit));
+
+          // Trailing SL
+          if (data.trailingSl) {
+            const tsl = String(data.trailingSl);
+            if (tsl.includes('Lock and Trail')) setProfitTrailingMode('Lock and Trail');
+            else if (tsl.includes('Lock Fix Profit')) setProfitTrailingMode('Lock Fix Profit');
+            else if (tsl.includes('Trail Profit')) setProfitTrailingMode('Trail Profit');
+            else if (tsl.includes('No Trailing')) setProfitTrailingMode('No Trailing');
+
+            const match = tsl.match(/\((\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)\)/);
+            if (match) {
+              setTrailLockAmount(match[1]);
+              setTrailStepAmount(match[2]);
+            }
+          }
+
+          // Advanced features
+          if (data.advancedFeatures && typeof data.advancedFeatures === 'object') {
+            setAdvancedFeatures((prev) => ({ ...prev, ...data.advancedFeatures }));
+          }
         }
       } catch (e) {
         console.error('Failed to load strategy for edit:', e);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchToEdit();
   }, [editId, location.state]);
+
+  const handleInstrumentChange = (newInstrument: string) => {
+    setInstrumentName(newInstrument);
+    const preset = INSTRUMENT_PRESETS.find((p) => p.name === newInstrument);
+    if (preset) {
+      setLotSize(preset.lotSize);
+      setExchange(preset.exchange);
+      // Auto-update leg quantities to default lot size
+      setLegs((prev) =>
+        prev.map((leg) => ({
+          ...leg,
+          quantity: preset.lotSize
+        }))
+      );
+    }
+  };
 
   const handleDayToggle = (day: string) => {
     setTradingDays((prev) =>
@@ -251,10 +343,13 @@ export const CreateStrategy: React.FC = () => {
     try {
       const payload = {
         name: strategyName.trim(),
-        author: 'AR427232',
-        segmentType: 'OPTION',
+        author: 'Trader',
+        segmentType: strategyType.includes('Stocks') ? 'EQUITY' : 'OPTION',
         strategyType: strategyType.includes('Indicator') ? 'Indicator Based' : 'Time Based',
         symbol: instrumentName,
+        underlyingType,
+        orderType,
+        lotSize: Number(lotSize) || 30,
         startTime,
         endTime: squareOffTime,
         tradingDays,
@@ -263,16 +358,26 @@ export const CreateStrategy: React.FC = () => {
           action: l.action,
           symbol: instrumentName,
           strike: l.strikeType || 'ATM 0',
+          strikeType: l.strikeType || 'ATM 0',
+          strikeCriteria: l.strikeCriteria || 'ATM pt',
           optionType: l.optionType,
           quantity: Number(l.quantity) || lotSize,
-          slType: 'percentage',
+          expiry: l.expiry || 'MONTHLY',
+          slType: l.slType || 'SL%',
           slValue: l.slValue !== undefined && l.slValue !== null ? Number(l.slValue) : 1,
-          targetType: 'percentage',
-          targetValue: l.tpValue !== undefined && l.tpValue !== null ? Number(l.tpValue) : 0
+          slOnPrice: l.slOnPrice || 'On Price',
+          targetType: l.tpType || 'TP%',
+          targetValue: l.tpValue !== undefined && l.tpValue !== null ? Number(l.tpValue) : 0,
+          tpType: l.tpType || 'TP%',
+          tpValue: l.tpValue !== undefined && l.tpValue !== null ? Number(l.tpValue) : 0,
+          tpOnPrice: l.tpOnPrice || 'On Price',
+          isActive: l.isActive
         })),
         maxProfit: Number(exitOnProfit) || 2200,
         maxLoss: Number(exitOnLoss) || 2200.10,
+        noTradeAfter,
         trailingSl: `${profitTrailingMode} (${trailLockAmount}/${trailStepAmount})`,
+        advancedFeatures,
         status: 'active'
       };
 
@@ -308,8 +413,8 @@ export const CreateStrategy: React.FC = () => {
   return (
     <Layout>
       <Container maxWidth="xl" sx={{ mt: { xs: 2, sm: 3 }, mb: { xs: 8, sm: 4 }, px: { xs: 1.5, sm: 2.5, md: 3 } }}>
-        {/* Back Link */}
-        <Box sx={{ mb: 2.5, display: 'flex', alignItems: 'center' }}>
+        {/* Top Navigation & Status Bar */}
+        <Box sx={{ mb: 2.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
           <Button
             startIcon={<ArrowBack />}
             onClick={() => navigate('/strategies')}
@@ -324,19 +429,47 @@ export const CreateStrategy: React.FC = () => {
           >
             Back to Strategies
           </Button>
+
+          {editId && (
+            <Chip
+              icon={<EditOutlined sx={{ fontSize: '15px !important' }} />}
+              label={`Editing Strategy ID: ${editId}`}
+              sx={{
+                bgcolor: '#eff6ff',
+                color: '#1d4ed8',
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                border: '1px solid #bfdbfe'
+              }}
+            />
+          )}
+        </Box>
+
+        {/* Header Title */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h5" sx={{ fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', mb: 0.5 }}>
+            {editId ? `Edit Strategy Logic: ${strategyName}` : 'Create New Strategy'}
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#64748b' }}>
+            Customize all execution legs, timings, instrument contracts, and profit/loss parameters with real-time broker synchronization.
+          </Typography>
         </Box>
 
         {error && <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2 }}>{error}</Alert>}
-        {success && <Alert severity="success" sx={{ mb: 2.5, borderRadius: 2 }}>Strategy created successfully! Redirecting to strategies...</Alert>}
+        {success && (
+          <Alert severity="success" icon={<CheckCircleOutline />} sx={{ mb: 2.5, borderRadius: 2 }}>
+            {editId ? 'Strategy updated successfully! Redirecting...' : 'Strategy created successfully! Redirecting...'}
+          </Alert>
+        )}
 
-        {/* 2-Column Grid matching Screenshot 1 & 2 */}
+        {/* 2-Column Grid Layout */}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.05fr 1fr' }, gap: 3 }}>
           {/* LEFT COLUMN: Strategy Type, Select Instruments, Order Type, Risk Management */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {/* Card 1: Strategy Type */}
             <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', mb: 1.5, fontSize: '0.95rem' }}>
-                Strategy Type
+                1. Strategy Execution Type
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {[
@@ -347,7 +480,7 @@ export const CreateStrategy: React.FC = () => {
                   <FormControlLabel
                     key={type}
                     control={
-                      <Checkbox
+                      <Radio
                         checked={strategyType === type}
                         onChange={() => setStrategyType(type)}
                         sx={{ color: '#94a3b8', '&.Mui-checked': { color: '#2563eb' } }}
@@ -359,17 +492,26 @@ export const CreateStrategy: React.FC = () => {
               </Box>
             </Paper>
 
-            {/* Card 2: Select Instruments */}
+            {/* Card 2: Select Instruments & Contract */}
             <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', mb: 0.5, fontSize: '0.95rem' }}>
-                Select Instruments
-              </Typography>
-              <Box sx={{ mb: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>
+                  2. Select Instrument & Contract
+                </Typography>
+                <Chip
+                  label={`${underlyingType} Mode`}
+                  size="small"
+                  sx={{ bgcolor: '#f1f5f9', color: '#475569', fontWeight: 700, fontSize: '0.72rem' }}
+                />
+              </Box>
+
+              {/* Underlying Toggle */}
+              <Box sx={{ mb: 2.5 }}>
                 <Typography variant="body2" sx={{ fontWeight: 700, color: '#1e293b', fontSize: '0.85rem' }}>
-                  Underlying
+                  Underlying Type
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1 }}>
-                  Choose the reference used for calculations.
+                  Choose reference used for calculations and strike selection.
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1 }}>
                   <Button
@@ -381,7 +523,7 @@ export const CreateStrategy: React.FC = () => {
                       textTransform: 'none',
                       fontWeight: 700,
                       borderRadius: 2,
-                      px: 2
+                      px: 2.5
                     }}
                   >
                     Spot
@@ -395,7 +537,7 @@ export const CreateStrategy: React.FC = () => {
                       textTransform: 'none',
                       fontWeight: 700,
                       borderRadius: 2,
-                      px: 2
+                      px: 2.5
                     }}
                   >
                     Future
@@ -403,29 +545,73 @@ export const CreateStrategy: React.FC = () => {
                 </Box>
               </Box>
 
-              <Box sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
-                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block' }}>
-                    INSTRUMENT NAME
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 800, color: '#0f172a' }}>
-                    {instrumentName}
-                  </Typography>
+              {/* Interactive Instrument & Lot Size Controls */}
+              <Box sx={{ p: 2.5, bgcolor: '#f8fafc', borderRadius: 2.5, border: '1px solid #e2e8f0' }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1.4fr 1fr' }, gap: 2, mb: 2 }}>
+                  {/* Select Instrument Dropdown */}
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700, display: 'block', mb: 0.8 }}>
+                      TRADING INSTRUMENT
+                    </Typography>
+                    <Select
+                      size="small"
+                      value={instrumentName}
+                      onChange={(e) => handleInstrumentChange(e.target.value)}
+                      fullWidth
+                      sx={{
+                        bgcolor: '#ffffff',
+                        fontWeight: 700,
+                        fontSize: '0.9rem',
+                        '& .MuiSelect-select': { py: 1 }
+                      }}
+                    >
+                      {INSTRUMENT_PRESETS.map((item) => (
+                        <MenuItem key={item.name} value={item.name} sx={{ fontWeight: 600 }}>
+                          {item.name} ({item.exchange} • Lot {item.lotSize})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </Box>
+
+                  {/* Lot Size with Plus/Minus buttons */}
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700, display: 'block', mb: 0.8 }}>
+                      LOT SIZE (QTY PER LOT)
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 2, overflow: 'hidden' }}>
+                      <Button
+                        size="small"
+                        onClick={() => setLotSize((prev) => Math.max(1, prev - 5))}
+                        sx={{ minWidth: 36, p: 0.5, color: '#334155', fontWeight: 800, bgcolor: '#f1f5f9' }}
+                      >
+                        -
+                      </Button>
+                      <TextField
+                        size="small"
+                        type="number"
+                        value={lotSize}
+                        onChange={(e) => setLotSize(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        inputProps={{ min: 1, style: { textAlign: 'center', padding: '6px 4px', fontWeight: 700 } }}
+                        sx={{ flex: 1, '& .MuiOutlinedInput-notchedOutline': { border: 'none' } }}
+                      />
+                      <Button
+                        size="small"
+                        onClick={() => setLotSize((prev) => prev + 5)}
+                        sx={{ minWidth: 36, p: 0.5, color: '#334155', fontWeight: 800, bgcolor: '#f1f5f9' }}
+                      >
+                        +
+                      </Button>
+                    </Box>
+                  </Box>
                 </Box>
-                <Box>
-                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block' }}>
-                    LOT SIZE
+
+                {/* Exchange info row */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1.5, borderTop: '1px solid #e2e8f0' }}>
+                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                    Active Exchange: <strong style={{ color: '#0f172a' }}>{exchange}</strong>
                   </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 800, color: '#0f172a' }}>
-                    {lotSize}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block' }}>
-                    EXCHANGE
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 800, color: '#0f172a' }}>
-                    {exchange}
+                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                    Segment: <strong style={{ color: '#2563eb' }}>{strategyType.includes('Stocks') ? 'EQUITY' : 'OPTION'}</strong>
                   </Typography>
                 </Box>
               </Box>
@@ -434,23 +620,24 @@ export const CreateStrategy: React.FC = () => {
             {/* Card 3: Order Type & Timing */}
             <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', mb: 0.5, fontSize: '0.95rem' }}>
-                Order Type
+                3. Order Type & Timing Schedule
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1 }}>
-                Select your type
+              <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1.5 }}>
+                Configure order placement type, entry window, and auto square-off timing.
               </Typography>
+
               <RadioGroup row value={orderType} onChange={(e) => setOrderType(e.target.value)} sx={{ mb: 2 }}>
-                <FormControlLabel value="MIS" control={<Radio size="small" sx={{ color: '#2563eb', '&.Mui-checked': { color: '#2563eb' } }} />} label={<Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }}>MIS</Typography>} />
-                <FormControlLabel value="CNC" control={<Radio size="small" sx={{ color: '#2563eb', '&.Mui-checked': { color: '#2563eb' } }} />} label={<Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }}>CNC</Typography>} />
+                <FormControlLabel value="MIS" control={<Radio size="small" sx={{ color: '#2563eb', '&.Mui-checked': { color: '#2563eb' } }} />} label={<Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }}>MIS (Intraday)</Typography>} />
+                <FormControlLabel value="CNC" control={<Radio size="small" sx={{ color: '#2563eb', '&.Mui-checked': { color: '#2563eb' } }} />} label={<Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }}>CNC (Delivery)</Typography>} />
+                <FormControlLabel value="NRML" control={<Radio size="small" sx={{ color: '#2563eb', '&.Mui-checked': { color: '#2563eb' } }} />} label={<Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }}>NRML (Normal)</Typography>} />
                 <FormControlLabel value="BTST" control={<Radio size="small" sx={{ color: '#2563eb', '&.Mui-checked': { color: '#2563eb' } }} />} label={<Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }}>BTST</Typography>} />
               </RadioGroup>
 
               {/* Start Time & Square Off Inputs */}
-              {/* Start Time & Square Off Inputs */}
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2.5 }}>
                 <Box>
                   <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>
-                    Start Time
+                    Start Time (IST)
                   </Typography>
                   <TextField
                     size="small"
@@ -464,7 +651,7 @@ export const CreateStrategy: React.FC = () => {
                 </Box>
                 <Box>
                   <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>
-                    Square Off
+                    Square Off Time (IST)
                   </Typography>
                   <TextField
                     size="small"
@@ -478,33 +665,38 @@ export const CreateStrategy: React.FC = () => {
                 </Box>
               </Box>
 
-              {/* Day Pills (MON, TUE, WED, THU, FRI) */}
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                {['MON', 'TUE', 'WED', 'THU', 'FRI'].map((day) => {
-                  const isSelected = tradingDays.includes(day);
-                  return (
-                    <Button
-                      key={day}
-                      variant={isSelected ? 'contained' : 'outlined'}
-                      size="small"
-                      onClick={() => handleDayToggle(day)}
-                      sx={{
-                        minWidth: 48,
-                        borderRadius: 2,
-                        textTransform: 'none',
-                        fontWeight: 700,
-                        fontSize: '0.78rem',
-                        bgcolor: isSelected ? '#eff6ff' : 'transparent',
-                        color: isSelected ? '#2563eb' : '#64748b',
-                        borderColor: isSelected ? '#3b82f6' : '#e2e8f0',
-                        boxShadow: 'none',
-                        '&:hover': { bgcolor: isSelected ? '#dbeafe' : '#f8fafc', boxShadow: 'none' }
-                      }}
-                    >
-                      {day}
-                    </Button>
-                  );
-                })}
+              {/* Trading Day Pills */}
+              <Box>
+                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.8 }}>
+                  Active Trading Days
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  {['MON', 'TUE', 'WED', 'THU', 'FRI'].map((day) => {
+                    const isSelected = tradingDays.includes(day);
+                    return (
+                      <Button
+                        key={day}
+                        variant={isSelected ? 'contained' : 'outlined'}
+                        size="small"
+                        onClick={() => handleDayToggle(day)}
+                        sx={{
+                          minWidth: 52,
+                          borderRadius: 2,
+                          textTransform: 'none',
+                          fontWeight: 700,
+                          fontSize: '0.8rem',
+                          bgcolor: isSelected ? '#eff6ff' : 'transparent',
+                          color: isSelected ? '#2563eb' : '#64748b',
+                          borderColor: isSelected ? '#3b82f6' : '#e2e8f0',
+                          boxShadow: 'none',
+                          '&:hover': { bgcolor: isSelected ? '#dbeafe' : '#f8fafc', boxShadow: 'none' }
+                        }}
+                      >
+                        {day}
+                      </Button>
+                    );
+                  })}
+                </Box>
               </Box>
             </Paper>
 
@@ -512,19 +704,19 @@ export const CreateStrategy: React.FC = () => {
             <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>
-                  Risk Management
+                  4. Risk Management & Profit Trailing
                 </Typography>
                 <Tooltip title="Global strategy profit and loss controls">
                   <InfoOutlined sx={{ fontSize: 16, color: '#94a3b8' }} />
                 </Tooltip>
               </Box>
               <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 2 }}>
-                Control your trading outcomes by setting global limits on losses and profits on the strategy, and automating how gains are protected (trailing).
+                Control your trading outcomes by setting global limits on losses and profits, and automating profit lock & trail rules.
               </Typography>
 
               <Box sx={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 2, mb: 2, alignItems: 'center' }}>
                 <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
-                  Exit When Over All Loss In Amount (INR)
+                  Exit When Over All Loss In Amount (₹ INR)
                 </Typography>
                 <TextField
                   size="small"
@@ -537,7 +729,7 @@ export const CreateStrategy: React.FC = () => {
 
               <Box sx={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 2, mb: 2, alignItems: 'center' }}>
                 <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
-                  Exit When Over All Profit In Amount (INR)
+                  Exit When Over All Profit In Amount (₹ INR)
                 </Typography>
                 <TextField
                   size="small"
@@ -548,9 +740,9 @@ export const CreateStrategy: React.FC = () => {
                 />
               </Box>
 
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 2, mb: 2, alignItems: 'center' }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 2, mb: 2.5, alignItems: 'center' }}>
                 <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
-                  No Trade After
+                  No Trade After (Time)
                 </Typography>
                 <TextField
                   size="small"
@@ -562,9 +754,10 @@ export const CreateStrategy: React.FC = () => {
                 />
               </Box>
 
-              <Box sx={{ mt: 1 }}>
-                <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700, display: 'block', mb: 0.5 }}>
-                  Profit Trailing
+              {/* Profit Trailing Mode */}
+              <Box sx={{ mt: 1, p: 2, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+                <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700, display: 'block', mb: 1 }}>
+                  Profit Trailing Rules
                 </Typography>
                 <RadioGroup row value={profitTrailingMode} onChange={(e) => setProfitTrailingMode(e.target.value)} sx={{ gap: 1, mb: 1.5 }}>
                   <FormControlLabel value="No Trailing" control={<Radio size="small" />} label={<Typography sx={{ fontSize: '0.8rem', fontWeight: 600 }}>No Trailing</Typography>} />
@@ -574,8 +767,14 @@ export const CreateStrategy: React.FC = () => {
                 </RadioGroup>
 
                 <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                  <TextField size="small" value={trailLockAmount} onChange={(e) => setTrailLockAmount(e.target.value)} fullWidth />
-                  <TextField size="small" value={trailStepAmount} onChange={(e) => setTrailStepAmount(e.target.value)} fullWidth />
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.72rem', display: 'block', mb: 0.5 }}>Lock Threshold (₹)</Typography>
+                    <TextField size="small" value={trailLockAmount} onChange={(e) => setTrailLockAmount(e.target.value)} fullWidth />
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.72rem', display: 'block', mb: 0.5 }}>Trail Step (₹)</Typography>
+                    <TextField size="small" value={trailStepAmount} onChange={(e) => setTrailStepAmount(e.target.value)} fullWidth />
+                  </Box>
                 </Box>
               </Box>
             </Paper>
@@ -586,9 +785,14 @@ export const CreateStrategy: React.FC = () => {
             {/* Card 5: Strategy Legs */}
             <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>
-                  Strategy Legs
-                </Typography>
+                <Box>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>
+                    5. Strategy Legs ({legs.length})
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#64748b' }}>
+                    Individually customize strikes, stop losses, and target profits per leg.
+                  </Typography>
+                </Box>
                 <Button
                   variant="contained"
                   size="small"
@@ -619,32 +823,64 @@ export const CreateStrategy: React.FC = () => {
                       p: 2.5,
                       borderRadius: 2.5,
                       border: '1px solid #e2e8f0',
-                      bgcolor: '#ffffff'
+                      bgcolor: leg.isActive ? '#ffffff' : '#f8fafc',
+                      opacity: leg.isActive ? 1 : 0.75,
+                      transition: 'all 0.2s ease'
                     }}
                   >
                     {/* Leg Header Row */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 800, color: '#0f172a' }}>
-                        Leg {idx + 1} <span style={{ color: leg.action === 'SELL' ? '#dc2626' : '#2563eb' }}>{leg.action} {leg.optionType}</span>
-                      </Typography>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Chip label={leg.isActive ? 'ACTIVE' : 'INACTIVE'} size="small" sx={{ bgcolor: leg.isActive ? '#dbeafe' : '#f1f5f9', color: leg.isActive ? '#1e40af' : '#64748b', fontWeight: 800, fontSize: '0.68rem', height: 22 }} />
-                        <Button size="small" onClick={() => handleRemoveLeg(idx)} sx={{ color: '#ef4444', textTransform: 'none', fontWeight: 700, p: 0, minWidth: 50, fontSize: '0.75rem' }}>
-                          Remove
-                        </Button>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#0f172a' }}>
+                          Leg {idx + 1}:
+                        </Typography>
+                        <Chip
+                          label={`${leg.action} ${leg.optionType}`}
+                          size="small"
+                          sx={{
+                            bgcolor: leg.action === 'BUY' ? '#dcfce7' : '#fee2e2',
+                            color: leg.action === 'BUY' ? '#166534' : '#991b1b',
+                            fontWeight: 800,
+                            fontSize: '0.72rem',
+                            height: 22
+                          }}
+                        />
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                        <Chip
+                          label={leg.isActive ? 'ACTIVE' : 'DISABLED'}
+                          size="small"
+                          onClick={() => handleUpdateLeg(idx, { isActive: !leg.isActive })}
+                          clickable
+                          sx={{
+                            bgcolor: leg.isActive ? '#dbeafe' : '#f1f5f9',
+                            color: leg.isActive ? '#1e40af' : '#64748b',
+                            fontWeight: 800,
+                            fontSize: '0.68rem',
+                            height: 22
+                          }}
+                        />
+                        <IconButton size="small" onClick={() => handleCopyLeg(idx)} sx={{ color: '#f59e0b' }}>
+                          <ContentCopy fontSize="small" />
+                        </IconButton>
+                        {legs.length > 1 && (
+                          <IconButton size="small" onClick={() => handleRemoveLeg(idx)} sx={{ color: '#ef4444' }}>
+                            <DeleteOutline fontSize="small" />
+                          </IconButton>
+                        )}
                       </Box>
                     </Box>
 
                     {/* Subtitle badge */}
                     <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 2, fontSize: '0.75rem' }}>
-                      {leg.action} {leg.optionType} • {instrumentName} • Qty {leg.quantity} • Strike {leg.strikeType} • TP {leg.tpValue}% • SL {leg.slValue}%
+                      {leg.action} {leg.optionType} • {instrumentName} • Qty {leg.quantity} • Strike {leg.strikeType} • SL {leg.slValue}% • TP {leg.tpValue}%
                     </Typography>
 
-                    {/* Leg Controls Grid */}
+                    {/* Leg Controls Grid: Row 1 (Qty, Position, Option Type) */}
                     <Box sx={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: 1.5, mb: 1.5 }}>
                       {/* Qty Counter with Manual Typing Support */}
                       <Box>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>Qty</Typography>
+                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>Qty (Shares)</Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', border: '1px solid #cbd5e1', borderRadius: 2, bgcolor: '#ffffff', overflow: 'hidden' }}>
                           <Button
                             size="small"
@@ -675,7 +911,7 @@ export const CreateStrategy: React.FC = () => {
                             +
                           </Button>
                         </Box>
-                        <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem' }}>Direct edit or lot ({lotSize})</Typography>
+                        <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.68rem' }}>Lot: {lotSize}</Typography>
                       </Box>
 
                       {/* Position Toggle (BUY / SELL) */}
@@ -711,7 +947,7 @@ export const CreateStrategy: React.FC = () => {
                             onClick={() => handleUpdateLeg(idx, { optionType: 'CE' })}
                             sx={{ flex: 1, textTransform: 'none', fontWeight: 700, bgcolor: leg.optionType === 'CE' ? '#eff6ff' : 'transparent', color: leg.optionType === 'CE' ? '#1e40af' : '#64748b', borderColor: '#d1d5db', boxShadow: 'none' }}
                           >
-                            Call
+                            Call (CE)
                           </Button>
                           <Button
                             variant={leg.optionType === 'PE' ? 'contained' : 'outlined'}
@@ -719,7 +955,7 @@ export const CreateStrategy: React.FC = () => {
                             onClick={() => handleUpdateLeg(idx, { optionType: 'PE' })}
                             sx={{ flex: 1, textTransform: 'none', fontWeight: 700, bgcolor: leg.optionType === 'PE' ? '#fdf2f8' : 'transparent', color: leg.optionType === 'PE' ? '#9d174d' : '#64748b', borderColor: '#d1d5db', boxShadow: 'none' }}
                           >
-                            Put
+                            Put (PE)
                           </Button>
                         </Box>
                       </Box>
@@ -729,75 +965,147 @@ export const CreateStrategy: React.FC = () => {
                     <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1.5, mb: 1.5 }}>
                       <Box>
                         <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>Expiry</Typography>
-                        <TextField size="small" value={leg.expiry} onChange={(e) => handleUpdateLeg(idx, { expiry: e.target.value })} fullWidth />
+                        <Select
+                          size="small"
+                          value={leg.expiry}
+                          onChange={(e) => handleUpdateLeg(idx, { expiry: e.target.value })}
+                          fullWidth
+                          sx={{ bgcolor: '#ffffff', fontSize: '0.85rem' }}
+                        >
+                          <MenuItem value="WEEKLY">WEEKLY</MenuItem>
+                          <MenuItem value="NEXT WEEKLY">NEXT WEEKLY</MenuItem>
+                          <MenuItem value="MONTHLY">MONTHLY</MenuItem>
+                          <MenuItem value="QUARTERLY">QUARTERLY</MenuItem>
+                        </Select>
                       </Box>
                       <Box>
                         <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>Strike Criteria</Typography>
-                        <TextField size="small" value={leg.strikeCriteria} onChange={(e) => handleUpdateLeg(idx, { strikeCriteria: e.target.value })} fullWidth />
+                        <Select
+                          size="small"
+                          value={leg.strikeCriteria}
+                          onChange={(e) => handleUpdateLeg(idx, { strikeCriteria: e.target.value })}
+                          fullWidth
+                          sx={{ bgcolor: '#ffffff', fontSize: '0.85rem' }}
+                        >
+                          <MenuItem value="ATM pt">ATM pt</MenuItem>
+                          <MenuItem value="ATM %">ATM %</MenuItem>
+                          <MenuItem value="Delta">Delta</MenuItem>
+                          <MenuItem value="Premium Range">Premium Range</MenuItem>
+                        </Select>
                       </Box>
                       <Box>
                         <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>Strike Type</Typography>
-                        <TextField size="small" value={leg.strikeType} onChange={(e) => handleUpdateLeg(idx, { strikeType: e.target.value })} fullWidth />
+                        <TextField
+                          size="small"
+                          value={leg.strikeType}
+                          onChange={(e) => handleUpdateLeg(idx, { strikeType: e.target.value })}
+                          placeholder="ATM 0"
+                          fullWidth
+                          sx={{ bgcolor: '#ffffff' }}
+                        />
                       </Box>
                     </Box>
 
-                    {/* SL & TP Rows */}
+                    {/* Stop Loss Row */}
                     <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1.5, mb: 1.5 }}>
                       <Box>
                         <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>SL Type</Typography>
-                        <TextField size="small" value={leg.slType} onChange={(e) => handleUpdateLeg(idx, { slType: e.target.value })} fullWidth />
+                        <Select
+                          size="small"
+                          value={leg.slType}
+                          onChange={(e) => handleUpdateLeg(idx, { slType: e.target.value })}
+                          fullWidth
+                          sx={{ bgcolor: '#ffffff', fontSize: '0.85rem' }}
+                        >
+                          <MenuItem value="SL%">SL%</MenuItem>
+                          <MenuItem value="Points">Points</MenuItem>
+                          <MenuItem value="Underlying %">Underlying %</MenuItem>
+                        </Select>
                       </Box>
                       <Box>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>SL</Typography>
-                        <TextField size="small" type="number" value={leg.slValue} onChange={(e) => handleUpdateLeg(idx, { slValue: Number(e.target.value) })} fullWidth />
+                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>SL Value</Typography>
+                        <TextField
+                          size="small"
+                          type="number"
+                          value={leg.slValue}
+                          onChange={(e) => handleUpdateLeg(idx, { slValue: Number(e.target.value) })}
+                          fullWidth
+                          sx={{ bgcolor: '#ffffff' }}
+                        />
                       </Box>
                       <Box>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>On Price</Typography>
-                        <TextField size="small" value={leg.slOnPrice} onChange={(e) => handleUpdateLeg(idx, { slOnPrice: e.target.value })} fullWidth />
+                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>SL On Price</Typography>
+                        <Select
+                          size="small"
+                          value={leg.slOnPrice}
+                          onChange={(e) => handleUpdateLeg(idx, { slOnPrice: e.target.value })}
+                          fullWidth
+                          sx={{ bgcolor: '#ffffff', fontSize: '0.85rem' }}
+                        >
+                          <MenuItem value="On Price">On Price</MenuItem>
+                          <MenuItem value="On Underlying">On Underlying</MenuItem>
+                        </Select>
                       </Box>
                     </Box>
 
-                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1.5, mb: 1.5 }}>
+                    {/* Target Profit Row */}
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1.5 }}>
                       <Box>
                         <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>TP Type</Typography>
-                        <TextField size="small" value={leg.tpType} onChange={(e) => handleUpdateLeg(idx, { tpType: e.target.value })} fullWidth />
+                        <Select
+                          size="small"
+                          value={leg.tpType}
+                          onChange={(e) => handleUpdateLeg(idx, { tpType: e.target.value })}
+                          fullWidth
+                          sx={{ bgcolor: '#ffffff', fontSize: '0.85rem' }}
+                        >
+                          <MenuItem value="TP%">TP%</MenuItem>
+                          <MenuItem value="Points">Points</MenuItem>
+                          <MenuItem value="Underlying %">Underlying %</MenuItem>
+                        </Select>
                       </Box>
                       <Box>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>TP</Typography>
-                        <TextField size="small" type="number" value={leg.tpValue} onChange={(e) => handleUpdateLeg(idx, { tpValue: Number(e.target.value) })} fullWidth />
+                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>TP Value</Typography>
+                        <TextField
+                          size="small"
+                          type="number"
+                          value={leg.tpValue}
+                          onChange={(e) => handleUpdateLeg(idx, { tpValue: Number(e.target.value) })}
+                          fullWidth
+                          sx={{ bgcolor: '#ffffff' }}
+                        />
                       </Box>
                       <Box>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>On Price</Typography>
-                        <TextField size="small" value={leg.tpOnPrice} onChange={(e) => handleUpdateLeg(idx, { tpOnPrice: e.target.value })} fullWidth />
+                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>TP On Price</Typography>
+                        <Select
+                          size="small"
+                          value={leg.tpOnPrice}
+                          onChange={(e) => handleUpdateLeg(idx, { tpOnPrice: e.target.value })}
+                          fullWidth
+                          sx={{ bgcolor: '#ffffff', fontSize: '0.85rem' }}
+                        >
+                          <MenuItem value="On Price">On Price</MenuItem>
+                          <MenuItem value="On Underlying">On Underlying</MenuItem>
+                        </Select>
                       </Box>
-                    </Box>
-
-                    {/* Footer icons: Delete / Copy */}
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, pt: 1, borderTop: '1px solid #f1f5f9' }}>
-                      <IconButton size="small" onClick={() => handleRemoveLeg(idx)} sx={{ color: '#ef4444' }}>
-                        <DeleteOutline fontSize="small" />
-                      </IconButton>
-                      <IconButton size="small" onClick={() => handleCopyLeg(idx)} sx={{ color: '#f59e0b' }}>
-                        <ContentCopy fontSize="small" />
-                      </IconButton>
                     </Box>
                   </Paper>
                 ))}
               </Box>
             </Paper>
 
-            {/* Card 6: Advance Features */}
+            {/* Card 6: Advance Execution Features */}
             <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>
-                  Advance Features
+                  6. Advanced Execution Controls
                 </Typography>
                 <Tooltip title="Dynamic stop-loss movement and execution controls">
                   <InfoOutlined sx={{ fontSize: 16, color: '#94a3b8' }} />
                 </Tooltip>
               </Box>
               <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 2 }}>
-                Utilize advanced execution controls for dynamic stop-loss movement, conditional entry/re-entry, and strategy-wide exit synchronization.
+                Enable dynamic stop-loss to cost, multi-leg synchronization, and conditional order triggers.
               </Typography>
 
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
@@ -824,10 +1132,10 @@ export const CreateStrategy: React.FC = () => {
               </Box>
             </Paper>
 
-            {/* Card 7: Strategy Name & Create Action */}
+            {/* Card 7: Strategy Name & Save/Deploy Action */}
             <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a', mb: 1, fontSize: '0.95rem' }}>
-                Strategy Name
+                7. Strategy Name & Save
               </Typography>
               <TextField
                 size="small"
@@ -846,16 +1154,22 @@ export const CreateStrategy: React.FC = () => {
                 sx={{
                   bgcolor: '#2563eb',
                   color: '#ffffff',
-                  fontWeight: 700,
-                  fontSize: '0.9rem',
+                  fontWeight: 800,
+                  fontSize: '0.95rem',
                   textTransform: 'none',
                   borderRadius: 2.5,
-                  py: 1.2,
-                  boxShadow: 'none',
-                  '&:hover': { bgcolor: '#1d4ed8', boxShadow: 'none' }
+                  py: 1.4,
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                  '&:hover': { bgcolor: '#1d4ed8', boxShadow: '0 6px 16px rgba(37, 99, 235, 0.35)' }
                 }}
               >
-                {loading ? <CircularProgress size={20} color="inherit" /> : 'Save & Deploy Strategy'}
+                {loading ? (
+                  <CircularProgress size={22} color="inherit" />
+                ) : editId ? (
+                  'Save & Update Strategy Logic'
+                ) : (
+                  'Save & Deploy Strategy'
+                )}
               </Button>
             </Paper>
           </Box>

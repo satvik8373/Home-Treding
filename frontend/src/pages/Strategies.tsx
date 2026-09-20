@@ -11,8 +11,6 @@ import {
   Dialog,
   DialogContent,
   DialogActions,
-  FormControl,
-  InputLabel,
   Select,
   MenuItem,
   CircularProgress,
@@ -31,7 +29,6 @@ import {
   Stop,
   Bolt,
   TrendingUp,
-  AccountTree,
   Assessment,
   Refresh,
   Close,
@@ -80,20 +77,6 @@ export interface CustomStrategy {
   status: 'draft' | 'active';
 }
 
-export interface StrategyTemplate {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  timeframe: string;
-  symbols: string[];
-  margin: string;
-  maxDrawdown: string;
-  winRate: string;
-  rules: string[];
-  createdAt?: string;
-}
-
 export interface DeployedStrategy {
   deploymentId: string;
   strategyId: string;
@@ -115,7 +98,6 @@ const Strategies: React.FC = () => {
   const navigate = useNavigate();
   const [tabValue, setTabValue] = useState(0);
   const [customStrategies, setCustomStrategies] = useState<CustomStrategy[]>([]);
-  const [templates, setTemplates] = useState<StrategyTemplate[]>([]);
   const [activeDeployments, setActiveDeployments] = useState<DeployedStrategy[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -125,15 +107,10 @@ const Strategies: React.FC = () => {
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [menuStrategy, setMenuStrategy] = useState<CustomStrategy | null>(null);
 
-  // Template Menu Anchor
-  const [templateMenuAnchor, setTemplateMenuAnchor] = useState<null | HTMLElement>(null);
-  const [menuTemplate, setMenuTemplate] = useState<StrategyTemplate | null>(null);
-
   // Deploy Dialog State
-  const [deployModal, setDeployModal] = useState<{ open: boolean; strategy?: CustomStrategy | null; template?: StrategyTemplate | null }>({
+  const [deployModal, setDeployModal] = useState<{ open: boolean; strategy?: CustomStrategy | null }>({
     open: false,
-    strategy: null,
-    template: null
+    strategy: null
   });
   const [selectedSymbol, setSelectedSymbol] = useState('NIFTY 50');
   const [qtyMultiplier, setQtyMultiplier] = useState(1);
@@ -155,10 +132,10 @@ const Strategies: React.FC = () => {
     loadData();
     if (location.state?.backtestTemplate) {
       setBtStrategy(location.state.backtestTemplate);
-      setTabValue(3);
+      setTabValue(2);
       runQuickBacktest(location.state.backtestTemplate);
     } else if (location.state?.deployTemplate) {
-      setTabValue(1);
+      setTabValue(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]);
@@ -166,17 +143,13 @@ const Strategies: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [customRes, templatesRes, activeRes] = await Promise.all([
+      const [customRes, activeRes] = await Promise.all([
         axios.get(`${API_CONFIG.BASE_URL}/api/strategies`).catch(() => ({ data: { success: false } })),
-        axios.get(`${API_CONFIG.BASE_URL}/api/strategies/templates`).catch(() => ({ data: { success: false } })),
         axios.get(`${API_CONFIG.BASE_URL}/api/strategies/active`).catch(() => ({ data: { success: false } }))
       ]);
 
       if (customRes.data?.success && customRes.data?.strategies) {
         setCustomStrategies(customRes.data.strategies);
-      }
-      if (templatesRes.data?.success && templatesRes.data?.templates) {
-        setTemplates(templatesRes.data.templates);
       }
       if (activeRes.data?.success && activeRes.data?.deployments) {
         setActiveDeployments(activeRes.data.deployments);
@@ -247,105 +220,32 @@ const Strategies: React.FC = () => {
     handleCloseMenu();
   };
 
-  // ==========================================
-  // TEMPLATE STRATEGY HANDLERS (EDITABLE TEMPLATES)
-  // ==========================================
-
-  const handleOpenCreateTemplate = () => {
-    navigate('/strategies/create');
-  };
-
-  const handleOpenEditTemplate = (template: StrategyTemplate) => {
-    navigate(`/strategies/edit/${template.id}`);
-    handleCloseTemplateMenu();
-  };
-
-
-  const handleDuplicateTemplate = async (template: StrategyTemplate) => {
-    try {
-      setActionLoading(true);
-      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/strategies/templates/duplicate/${template.id}`);
-      if (res.data?.success) {
-        setStatusMessage({ type: 'success', text: `Template duplicated as "${res.data.template.name}"` });
-        await loadData();
-      }
-    } catch (err) {
-      setStatusMessage({ type: 'error', text: 'Failed to duplicate template' });
-    } finally {
-      setActionLoading(false);
-      handleCloseTemplateMenu();
-    }
-  };
-
-  const handleDeleteTemplate = async (template: StrategyTemplate) => {
-    if (!window.confirm(`Are you sure you want to delete template "${template.name}"?`)) return;
-
-    try {
-      setActionLoading(true);
-      const res = await axios.delete(`${API_CONFIG.BASE_URL}/api/strategies/templates/${template.id}`);
-      if (res.data?.success) {
-        setStatusMessage({ type: 'success', text: `Template "${template.name}" deleted.` });
-        await loadData();
-      }
-    } catch (err) {
-      setStatusMessage({ type: 'error', text: 'Failed to delete template' });
-    } finally {
-      setActionLoading(false);
-      handleCloseTemplateMenu();
-    }
-  };
-
-
-  const handleOpenTemplateMenu = (event: React.MouseEvent<HTMLElement>, template: StrategyTemplate) => {
-    setTemplateMenuAnchor(event.currentTarget);
-    setMenuTemplate(template);
-  };
-
-  const handleCloseTemplateMenu = () => {
-    setTemplateMenuAnchor(null);
-    setMenuTemplate(null);
-  };
-
   // Card Backtest Trigger -> Navigate to dedicated Backtest Screen
   const handleCardBacktest = (strategy: CustomStrategy) => {
-    navigate(`/backtest?strategyId=${strategy.id || '1_percent_sl_strangle_bnf'}`);
+    navigate(`/backtest?strategyId=${strategy.id || 'nifty-009-atm-breakout'}`);
   };
 
   // Card Deploy Trigger
   const handleCardDeploy = (strategy: CustomStrategy) => {
-    setDeployModal({ open: true, strategy, template: null });
-    setSelectedSymbol(strategy.symbol || 'NIFTY BANK');
+    setDeployModal({ open: true, strategy });
+    setSelectedSymbol(strategy.symbol || 'NIFTY 50');
     setQtyMultiplier(1);
     setMaxLoss(strategy.maxLoss || 2500);
     setTradingMode('paper');
   };
 
-  // Template Backtest Trigger -> Navigate to dedicated Backtest Screen
-  const handleTemplateBacktest = (template: StrategyTemplate) => {
-    navigate(`/backtest?strategyId=${template.id}`);
-  };
-
-  // Template Deploy Trigger
-  const handleOpenTemplateDeploy = (template: StrategyTemplate) => {
-    const firstSym = template.symbols[0] || 'NIFTY 50';
-    setDeployModal({ open: true, template, strategy: null });
-    setSelectedSymbol(firstSym);
-    setQtyMultiplier(1);
-    setMaxLoss(2500);
-    setTradingMode('paper');
-  };
-
   // Confirm Deploy
   const handleConfirmDeploy = async () => {
-    const name = deployModal.strategy ? deployModal.strategy.name : deployModal.template?.name || 'Strategy';
-    const stratId = deployModal.strategy ? deployModal.strategy.id : deployModal.template?.id || 'custom';
+    const name = deployModal.strategy?.name || 'NIFTY 0.09% ATM Full-Day Breakout';
+    const stratId = deployModal.strategy?.id || 'nifty-009-atm-breakout';
+    const defaultSymbol = deployModal.strategy?.symbol || selectedSymbol || 'NIFTY 50';
 
     try {
       setActionLoading(true);
       const res = await axios.post(`${API_CONFIG.BASE_URL}/api/strategies/deploy`, {
         strategyId: stratId,
         name,
-        symbol: selectedSymbol,
+        symbol: defaultSymbol,
         templateType: stratId,
         qtyMultiplier,
         maxLoss,
@@ -354,9 +254,9 @@ const Strategies: React.FC = () => {
 
       if (res.data?.success) {
         setStatusMessage({ type: 'success', text: res.data.message });
-        setDeployModal({ open: false, strategy: null, template: null });
+        setDeployModal({ open: false, strategy: null });
         await loadData();
-        setTabValue(2);
+        setTabValue(1);
       }
     } catch (err: any) {
       setStatusMessage({ type: 'error', text: err.response?.data?.message || 'Deployment failed' });
@@ -524,7 +424,6 @@ const Strategies: React.FC = () => {
             }}
           >
             <Tab icon={<Layers sx={{ fontSize: 16 }} />} iconPosition="start" label={`My Strategies (${customStrategies.length})`} />
-            <Tab icon={<AccountTree sx={{ fontSize: 16 }} />} iconPosition="start" label={`Curated Templates (${templates.length})`} />
             <Tab
               icon={<TrendingUp sx={{ fontSize: 16 }} />}
               iconPosition="start"
@@ -547,10 +446,10 @@ const Strategies: React.FC = () => {
                   <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 3, border: '1px dashed #cbd5e1', bgcolor: '#f8fafc' }}>
                     <Layers sx={{ fontSize: 44, color: '#94a3b8', mb: 1.5 }} />
                     <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1e293b' }}>
-                      No Custom Strategies Yet
+                      Ready For Your Custom Strategy Logic
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#64748b', maxWidth: 440, mx: 'auto', mt: 0.5, mb: 2.5, fontSize: '0.85rem' }}>
-                      Create your first custom options strangle, straddle, or breakout strategy with custom legs and automated time filters.
+                    <Typography variant="body2" sx={{ color: '#64748b', maxWidth: 460, mx: 'auto', mt: 0.5, mb: 2.5, fontSize: '0.85rem' }}>
+                      All curated templates and default strategies have been completely removed. Your workspace is completely clean. Click &quot;Create Strategy&quot; or provide your rules to deploy.
                     </Typography>
                     <Button
                       variant="contained"
@@ -558,7 +457,7 @@ const Strategies: React.FC = () => {
                       onClick={handleOpenCreateModal}
                       sx={{ bgcolor: '#2563eb', color: '#ffffff', fontWeight: 700, borderRadius: 2, textTransform: 'none', px: 3 }}
                     >
-                      Create Strategy Now
+                      Create Custom Strategy
                     </Button>
                   </Paper>
                 ) : (
@@ -732,216 +631,8 @@ const Strategies: React.FC = () => {
               </Box>
             )}
 
-            {/* TAB 1: CURATED STRATEGY TEMPLATES (EDITABLE) */}
+            {/* TAB 1: ACTIVE DEPLOYMENTS */}
             {tabValue === 1 && (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                {/* Header Sub-bar */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
-                  <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a' }}>
-                      Curated Strategy Templates ({templates.length})
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.82rem' }}>
-                      Pre-built algorithmic strategies with proven market rules. Click <strong>Edit</strong> on any card to customize rules, timeframe, and risk settings.
-                    </Typography>
-                  </Box>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<Add />}
-                    onClick={handleOpenCreateTemplate}
-                    sx={{
-                      borderColor: '#0f172a',
-                      color: '#0f172a',
-                      fontWeight: 700,
-                      fontSize: '0.8rem',
-                      textTransform: 'none',
-                      borderRadius: 2,
-                      px: 2,
-                      '&:hover': { bgcolor: '#f8fafc', borderColor: '#0f172a' }
-                    }}
-                  >
-                    + Add Strategy Template
-                  </Button>
-                </Box>
-
-                {templates.length === 0 ? (
-                  <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 3, border: '1px dashed #cbd5e1' }}>
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: '#334155', mb: 1 }}>
-                      No Strategy Templates Available
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#64748b', mb: 3, maxWidth: 500, mx: 'auto' }}>
-                      All pre-configured strategy templates have been cleared. Build and customize your own strategies from the Custom Strategy Builder tab.
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      onClick={() => setTabValue(1)}
-                      sx={{ bgcolor: '#0f172a', fontWeight: 700, textTransform: 'none' }}
-                    >
-                      Go to Strategy Builder
-                    </Button>
-                  </Paper>
-                ) : (
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 3 }}>
-                    {templates.map(template => (
-                      <Paper
-                        key={template.id}
-                        sx={{
-                          p: 3,
-                          borderRadius: 3.5,
-                          border: '1px solid #f1f5f9',
-                          boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          bgcolor: '#ffffff',
-                          transition: 'all 0.2s ease',
-                          '&:hover': {
-                            boxShadow: '0 8px 30px -4px rgba(15, 23, 42, 0.1)',
-                            borderColor: '#e2e8f0'
-                          }
-                        }}
-                      >
-                        <Box>
-                          {/* Card Header */}
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                            <Box>
-                              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1.05rem', letterSpacing: '-0.01em' }}>
-                                {template.name}
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.82rem', mt: 0.2 }}>
-                                By AR427232
-                              </Typography>
-                            </Box>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleOpenTemplateMenu(e, template)}
-                              sx={{ color: '#94a3b8', '&:hover': { color: '#0f172a' } }}
-                            >
-                              <MoreVert fontSize="small" />
-                            </IconButton>
-                          </Box>
-
-                          {/* 4-Grid Meta */}
-                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2.5 }}>
-                            <Box>
-                              <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a' }}>
-                                09:16
-                              </Typography>
-                              <Typography sx={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600 }}>
-                                Start Time
-                              </Typography>
-                            </Box>
-                            <Box>
-                              <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a' }}>
-                                15:10
-                              </Typography>
-                              <Typography sx={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600 }}>
-                                End Time
-                              </Typography>
-                            </Box>
-                            <Box>
-                              <Typography sx={{ fontWeight: 800, fontSize: '0.9rem', color: '#475569', textTransform: 'uppercase' }}>
-                                OPTION
-                              </Typography>
-                              <Typography sx={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600 }}>
-                                Segment Type
-                              </Typography>
-                            </Box>
-                            <Box>
-                              <Typography sx={{ fontWeight: 800, fontSize: '0.9rem', color: '#475569' }}>
-                                Time Based
-                              </Typography>
-                              <Typography sx={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600 }}>
-                                Strategy Type
-                              </Typography>
-                            </Box>
-                          </Box>
-
-                          {/* Legs Pills */}
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 3 }}>
-                            <Box sx={{
-                              bgcolor: '#f8fafc',
-                              p: '8px 12px',
-                              borderRadius: 2,
-                              border: '1px solid #f1f5f9',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center'
-                            }}>
-                              <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
-                                SELL {template.symbols?.[0] || 'NIFTY BANK'} ATM 0 CE
-                              </Typography>
-                              <Typography sx={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                                Qty: 35
-                              </Typography>
-                            </Box>
-                            <Box sx={{
-                              bgcolor: '#f8fafc',
-                              p: '8px 12px',
-                              borderRadius: 2,
-                              border: '1px solid #f1f5f9',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center'
-                            }}>
-                              <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
-                                SELL {template.symbols?.[0] || 'NIFTY BANK'} ATM 0 PE
-                              </Typography>
-                              <Typography sx={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-                                Qty: 35
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </Box>
-
-                        {/* Bottom Action Buttons */}
-                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-                          <Button
-                            variant="outlined"
-                            fullWidth
-                            onClick={() => handleTemplateBacktest(template)}
-                            sx={{
-                              borderColor: '#e2e8f0',
-                              color: '#0f172a',
-                              fontWeight: 700,
-                              fontSize: '0.85rem',
-                              textTransform: 'none',
-                              borderRadius: 2,
-                              py: 1,
-                              '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' }
-                            }}
-                          >
-                            Backtest
-                          </Button>
-                          <Button
-                            variant="contained"
-                            fullWidth
-                            onClick={() => handleOpenTemplateDeploy(template)}
-                            sx={{
-                              bgcolor: '#2563eb',
-                              color: '#ffffff',
-                              fontWeight: 700,
-                              fontSize: '0.85rem',
-                              textTransform: 'none',
-                              borderRadius: 2,
-                              py: 1,
-                              boxShadow: 'none',
-                              '&:hover': { bgcolor: '#1d4ed8', boxShadow: 'none' }
-                            }}
-                          >
-                            Deploy
-                          </Button>
-                        </Box>
-                      </Paper>
-                    ))}
-                  </Box>
-                )}
-              </Box>
-            )}
-
-            {/* TAB 2: ACTIVE DEPLOYMENTS */}
-            {tabValue === 2 && (
               <Box>
                 {activeDeployments.length === 0 ? (
                   <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 3, border: '1px dashed #cbd5e1', bgcolor: '#f8fafc' }}>
@@ -950,7 +641,7 @@ const Strategies: React.FC = () => {
                       No Active Strategy Deployments
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#64748b', maxWidth: 440, mx: 'auto', mt: 0.5, mb: 2.5, fontSize: '0.85rem' }}>
-                      Select a strategy from the templates or create your own, then deploy it in paper or live mode.
+                      Create and deploy your custom strategies in paper or live mode.
                     </Typography>
                     <Button
                       variant="contained"
@@ -1081,19 +772,17 @@ const Strategies: React.FC = () => {
               </Box>
             )}
 
-            {/* TAB 3: BACKTEST ANALYTICS & SIMULATOR */}
-            {tabValue === 3 && (
+            {/* TAB 2: BACKTEST ANALYTICS & SIMULATOR */}
+            {tabValue === 2 && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <BacktestControls
                   strategyName={
-                    templates.find(t => t.id === btStrategy)?.name ||
                     customStrategies.find(c => c.id === btStrategy)?.name ||
                     'NIFTY 0.09% ATM Full-Day Breakout'
                   }
-                  strategiesList={[
-                    ...templates.map(t => ({ id: t.id, name: t.name })),
-                    ...customStrategies.map(c => ({ id: c.id, name: c.name }))
-                  ]}
+                  strategiesList={
+                    customStrategies.map(c => ({ id: c.id, name: c.name }))
+                  }
                   selectedStrategyId={btStrategy || 'nifty-009-atm-breakout'}
                   onSelectStrategy={(id) => {
                     setBtStrategy(id);
@@ -1109,8 +798,8 @@ const Strategies: React.FC = () => {
                   }}
                   creditsRemaining={creditsRemaining}
                   totalCredits={50}
-                  totalPnl={backtestResult ? backtestResult.totalNetPnl : 15702.4}
-                  maxDrawdown={backtestResult ? backtestResult.maxDrawdown : -6600.3}
+                  totalPnl={backtestResult ? backtestResult.totalNetPnl : null}
+                  maxDrawdown={backtestResult ? backtestResult.maxDrawdown : null}
                   equityCurve={backtestResult?.equityCurve || []}
                   loading={backtesting}
                   onRunBacktest={() => runQuickBacktest(btStrategy, btSymbol, btDays, btCapital)}
@@ -1172,120 +861,167 @@ const Strategies: React.FC = () => {
           )}
         </Menu>
 
-        {/* TEMPLATE STRATEGY CONTEXT MENU */}
-        <Menu
-          anchorEl={templateMenuAnchor}
-          open={Boolean(templateMenuAnchor)}
-          onClose={handleCloseTemplateMenu}
-          PaperProps={{
-            sx: {
-              borderRadius: 2,
-              boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
-              minWidth: 160
-            }
-          }}
-        >
-          {menuTemplate && (
-            <>
-              <MenuItem onClick={() => handleOpenEditTemplate(menuTemplate)}>
-                <Edit fontSize="small" sx={{ mr: 1.5, color: '#475569' }} />
-                <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>Edit Template</Typography>
-              </MenuItem>
-              <MenuItem onClick={() => handleDuplicateTemplate(menuTemplate)}>
-                <ContentCopy fontSize="small" sx={{ mr: 1.5, color: '#475569' }} />
-                <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>Duplicate Template</Typography>
-              </MenuItem>
-              <Divider sx={{ my: 0.5 }} />
-              <MenuItem onClick={() => handleDeleteTemplate(menuTemplate)} sx={{ color: '#dc2626' }}>
-                <Delete fontSize="small" sx={{ mr: 1.5, color: '#dc2626' }} />
-                <Typography variant="body2" sx={{ fontWeight: 600, color: '#dc2626' }}>Delete</Typography>
-              </MenuItem>
-            </>
-          )}
-        </Menu>
-
         {/* DEPLOY MODAL */}
         <Dialog
           open={deployModal.open}
-          onClose={() => setDeployModal({ open: false, strategy: null, template: null })}
-          maxWidth="sm"
+          onClose={() => setDeployModal({ open: false, strategy: null })}
+          maxWidth="xs"
           fullWidth
           PaperProps={{
             sx: {
               borderRadius: 3.5,
+              maxWidth: 480,
+              width: '100%',
               p: 0,
               overflow: 'hidden',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
             }
           }}
         >
-          <Box sx={{ p: 3, borderBottom: '1px solid #e2e8f0', bgcolor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a' }}>
-                Deploy Strategy: {deployModal.strategy?.name || deployModal.template?.name}
+          {/* Modal Header */}
+          <Box sx={{ p: 2.5, borderBottom: '1px solid #f1f5f9', bgcolor: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <Box sx={{ pr: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1.1rem', lineHeight: 1.3 }}>
+                Deploy Strategy: {deployModal.strategy?.name}
               </Typography>
-              <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.85rem' }}>
-                Select execution mode, symbol, and daily risk protection parameters.
+              <Typography sx={{ color: '#64748b', fontSize: '0.8rem', mt: 0.3 }}>
+                Configure instrument, lot size, and daily risk protection parameters.
               </Typography>
             </Box>
-            <IconButton onClick={() => setDeployModal({ open: false, strategy: null, template: null })} size="small" sx={{ color: '#94a3b8' }}>
-              <Close />
+            <IconButton
+              onClick={() => setDeployModal({ open: false, strategy: null })}
+              size="small"
+              sx={{ color: '#94a3b8', '&:hover': { bgcolor: '#e2e8f0', color: '#0f172a' } }}
+            >
+              <Close fontSize="small" />
             </IconButton>
           </Box>
 
-          <DialogContent sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-              <FormControl size="small" fullWidth>
-                <InputLabel>Trading Instrument</InputLabel>
-                <Select
-                  value={selectedSymbol}
-                  label="Trading Instrument"
-                  onChange={(e) => setSelectedSymbol(e.target.value)}
-                >
-                  <MenuItem value="NIFTY BANK">NIFTY BANK</MenuItem>
-                  <MenuItem value="NIFTY 50">NIFTY 50</MenuItem>
-                  <MenuItem value="FINNIFTY">FINNIFTY</MenuItem>
-                  <MenuItem value="RELIANCE">RELIANCE</MenuItem>
-                  <MenuItem value="TCS">TCS</MenuItem>
-                  <MenuItem value="HDFCBANK">HDFCBANK</MenuItem>
-                </Select>
-              </FormControl>
+          {/* Form Content (Clean, top-aligned labels that never clip) */}
+          <DialogContent sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {/* Trading Instrument (Pre-configured by default in strategy) */}
+            <Box
+              sx={{
+                p: 1.8,
+                borderRadius: '12px',
+                bgcolor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <Box>
+                <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: '#64748b' }}>
+                  Trading Instrument (Strategy Default)
+                </Typography>
+                <Typography sx={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', mt: 0.2 }}>
+                  {deployModal.strategy?.symbol || 'NIFTY 50'}
+                </Typography>
+              </Box>
+              <Chip
+                label="Pre-Configured"
+                size="small"
+                sx={{
+                  bgcolor: '#eff6ff',
+                  color: '#2563eb',
+                  fontWeight: 700,
+                  fontSize: '0.72rem',
+                  border: '1px solid #dbeafe'
+                }}
+              />
+            </Box>
 
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            {/* Lot Multiplier & Max Loss */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+              <Box>
+                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', mb: 0.7 }}>
+                  Lot Multiplier (1-10)
+                </Typography>
                 <TextField
                   size="small"
-                  label="Lot Multiplier (1-10)"
                   type="number"
                   value={qtyMultiplier}
                   onChange={(e) => setQtyMultiplier(Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 1)))}
                   fullWidth
+                  InputProps={{
+                    sx: {
+                      borderRadius: '10px',
+                      bgcolor: '#ffffff',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      '& fieldset': { borderColor: '#e2e8f0' }
+                    }
+                  }}
                 />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', mb: 0.7 }}>
+                  Max Loss Limit (₹)
+                </Typography>
                 <TextField
                   size="small"
-                  label="Max Loss Limit (₹)"
                   type="number"
                   value={maxLoss}
                   onChange={(e) => setMaxLoss(Number(e.target.value))}
                   fullWidth
+                  InputProps={{
+                    sx: {
+                      borderRadius: '10px',
+                      bgcolor: '#ffffff',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      '& fieldset': { borderColor: '#e2e8f0' }
+                    }
+                  }}
                 />
               </Box>
+            </Box>
 
-              <FormControl size="small" fullWidth>
-                <InputLabel>Execution Mode</InputLabel>
-                <Select
-                  value={tradingMode}
-                  label="Execution Mode"
-                  onChange={(e) => setTradingMode(e.target.value as 'paper' | 'live')}
-                >
-                  <MenuItem value="paper">Paper Trading (Simulated Ledger)</MenuItem>
-                  <MenuItem value="live">Live Broker (Dhan HQ API)</MenuItem>
-                </Select>
-              </FormControl>
+            {/* Execution Mode */}
+            <Box>
+              <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155', mb: 0.7 }}>
+                Execution Mode
+              </Typography>
+              <Select
+                value={tradingMode}
+                onChange={(e) => setTradingMode(e.target.value as 'paper' | 'live')}
+                fullWidth
+                size="small"
+                sx={{
+                  borderRadius: '10px',
+                  bgcolor: '#ffffff',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: '#e2e8f0' }
+                }}
+              >
+                <MenuItem value="paper">Paper Trading (Simulated Ledger)</MenuItem>
+                <MenuItem value="live">Live Broker (Dhan HQ API)</MenuItem>
+              </Select>
+              <Typography sx={{ color: tradingMode === 'live' ? '#16a34a' : '#64748b', fontSize: '0.75rem', mt: 0.8, fontWeight: 600 }}>
+                {tradingMode === 'live'
+                  ? '● Connected to Dhan (1108893841) • Direct institutional order placement'
+                  : '● Risk-free virtual execution with simulated fills on live market ticks'}
+              </Typography>
             </Box>
           </DialogContent>
 
-          <DialogActions sx={{ p: 2.5, bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
-            <Button onClick={() => setDeployModal({ open: false, strategy: null, template: null })} sx={{ color: '#64748b', fontWeight: 600, textTransform: 'none' }}>
+          {/* Modal Footer Actions */}
+          <DialogActions sx={{ px: 3, py: 2, bgcolor: '#f8fafc', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+            <Button
+              onClick={() => setDeployModal({ open: false, strategy: null })}
+              sx={{
+                color: '#64748b',
+                fontWeight: 600,
+                fontSize: '0.85rem',
+                textTransform: 'none',
+                px: 2,
+                py: 0.8,
+                borderRadius: '8px',
+                '&:hover': { bgcolor: '#f1f5f9', color: '#0f172a' }
+              }}
+            >
               Cancel
             </Button>
             <Button
@@ -1293,13 +1029,16 @@ const Strategies: React.FC = () => {
               onClick={handleConfirmDeploy}
               disabled={actionLoading}
               sx={{
-                bgcolor: '#0f172a',
+                bgcolor: tradingMode === 'live' ? '#0f172a' : '#2563eb',
                 color: '#ffffff',
                 fontWeight: 700,
-                px: 3,
-                borderRadius: 2,
+                fontSize: '0.875rem',
+                px: 2.5,
+                py: 0.9,
+                borderRadius: '8px',
                 textTransform: 'none',
-                '&:hover': { bgcolor: '#1e293b' }
+                boxShadow: 'none',
+                '&:hover': { bgcolor: tradingMode === 'live' ? '#1e293b' : '#1d4ed8', boxShadow: 'none' }
               }}
             >
               {actionLoading ? 'Deploying...' : `Confirm & Deploy (${tradingMode.toUpperCase()})`}

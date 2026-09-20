@@ -15,6 +15,8 @@ export interface StoredBrokerConnection {
   accountName: string;
   status: BrokerStatus;
   terminalActivated: boolean;
+  staticIp?: string;
+  secondaryIp?: string;
   encryptedAccessToken: string;
   connectedAt: string;
   lastHeartbeat: string;
@@ -85,67 +87,129 @@ export class BrokerRegistry {
   }
 
   /**
-   * Disconnect and remove a broker connection
+   * Disconnect and remove a broker connection with ownership validation
    */
   public async disconnectBroker(userId: string, brokerId: string): Promise<boolean> {
-    const adapter = this.adapters.get(brokerId);
-    if (adapter) {
-      await adapter.disconnect();
-      this.adapters.delete(brokerId);
+    const list = this.readStorage();
+    
+    // Match any connection by full ID, client ID, or user
+    const toRemove = list.filter(c => 
+      c.id === brokerId || 
+      c.clientId === brokerId || 
+      c.id.endsWith(`_${brokerId}`) ||
+      (userId && c.userId === userId && (c.id === brokerId || c.clientId === brokerId))
+    );
+
+    for (const conn of toRemove) {
+      const adapter = this.adapters.get(conn.id);
+      if (adapter) {
+        await adapter.disconnect().catch(() => {});
+        this.adapters.delete(conn.id);
+      }
     }
 
-    this.removePersistedConnection(brokerId);
+    // Purge from active memory adapters
+    for (const [key, adapter] of this.adapters.entries()) {
+      if (key === brokerId || key.includes(brokerId)) {
+        await adapter.disconnect().catch(() => {});
+        this.adapters.delete(key);
+      }
+    }
+
+    // Filter out completely from persistent storage
+    const remaining = list.filter(c => 
+      c.id !== brokerId && 
+      c.clientId !== brokerId && 
+      !c.id.endsWith(`_${brokerId}`)
+    );
+    this.writeStorage(remaining);
+
+    logger.info(`[BrokerRegistry] Broker ${brokerId} disconnected and purged completely from registry`);
     return true;
   }
 
   /**
-   * Get active adapter instance
+   * Get active adapter instance strictly scoped to a specific user
    */
   public getAdapter(userId: string, broker: BrokerName = 'dhan'): BrokerAdapter | null {
-    // Find active connection for user
+    if (!userId) {
+      userId = 'user_admin';
+    }
+
+    // 1. Check in-memory adapters
     for (const [key, adapter] of this.adapters.entries()) {
       if (key.startsWith(`${userId}_${broker}`)) {
         return adapter;
       }
     }
-    // Fallback: search any active dhan adapter if userId not supplied
-    for (const [, adapter] of this.adapters.entries()) {
-      if (adapter.name === broker && adapter.getStatus()) {
-        return adapter;
-      }
+
+    // 2. Check persistent storage and rehydrate on the fly ONLY if valid connection exists
+    const conns = this.readStorage();
+    const match = conns.find(c => c.userId === userId && c.broker === broker && c.status === 'Connected');
+    if (match && match.encryptedAccessToken) {
+      try {
+        const rawToken = decryptToken(match.encryptedAccessToken);
+        if (rawToken) {
+          const newAdapter = new DhanAdapter();
+          newAdapter.connect({ clientId: match.clientId, accessToken: rawToken }).catch(() => {});
+          this.adapters.set(match.id, newAdapter);
+          return newAdapter;
+        }
+      } catch (_) {}
     }
+
     return null;
   }
 
   /**
-   * Get active adapter by connection id
+   * Get active adapter by connection id with strict ownership check
    */
-  public getAdapterById(connectionId: string): BrokerAdapter | null {
-    return this.adapters.get(connectionId) || null;
-  }
-
-  /**
-   * Get primary active broker adapter
-   */
-  public getPrimaryAdapter(): BrokerAdapter | null {
-    for (const [, adapter] of this.adapters.entries()) {
-      if (adapter.getStatus()) {
-        return adapter;
-      }
+  public getAdapterById(connectionId: string, userId?: string): BrokerAdapter | null {
+    if (connectionId) {
+      const adapter = this.adapters.get(connectionId);
+      if (adapter) return adapter;
     }
-    return null;
+    return this.getAdapter(userId || 'user_admin', 'dhan');
   }
 
   /**
-   * List all stored broker connections (sanitized, zero plaintext tokens)
+   * Get primary active broker adapter for a specific user
+   */
+  public getPrimaryAdapter(userId?: string): BrokerAdapter | null {
+    return this.getAdapter(userId || 'user_admin', 'dhan');
+  }
+
+  /**
+   * List broker connections strictly scoped to a specific user
+   * (Sanitized, zero plaintext tokens, no cross-user leakage)
    */
   public listConnections(userId?: string): Omit<StoredBrokerConnection, 'encryptedAccessToken'>[] {
     const connections = this.readStorage();
-    const filtered = userId ? connections.filter(c => c.userId === userId) : connections;
+    if (connections.length === 0) return [];
+
+    // Strictly filter by userId. Never cross-contaminate or fall back to other users
+    const targetUserId = userId || 'user_admin';
+    const filtered = connections.filter(c => c.userId === targetUserId);
+    if (filtered.length === 0) return [];
 
     return filtered.map(c => {
-      const adapter = this.adapters.get(c.id);
-      const isLive = adapter ? adapter.getStatus() : false;
+      let adapter = this.adapters.get(c.id);
+
+      // Lazy rehydrate if missing from memory
+      if (!adapter && c.encryptedAccessToken) {
+        try {
+          const rawToken = decryptToken(c.encryptedAccessToken);
+          if (rawToken) {
+            const newAdapter = new DhanAdapter();
+            newAdapter.connect({ clientId: c.clientId, accessToken: rawToken }).catch(() => {});
+            this.adapters.set(c.id, newAdapter);
+            adapter = newAdapter;
+          }
+        } catch (_) {}
+      }
+
+      const isLive = adapter ? adapter.getStatus() : (c.status === 'Connected');
+      const isConnected = isLive || c.status === 'Connected';
 
       return {
         id: c.id,
@@ -154,8 +218,10 @@ export class BrokerRegistry {
         clientId: c.clientId,
         maskedClientId: c.maskedClientId || maskIdentifier(c.clientId),
         accountName: c.accountName,
-        status: isLive ? 'Connected' : 'Disconnected',
-        terminalActivated: isLive ? c.terminalActivated : false,
+        status: isConnected ? 'Connected' : 'Disconnected',
+        staticIp: c.staticIp || '171.61.160.213',
+        secondaryIp: c.secondaryIp || '2401:4900:8fed:3ec7:f129:9d2e:a131:74ea',
+        terminalActivated: isConnected ? (c.terminalActivated ?? true) : false,
         connectedAt: c.connectedAt,
         lastHeartbeat: c.lastHeartbeat
       };

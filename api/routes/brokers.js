@@ -2,8 +2,28 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 
-// In-memory broker storage (no fake default seed)
+// In-memory broker storage
 const brokers = new Map();
+
+// Helper to safely find user broker without cross-user leakage
+const findUserBroker = (userId, brokerId) => {
+  if (brokerId) {
+    const b = brokers.get(brokerId);
+    if (b && (!userId || b.userId === userId)) return b;
+    for (const item of brokers.values()) {
+      if ((item.id === brokerId || item.clientId === brokerId) && (!userId || item.userId === userId)) {
+        return item;
+      }
+    }
+    return null;
+  }
+  if (userId) {
+    for (const item of brokers.values()) {
+      if (item.userId === userId) return item;
+    }
+  }
+  return null;
+};
 
 // Get broker list (support both / and /list)
 const handleGetBrokers = (req, res) => {
@@ -12,7 +32,7 @@ const handleGetBrokers = (req, res) => {
     const all = Array.from(brokers.values());
     const userBrokers = userId 
       ? all.filter(b => b.userId === userId)
-      : all;
+      : [];
 
     // Sanitize: do not send plaintext accessToken to client list
     const sanitized = userBrokers.map(b => ({
@@ -46,8 +66,8 @@ router.get('/list', handleGetBrokers);
 // Toggle Terminal Status
 router.post('/terminal', (req, res) => {
   try {
-    const { brokerId, enabled } = req.body;
-    const broker = brokers.get(brokerId) || Array.from(brokers.values())[0];
+    const { brokerId, enabled, userId } = req.body;
+    const broker = findUserBroker(userId, brokerId);
     if (broker) {
       broker.terminalEnabled = enabled;
       broker.lastActivity = new Date().toISOString();
@@ -243,7 +263,8 @@ router.post('/dhan-login-url', (req, res) => {
 const handleGetFunds = async (req, res) => {
   try {
     const { brokerId } = req.params;
-    const broker = brokerId ? brokers.get(brokerId) : Array.from(brokers.values())[0];
+    const userId = req.query.userId || req.body?.userId;
+    const broker = findUserBroker(userId, brokerId);
     if (!broker || !broker.accessToken || !broker.clientId) {
       return res.json({
         success: false,
@@ -304,7 +325,8 @@ router.get('/funds/:brokerId', handleGetFunds);
 const handleGetPositions = async (req, res) => {
   try {
     const { brokerId } = req.params;
-    const broker = brokerId ? brokers.get(brokerId) : Array.from(brokers.values())[0];
+    const userId = req.query.userId || req.body?.userId;
+    const broker = findUserBroker(userId, brokerId);
     if (!broker || !broker.accessToken || !broker.clientId) {
       return res.json({ success: true, positions: [] });
     }
@@ -336,7 +358,8 @@ router.get('/positions/:brokerId', handleGetPositions);
 const handleGetOrders = async (req, res) => {
   try {
     const { brokerId } = req.params;
-    const broker = brokerId ? brokers.get(brokerId) : Array.from(brokers.values())[0];
+    const userId = req.query.userId || req.body?.userId;
+    const broker = findUserBroker(userId, brokerId);
     if (!broker || !broker.accessToken || !broker.clientId) {
       return res.json({ success: true, orders: [] });
     }

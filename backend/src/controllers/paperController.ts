@@ -1,12 +1,16 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
-import { paperExecutor } from '../execution/PaperExecutor';
+import { paperTradingManager } from '../execution/PaperTradingManager';
 import { riskEngine } from '../risk/RiskEngine';
 
 /**
- * Place a paper trading virtual order
+ * Place a paper trading virtual order strictly for authenticated user
  */
-export const placePaperOrder = asyncHandler(async (req: Request, res: Response) => {
+export const placePaperOrder = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || 'default';
+  const executor = paperTradingManager.getExecutor(userId);
+
   const { symbol, side, quantity, price, orderType = 'MARKET', productType = 'INTRADAY', strategyId } = req.body;
 
   if (!symbol || !side || !quantity) {
@@ -29,8 +33,8 @@ export const placePaperOrder = asyncHandler(async (req: Request, res: Response) 
     isPaper: true
   };
 
-  // Run pre-trade risk validation
-  const positions = await paperExecutor.getPositions();
+  // Run pre-trade risk validation for this user's current positions
+  const positions = await executor.getPositions();
   const currentPos = positions.find(p => p.symbol === symbol)?.quantity || 0;
   const riskCheck = riskEngine.validateOrder(orderRequest, currentPos);
 
@@ -42,7 +46,7 @@ export const placePaperOrder = asyncHandler(async (req: Request, res: Response) 
     });
   }
 
-  const result = await paperExecutor.executeOrder(orderRequest);
+  const result = await executor.executeOrder(orderRequest);
 
   res.json({
     success: result.success,
@@ -51,13 +55,16 @@ export const placePaperOrder = asyncHandler(async (req: Request, res: Response) 
 });
 
 /**
- * Get all paper orders
+ * Get paper orders for authenticated user
  */
-export const getPaperOrders = asyncHandler(async (req: Request, res: Response) => {
+export const getPaperOrders = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || (req.query.userId as string) || 'default';
+  const executor = paperTradingManager.getExecutor(userId);
+
   const status = req.query.status as string | undefined;
   const strategyId = req.query.strategyId as string | undefined;
 
-  const orders = await paperExecutor.getOrders({ status, strategyId });
+  const orders = await executor.getOrders({ status, strategyId });
   res.json({
     success: true,
     orders
@@ -65,10 +72,13 @@ export const getPaperOrders = asyncHandler(async (req: Request, res: Response) =
 });
 
 /**
- * Get active paper positions
+ * Get active paper positions for authenticated user
  */
-export const getPaperPositions = asyncHandler(async (_req: Request, res: Response) => {
-  const positions = await paperExecutor.getPositions();
+export const getPaperPositions = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || (req.query.userId as string) || 'default';
+  const executor = paperTradingManager.getExecutor(userId);
+
+  const positions = await executor.getPositions();
   res.json({
     success: true,
     positions
@@ -76,10 +86,13 @@ export const getPaperPositions = asyncHandler(async (_req: Request, res: Respons
 });
 
 /**
- * Get paper portfolio summary & metrics
+ * Get paper portfolio summary & metrics for authenticated user
  */
-export const getPaperPortfolio = asyncHandler(async (_req: Request, res: Response) => {
-  const portfolio = await paperExecutor.getPortfolio();
+export const getPaperPortfolio = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || (req.query.userId as string) || 'default';
+  const executor = paperTradingManager.getExecutor(userId);
+
+  const portfolio = await executor.getPortfolio();
   res.json({
     success: true,
     portfolio
@@ -87,10 +100,13 @@ export const getPaperPortfolio = asyncHandler(async (_req: Request, res: Respons
 });
 
 /**
- * Get daily paper trading report (Gross P&L, Brokerage, Slippage, Net P&L, Win Rate)
+ * Get daily paper trading report for authenticated user
  */
-export const getPaperDailyReport = asyncHandler(async (_req: Request, res: Response) => {
-  const report = await paperExecutor.getDailyReport();
+export const getPaperDailyReport = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || (req.query.userId as string) || 'default';
+  const executor = paperTradingManager.getExecutor(userId);
+
+  const report = await executor.getDailyReport();
   res.json({
     success: true,
     report
@@ -98,10 +114,13 @@ export const getPaperDailyReport = asyncHandler(async (_req: Request, res: Respo
 });
 
 /**
- * Get paper execution audit logs (Tick -> Signal -> Order -> Fill -> Position)
+ * Get paper execution audit logs for authenticated user
  */
-export const getPaperAuditLogs = asyncHandler(async (_req: Request, res: Response) => {
-  const logs = paperExecutor.getAuditLogs();
+export const getPaperAuditLogs = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || (req.query.userId as string) || 'default';
+  const executor = paperTradingManager.getExecutor(userId);
+
+  const logs = executor.getAuditLogs();
   res.json({
     success: true,
     logs
@@ -109,11 +128,14 @@ export const getPaperAuditLogs = asyncHandler(async (_req: Request, res: Respons
 });
 
 /**
- * Reset paper portfolio to initial capital
+ * Reset paper portfolio to initial capital for authenticated user
  */
-export const resetPaperPortfolio = asyncHandler(async (req: Request, res: Response) => {
+export const resetPaperPortfolio = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || 'default';
+  const executor = paperTradingManager.getExecutor(userId);
+
   const capital = req.body.initialCapital ? Number(req.body.initialCapital) : 100000;
-  paperExecutor.resetPortfolio(capital);
+  executor.resetPortfolio(capital);
 
   res.json({
     success: true,

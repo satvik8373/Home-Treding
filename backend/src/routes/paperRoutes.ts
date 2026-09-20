@@ -8,15 +8,16 @@ import {
   getPaperAuditLogs,
   resetPaperPortfolio
 } from '../controllers/paperController';
+import { authenticate, optionalAuth } from '../middleware/auth';
 
 const router = Router();
 
-router.post('/order', placePaperOrder);
-router.get('/orders', getPaperOrders);
-router.get('/positions', getPaperPositions);
-router.get('/portfolio', getPaperPortfolio);
-router.get('/report', getPaperDailyReport);
-router.get('/audit-logs', getPaperAuditLogs);
-router.post('/reset', resetPaperPortfolio);
+router.post('/order', optionalAuth, placePaperOrder);
+router.get('/orders', optionalAuth, getPaperOrders);
+router.get('/positions', optionalAuth, getPaperPositions);
+router.get('/portfolio', optionalAuth, getPaperPortfolio);
+router.get('/report', optionalAuth, getPaperDailyReport);
+router.get('/audit-logs', optionalAuth, getPaperAuditLogs);
+router.post('/reset', optionalAuth, resetPaperPortfolio);
 
 export default router;

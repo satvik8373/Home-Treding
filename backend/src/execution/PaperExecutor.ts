@@ -48,15 +48,18 @@ export class PaperExecutor extends ExecutionProvider {
   private trades: PaperTradeRecord[] = [];
   private auditLogs: PaperAuditLog[] = [];
   private lastKnownPrices: Map<string, number> = new Map();
+  public readonly userId: string;
   private stateFilePath: string;
 
-  constructor(initialCapital: number = 100000) {
+  constructor(initialCapital: number = 100000, userId: string = 'default') {
     super();
+    this.userId = userId || 'default';
     this.initialCapital = initialCapital;
     this.availableCash = initialCapital;
     this.peakCapital = initialCapital;
 
-    this.stateFilePath = path.join(__dirname, '../../data/paper-trading-state.json');
+    const safeUserId = this.userId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    this.stateFilePath = path.join(__dirname, `../../data/paper-trading/${safeUserId}.json`);
 
     // Seed realistic live Indian equity & index baseline prices
     this.lastKnownPrices.set('NIFTY 50', 24100.70);

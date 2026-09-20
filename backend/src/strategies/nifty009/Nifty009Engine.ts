@@ -15,6 +15,7 @@ export interface EngineStatus {
   isRunning: boolean;
   isPaused: boolean;
   isHalted: boolean;
+  mode: 'paper' | 'live';
   sessionDate: string;
   state: string;
   niftyLtp: number;
@@ -36,6 +37,8 @@ export class Nifty009Engine extends EventEmitter {
   private isRunning: boolean = false;
   private isPaused: boolean = false;
   private isHalted: boolean = false;
+  private mode: 'paper' | 'live' = 'paper';
+  private userId: string = 'user_admin';
 
   private candleEngine: CandleEngine;
   private atmResolver: AtmResolver;
@@ -77,7 +80,11 @@ export class Nifty009Engine extends EventEmitter {
         this.logEvent('REFERENCE_CANDLE_RECORDED', { close: firstCandle.close });
 
         // Resolve ATM Strike at 09:20 IST
-        const lockedAtm = await this.atmResolver.resolveAndLockAtm(firstCandle.close);
+        const lockedAtm = await this.atmResolver.resolveAndLockAtm(
+          firstCandle.close,
+          this.stateMachine.getConfig().lotSize || 75,
+          this.userId
+        );
         this.stateMachine.onAtmResolved(lockedAtm);
         this.emit('atmLocked', lockedAtm);
         this.logEvent('ATM_LOCKED', { strike: lockedAtm.atmStrike, ce: lockedAtm.ceSymbol, pe: lockedAtm.peSymbol });
@@ -107,7 +114,11 @@ export class Nifty009Engine extends EventEmitter {
   /**
    * Start Strategy Session
    */
-  public async start(config: Partial<StrategyConfig> = {}): Promise<void> {
+  public async start(
+    config: Partial<StrategyConfig> = {},
+    mode: 'paper' | 'live' = 'paper',
+    userId: string = 'user_admin'
+  ): Promise<void> {
     if (this.isRunning) {
       logger.warn('[Nifty009Engine] Strategy is already running');
       return;
@@ -116,6 +127,8 @@ export class Nifty009Engine extends EventEmitter {
     this.isRunning = true;
     this.isPaused = false;
     this.isHalted = false;
+    this.mode = mode;
+    this.userId = userId;
 
     this.candleEngine.reset();
     this.atmResolver.reset();
@@ -124,8 +137,8 @@ export class Nifty009Engine extends EventEmitter {
     this.eventsLog = [];
     this.sessionPnl = 0;
 
-    this.logEvent('STRATEGY_STARTED', { config: this.stateMachine.getConfig(), mode: 'PAPER' });
-    logger.info(`[Nifty009Engine] 🚀 NIFTY 0.09% ATM Breakout Strategy Started (PAPER MODE)`);
+    this.logEvent('STRATEGY_STARTED', { config: this.stateMachine.getConfig(), mode: this.mode.toUpperCase() });
+    logger.info(`[Nifty009Engine] 🚀 NIFTY 0.09% ATM Breakout Strategy Started (${this.mode.toUpperCase()} MODE for user ${userId})`);
 
     // Schedule 15:10 Force Square-Off
     this.scheduleSquareOffTimer();
@@ -211,7 +224,10 @@ export class Nifty009Engine extends EventEmitter {
     }
 
     const config = this.stateMachine.getConfig();
-    const qty = (config.lotSize || 1) * lockedAtm.lotSize;
+    const baseLot = lockedAtm.lotSize || 75;
+    const qty = config.lotSize && config.lotSize >= baseLot
+      ? config.lotSize
+      : (config.lotSize || 1) * baseLot;
 
     // ───────────────────────────────────────────────
     // BUY CE
@@ -229,7 +245,31 @@ export class Nifty009Engine extends EventEmitter {
         unrealizedPnl: 0
       };
 
-      // Record Virtual Paper Order
+      let liveOrderResult: any = null;
+      if (this.mode === 'live') {
+        const primaryAdapter = BrokerRegistry.getInstance().getPrimaryAdapter(this.userId);
+        if (primaryAdapter && primaryAdapter.getStatus()) {
+          try {
+            liveOrderResult = await primaryAdapter.placeOrder({
+              symbol: lockedAtm.ceSymbol,
+              securityId: lockedAtm.ceSecurityId,
+              exchange: 'NFO',
+              side: 'BUY',
+              orderType: 'MARKET',
+              productType: 'INTRADAY',
+              validity: 'DAY',
+              quantity: qty
+            });
+            logger.info(`[Nifty009Engine LIVE DHAN] 🟢 Placed BUY CE: ${JSON.stringify(liveOrderResult)}`);
+          } catch (err: any) {
+            logger.error(`[Nifty009Engine LIVE DHAN FAILED] BUY CE: ${err.message}`);
+          }
+        } else {
+          logger.warn('[Nifty009Engine LIVE] No connected Dhan adapter found for live order execution.');
+        }
+      }
+
+      // Record Virtual Paper Order for audit and platform tracking
       await paperExecutor.executeOrder({
         symbol: lockedAtm.ceSymbol,
         exchange: 'NSE',
@@ -242,8 +282,8 @@ export class Nifty009Engine extends EventEmitter {
       });
 
       this.stateMachine.onPositionOpened(position);
-      this.logEvent('POSITION_OPENED', { type: 'CE', symbol: lockedAtm.ceSymbol, price: fillPrice, quantity: qty });
-      this.emit('order', { action: 'ENTRY', type: 'CE', symbol: lockedAtm.ceSymbol, price: fillPrice, quantity: qty });
+      this.logEvent('POSITION_OPENED', { type: 'CE', symbol: lockedAtm.ceSymbol, price: fillPrice, quantity: qty, liveOrder: liveOrderResult });
+      this.emit('order', { action: 'ENTRY', type: 'CE', symbol: lockedAtm.ceSymbol, price: fillPrice, quantity: qty, liveOrder: liveOrderResult });
     }
 
     // ───────────────────────────────────────────────
@@ -262,6 +302,30 @@ export class Nifty009Engine extends EventEmitter {
         unrealizedPnl: 0
       };
 
+      let liveOrderResult: any = null;
+      if (this.mode === 'live') {
+        const primaryAdapter = BrokerRegistry.getInstance().getPrimaryAdapter(this.userId);
+        if (primaryAdapter && primaryAdapter.getStatus()) {
+          try {
+            liveOrderResult = await primaryAdapter.placeOrder({
+              symbol: lockedAtm.peSymbol,
+              securityId: lockedAtm.peSecurityId,
+              exchange: 'NFO',
+              side: 'BUY',
+              orderType: 'MARKET',
+              productType: 'INTRADAY',
+              validity: 'DAY',
+              quantity: qty
+            });
+            logger.info(`[Nifty009Engine LIVE DHAN] 🔴 Placed BUY PE: ${JSON.stringify(liveOrderResult)}`);
+          } catch (err: any) {
+            logger.error(`[Nifty009Engine LIVE DHAN FAILED] BUY PE: ${err.message}`);
+          }
+        } else {
+          logger.warn('[Nifty009Engine LIVE] No connected Dhan adapter found for live order execution.');
+        }
+      }
+
       await paperExecutor.executeOrder({
         symbol: lockedAtm.peSymbol,
         exchange: 'NSE',
@@ -274,8 +338,8 @@ export class Nifty009Engine extends EventEmitter {
       });
 
       this.stateMachine.onPositionOpened(position);
-      this.logEvent('POSITION_OPENED', { type: 'PE', symbol: lockedAtm.peSymbol, price: fillPrice, quantity: qty });
-      this.emit('order', { action: 'ENTRY', type: 'PE', symbol: lockedAtm.peSymbol, price: fillPrice, quantity: qty });
+      this.logEvent('POSITION_OPENED', { type: 'PE', symbol: lockedAtm.peSymbol, price: fillPrice, quantity: qty, liveOrder: liveOrderResult });
+      this.emit('order', { action: 'ENTRY', type: 'PE', symbol: lockedAtm.peSymbol, price: fillPrice, quantity: qty, liveOrder: liveOrderResult });
     }
 
     // ───────────────────────────────────────────────
@@ -287,6 +351,27 @@ export class Nifty009Engine extends EventEmitter {
         const exitPrice = activePos.type === 'CE' ? lockedAtm.ceLtp - 0.10 : lockedAtm.peLtp - 0.10;
         const tradePnl = (exitPrice - activePos.entryPrice) * activePos.quantity;
         this.sessionPnl += tradePnl;
+
+        let liveExitResult: any = null;
+        if (this.mode === 'live') {
+          const primaryAdapter = BrokerRegistry.getInstance().getPrimaryAdapter(this.userId);
+          if (primaryAdapter && primaryAdapter.getStatus()) {
+            try {
+              liveExitResult = await primaryAdapter.placeOrder({
+                symbol: activePos.symbol,
+                exchange: 'NFO',
+                side: 'SELL',
+                orderType: 'MARKET',
+                productType: 'INTRADAY',
+                validity: 'DAY',
+                quantity: activePos.quantity
+              });
+              logger.info(`[Nifty009Engine LIVE DHAN] ⏹️ Placed EXIT SELL: ${JSON.stringify(liveExitResult)}`);
+            } catch (err: any) {
+              logger.error(`[Nifty009Engine LIVE DHAN FAILED] EXIT SELL: ${err.message}`);
+            }
+          }
+        }
 
         await paperExecutor.executeOrder({
           symbol: activePos.symbol,
@@ -300,8 +385,8 @@ export class Nifty009Engine extends EventEmitter {
         });
 
         this.stateMachine.onPositionClosed();
-        this.logEvent('POSITION_CLOSED', { symbol: activePos.symbol, exitPrice, tradePnl, reason: signal.triggerReason });
-        this.emit('order', { action: 'EXIT', symbol: activePos.symbol, price: exitPrice, tradePnl });
+        this.logEvent('POSITION_CLOSED', { symbol: activePos.symbol, exitPrice, tradePnl, reason: signal.triggerReason, liveOrder: liveExitResult });
+        this.emit('order', { action: 'EXIT', symbol: activePos.symbol, price: exitPrice, tradePnl, liveOrder: liveExitResult });
       }
     }
   }
@@ -321,6 +406,27 @@ export class Nifty009Engine extends EventEmitter {
     const tradePnl = (exitPrice - activePos.entryPrice) * activePos.quantity;
     this.sessionPnl += tradePnl;
 
+    let liveSquareOffResult: any = null;
+    if (this.mode === 'live') {
+      const primaryAdapter = BrokerRegistry.getInstance().getPrimaryAdapter(this.userId);
+      if (primaryAdapter && primaryAdapter.getStatus()) {
+        try {
+          liveSquareOffResult = await primaryAdapter.placeOrder({
+            symbol: activePos.symbol,
+            exchange: 'NFO',
+            side: 'SELL',
+            orderType: 'MARKET',
+            productType: 'INTRADAY',
+            validity: 'DAY',
+            quantity: activePos.quantity
+          });
+          logger.info(`[Nifty009Engine LIVE DHAN] ⏹️ Square-off SELL: ${JSON.stringify(liveSquareOffResult)}`);
+        } catch (err: any) {
+          logger.error(`[Nifty009Engine LIVE DHAN FAILED] Square-off SELL: ${err.message}`);
+        }
+      }
+    }
+
     await paperExecutor.executeOrder({
       symbol: activePos.symbol,
       exchange: 'NSE',
@@ -333,8 +439,8 @@ export class Nifty009Engine extends EventEmitter {
     });
 
     this.stateMachine.onPositionClosed();
-    this.logEvent('MANUAL_SQUARE_OFF', { symbol: activePos.symbol, exitPrice, tradePnl });
-    this.emit('order', { action: 'SQUARE_OFF', symbol: activePos.symbol, price: exitPrice, tradePnl });
+    this.logEvent('MANUAL_SQUARE_OFF', { symbol: activePos.symbol, exitPrice, tradePnl, liveOrder: liveSquareOffResult });
+    this.emit('order', { action: 'SQUARE_OFF', symbol: activePos.symbol, price: exitPrice, tradePnl, liveOrder: liveSquareOffResult });
     this.updateStatusAndEmit();
   }
 
@@ -392,9 +498,9 @@ export class Nifty009Engine extends EventEmitter {
   private subscribeDhanMarketFeed(): void {
     try {
       const brokerRegistry = BrokerRegistry.getInstance();
-      const primaryAdapter = brokerRegistry.getPrimaryAdapter();
+      const primaryAdapter = brokerRegistry.getPrimaryAdapter(this.userId);
       if (primaryAdapter) {
-        logger.info('[Nifty009Engine] Connected to Dhan live feed for NIFTY 50');
+        logger.info(`[Nifty009Engine] Connected to Dhan live feed for NIFTY 50 (Mode: ${this.mode.toUpperCase()})`);
       }
     } catch (err: any) {
       logger.warn('[Nifty009Engine] Market feed subscription info:', err.message);
@@ -409,6 +515,7 @@ export class Nifty009Engine extends EventEmitter {
       isRunning: this.isRunning,
       isPaused: this.isPaused,
       isHalted: this.isHalted,
+      mode: this.mode,
       sessionDate: summary.sessionDate,
       state: summary.state,
       niftyLtp: this.niftyLtp,

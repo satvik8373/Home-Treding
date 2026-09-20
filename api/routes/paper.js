@@ -2,117 +2,75 @@ const express = require('express');
 const router = express.Router();
 const realMarketData = require('../services/realMarketData');
 
-// In-memory paper trading portfolio state
-let paperPortfolio = {
-  initialCapital: 100000,
-  availableCash: 95000,
-  utilizedMargin: 5000,
-  totalPortfolioValue: 102450,
-  realizedPnl: 1250,
-  unrealizedPnl: 1200,
-  totalPnl: 2450,
-  dayPnl: 2450,
-  winCount: 4,
-  lossCount: 1,
-  totalTrades: 5,
-  winRate: 80
+// In-memory paper trading portfolio state mapped by userId
+const userPortfolios = new Map();
+const userPositions = new Map();
+const userOrders = new Map();
+
+const getInitialPortfolio = (capital = 100000) => ({
+  initialCapital: capital,
+  availableCash: capital,
+  utilizedMargin: 0,
+  totalPortfolioValue: capital,
+  realizedPnl: 0,
+  unrealizedPnl: 0,
+  totalPnl: 0,
+  dayPnl: 0,
+  winCount: 0,
+  lossCount: 0,
+  totalTrades: 0,
+  winRate: 0
+});
+
+const getUserData = (req) => {
+  const userId = req.query.userId || req.body?.userId || 'default';
+  if (!userPortfolios.has(userId)) {
+    userPortfolios.set(userId, getInitialPortfolio(100000));
+  }
+  if (!userPositions.has(userId)) {
+    userPositions.set(userId, []);
+  }
+  if (!userOrders.has(userId)) {
+    userOrders.set(userId, []);
+  }
+  return {
+    userId,
+    portfolio: userPortfolios.get(userId),
+    positions: userPositions.get(userId),
+    orders: userOrders.get(userId)
+  };
 };
 
-let paperPositions = [
-  {
-    positionId: 'pos_1',
-    symbol: 'RELIANCE',
-    exchange: 'NSE',
-    segment: 'EQ',
-    productType: 'INTRADAY',
-    quantity: 10,
-    buyQuantity: 10,
-    sellQuantity: 0,
-    buyAvgPrice: 2960.00,
-    sellAvgPrice: 0,
-    netAvgPrice: 2960.00,
-    ltp: 2985.50,
-    realizedPnl: 0,
-    unrealizedPnl: 255.00,
-    totalPnl: 255.00
-  },
-  {
-    positionId: 'pos_2',
-    symbol: 'TCS',
-    exchange: 'NSE',
-    segment: 'EQ',
-    productType: 'INTRADAY',
-    quantity: 5,
-    buyQuantity: 5,
-    sellQuantity: 0,
-    buyAvgPrice: 4090.00,
-    sellAvgPrice: 0,
-    netAvgPrice: 4090.00,
-    ltp: 4120.00,
-    realizedPnl: 0,
-    unrealizedPnl: 150.00,
-    totalPnl: 150.00
-  }
-];
-
-let paperOrders = [
-  {
-    orderId: 'PORD_1',
-    brokerOrderId: 'PORD_1',
-    symbol: 'RELIANCE',
-    side: 'BUY',
-    orderType: 'MARKET',
-    productType: 'INTRADAY',
-    quantity: 10,
-    filledQuantity: 10,
-    pendingQuantity: 0,
-    price: 2960.00,
-    averagePrice: 2960.00,
-    status: 'FILLED',
-    orderTimestamp: new Date(Date.now() - 3600000).toISOString()
-  },
-  {
-    orderId: 'PORD_2',
-    brokerOrderId: 'PORD_2',
-    symbol: 'TCS',
-    side: 'BUY',
-    orderType: 'MARKET',
-    productType: 'INTRADAY',
-    quantity: 5,
-    filledQuantity: 5,
-    pendingQuantity: 0,
-    price: 4090.00,
-    averagePrice: 4090.00,
-    status: 'FILLED',
-    orderTimestamp: new Date(Date.now() - 1800000).toISOString()
-  }
-];
-
-// Get paper portfolio
+// Get paper trading portfolio
 router.get('/portfolio', async (req, res) => {
   try {
-    // Update LTPs for open positions
-    let unrealized = 0;
-    for (const pos of paperPositions) {
-      if (pos.quantity > 0) {
-        const quotes = await realMarketData.fetchLiveData([pos.symbol]);
-        if (quotes[0]?.ltp) {
-          pos.ltp = quotes[0].ltp;
-          pos.unrealizedPnl = Number(((pos.ltp - pos.netAvgPrice) * pos.quantity).toFixed(2));
-          pos.totalPnl = Number((pos.realizedPnl + pos.unrealizedPnl).toFixed(2));
-        }
-        unrealized += pos.unrealizedPnl;
-      }
-    }
+    const { portfolio, positions } = getUserData(req);
 
-    paperPortfolio.unrealizedPnl = Number(unrealized.toFixed(2));
-    paperPortfolio.totalPnl = Number((paperPortfolio.realizedPnl + paperPortfolio.unrealizedPnl).toFixed(2));
-    paperPortfolio.dayPnl = paperPortfolio.totalPnl;
-    paperPortfolio.totalPortfolioValue = Number((paperPortfolio.availableCash + paperPortfolio.utilizedMargin + paperPortfolio.totalPnl).toFixed(2));
+    // Update real-time LTP and unrealized P&L
+    if (positions.length > 0) {
+      const symbols = positions.map(p => p.symbol);
+      const quotes = await realMarketData.fetchLiveData(symbols);
+      const priceMap = new Map(quotes.map(q => [q.symbol, q.ltp]));
+
+      let totalUnrealized = 0;
+      positions.forEach(pos => {
+        const ltp = priceMap.get(pos.symbol) || pos.ltp;
+        pos.ltp = ltp;
+        const diff = pos.quantity > 0 ? (ltp - pos.buyAvgPrice) : (pos.sellAvgPrice - ltp);
+        pos.unrealizedPnl = Number((diff * Math.abs(pos.quantity)).toFixed(2));
+        pos.totalPnl = Number((pos.realizedPnl + pos.unrealizedPnl).toFixed(2));
+        totalUnrealized += pos.unrealizedPnl;
+      });
+
+      portfolio.unrealizedPnl = Number(totalUnrealized.toFixed(2));
+      portfolio.totalPnl = Number((portfolio.realizedPnl + portfolio.unrealizedPnl).toFixed(2));
+      portfolio.dayPnl = portfolio.totalPnl;
+      portfolio.totalPortfolioValue = Number((portfolio.availableCash + portfolio.utilizedMargin + portfolio.totalPnl).toFixed(2));
+    }
 
     res.json({
       success: true,
-      portfolio: paperPortfolio
+      portfolio
     });
   } catch (error) {
     res.status(500).json({
@@ -125,9 +83,10 @@ router.get('/portfolio', async (req, res) => {
 // Get paper positions
 router.get('/positions', async (req, res) => {
   try {
+    const { positions } = getUserData(req);
     res.json({
       success: true,
-      positions: paperPositions
+      positions
     });
   } catch (error) {
     res.status(500).json({
@@ -140,9 +99,10 @@ router.get('/positions', async (req, res) => {
 // Get paper orders
 router.get('/orders', (req, res) => {
   try {
+    const { orders } = getUserData(req);
     res.json({
       success: true,
-      orders: paperOrders
+      orders
     });
   } catch (error) {
     res.status(500).json({
@@ -163,6 +123,8 @@ router.post('/order', async (req, res) => {
         message: 'Symbol, side, and quantity are required'
       });
     }
+
+    const { portfolio, positions, orders } = getUserData(req);
 
     let fillPrice = Number(price) || 0;
     if (fillPrice <= 0) {
@@ -187,53 +149,69 @@ router.post('/order', async (req, res) => {
       orderTimestamp: new Date().toISOString()
     };
 
-    paperOrders.unshift(newOrder);
+    orders.unshift(newOrder);
+    portfolio.totalTrades += 1;
 
     // Update positions
-    const existingPos = paperPositions.find(p => p.symbol.toUpperCase() === symbol.toUpperCase() && p.productType === productType.toUpperCase());
-    if (existingPos) {
+    const existingIndex = positions.findIndex(p => p.symbol === symbol.toUpperCase());
+    const qty = Number(quantity);
+    const orderCost = fillPrice * qty;
+
+    if (existingIndex >= 0) {
+      const pos = positions[existingIndex];
       if (side.toUpperCase() === 'BUY') {
-        const totalCost = (existingPos.quantity * existingPos.netAvgPrice) + (Number(quantity) * fillPrice);
-        existingPos.quantity += Number(quantity);
-        existingPos.buyQuantity += Number(quantity);
-        existingPos.netAvgPrice = Number((totalCost / existingPos.quantity).toFixed(2));
-        existingPos.ltp = fillPrice;
+        const totalCost = (pos.buyAvgPrice * pos.buyQuantity) + orderCost;
+        pos.buyQuantity += qty;
+        pos.quantity += qty;
+        pos.buyAvgPrice = Number((totalCost / pos.buyQuantity).toFixed(2));
+        pos.netAvgPrice = pos.buyAvgPrice;
       } else {
-        // Sell / reduce
-        const soldQty = Math.min(existingPos.quantity, Number(quantity));
-        const profit = (fillPrice - existingPos.netAvgPrice) * soldQty;
-        paperPortfolio.realizedPnl += profit;
-        existingPos.quantity -= soldQty;
-        existingPos.sellQuantity += soldQty;
+        pos.sellQuantity += qty;
+        pos.quantity -= qty;
+        pos.sellAvgPrice = fillPrice;
+        const pnl = Number(((fillPrice - pos.buyAvgPrice) * qty).toFixed(2));
+        pos.realizedPnl += pnl;
+        portfolio.realizedPnl += pnl;
+        if (pnl >= 0) portfolio.winCount += 1;
+        else portfolio.lossCount += 1;
+      }
+
+      if (pos.quantity === 0) {
+        positions.splice(existingIndex, 1);
       }
     } else {
-      if (side.toUpperCase() === 'BUY') {
-        paperPositions.push({
-          positionId: `pos_${Date.now()}`,
-          symbol: symbol.toUpperCase(),
-          exchange: 'NSE',
-          segment: 'EQ',
-          productType: productType.toUpperCase(),
-          quantity: Number(quantity),
-          buyQuantity: Number(quantity),
-          sellQuantity: 0,
-          buyAvgPrice: fillPrice,
-          sellAvgPrice: 0,
-          netAvgPrice: fillPrice,
-          ltp: fillPrice,
-          realizedPnl: 0,
-          unrealizedPnl: 0,
-          totalPnl: 0
-        });
-      }
+      positions.push({
+        positionId: `pos_${Date.now()}`,
+        symbol: symbol.toUpperCase(),
+        exchange: 'NSE',
+        segment: 'EQ',
+        productType: productType.toUpperCase(),
+        quantity: side.toUpperCase() === 'BUY' ? qty : -qty,
+        buyQuantity: side.toUpperCase() === 'BUY' ? qty : 0,
+        sellQuantity: side.toUpperCase() === 'SELL' ? qty : 0,
+        buyAvgPrice: side.toUpperCase() === 'BUY' ? fillPrice : 0,
+        sellAvgPrice: side.toUpperCase() === 'SELL' ? fillPrice : 0,
+        netAvgPrice: fillPrice,
+        ltp: fillPrice,
+        realizedPnl: 0,
+        unrealizedPnl: 0,
+        totalPnl: 0
+      });
     }
 
-    paperPortfolio.totalTrades += 1;
+    // Recalculate margins
+    const utilizedMargin = positions.reduce((acc, p) => acc + (p.ltp * Math.abs(p.quantity) * 0.2), 0);
+    portfolio.utilizedMargin = Number(utilizedMargin.toFixed(2));
+    portfolio.availableCash = Number((portfolio.initialCapital - portfolio.utilizedMargin + portfolio.realizedPnl).toFixed(2));
+    portfolio.totalPortfolioValue = Number((portfolio.availableCash + portfolio.utilizedMargin).toFixed(2));
+    portfolio.winRate = portfolio.totalTrades > 0
+      ? Number(((portfolio.winCount / portfolio.totalTrades) * 100).toFixed(1))
+      : 0;
 
     res.json({
       success: true,
-      order: newOrder,
-      message: 'Paper order executed successfully'
+      message: 'Paper order executed successfully',
+      order: newOrder
     });
   } catch (error) {
     res.status(500).json({
@@ -246,23 +224,11 @@ router.post('/order', async (req, res) => {
 // Reset paper portfolio
 router.post('/reset', (req, res) => {
   try {
-    const capital = req.body.initialCapital ? Number(req.body.initialCapital) : 100000;
-    paperPortfolio = {
-      initialCapital: capital,
-      availableCash: capital,
-      utilizedMargin: 0,
-      totalPortfolioValue: capital,
-      realizedPnl: 0,
-      unrealizedPnl: 0,
-      totalPnl: 0,
-      dayPnl: 0,
-      winCount: 0,
-      lossCount: 0,
-      totalTrades: 0,
-      winRate: 0
-    };
-    paperPositions = [];
-    paperOrders = [];
+    const { userId } = getUserData(req);
+    const capital = req.body?.initialCapital ? Number(req.body.initialCapital) : 100000;
+    userPortfolios.set(userId, getInitialPortfolio(capital));
+    userPositions.set(userId, []);
+    userOrders.set(userId, []);
 
     res.json({
       success: true,

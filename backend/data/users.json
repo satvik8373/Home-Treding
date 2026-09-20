@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "id": "cxZXNhj2HmbnZRhR5lCI29iKT2N2",
+    "uid": "cxZXNhj2HmbnZRhR5lCI29iKT2N2",
+    "email": "satvikpatel8373@gmail.com",
+    "name": "Satvikpatel",
+    "phone": "",
+    "subscriptionPlan": "free",
+    "isActive": true,
+    "isVerified": true,
+    "createdAt": "2026-09-20T05:22:41.821Z",
+    "updatedAt": "2026-09-20T05:22:41.821Z"
+  }
+]

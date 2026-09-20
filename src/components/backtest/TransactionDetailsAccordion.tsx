@@ -34,6 +34,8 @@ export interface BacktestTradeItem {
   netPnl: number;
   exitReason: string;
   status: 'WIN' | 'LOSS';
+  spotRefPrice?: string;
+  fillModel?: string;
 }
 
 export interface DayTransactionGroup {
@@ -156,6 +158,7 @@ export const TransactionDetailsAccordion: React.FC<TransactionDetailsAccordionPr
                       <TableRow>
                         <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.75rem' }}>Time</TableCell>
                         <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.75rem' }}>Instrument</TableCell>
+                        <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.75rem' }}>Spot Market Val</TableCell>
                         <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.75rem' }}>Side</TableCell>
                         <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.75rem' }}>Qty</TableCell>
                         <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.75rem' }}>Entry Price</TableCell>
@@ -175,6 +178,9 @@ export const TransactionDetailsAccordion: React.FC<TransactionDetailsAccordionPr
                             </TableCell>
                             <TableCell sx={{ fontSize: '0.8rem', fontWeight: 600, color: '#0f172a' }}>
                               {trade.instrument}
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.75rem', color: '#0369a1', fontWeight: 600 }}>
+                              {trade.spotRefPrice || '—'}
                             </TableCell>
                             <TableCell>
                               <Chip

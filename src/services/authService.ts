@@ -2,7 +2,7 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signOut, 
-  updateProfile,
+  updateProfile, 
   onAuthStateChanged,
   User,
   GoogleAuthProvider,
@@ -14,7 +14,10 @@ import {
   getDoc, 
   serverTimestamp 
 } from 'firebase/firestore';
+import axios from 'axios';
 import { auth, db } from '../config/firebase';
+import { API_CONFIG } from '../config/api';
+import { brokerApi } from './brokerApi';
 
 export interface UserProfile {
   uid: string;
@@ -46,35 +49,91 @@ class AuthService {
   private authListeners: Array<(user: User | null) => void> = [];
 
   constructor() {
-    // Restore persisted local demo session if available
-    try {
-      const saved = localStorage.getItem('mavrix_local_user');
-      if (saved) {
-        this.localUser = JSON.parse(saved);
-      }
-    } catch (_) {}
+    // Restore persisted local session if available
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('mavrix_local_user');
+        if (saved) {
+          this.localUser = JSON.parse(saved);
+        }
+      } catch (_) {}
+    }
   }
 
-  private createLocalDemoUser(email: string, name?: string): User {
+  private async syncBackendSession(user: { uid: string; email: string; name?: string; phone?: string; password?: string }): Promise<string | null> {
+    try {
+      const res = await axios.post(`${API_CONFIG.BASE_URL}/api/auth/sync`, {
+        uid: user.uid,
+        email: user.email,
+        name: user.name,
+        phone: user.phone
+      }, { timeout: 8000 });
+
+      if (res.data?.token) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('mavrix_auth_token', res.data.token);
+        }
+        return res.data.token;
+      }
+    } catch (e) {
+      console.warn('Backend session sync notice:', e);
+    }
+    return null;
+  }
+
+  private async createLocalDemoUser(email: string, name?: string, password?: string): Promise<User> {
+    const rawUid = 'user_' + Math.abs(email.split('').reduce((a, b) => ((a << 5) - a) + b.charCodeAt(0), 0)).toString(16);
+    const displayName = name || email.split('@')[0];
+
+    // Attempt to register or login with backend
+    let sessionToken = '';
+    try {
+      const loginRes = await axios.post(`${API_CONFIG.BASE_URL}/api/auth/login`, {
+        email,
+        password: password || 'Trading@123',
+        uid: rawUid,
+        name: displayName
+      }, { timeout: 6000 }).catch(() => null);
+
+      if (loginRes?.data?.token) {
+        sessionToken = loginRes.data.token;
+      } else {
+        const syncRes = await axios.post(`${API_CONFIG.BASE_URL}/api/auth/sync`, {
+          uid: rawUid,
+          email,
+          name: displayName
+        }, { timeout: 6000 }).catch(() => null);
+        if (syncRes?.data?.token) {
+          sessionToken = syncRes.data.token;
+        }
+      }
+    } catch (_) {}
+
+    if (sessionToken && typeof window !== 'undefined') {
+      localStorage.setItem('mavrix_auth_token', sessionToken);
+    }
+
     const fakeUser: any = {
-      uid: 'user_' + Buffer.from(email).toString('hex').substr(0, 12),
+      uid: rawUid,
       email: email,
-      displayName: name || email.split('@')[0],
+      displayName: displayName,
       emailVerified: true,
       isAnonymous: false,
-      getIdToken: async () => 'mock-local-token-' + Date.now(),
+      getIdToken: async () => sessionToken || (typeof window !== 'undefined' ? localStorage.getItem('mavrix_auth_token') : null) || 'local_token_' + Date.now(),
       reload: async () => {},
-      toJSON: () => ({ email, displayName: name || email.split('@')[0] })
+      toJSON: () => ({ email, displayName })
     };
 
     this.localUser = fakeUser as User;
-    try {
-      localStorage.setItem('mavrix_local_user', JSON.stringify({
-        uid: fakeUser.uid,
-        email: fakeUser.email,
-        displayName: fakeUser.displayName
-      }));
-    } catch (_) {}
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('mavrix_local_user', JSON.stringify({
+          uid: fakeUser.uid,
+          email: fakeUser.email,
+          displayName: fakeUser.displayName
+        }));
+      } catch (_) {}
+    }
 
     // Notify listeners
     this.authListeners.forEach((cb) => cb(this.localUser));
@@ -97,6 +156,21 @@ class AuthService {
       } catch (_) {}
 
       try {
+        const token = await userCredential.user.getIdToken();
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('mavrix_auth_token', token);
+        }
+      } catch (_) {}
+
+      await this.syncBackendSession({
+        uid: userCredential.user.uid,
+        email: data.email,
+        name: data.name,
+        phone: data.phone,
+        password: data.password
+      });
+
+      try {
         await setDoc(doc(db, 'users', userCredential.user.uid), {
           uid: userCredential.user.uid,
           name: data.name,
@@ -113,14 +187,14 @@ class AuthService {
     } catch (error: any) {
       const errorCode = String(error.code || error.message || '');
 
-      // If Firebase API key is invalid/blocked, seamlessly activate local session
+      // If Firebase API key is invalid/blocked, seamlessly activate authenticated local session
       if (
         errorCode.includes('api-key-not-valid') ||
         errorCode.includes('invalid-api-key') ||
         errorCode.includes('configuration-not-found')
       ) {
-        console.warn('Firebase API key error — logging in via local trading session.');
-        return this.createLocalDemoUser(data.email, data.name);
+        console.warn('Firebase Auth notice — activating authenticated local session.');
+        return await this.createLocalDemoUser(data.email, data.name, data.password);
       }
 
       let errorMessage = 'Registration failed';
@@ -155,6 +229,20 @@ class AuthService {
       );
 
       try {
+        const token = await userCredential.user.getIdToken();
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('mavrix_auth_token', token);
+        }
+      } catch (_) {}
+
+      await this.syncBackendSession({
+        uid: userCredential.user.uid,
+        email: data.email,
+        name: userCredential.user.displayName || '',
+        password: data.password
+      });
+
+      try {
         const userRef = doc(db, 'users', userCredential.user.uid);
         await setDoc(userRef, { updatedAt: serverTimestamp() }, { merge: true });
       } catch (_) {}
@@ -163,15 +251,14 @@ class AuthService {
     } catch (error: any) {
       const errorCode = String(error.code || error.message || '');
 
-      // If Firebase API key is invalid/blocked or auth service unavailable, activate local session
       if (
         errorCode.includes('api-key-not-valid') ||
         errorCode.includes('invalid-api-key') ||
         errorCode.includes('configuration-not-found') ||
         errorCode.includes('internal-error')
       ) {
-        console.warn('Firebase Auth fallback — activating local trading session.');
-        return this.createLocalDemoUser(data.email);
+        console.warn('Firebase Auth notice — activating authenticated local session.');
+        return await this.createLocalDemoUser(data.email, undefined, data.password);
       }
 
       let errorMessage = 'Login failed';
@@ -207,6 +294,19 @@ class AuthService {
     try {
       const provider = new GoogleAuthProvider();
       const userCredential = await signInWithPopup(auth, provider);
+      try {
+        const token = await userCredential.user.getIdToken();
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('mavrix_auth_token', token);
+        }
+      } catch (_) {}
+
+      await this.syncBackendSession({
+        uid: userCredential.user.uid,
+        email: userCredential.user.email || '',
+        name: userCredential.user.displayName || ''
+      });
+
       return userCredential.user;
     } catch (error: any) {
       const errorCode = String(error.code || error.message || '');
@@ -215,29 +315,47 @@ class AuthService {
         errorCode.includes('invalid-api-key') ||
         errorCode.includes('unauthorized-domain')
       ) {
-        return this.createLocalDemoUser('trader@algorooms.local', 'AlgoRooms Trader');
+        return await this.createLocalDemoUser('trader@algorooms.local', 'AlgoRooms Trader');
       }
       throw new Error(error.message || 'Google sign-in failed');
     }
   }
 
-  // Logout user
+  // Logout user and completely purge all account caches
   async logout(): Promise<void> {
     try {
       this.localUser = null;
-      try {
-        localStorage.removeItem('mavrix_local_user');
-      } catch (_) {}
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem('mavrix_auth_token');
+          localStorage.removeItem('mavrix_local_user');
+          localStorage.removeItem('mavrix_connected_brokers');
+          localStorage.removeItem('dhan_connected_client_id');
+
+          // Purge all user-scoped caches
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith('mavrix_') || key.startsWith('dhan_') || key.startsWith('paper_'))) {
+              localStorage.removeItem(key);
+            }
+          }
+        } catch (_) {}
+      }
+
+      // Reset client state in brokerApi
+      brokerApi.clearClientState();
+
       await signOut(auth);
     } catch (_) {}
+
     this.authListeners.forEach((cb) => cb(null));
   }
 
   // Get current user profile
-    // Alias for getUserProfile
   async getUserProfile(uid?: string): Promise<UserProfile | null> {
     return this.getCurrentUserProfile();
   }
+
   async getCurrentUserProfile(): Promise<UserProfile | null> {
     const user = this.getCurrentUser();
     if (!user) return null;
@@ -281,10 +399,16 @@ class AuthService {
       callback(this.localUser);
     }
 
-    const unsubscribeFirebase = onAuthStateChanged(auth, (user) => {
+    const unsubscribeFirebase = onAuthStateChanged(auth, async (user) => {
       if (user) {
         this.localUser = null;
         try { localStorage.removeItem('mavrix_local_user'); } catch (_) {}
+        try {
+          const token = await user.getIdToken();
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('mavrix_auth_token', token);
+          }
+        } catch (_) {}
         callback(user);
       } else if (!this.localUser) {
         callback(null);
@@ -304,9 +428,20 @@ class AuthService {
 
   // Get ID token
   async getIdToken(): Promise<string | null> {
+    if (typeof window !== 'undefined') {
+      const savedToken = localStorage.getItem('mavrix_auth_token');
+      if (savedToken) return savedToken;
+    }
+
     const user = this.getCurrentUser();
-    if (user) {
-      return await user.getIdToken();
+    if (user && typeof user.getIdToken === 'function') {
+      try {
+        const token = await user.getIdToken();
+        if (token && typeof window !== 'undefined') {
+          localStorage.setItem('mavrix_auth_token', token);
+        }
+        return token;
+      } catch (_) {}
     }
     return null;
   }

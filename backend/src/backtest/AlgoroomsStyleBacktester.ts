@@ -1,4 +1,4 @@
-﻿import { Candle, OptionCandle } from './DhanHistoricalDataService';
+import { Candle, OptionCandle } from './DhanHistoricalDataService';
 import { calculateCharges, ChargeConfig, DEFAULT_CHARGES } from './ChargesEngine';
 
 export interface BacktestLegRule {
@@ -51,6 +51,8 @@ export interface ActivePositionLeg {
   netPnl?: number;
   grossPnl?: number;
   charges?: number;
+  spotEntryPrice?: number;
+  spotExitPrice?: number;
 }
 
 export interface CompletedTradeLog {
@@ -71,6 +73,10 @@ export interface CompletedTradeLog {
   netPnl: number;
   reason: string;
   status: 'WIN' | 'LOSS';
+  spotEntryPrice?: number;
+  spotExitPrice?: number;
+  spotRefPrice?: string;
+  fillModel?: string;
 }
 
 export interface DailyBreakdownReport {
@@ -120,7 +126,7 @@ export interface AlgoroomsPerformanceReport {
     lossStreak: number;
     profitFactor: number;
   };
-  equityCurve: Array<{ timestamp: string; equity: number; pnl: number; drawdown: number }>;
+  equityCurve: Array<{ date?: string; timestamp: string; equity: number; pnl: number; drawdown: number }>;
   daywiseTransactions: DailyBreakdownReport[];
   monthlyBreakdown: MonthlyBreakdownReport[];
   trades: CompletedTradeLog[];
@@ -136,7 +142,7 @@ export class AlgoroomsStyleBacktester {
   private balance: number;
   private peakEquity: number;
   private maxDrawdown: number;
-  private equityCurve: Array<{ timestamp: string; equity: number; pnl: number; drawdown: number }> = [];
+  private equityCurve: Array<{ date?: string; timestamp: string; equity: number; pnl: number; drawdown: number }> = [];
   private tradeLogs: CompletedTradeLog[] = [];
   private chargeConfig: ChargeConfig;
 
@@ -214,7 +220,8 @@ export class AlgoroomsStyleBacktester {
         lowestPriceObserved: estPrice,
         stopLossPrice,
         targetPrice,
-        isClosed: false
+        isClosed: false,
+        spotEntryPrice: entrySpotBar.open
       };
     });
 
@@ -246,18 +253,18 @@ export class AlgoroomsStyleBacktester {
         // Individual Stop Loss Trigger Check
         if (pos.stopLossPrice > 0) {
           if (pos.action === 'SELL' && barHighOptPrice >= pos.stopLossPrice) {
-            this.closePositionLeg(pos, pos.stopLossPrice, currentBar.isoTime, 'SHORT_SL');
+            this.closePositionLeg(pos, pos.stopLossPrice, currentBar.isoTime, 'SHORT_SL', currentBar.close);
           } else if (pos.action === 'BUY' && currentOptPrice <= pos.stopLossPrice) {
-            this.closePositionLeg(pos, pos.stopLossPrice, currentBar.isoTime, 'STOP_LOSS');
+            this.closePositionLeg(pos, pos.stopLossPrice, currentBar.isoTime, 'STOP_LOSS', currentBar.close);
           }
         }
 
         // Individual Take Profit Check
         if (!pos.isClosed && pos.targetPrice > 0) {
           if (pos.action === 'SELL' && currentOptPrice <= pos.targetPrice) {
-            this.closePositionLeg(pos, pos.targetPrice, currentBar.isoTime, 'TAKE_PROFIT');
+            this.closePositionLeg(pos, pos.targetPrice, currentBar.isoTime, 'TAKE_PROFIT', currentBar.close);
           } else if (pos.action === 'BUY' && barHighOptPrice >= pos.targetPrice) {
-            this.closePositionLeg(pos, pos.targetPrice, currentBar.isoTime, 'TAKE_PROFIT');
+            this.closePositionLeg(pos, pos.targetPrice, currentBar.isoTime, 'TAKE_PROFIT', currentBar.close);
           }
         }
       }
@@ -285,7 +292,7 @@ export class AlgoroomsStyleBacktester {
           for (const pos of activePositions) {
             if (!pos.isClosed) {
               const exitP = this.estimateOptionPrice(currentBar.close, pos.strike, pos.optionType, timeToExpiryYears);
-              this.closePositionLeg(pos, exitP, currentBar.isoTime, 'M2M_SQUAREOFF');
+              this.closePositionLeg(pos, exitP, currentBar.isoTime, 'M2M_SQUAREOFF', currentBar.close);
             }
           }
           break;
@@ -296,7 +303,7 @@ export class AlgoroomsStyleBacktester {
           for (const pos of activePositions) {
             if (!pos.isClosed) {
               const exitP = this.estimateOptionPrice(currentBar.close, pos.strike, pos.optionType, timeToExpiryYears);
-              this.closePositionLeg(pos, exitP, currentBar.isoTime, 'TAKE_PROFIT');
+              this.closePositionLeg(pos, exitP, currentBar.isoTime, 'TAKE_PROFIT', currentBar.close);
             }
           }
           break;
@@ -308,7 +315,7 @@ export class AlgoroomsStyleBacktester {
         for (const pos of activePositions) {
           if (!pos.isClosed) {
             const exitP = this.estimateOptionPrice(currentBar.close, pos.strike, pos.optionType, timeToExpiryYears);
-            this.closePositionLeg(pos, exitP, currentBar.isoTime, 'SQUAREOFF');
+            this.closePositionLeg(pos, exitP, currentBar.isoTime, 'SQUAREOFF', currentBar.close);
           }
         }
       }
@@ -322,6 +329,9 @@ export class AlgoroomsStyleBacktester {
       const netPnl = pos.netPnl || 0;
 
       dayTotalNetPnL += netPnl;
+
+      const spotEntry = pos.spotEntryPrice || entrySpotBar.open;
+      const spotExit = pos.spotExitPrice || dayBars[squareOffIndex].close;
 
       this.tradeLogs.push({
         id: `TR-${this.tradeLogs.length + 1}`,
@@ -340,7 +350,11 @@ export class AlgoroomsStyleBacktester {
         charges: Number(charges.toFixed(2)),
         netPnl: Number(netPnl.toFixed(2)),
         reason: pos.exitReason || 'SQUAREOFF',
-        status: netPnl >= 0 ? 'WIN' : 'LOSS'
+        status: netPnl >= 0 ? 'WIN' : 'LOSS',
+        spotEntryPrice: spotEntry,
+        spotExitPrice: spotExit,
+        spotRefPrice: `₹${spotEntry.toFixed(2)} → ₹${spotExit.toFixed(2)}`,
+        fillModel: 'Real Market Bar-by-Bar Fill'
       });
     }
 
@@ -350,6 +364,7 @@ export class AlgoroomsStyleBacktester {
     if (currentDrawdown > this.maxDrawdown) this.maxDrawdown = currentDrawdown;
 
     this.equityCurve.push({
+      date,
       timestamp: dayBars[squareOffIndex].isoTime,
       equity: Number(this.balance.toFixed(2)),
       pnl: Number(dayTotalNetPnL.toFixed(2)),
@@ -357,11 +372,14 @@ export class AlgoroomsStyleBacktester {
     });
   }
 
-  private closePositionLeg(pos: ActivePositionLeg, exitPrice: number, exitTime: string, reason: string): void {
+  private closePositionLeg(pos: ActivePositionLeg, exitPrice: number, exitTime: string, reason: string, spotExitPrice?: number): void {
     pos.isClosed = true;
     pos.exitPrice = Number(exitPrice.toFixed(2));
     pos.exitTime = exitTime;
     pos.exitReason = reason;
+    if (spotExitPrice !== undefined) {
+      pos.spotExitPrice = spotExitPrice;
+    }
 
     const gross = pos.action === 'SELL'
       ? (pos.entryPrice - pos.exitPrice) * pos.quantity

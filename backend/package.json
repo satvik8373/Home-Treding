@@ -7,8 +7,7 @@
     "start": "tsx src/server.ts",
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "serve": "node dist/server.js",
-    "legacy": "node algorroms-server.js"
+    "serve": "node dist/server.js"
   },
   "dependencies": {
     "@types/pg": "^8.23.1",

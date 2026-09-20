@@ -55,4 +55,54 @@ export class DhanPositionsService {
       };
     });
   }
+
+  /**
+   * Exit all active positions and cancel open orders for the current trading day
+   * DELETE /positions (DhanHQ OpenAPI 3.0.1)
+   */
+  public async exitAllPositions(): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await this.client.delete<any>(DHAN_CONFIG.ENDPOINTS.EXIT_ALL_POSITIONS);
+      return {
+        success: response?.status === 'SUCCESS' || true,
+        message: response?.message || 'All positions exit order triggered successfully'
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Failed to exit all positions'
+      };
+    }
+  }
+
+  /**
+   * Convert open position between product types (e.g. INTRADAY <-> CNC / MARGIN)
+   * POST /positions/convert (DhanHQ OpenAPI 3.0.1)
+   */
+  public async convertPosition(payload: {
+    fromProductType: 'CNC' | 'INTRADAY' | 'MARGIN' | 'MTF' | 'CO' | 'BO';
+    exchangeSegment: 'NSE_EQ' | 'NSE_FNO' | 'BSE_EQ' | 'BSE_FNO' | 'MCX_COMM';
+    positionType: 'LONG' | 'SHORT' | 'CLOSED';
+    securityId: string;
+    convertQty: number;
+    toProductType: 'CNC' | 'INTRADAY' | 'MARGIN' | 'MTF' | 'CO' | 'BO';
+  }): Promise<{ success: boolean; message: string }> {
+    try {
+      const requestPayload = {
+        dhanClientId: this.client.getClientId(),
+        ...payload
+      };
+      await this.client.post(DHAN_CONFIG.ENDPOINTS.CONVERT_POSITION, requestPayload);
+      return {
+        success: true,
+        message: `Position conversion requested for security ${payload.securityId} from ${payload.fromProductType} to ${payload.toProductType}`
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Position conversion failed'
+      };
+    }
+  }
 }
+

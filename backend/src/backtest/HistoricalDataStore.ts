@@ -225,7 +225,7 @@ export class HistoricalDataStore {
     let accessToken = process.env.DHAN_ACCESS_TOKEN || null;
 
     if (!accessToken && dhanConn) {
-      const storageFile = path.join(__dirname, '../../data/broker_connections.json');
+      const storageFile = path.join(__dirname, '../../data/broker-connections.json');
       if (fs.existsSync(storageFile)) {
         const rawList = JSON.parse(fs.readFileSync(storageFile, 'utf8'));
         const fullConn = rawList.find((c: any) => c.id === dhanConn.id);

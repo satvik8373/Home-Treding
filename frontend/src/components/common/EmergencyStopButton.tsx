@@ -25,9 +25,10 @@ export const EmergencyStopButton: React.FC = () => {
 
   const fetchStatus = async () => {
     try {
-      const res = await brokerApi.getRiskStatus();
-      if (res && res.killSwitch) {
-        setStatus(res.killSwitch);
+      const res: any = await brokerApi.getRiskStatus();
+      const ks = res?.killSwitch || res;
+      if (ks && typeof ks.isHalted === 'boolean') {
+        setStatus(ks);
       }
     } catch {
       // ignore
@@ -38,15 +39,17 @@ export const EmergencyStopButton: React.FC = () => {
     setLoading(true);
     try {
       if (status.isHalted) {
-        const res = await brokerApi.resetEmergencyStop();
-        setStatus(res);
+        const res: any = await brokerApi.resetEmergencyStop();
+        const ks = res?.killSwitch || res;
+        if (ks && typeof ks.isHalted === 'boolean') setStatus(ks);
       } else {
-        const res = await brokerApi.triggerEmergencyStop('Manual Emergency Stop triggered from Navbar');
-        setStatus(res);
+        const res: any = await brokerApi.triggerEmergencyStop('Manual Stop from Header');
+        const ks = res?.killSwitch || res;
+        if (ks && typeof ks.isHalted === 'boolean') setStatus(ks);
       }
       setOpenModal(false);
     } catch (e) {
-      console.error('Failed to toggle kill switch', e);
+      console.error('Failed to toggle emergency stop:', e);
     } finally {
       setLoading(false);
     }

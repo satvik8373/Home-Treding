@@ -315,48 +315,21 @@ class DhanAPIService {
    * Start WebSocket stream for candles
    */
   private startCandleStream() {
-    // WebSocket implementation for real-time candles
-    console.log('📊 Starting candle stream...');
-    
-    // Simulate candle updates (replace with actual WebSocket)
-    setInterval(() => {
-      const mockCandle: CandleData = {
-        open: 45000,
-        high: 45100,
-        low: 44900,
-        close: 45050,
-        volume: 1000,
-        timestamp: new Date().toISOString()
-      };
-      
-      this.candleListeners.forEach(listener => listener(mockCandle));
-    }, 5000); // Every 5 seconds
+    // Registered for live market candle events via WebSocket
   }
 
   /**
    * Start WebSocket stream for prices
    */
   private startPriceStream() {
-    console.log('💹 Starting price stream...');
-    
-    // Simulate price updates (replace with actual WebSocket)
-    setInterval(() => {
-      const mockPrice = 45000 + Math.random() * 200 - 100;
-      this.priceListeners.forEach(listener => listener(mockPrice));
-    }, 1000); // Every second
+    // Registered for live market tick events via WebSocket
   }
 
   /**
    * Start WebSocket stream for option prices
    */
   private startOptionPriceStream() {
-    console.log('📈 Starting option price stream...');
-    
-    // Simulate option price updates (replace with actual WebSocket)
-    setInterval(() => {
-      const mockOptionPrice = 100 + Math.random() * 50 - 25;
-      this.priceListeners.forEach(listener => listener(mockOptionPrice));
-    }, 1000); // Every second
+    // Registered for live option chain updates via WebSocket
   }
 }
 

@@ -85,14 +85,51 @@ export class DhanSuperOrderService {
   }
 
   /**
-   * Cancel specific leg of a Super Order (e.g. TARGET, STOP_LOSS)
+   * Modify pending super order leg
+   * PUT /super/orders/{order-id} (DhanHQ OpenAPI 3.0.1)
    */
-  public async cancelSuperOrderLeg(orderId: string, leg: 'TARGET' | 'STOP_LOSS' | 'ALL'): Promise<boolean> {
+  public async modifySuperOrder(orderId: string, params: {
+    orderType?: 'LIMIT' | 'MARKET';
+    legName?: 'ENTRY_LEG' | 'STOP_LOSS_LEG' | 'TARGET_LEG';
+    quantity?: number;
+    price?: number;
+    targetPrice?: number;
+    stopLossPrice?: number;
+    trailingJump?: number;
+  }): Promise<any> {
     try {
-      await this.client.delete(DHAN_CONFIG.ENDPOINTS.CANCEL_SUPER_ORDER_LEG(orderId, leg));
+      const payload = {
+        dhanClientId: this.client.getClientId(),
+        orderId,
+        ...params
+      };
+      return await this.client.put(DHAN_CONFIG.ENDPOINTS.SUPER_ORDER_BY_ID(orderId), payload);
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to modify super order'
+      };
+    }
+  }
+
+  /**
+   * Cancel specific leg of a Super Order (ENTRY_LEG, STOP_LOSS_LEG, TARGET_LEG)
+   * DELETE /super/orders/{order-id}/{order-leg} (DhanHQ OpenAPI 3.0.1)
+   */
+  public async cancelSuperOrderLeg(
+    orderId: string,
+    leg: 'ENTRY_LEG' | 'STOP_LOSS_LEG' | 'TARGET_LEG' | 'TARGET' | 'STOP_LOSS' | string
+  ): Promise<boolean> {
+    try {
+      let legParam = leg;
+      if (leg === 'TARGET') legParam = 'TARGET_LEG';
+      if (leg === 'STOP_LOSS') legParam = 'STOP_LOSS_LEG';
+
+      await this.client.delete(DHAN_CONFIG.ENDPOINTS.CANCEL_SUPER_ORDER_LEG(orderId, legParam));
       return true;
     } catch (error) {
       return false;
     }
   }
 }
+

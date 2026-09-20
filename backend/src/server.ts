@@ -66,6 +66,7 @@ app.get('/health', (_req, res) => {
 });
 
 // Import routes
+import authRoutes from './routes/authRoutes';
 import marketRoutes from './routes/market';
 import oauthRoutes from './routes/oauthRoutes';
 import brokerRoutes from './routes/brokerRoutes';
@@ -83,6 +84,7 @@ app.get('/api', (_req, res) => {
         version: '3.0.0',
         broker: 'DhanHQ v2',
         endpoints: {
+            auth: '/api/auth',
             brokers: '/api/brokers',
             paper: '/api/paper',
             risk: '/api/risk',
@@ -95,6 +97,7 @@ app.get('/api', (_req, res) => {
 });
 
 // Register API Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/oauth', oauthRoutes);
 app.use('/api/broker', brokerRoutes);
@@ -107,8 +110,32 @@ app.use('/api/trading', tradingRoutes);
 app.use('/api/backtest', backtestRoutes);
 
 // Socket.IO event handling
-io.on('connection', (socket) => {
+import { verifyAuthToken } from './middleware/auth';
+
+io.on('connection', async (socket) => {
     logger.info(`🔌 Client connected to Socket.IO: ${socket.id}`);
+
+    // Check for user authentication in handshake
+    const token = (socket.handshake.auth?.token || socket.handshake.query?.token) as string | undefined;
+    if (token) {
+        const user = await verifyAuthToken(token);
+        if (user && user.uid) {
+            socket.join(`user_${user.uid}`);
+            logger.info(`👤 Socket ${socket.id} authenticated and joined room: user_${user.uid}`);
+        }
+    }
+
+    // Allow socket to explicitly join user room if token is provided later
+    socket.on('authenticate', async (authToken: string) => {
+        if (authToken) {
+            const user = await verifyAuthToken(authToken);
+            if (user && user.uid) {
+                socket.join(`user_${user.uid}`);
+                socket.emit('authenticated', { uid: user.uid, success: true });
+                logger.info(`👤 Socket ${socket.id} authenticated via event: user_${user.uid}`);
+            }
+        }
+    });
 
     // Send initial status
     socket.emit('system_status', {
@@ -128,7 +155,10 @@ io.on('connection', (socket) => {
     });
 });
 
-// Wire Paper Executor Events to Socket.IO
+// Wire Paper Trading Manager Events to Socket.IO
+import { paperTradingManager } from './execution/PaperTradingManager';
+paperTradingManager.setSocketIO(io);
+
 paperExecutor.on('orderFilled', (order) => {
     io.emit('paper_order_filled', order);
 });

@@ -26,6 +26,7 @@ export const DHAN_CONFIG = {
     ORDER_SLICING: '/orders/slicing',
     TRADES: '/trades',
     TRADE_BOOK: (orderId: string) => `/trades/${orderId}`,
+    TRADE_HISTORY: (fromDate: string, toDate: string, pageNumber: number = 0) => `/trades/${fromDate}/${toDate}/${pageNumber}`,
     
     // 3. Super Orders (Multi-leg Entry + Target + SL + Trailing)
     SUPER_ORDERS: '/super/orders',
@@ -36,28 +37,41 @@ export const DHAN_CONFIG = {
     FOREVER_ORDERS: '/forever/orders',
     FOREVER_ORDER_BY_ID: (orderId: string) => `/forever/orders/${orderId}`,
     
-    // 5. Conditional Triggers / Alerts
+    // 5. Conditional Triggers / Alerts & Multi Orders
     CONDITIONAL_TRIGGERS: '/alerts/orders',
     CONDITIONAL_TRIGGER_BY_ID: (alertId: string) => `/alerts/orders/${alertId}`,
+    MULTI_ORDERS: '/alerts/multi/orders',
     
     // 6. Portfolio & Positions
     HOLDINGS: '/holdings',
     POSITIONS: '/positions',
     CONVERT_POSITION: '/positions/convert',
-    EXIT_ALL_POSITIONS: '/positions/exitall',
+    EXIT_ALL_POSITIONS: '/positions', // HTTP DELETE exits all active positions
     
-    // 7. Risk Controls / Trader's Control (Kill Switch)
+    // 7. Risk Controls / Trader's Control (Kill Switch & P&L Exit)
     KILL_SWITCH: '/killswitch',
+    PNL_EXIT: '/pnlExit',
+
+    // 8. Static IP Setup
+    GET_IP: '/ip/getIP',
+    SET_IP: '/ip/setIP',
+    MODIFY_IP: '/ip/modifyIP',
+
+    // 9. EDIS Authentication
+    EDIS_FORM: '/edis/form',
+    EDIS_BULK_FORM: '/edis/bulkform',
+    EDIS_TPIN: '/edis/tpin',
+    EDIS_INQUIRE: (isin: string) => `/edis/inquire/${isin}`,
     
-    // 8. Funds & Margin Calculation
+    // 10. Funds & Margin Calculation
     FUND_LIMIT: '/fundlimit',
     MARGIN_CALCULATOR: '/margincalculator',
     MARGIN_CALCULATOR_MULTI: '/margincalculator/multi',
     
-    // 9. Statements & Ledger
+    // 11. Statements & Ledger
     LEDGER: '/ledger',
     
-    // 10. Market Data, Quotes & Depth
+    // 12. Market Data, Quotes & Depth
     MARKET_FEED: '/marketfeed/quote',
     MARKET_FEED_OHLC: '/marketfeed/ohlc',
     MARKET_FEED_LTP: '/marketfeed/ltp',
@@ -65,11 +79,17 @@ export const DHAN_CONFIG = {
     CHARTS_INTRADAY: '/charts/intraday',
     CHARTS_ROLLING_OPTION: '/charts/rollingoption',
     
-    // 11. Option Chain & Expiries
+    // 13. Data APIs (Technical Metrics, News, Market Movers, Company Info)
+    DATA_TECHNICAL: '/data/technical',
+    DATA_NEWS_HEADLINE: '/data/newsheadline',
+    DATA_MARKET_MOVERS: '/data/marketmovers',
+    DATA_COMPANY_INFO: '/data/companyinfo',
+    
+    // 14. Option Chain & Expiries
     OPTION_CHAIN: '/optionchain',
     OPTION_CHAIN_EXPIRIES: '/optionchain/expirylist',
     
-    // 12. Security Master / Instruments
+    // 15. Security Master / Instruments
     SECURITY_LIST: '/instruments'
   },
 

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NIFTY 0.09% ATM Full-Day Breakout Strategy — Official Documentation</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --dark: #0f172a;
+      --text: #334155;
+      --light-bg: #f8fafc;
+      --border: #e2e8f0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background: #f1f5f9;
+      line-height: 1.65;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+      padding: 50px;
+      border: 1px solid var(--border);
+    }
+    .header {
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 25px;
+      margin-bottom: 35px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--dark);
+      letter-spacing: -0.02em;
+    }
+    .subtitle {
+      font-size: 1.05rem;
+      color: #64748b;
+      margin-top: 6px;
+      font-weight: 500;
+    }
+    .badge {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: #eff6ff;
+      color: var(--primary);
+      border: 1px solid #bfdbfe;
+    }
+    .badge.verified {
+      background: #ecfdf5;
+      color: var(--success);
+      border-color: #a7f3d0;
+    }
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--dark);
+      margin-top: 36px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 24px;
+      margin-bottom: 10px;
+    }
+    p { margin-bottom: 14px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    th {
+      background: var(--light-bg);
+      color: var(--dark);
+      font-weight: 700;
+    }
+    tr:nth-child(even) td { background: #fafafa; }
+    .formula-box {
+      background: #f8fafc;
+      border-left: 4px solid var(--primary);
+      padding: 18px 24px;
+      border-radius: 0 10px 10px 0;
+      margin: 20px 0;
+      font-family: Consolas, Monaco, "Courier New", monospace;
+      font-size: 1rem;
+      color: #0f172a;
+      line-height: 1.8;
+    }
+    .flowchart {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 24px;
+      border-radius: 12px;
+      font-family: Consolas, monospace;
+      font-size: 0.88rem;
+      line-height: 1.6;
+      overflow-x: auto;
+      margin: 24px 0;
+    }
+    .callout {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin: 20px 0;
+      font-size: 0.92rem;
+      color: #1e40af;
+    }
+    .callout strong { color: #1e3a8a; }
+    .print-button {
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.15s ease;
+    }
+    .print-button:hover { background: var(--primary-dark); }
+    @media print {
+      body { background: #ffffff; padding: 0; }
+      .container { border: none; box-shadow: none; padding: 0; max-width: 100%; }
+      .print-button { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <span class="badge verified">Production Certified & Live Ready</span>
+        <h1 style="margin-top: 10px;">NIFTY 0.09% ATM Full-Day Breakout</h1>
+        <div class="subtitle">Official System Specification & Real-Money Algorithmic Trading Rules</div>
+      </div>
+      <button class="print-button" onclick="window.print()">Print / Save as PDF</button>
+    </div>
+
+    <h2>1. Executive Summary</h2>
+    <table>
+      <tr><th style="width: 30%;">Attribute</th><th>Specification</th></tr>
+      <tr><td><strong>Strategy Name</strong></td><td>NIFTY 0.09% ATM Full-Day Breakout</td></tr>
+      <tr><td><strong>Underlying Index</strong></td><td><strong>NIFTY 50</strong> (Spot Price)</td></tr>
+      <tr><td><strong>Trading Instrument</strong></td><td>Current Weekly Expiry <strong>ATM CE & ATM PE</strong></td></tr>
+      <tr><td><strong>Reference Candle</strong></td><td><strong>09:15 to 09:20 IST</strong> (First 5-Minute Candle)</td></tr>
+      <tr><td><strong>Execution Trigger</strong></td><td><strong>5-Minute Candle Close</strong> (09:20 to 15:10 IST)</td></tr>
+      <tr><td><strong>Base Lot Size</strong></td><td><strong>75 Shares</strong> (1 Lot)</td></tr>
+      <tr><td><strong>Force Square-Off</strong></td><td><strong>15:10 IST</strong> (Strict Intraday Close)</td></tr>
+      <tr><td><strong>Execution Mode</strong></td><td><strong>Live Real Money</strong> (DhanHQ v2) & <strong>Paper Trading</strong></td></tr>
+    </table>
+
+    <h2>2. Mathematical Model & Boundary Calculation</h2>
+    <p>At <strong>09:20:00 IST</strong>, when the first 5-minute candle closes, the reference price <code>X</code> is captured:</p>
+    
+    <div class="formula-box">
+      <strong>Reference Close (X)</strong> = Close of 09:15–09:20 Candle<br>
+      <strong>Upper Breakout Level (+0.09%)</strong> = X &times; (1 + 0.09 / 100) = <strong>X &times; 1.0009</strong><br>
+      <strong>Lower Breakout Level (&minus;0.09%)</strong> = X &times; (1 &minus; 0.09 / 100) = <strong>X &times; 0.9991</strong><br>
+      <strong>Locked ATM Strike</strong> = round(X / 50) &times; 50
+    </div>
+
+    <div class="callout">
+      <strong>Level Invariance Rule:</strong> Once calculated at 09:20:00 IST, the Upper Level, Lower Level, and Locked ATM Strike remain <strong>100% fixed for the remainder of the trading day</strong>. They are never updated or shifted intrabar.
+    </div>
+
+    <h2>3. ATM Option Strike & Contract Resolution</h2>
+    <p>At 09:20:00 IST, the engine connects to the live <strong>Dhan Option Chain API</strong> and resolves the exact weekly option contracts corresponding to the locked strike:</p>
+    <ul>
+      <li><strong>ATM CE:</strong> e.g., <code>NIFTY [Current Weekly Expiry] [Locked Strike] CE</code></li>
+      <li><strong>ATM PE:</strong> e.g., <code>NIFTY [Current Weekly Expiry] [Locked Strike] PE</code></li>
+    </ul>
+    <p style="margin-top: 8px;">Both contracts are monitored concurrently. Orders are dispatched directly to the exchange <strong>NFO</strong> segment using their official Dhan Security IDs.</p>
+
+    <h2>4. Operational Trading Rules</h2>
+    <h3>4.1 Entry Rules</h3>
+    <table>
+      <tr><th>Signal</th><th>Trigger Condition</th><th>Position State</th><th>Dispatched Action</th></tr>
+      <tr>
+        <td style="color: var(--success); font-weight: 700;">BUY_CE</td>
+        <td>5-min Candle Close &gt; Upper Level</td>
+        <td>Flat (No active position)</td>
+        <td>Place Market <strong>BUY</strong> order for locked ATM CE (75 &times; Multiplier)</td>
+      </tr>
+      <tr>
+        <td style="color: var(--danger); font-weight: 700;">BUY_PE</td>
+        <td>5-min Candle Close &lt; Lower Level</td>
+        <td>Flat (No active position)</td>
+        <td>Place Market <strong>BUY</strong> order for locked ATM PE (75 &times; Multiplier)</td>
+      </tr>
+    </table>
+
+    <h3>4.2 Exit Rules & Symmetric Reversals</h3>
+    <table>
+      <tr><th>Exit Event</th><th>Condition</th><th>Holding Position</th><th>Dispatched Action</th></tr>
+      <tr>
+        <td><strong>EXIT_CE</strong></td>
+        <td>5-min Candle Close &lt; Lower Level</td>
+        <td>Holding ATM CE</td>
+        <td>Place Market <strong>SELL</strong> order to exit CE (flips to BUY PE)</td>
+      </tr>
+      <tr>
+        <td><strong>EXIT_PE</strong></td>
+        <td>5-min Candle Close &gt; Upper Level</td>
+        <td>Holding ATM PE</td>
+        <td>Place Market <strong>SELL</strong> order to exit PE (flips to BUY CE)</td>
+      </tr>
+      <tr>
+        <td><strong>EOD Square-Off</strong></td>
+        <td>15:10 IST Reached</td>
+        <td>Any Open Position</td>
+        <td>Force square-off via Market <strong>SELL</strong>; stop trading for day</td>
+      </tr>
+    </table>
+
+    <h2>5. Execution Timeline</h2>
+    <div class="flowchart">
+09:15 IST ────► Market Opens (NIFTY 50 live feed active)
+  │
+09:20 IST ────► 1st 5-Min Candle Closes (Close = X)
+  │             • Upper Level = X * 1.0009
+  │             • Lower Level = X * 0.9991
+  │             • Locked ATM Strike = round(X / 50) * 50
+  │             • Lock CE and PE contracts from Dhan Option Chain
+  │
+09:20 - 15:10 ─► Full-Day Breakout Monitoring (On each 5-min candle close):
+  │             • Close > Upper Level  ===> BUY ATM CE (or exit PE)
+  │             • Close < Lower Level  ===> BUY ATM PE (or exit CE)
+  │
+15:10 IST ────► Intraday Cutoff & Force Square-Off
+  │             • Market SELL any active position
+  │             • Daily session finalized and report generated
+  │
+15:30 IST ────► Market Closes
+    </div>
+
+    <h2>6. Numerical Walkthrough Example</h2>
+    <p>Assume on a trading day:</p>
+    <ul>
+      <li>First 5-min candle (09:15–09:20) closes at <strong>X = 24,850.00</strong></li>
+    </ul>
+    <table>
+      <tr><th>Metric</th><th>Formula</th><th>Calculated Value</th></tr>
+      <tr><td><strong>Upper Level (+0.09%)</strong></td><td>24,850.00 &times; 1.0009</td><td><strong>24,872.365</strong></td></tr>
+      <tr><td><strong>Lower Level (-0.09%)</strong></td><td>24,850.00 &times; 0.9991</td><td><strong>24,827.635</strong></td></tr>
+      <tr><td><strong>Locked ATM Strike</strong></td><td>round(24,850 / 50) &times; 50</td><td><strong>24,850</strong></td></tr>
+      <tr><td><strong>CE Contract</strong></td><td>Nearest Weekly Expiry</td><td>NIFTY 24-SEP-2026 24850 CE</td></tr>
+      <tr><td><strong>PE Contract</strong></td><td>Nearest Weekly Expiry</td><td>NIFTY 24-SEP-2026 24850 PE</td></tr>
+    </table>
+
+    <p><strong>Session Events:</strong></p>
+    <ol style="padding-left: 20px; line-height: 1.8;">
+      <li><strong>09:35 Candle Closes at 24,880.00:</strong> 24,880.00 &gt; 24,872.365 &implies; <strong>BUY 75 Qty 24850 CE</strong> at ₹142.50.</li>
+      <li><strong>11:15 Candle Closes at 24,815.00:</strong> 24,815.00 &lt; 24,827.635 &implies; <strong>EXIT CE</strong> at ₹98.00 and immediately <strong>BUY 75 Qty 24850 PE</strong> at ₹135.00 (Symmetric Reversal).</li>
+      <li><strong>15:10 IST EOD:</strong> 15:10 cutoff closes active PE position at ₹178.00.</li>
+    </ol>
+
+    <h2>7. Implementation Files in Repository</h2>
+    <table>
+      <tr><th>Role</th><th>File Path</th></tr>
+      <tr><td><strong>Engine Core</strong></td><td><code>backend/src/strategies/nifty009/Nifty009Engine.ts</code></td></tr>
+      <tr><td><strong>State Machine</strong></td><td><code>backend/src/strategies/nifty009/StrategyStateMachine.ts</code></td></tr>
+      <tr><td><strong>ATM Contract Resolver</strong></td><td><code>backend/src/strategies/nifty009/AtmResolver.ts</code></td></tr>
+      <tr><td><strong>Strategy Data Definition</strong></td><td><code>backend/data/strategies.json</code></td></tr>
+      <tr><td><strong>Backtesting Engine</strong></td><td><code>backend/src/backtest/BacktestEngine.ts</code></td></tr>
+    </table>
+  </div>
+</body>
+</html>

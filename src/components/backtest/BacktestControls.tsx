@@ -62,6 +62,8 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
   const [strategyMenuAnchor, setStrategyMenuAnchor] = useState<null | HTMLElement>(null);
 
   const ranges = [
+    { label: '5 Days', days: 5 },
+    { label: '1 Week', days: 7 },
     { label: '1 Month', days: 23 },
     { label: '3 Months', days: 65 },
     { label: '6 Months', days: 130 },

@@ -28,7 +28,28 @@ import { DhanConditionalTriggerService, ConditionalTriggerRequest, ConditionalTr
 import { DhanOptionChainService, OptionChainResponse } from './optionChain';
 import { DhanMarginCalculatorService, MarginOrderInput, MarginCalculationResult } from './marginCalculator';
 import { DhanStatementsService, LedgerEntry } from './statements';
+import { DhanRiskControlsService } from './riskControls';
+import { DhanDataApiService } from './dataApi';
 import { DhanOrderUpdateWsClient } from './orderUpdateWs';
+import {
+  DhanTradeResponse,
+  DhanTradeHistoryResponseModel,
+  DhanPositionConversionRequest,
+  DhanGetIPDetailsResponse,
+  DhanUserIPResponse,
+  DhanExitPnlResponse,
+  DhanPnlBasedExitRequest,
+  DhanTechnicalMetricsRequest,
+  DhanTechnicalMetricsResponse,
+  DhanNewsHeadlineRequest,
+  DhanNewsHeadlineResponse,
+  DhanTopInstrumentsRequest,
+  DhanTopInstrumentsResponse,
+  DhanCompanyInfoRequest,
+  DhanCompanyInfoResponse,
+  DhanEdisFormResponse,
+  DhanEdisQtyStatusResponse
+} from './types';
 import { DHAN_CONFIG } from './config';
 import { logger } from '../../utils/logger';
 
@@ -48,6 +69,8 @@ export class DhanAdapter extends BrokerAdapter {
   private optionChainService: DhanOptionChainService | null = null;
   private marginCalculatorService: DhanMarginCalculatorService | null = null;
   private statementsService: DhanStatementsService | null = null;
+  private riskControlsService: DhanRiskControlsService | null = null;
+  private dataApiService: DhanDataApiService | null = null;
   private wsClient: DhanWebSocketClient | null = null;
   private orderUpdateWs: DhanOrderUpdateWsClient | null = null;
 
@@ -79,6 +102,8 @@ export class DhanAdapter extends BrokerAdapter {
     this.optionChainService = new DhanOptionChainService(this.httpClient);
     this.marginCalculatorService = new DhanMarginCalculatorService(this.httpClient);
     this.statementsService = new DhanStatementsService(this.httpClient);
+    this.riskControlsService = new DhanRiskControlsService(this.httpClient);
+    this.dataApiService = new DhanDataApiService(this.httpClient);
 
     // Step 3: Fetch verified profile
     this.profile = await this.profileService.getProfile();
@@ -233,23 +258,225 @@ export class DhanAdapter extends BrokerAdapter {
     return await this.statementsService!.getLedger(fromDate, toDate);
   }
 
+  // ==========================================
+  // Positions & Orders Extended (OpenAPI 3.0.1)
+  // ==========================================
+
+  public async exitAllPositions(): Promise<{ success: boolean; message: string }> {
+    this.ensureConnected();
+    return await this.positionsService!.exitAllPositions();
+  }
+
+  public async convertPosition(payload: {
+    fromProductType: 'CNC' | 'INTRADAY' | 'MARGIN' | 'MTF' | 'CO' | 'BO';
+    exchangeSegment: 'NSE_EQ' | 'NSE_FNO' | 'BSE_EQ' | 'BSE_FNO' | 'MCX_COMM';
+    positionType: 'LONG' | 'SHORT' | 'CLOSED';
+    securityId: string;
+    convertQty: number;
+    toProductType: 'CNC' | 'INTRADAY' | 'MARGIN' | 'MTF' | 'CO' | 'BO';
+  }): Promise<{ success: boolean; message: string }> {
+    this.ensureConnected();
+    return await this.positionsService!.convertPosition(payload);
+  }
+
+  public async placeSliceOrder(order: OrderRequest): Promise<OrderResult[]> {
+    this.ensureConnected();
+    return await this.ordersService!.placeSliceOrder(order);
+  }
+
+  public async getAllTrades(): Promise<DhanTradeResponse[]> {
+    this.ensureConnected();
+    return await this.ordersService!.getAllTrades();
+  }
+
+  public async getTradeByOrderId(orderId: string): Promise<DhanTradeResponse[]> {
+    this.ensureConnected();
+    return await this.ordersService!.getTradeByOrderId(orderId);
+  }
+
+  public async getTradeHistory(fromDate: string, toDate: string, pageNumber: number = 0): Promise<DhanTradeHistoryResponseModel[]> {
+    this.ensureConnected();
+    return await this.ordersService!.getTradeHistory(fromDate, toDate, pageNumber);
+  }
+
+  public async getOrderById(orderId: string): Promise<BrokerOrder | null> {
+    this.ensureConnected();
+    return await this.ordersService!.getOrderById(orderId);
+  }
+
+  public async getOrderByCorrelationId(correlationId: string): Promise<BrokerOrder | null> {
+    this.ensureConnected();
+    return await this.ordersService!.getOrderByCorrelationId(correlationId);
+  }
+
+  // ==========================================
+  // Super Orders & Multi Orders Extended
+  // ==========================================
+
+  public async modifySuperOrder(orderId: string, params: any): Promise<any> {
+    this.ensureConnected();
+    return await this.superOrderService!.modifySuperOrder(orderId, params);
+  }
+
+  public async cancelSuperOrderLeg(orderId: string, leg: 'ENTRY_LEG' | 'STOP_LOSS_LEG' | 'TARGET_LEG' | string): Promise<boolean> {
+    this.ensureConnected();
+    return await this.superOrderService!.cancelSuperOrderLeg(orderId, leg as any);
+  }
+
+  public async modifyForeverOrder(orderId: string, params: any): Promise<any> {
+    this.ensureConnected();
+    return await this.foreverOrderService!.modifyForeverOrder(orderId, params);
+  }
+
+  public async cancelForeverOrder(orderId: string): Promise<boolean> {
+    this.ensureConnected();
+    return await this.foreverOrderService!.cancelForeverOrder(orderId);
+  }
+
+  public async placeMultiOrder(orders: any[]): Promise<any> {
+    this.ensureConnected();
+    return await this.conditionalTriggerService!.placeMultiOrder(orders);
+  }
+
+  public async getConditionalTriggerById(alertId: string): Promise<any> {
+    this.ensureConnected();
+    return await this.conditionalTriggerService!.getConditionalTriggerById(alertId);
+  }
+
+  public async modifyConditionalTrigger(alertId: string, params: any): Promise<any> {
+    this.ensureConnected();
+    return await this.conditionalTriggerService!.modifyConditionalTrigger(alertId, params);
+  }
+
+  public async cancelConditionalTrigger(alertId: string): Promise<boolean> {
+    this.ensureConnected();
+    return await this.conditionalTriggerService!.cancelConditionalTrigger(alertId);
+  }
+
+  // ==========================================
+  // Trader's Control & Risk Management
+  // ==========================================
+
   public async activateKillSwitch(): Promise<boolean> {
     this.ensureConnected();
     try {
-      await this.httpClient!.post(`${DHAN_CONFIG.ENDPOINTS.KILL_SWITCH}?killSwitchStatus=ACTIVATE`, {});
-      return true;
+      const res = await this.riskControlsService!.manageKillSwitch('ACTIVATE');
+      return res?.killSwitchStatus === 'ACTIVATE';
     } catch (e) {
       return false;
     }
   }
 
+  public async manageKillSwitch(status: 'ACTIVATE' | 'DEACTIVATE'): Promise<any> {
+    this.ensureConnected();
+    return await this.riskControlsService!.manageKillSwitch(status);
+  }
+
   public async getKillSwitchStatus(): Promise<any> {
     this.ensureConnected();
-    try {
-      return await this.httpClient!.get(DHAN_CONFIG.ENDPOINTS.KILL_SWITCH);
-    } catch (e) {
-      return { killSwitchStatus: 'DEACTIVATED' };
-    }
+    return await this.riskControlsService!.getKillSwitchStatus();
+  }
+
+  public async getPnlExit(): Promise<DhanExitPnlResponse> {
+    this.ensureConnected();
+    return await this.riskControlsService!.getPnlExit();
+  }
+
+  public async setPnlExit(params: {
+    profitValue: number;
+    lossValue: number;
+    enableKillSwitch?: boolean;
+    productType?: ('INTRADAY' | 'DELIVERY')[];
+  }): Promise<DhanExitPnlResponse> {
+    this.ensureConnected();
+    return await this.riskControlsService!.setPnlExit(params);
+  }
+
+  public async stopPnlExit(): Promise<DhanUserIPResponse> {
+    this.ensureConnected();
+    return await this.riskControlsService!.stopPnlExit();
+  }
+
+  // ==========================================
+  // Static IP Setup
+  // ==========================================
+
+  public async getIP(): Promise<DhanGetIPDetailsResponse> {
+    this.ensureConnected();
+    return await this.riskControlsService!.getIP();
+  }
+
+  public async setIP(params: { ip: string; ipFlag: 'PRIMARY' | 'SECONDARY' }): Promise<DhanUserIPResponse> {
+    this.ensureConnected();
+    return await this.riskControlsService!.setIP(params);
+  }
+
+  public async modifyIP(params: { ip: string; ipFlag: 'PRIMARY' | 'SECONDARY' }): Promise<DhanUserIPResponse> {
+    this.ensureConnected();
+    return await this.riskControlsService!.modifyIP(params);
+  }
+
+  // ==========================================
+  // EDIS Authentication
+  // ==========================================
+
+  public async generateEdisForm(params: {
+    isin: string;
+    qty: number;
+    exchange: 'NSE' | 'BSE' | 'MCX' | 'ALL';
+    segment: 'EQ' | 'COMM' | 'FNO';
+    bulk?: boolean;
+  }): Promise<DhanEdisFormResponse> {
+    this.ensureConnected();
+    return await this.riskControlsService!.generateEdisForm(params);
+  }
+
+  public async generateBulkEdisForm(params: {
+    isin: string[];
+    exchange: 'NSE' | 'BSE' | 'MCX' | 'ALL';
+    segment: 'EQ' | 'COMM' | 'FNO';
+  }): Promise<DhanEdisFormResponse> {
+    this.ensureConnected();
+    return await this.riskControlsService!.generateBulkEdisForm(params);
+  }
+
+  public async generateEdisTpin(): Promise<{ success: boolean; message: string }> {
+    this.ensureConnected();
+    return await this.riskControlsService!.generateEdisTpin();
+  }
+
+  public async inquireEdisQty(isin: string): Promise<DhanEdisQtyStatusResponse> {
+    this.ensureConnected();
+    return await this.riskControlsService!.inquireEdisQty(isin);
+  }
+
+  // ==========================================
+  // Data APIs (OpenAPI 3.0.1)
+  // ==========================================
+
+  public async getTechnicalMetrics(params: DhanTechnicalMetricsRequest): Promise<DhanTechnicalMetricsResponse> {
+    this.ensureConnected();
+    return await this.dataApiService!.getTechnicalMetrics(params);
+  }
+
+  public async getNewsHeadlines(params: {
+    categories?: string[];
+    limit?: number;
+    universe?: 'PORTFOLIO' | 'WATCHLIST';
+    stockList?: string[];
+  }): Promise<DhanNewsHeadlineResponse> {
+    this.ensureConnected();
+    return await this.dataApiService!.getNewsHeadlines(params);
+  }
+
+  public async getMarketMovers(params: DhanTopInstrumentsRequest): Promise<DhanTopInstrumentsResponse> {
+    this.ensureConnected();
+    return await this.dataApiService!.getMarketMovers(params);
+  }
+
+  public async getCompanyInfo(params: DhanCompanyInfoRequest): Promise<DhanCompanyInfoResponse> {
+    this.ensureConnected();
+    return await this.dataApiService!.getCompanyInfo(params);
   }
 
   public async subscribeMarketData(symbols: string[]): Promise<void> {
@@ -270,3 +497,4 @@ export class DhanAdapter extends BrokerAdapter {
     }
   }
 }
+

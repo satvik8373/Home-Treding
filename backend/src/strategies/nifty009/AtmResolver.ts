@@ -58,7 +58,7 @@ export class AtmResolver {
   /**
    * Resolve and lock ATM strike at 09:20 IST.
    */
-  public async resolveAndLockAtm(spotPrice: number): Promise<LockedAtm> {
+  public async resolveAndLockAtm(spotPrice: number, defaultLotSize: number = 75, userId?: string): Promise<LockedAtm> {
     if (this.lockedAtm) {
       logger.info(`[AtmResolver] ATM already locked at ${this.lockedAtm.atmStrike}. Re-using locked strike.`);
       return this.lockedAtm;
@@ -66,7 +66,7 @@ export class AtmResolver {
 
     const atmStrike = this.getNearestStrike(spotPrice);
     const expiry = this.getNearestWeeklyExpiry();
-    const lotSize = 25; // NIFTY standard lot size
+    const lotSize = defaultLotSize || 75; // NIFTY standard lot size
 
     const ceSymbol = `NIFTY ${expiry} ${atmStrike} CE`;
     const peSymbol = `NIFTY ${expiry} ${atmStrike} PE`;
@@ -78,11 +78,14 @@ export class AtmResolver {
 
     try {
       const brokerRegistry = BrokerRegistry.getInstance();
-      const primaryAdapter = brokerRegistry.getPrimaryAdapter() as any;
+      const primaryAdapter = brokerRegistry.getPrimaryAdapter(userId) as any;
 
       if (primaryAdapter && typeof primaryAdapter.getOptionChain === 'function') {
-        // Attempt to fetch live option chain from Dhan
-        const chain = await primaryAdapter.getOptionChain('NIFTY', expiry);
+        // Attempt to fetch live option chain from Dhan (UnderlyingSecurityId '13' for NIFTY 50)
+        let chain = await primaryAdapter.getOptionChain('13', expiry);
+        if (!chain || !chain.strikes || chain.strikes.length === 0) {
+          chain = await primaryAdapter.getOptionChain('NIFTY', expiry);
+        }
         if (chain && chain.strikes) {
           const matched = chain.strikes.find((s: any) => s.strikePrice === atmStrike);
           if (matched) {

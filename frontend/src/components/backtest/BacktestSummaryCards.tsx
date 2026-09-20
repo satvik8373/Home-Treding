@@ -258,7 +258,7 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
                 letterSpacing: '-0.02em'
               }}
             >
-              {formatK(summary.maxDrawdownFromPeak)}
+              {formatK(summary.maxDrawdownFromPeak ?? (summary as any).maxDrawdown ?? 0)}
             </Typography>
           </Box>
         </Paper>

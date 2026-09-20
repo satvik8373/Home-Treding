@@ -74,6 +74,35 @@ export class DhanForeverOrderService {
   }
 
   /**
+   * Modify pending Forever / GTT order
+   * PUT /forever/orders/{order-id} (DhanHQ OpenAPI 3.0.1)
+   */
+  public async modifyForeverOrder(orderId: string, params: {
+    orderFlag?: 'SINGLE' | 'OCO';
+    orderType?: 'LIMIT' | 'MARKET';
+    legName?: 'TARGET_LEG' | 'STOP_LOSS_LEG';
+    quantity?: number;
+    price?: number;
+    triggerPrice?: number;
+    disclosedQuantity?: number;
+    validity?: string;
+  }): Promise<any> {
+    try {
+      const payload = {
+        dhanClientId: this.client.getClientId(),
+        orderId,
+        ...params
+      };
+      return await this.client.put(DHAN_CONFIG.ENDPOINTS.FOREVER_ORDER_BY_ID(orderId), payload);
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to modify forever order'
+      };
+    }
+  }
+
+  /**
    * Cancel open Forever Order
    */
   public async cancelForeverOrder(orderId: string): Promise<boolean> {
@@ -85,3 +114,4 @@ export class DhanForeverOrderService {
     }
   }
 }
+

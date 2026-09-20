@@ -146,4 +146,182 @@ export class DhanAuthService {
       };
     }
   }
+
+  // --- Official DhanHQ Developer API Key & Secret OAuth Flow ---
+  // In-memory store for pending consent sessions (TTL 15 mins)
+  private static pendingConsents = new Map<string, {
+    clientId: string;
+    apiKey: string;
+    apiSecret: string;
+    userId?: string;
+    timestamp: number;
+  }>();
+
+  /**
+   * Step 1: Generate Consent
+   * POST https://auth.dhan.co/app/generate-consent?client_id={clientId}
+   * Headers: app_id, app_secret
+   */
+  public static async generateConsent(params: {
+    clientId: string;
+    apiKey: string;
+    apiSecret: string;
+    userId?: string;
+  }): Promise<{
+    success: boolean;
+    consentAppId?: string;
+    loginUrl?: string;
+    error?: string;
+  }> {
+    const { clientId, apiKey, apiSecret, userId } = params;
+
+    if (!clientId || !apiKey || !apiSecret) {
+      return {
+        success: false,
+        error: 'Broker ID (Client ID), API Key, and API Secret Key are all required'
+      };
+    }
+
+    try {
+      const url = `https://auth.dhan.co/app/generate-consent?client_id=${encodeURIComponent(clientId.trim())}`;
+      const response = await axios.post(url, {}, {
+        headers: {
+          'app_id': apiKey.trim(),
+          'app_secret': apiSecret.trim(),
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000
+      });
+
+      const data = response.data;
+      const consentAppId = data?.consentAppId;
+
+      if (!consentAppId) {
+        return {
+          success: false,
+          error: data?.remarks || data?.message || 'Failed to receive consent session from Dhan'
+        };
+      }
+
+      // Store in pending consents map
+      this.pendingConsents.set(consentAppId, {
+        clientId: clientId.trim(),
+        apiKey: apiKey.trim(),
+        apiSecret: apiSecret.trim(),
+        userId,
+        timestamp: Date.now()
+      });
+
+      // Also clean up stale sessions (> 15 mins)
+      const now = Date.now();
+      for (const [key, val] of this.pendingConsents.entries()) {
+        if (now - val.timestamp > 15 * 60 * 1000) {
+          this.pendingConsents.delete(key);
+        }
+      }
+
+      const loginUrl = `https://auth.dhan.co/login/consentApp-login?consentAppId=${encodeURIComponent(consentAppId)}`;
+
+      return {
+        success: true,
+        consentAppId,
+        loginUrl
+      };
+    } catch (error: any) {
+      logger.error('[Dhan Generate Consent Error]', error.response?.data || error.message);
+      return {
+        success: false,
+        error: error.response?.data?.remarks || error.response?.data?.message || error.message || 'Dhan consent generation failed'
+      };
+    }
+  }
+
+  /**
+   * Step 3: Consume Consent
+   * POST https://auth.dhan.co/app/consumeApp-consent?tokenId={tokenId}
+   * Headers: app_id, app_secret
+   */
+  public static async consumeConsent(params: {
+    tokenId: string;
+    consentAppId?: string;
+    clientId?: string;
+    apiKey?: string;
+    apiSecret?: string;
+  }): Promise<{
+    success: boolean;
+    accessToken?: string;
+    dhanClientId?: string;
+    dhanClientName?: string;
+    dhanClientUcc?: string;
+    expiryTime?: string;
+    error?: string;
+  }> {
+    const { tokenId, consentAppId } = params;
+
+    let apiKey = params.apiKey;
+    let apiSecret = params.apiSecret;
+    let clientId = params.clientId;
+
+    if (consentAppId && this.pendingConsents.has(consentAppId)) {
+      const stored = this.pendingConsents.get(consentAppId)!;
+      apiKey = apiKey || stored.apiKey;
+      apiSecret = apiSecret || stored.apiSecret;
+      clientId = clientId || stored.clientId;
+    } else if (!apiKey || !apiSecret) {
+      // Find the most recent active consent session
+      const sessions = Array.from(this.pendingConsents.values()).sort((a, b) => b.timestamp - a.timestamp);
+      if (sessions.length > 0 && (Date.now() - sessions[0].timestamp < 15 * 60 * 1000)) {
+        apiKey = apiKey || sessions[0].apiKey;
+        apiSecret = apiSecret || sessions[0].apiSecret;
+        clientId = clientId || sessions[0].clientId;
+      }
+    }
+
+    if (!tokenId || !apiKey || !apiSecret) {
+      return {
+        success: false,
+        error: 'tokenId, API Key, and API Secret Key are required to consume consent'
+      };
+    }
+
+    try {
+      const url = `https://auth.dhan.co/app/consumeApp-consent?tokenId=${encodeURIComponent(tokenId.trim())}`;
+      const response = await axios.post(url, {}, {
+        headers: {
+          'app_id': apiKey.trim(),
+          'app_secret': apiSecret.trim(),
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000
+      });
+
+      const data = response.data;
+      if (data?.accessToken) {
+        if (consentAppId) {
+          this.pendingConsents.delete(consentAppId);
+        }
+
+        return {
+          success: true,
+          accessToken: data.accessToken,
+          dhanClientId: data.dhanClientId || clientId,
+          dhanClientName: data.dhanClientName,
+          dhanClientUcc: data.dhanClientUcc,
+          expiryTime: data.expiryTime
+        };
+      }
+
+      return {
+        success: false,
+        error: data?.remarks || data?.message || 'Failed to obtain access token from Dhan'
+      };
+    } catch (error: any) {
+      logger.error('[Dhan Consume Consent Error]', error.response?.data || error.message);
+      return {
+        success: false,
+        error: error.response?.data?.remarks || error.response?.data?.message || error.message || 'Failed to exchange token with Dhan'
+      };
+    }
+  }
 }
+

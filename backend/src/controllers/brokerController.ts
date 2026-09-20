@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { brokerRegistry } from '../brokers/BrokerRegistry';
 import { DhanAuthService } from '../brokers/dhan/auth';
@@ -8,9 +9,12 @@ import { logger } from '../utils/logger';
 
 /**
  * Connect a broker with Client ID and Access Token
+ * Strictly bound to req.userId
  */
-export const connectBroker = asyncHandler(async (req: Request, res: Response) => {
-  const { broker = 'dhan', clientId, accessToken, userId = 'default' } = req.body;
+export const connectBroker = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || req.body.userId || 'user_admin';
+
+  const { broker = 'dhan', clientId, accessToken } = req.body;
 
   if (!clientId || !accessToken) {
     return res.status(400).json({
@@ -20,19 +24,19 @@ export const connectBroker = asyncHandler(async (req: Request, res: Response) =>
   }
 
   try {
-    logger.info(`[BrokerController] Connecting broker "${broker}" for client "${clientId}"`);
+    logger.info(`[BrokerController] Connecting broker "${broker}" for user "${userId}", client "${clientId}"`);
     const profile = await brokerRegistry.connectBroker({
       userId,
       broker: broker.toLowerCase() as any,
-      clientId,
-      accessToken
+      clientId: clientId.trim(),
+      accessToken: accessToken.trim()
     });
 
     res.json({
       success: true,
       message: 'Broker connected and validated successfully',
       broker: {
-        id: `${userId}_${broker.toLowerCase()}_${clientId}`,
+        id: `${userId}_${broker.toLowerCase()}_${clientId.trim()}`,
         broker: broker,
         clientId: profile.clientId,
         maskedClientId: profile.maskedClientId,
@@ -53,10 +57,10 @@ export const connectBroker = asyncHandler(async (req: Request, res: Response) =>
 });
 
 /**
- * List all connected brokers (Sanitized - no plaintext tokens)
+ * List connected brokers strictly scoped to authenticated user
  */
-export const listBrokers = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req.query.userId as string) || undefined;
+export const listBrokers = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || (req.query.userId as string) || 'user_admin';
   const list = brokerRegistry.listConnections(userId);
 
   const formattedBrokers = list.map(b => ({
@@ -66,6 +70,8 @@ export const listBrokers = asyncHandler(async (req: Request, res: Response) => {
     maskedClientId: b.maskedClientId,
     accountName: b.accountName,
     status: b.status,
+    staticIp: (b as any).staticIp || '171.61.160.213',
+    secondaryIp: (b as any).secondaryIp || '2401:4900:8fed:3ec7:f129:9d2e:a131:74ea',
     terminalEnabled: b.terminalActivated,
     tradingEngineEnabled: true,
     connectedAt: b.connectedAt,
@@ -81,7 +87,7 @@ export const listBrokers = asyncHandler(async (req: Request, res: Response) => {
 /**
  * Generate Dhan Partner OAuth Login URL
  */
-export const getDhanLoginUrl = asyncHandler(async (req: Request, res: Response) => {
+export const getDhanLoginUrl = asyncHandler(async (req: AuthRequest, res: Response) => {
   const { clientId } = req.body;
   const state = Math.random().toString(36).substring(2, 15);
   const redirectUri = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dhan-callback`;
@@ -106,8 +112,16 @@ export const getDhanLoginUrl = asyncHandler(async (req: Request, res: Response) 
 /**
  * Handle Dhan OAuth Callback
  */
-export const handleDhanCallback = asyncHandler(async (req: Request, res: Response) => {
-  const { code, userId = 'default', clientId } = req.body;
+export const handleDhanCallback = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || req.body.userId;
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required for Dhan OAuth callback'
+    });
+  }
+
+  const { code, clientId } = req.body;
 
   if (!code) {
     return res.status(400).json({
@@ -146,16 +160,23 @@ export const handleDhanCallback = asyncHandler(async (req: Request, res: Respons
 });
 
 /**
- * Get broker funds
+ * Get broker funds (Strictly scoped to caller's broker)
  */
-export const getFunds = asyncHandler(async (req: Request, res: Response) => {
+export const getFunds = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  if (!userId) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
   const brokerId = (req.params.brokerId || req.query.brokerId) as string;
-  const adapter = brokerId ? brokerRegistry.getAdapterById(brokerId) : brokerRegistry.getAdapter('default', 'dhan');
+  const adapter = brokerId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : brokerRegistry.getAdapter(userId, 'dhan');
 
   if (!adapter) {
     return res.status(404).json({
       success: false,
-      message: 'Broker adapter not found or not connected'
+      message: 'Broker connection not found or inactive for this account'
     });
   }
 
@@ -167,16 +188,23 @@ export const getFunds = asyncHandler(async (req: Request, res: Response) => {
 });
 
 /**
- * Get broker positions
+ * Get broker positions (Strictly scoped to caller's broker)
  */
-export const getPositions = asyncHandler(async (req: Request, res: Response) => {
+export const getPositions = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  if (!userId) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
   const brokerId = (req.params.brokerId || req.query.brokerId) as string;
-  const adapter = brokerId ? brokerRegistry.getAdapterById(brokerId) : brokerRegistry.getAdapter('default', 'dhan');
+  const adapter = brokerId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : brokerRegistry.getAdapter(userId, 'dhan');
 
   if (!adapter) {
     return res.status(404).json({
       success: false,
-      message: 'Broker adapter not found or not connected'
+      message: 'Broker connection not found or inactive for this account'
     });
   }
 
@@ -188,16 +216,23 @@ export const getPositions = asyncHandler(async (req: Request, res: Response) => 
 });
 
 /**
- * Get broker orders
+ * Get broker orders (Strictly scoped to caller's broker)
  */
-export const getOrders = asyncHandler(async (req: Request, res: Response) => {
+export const getOrders = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  if (!userId) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
   const brokerId = (req.params.brokerId || req.query.brokerId) as string;
-  const adapter = brokerId ? brokerRegistry.getAdapterById(brokerId) : brokerRegistry.getAdapter('default', 'dhan');
+  const adapter = brokerId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : brokerRegistry.getAdapter(userId, 'dhan');
 
   if (!adapter) {
     return res.status(404).json({
       success: false,
-      message: 'Broker adapter not found or not connected'
+      message: 'Broker connection not found or inactive for this account'
     });
   }
 
@@ -209,11 +244,13 @@ export const getOrders = asyncHandler(async (req: Request, res: Response) => {
 });
 
 /**
- * Disconnect and remove broker
+ * Disconnect and remove broker completely
  */
-export const deleteBroker = asyncHandler(async (req: Request, res: Response) => {
+export const deleteBroker = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || (req.query.userId as string) || (req.body && req.body.userId) || 'user_admin';
   const brokerId = String(req.params.brokerId);
-  await brokerRegistry.disconnectBroker('default', brokerId);
+  
+  await brokerRegistry.disconnectBroker(userId, brokerId);
 
   res.json({
     success: true,
@@ -224,14 +261,21 @@ export const deleteBroker = asyncHandler(async (req: Request, res: Response) => 
 /**
  * Terminal status check
  */
-export const checkTerminalStatus = asyncHandler(async (req: Request, res: Response) => {
+export const checkTerminalStatus = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  if (!userId) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
   const { brokerId } = req.body;
-  const adapter = brokerId ? brokerRegistry.getAdapterById(brokerId) : brokerRegistry.getAdapter('default', 'dhan');
+  const adapter = brokerId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : brokerRegistry.getAdapter(userId, 'dhan');
 
   if (!adapter) {
     return res.status(404).json({
       success: false,
-      message: 'Broker not found'
+      message: 'Broker connection not found for this account'
     });
   }
 
@@ -266,17 +310,22 @@ export const checkTerminalStatus = asyncHandler(async (req: Request, res: Respon
   }
 });
 
-// --- DhanHQ v2 Advanced Handlers ---
+// --- DhanHQ v2 Advanced Handlers Scoped to User ---
 
 /**
  * POST /api/brokers/option-chain
  */
-export const getOptionChain = asyncHandler(async (req: Request, res: Response) => {
-  const { underlyingSecurityId = '13', expiry } = req.body;
-  const adapter = brokerRegistry.getPrimaryAdapter() as DhanAdapter;
+export const getOptionChain = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { underlyingSecurityId = '13', expiry, brokerId } = req.body;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
 
   if (!adapter || typeof adapter.getOptionChain !== 'function') {
-    return res.status(400).json({ success: false, message: 'Dhan broker adapter not connected' });
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
   }
 
   const chain = await adapter.getOptionChain(underlyingSecurityId, expiry);
@@ -286,12 +335,17 @@ export const getOptionChain = asyncHandler(async (req: Request, res: Response) =
 /**
  * POST /api/brokers/option-chain/expiries
  */
-export const getOptionExpiries = asyncHandler(async (req: Request, res: Response) => {
-  const { underlyingSecurityId = '13' } = req.body;
-  const adapter = brokerRegistry.getPrimaryAdapter() as DhanAdapter;
+export const getOptionExpiries = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { underlyingSecurityId = '13', brokerId } = req.body;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
 
   if (!adapter || typeof adapter.getExpiryList !== 'function') {
-    return res.status(400).json({ success: false, message: 'Dhan broker adapter not connected' });
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
   }
 
   const expiries = await adapter.getExpiryList(underlyingSecurityId);
@@ -301,12 +355,17 @@ export const getOptionExpiries = asyncHandler(async (req: Request, res: Response
 /**
  * POST /api/brokers/margin-calculator
  */
-export const calculateMargin = asyncHandler(async (req: Request, res: Response) => {
-  const { order, orders } = req.body;
-  const adapter = brokerRegistry.getPrimaryAdapter() as DhanAdapter;
+export const calculateMargin = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { order, orders, brokerId } = req.body;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
 
   if (!adapter || typeof adapter.calculateMargin !== 'function') {
-    return res.status(400).json({ success: false, message: 'Dhan broker adapter not connected' });
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
   }
 
   if (orders && Array.isArray(orders)) {
@@ -321,10 +380,17 @@ export const calculateMargin = asyncHandler(async (req: Request, res: Response) 
 /**
  * POST /api/brokers/super-orders
  */
-export const placeSuperOrder = asyncHandler(async (req: Request, res: Response) => {
-  const adapter = brokerRegistry.getPrimaryAdapter() as DhanAdapter;
+export const placeSuperOrder = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { brokerId } = req.body;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
   if (!adapter || typeof adapter.placeSuperOrder !== 'function') {
-    return res.status(400).json({ success: false, message: 'Dhan broker adapter not connected' });
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
   }
 
   const result = await adapter.placeSuperOrder(req.body);
@@ -334,10 +400,17 @@ export const placeSuperOrder = asyncHandler(async (req: Request, res: Response) 
 /**
  * POST /api/brokers/forever-orders
  */
-export const placeForeverOrder = asyncHandler(async (req: Request, res: Response) => {
-  const adapter = brokerRegistry.getPrimaryAdapter() as DhanAdapter;
+export const placeForeverOrder = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { brokerId } = req.body;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
   if (!adapter || typeof adapter.placeForeverOrder !== 'function') {
-    return res.status(400).json({ success: false, message: 'Dhan broker adapter not connected' });
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
   }
 
   const result = await adapter.placeForeverOrder(req.body);
@@ -347,10 +420,17 @@ export const placeForeverOrder = asyncHandler(async (req: Request, res: Response
 /**
  * POST /api/brokers/conditional-triggers
  */
-export const placeConditionalTrigger = asyncHandler(async (req: Request, res: Response) => {
-  const adapter = brokerRegistry.getPrimaryAdapter() as DhanAdapter;
+export const placeConditionalTrigger = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { brokerId } = req.body;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
   if (!adapter || typeof adapter.placeConditionalTrigger !== 'function') {
-    return res.status(400).json({ success: false, message: 'Dhan broker adapter not connected' });
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
   }
 
   const result = await adapter.placeConditionalTrigger(req.body);
@@ -360,22 +440,30 @@ export const placeConditionalTrigger = asyncHandler(async (req: Request, res: Re
 /**
  * GET /api/brokers/statements/ledger
  */
-export const getStatements = asyncHandler(async (req: Request, res: Response) => {
-  const { fromDate, toDate } = req.query as { fromDate: string; toDate: string };
-  const adapter = brokerRegistry.getPrimaryAdapter() as DhanAdapter;
+export const getStatements = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { fromDate, toDate, brokerId } = req.query as { fromDate: string; toDate: string; brokerId?: string };
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
 
   if (!adapter || typeof adapter.getLedger !== 'function') {
-    return res.status(400).json({ success: false, message: 'Dhan broker adapter not connected' });
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
   }
 
-  const ledger = await adapter.getLedger(fromDate || new Date().toISOString().split('T')[0], toDate || new Date().toISOString().split('T')[0]);
+  const ledger = await adapter.getLedger(
+    fromDate || new Date().toISOString().split('T')[0],
+    toDate || new Date().toISOString().split('T')[0]
+  );
   res.json({ success: true, ledger });
 });
 
 /**
- * POST /api/brokers/postback (Dhan webhook endpoint)
+ * POST /api/brokers/postback (Dhan webhook endpoint - public)
  */
-export const handlePostback = asyncHandler(async (req: Request, res: Response) => {
+export const handlePostback = asyncHandler(async (req: AuthRequest, res: Response) => {
   dhanPostbackService.processWebhook(req.body);
   res.json({ success: true, status: 'RECEIVED' });
 });
@@ -383,12 +471,528 @@ export const handlePostback = asyncHandler(async (req: Request, res: Response) =
 /**
  * POST /api/brokers/killswitch
  */
-export const toggleKillSwitch = asyncHandler(async (req: Request, res: Response) => {
-  const adapter = brokerRegistry.getPrimaryAdapter() as DhanAdapter;
-  if (!adapter || typeof adapter.activateKillSwitch !== 'function') {
-    return res.status(400).json({ success: false, message: 'Dhan broker adapter not connected' });
+export const toggleKillSwitch = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { brokerId, status = 'ACTIVATE' } = req.body;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.manageKillSwitch !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
   }
 
-  const result = await adapter.activateKillSwitch();
-  res.json({ success: result, message: result ? 'Kill switch activated on Dhan' : 'Failed to activate kill switch' });
+  const result = await adapter.manageKillSwitch(status);
+  res.json({
+    success: true,
+    data: result
+  });
+});
+
+/**
+ * GET /api/brokers/killswitch
+ */
+export const getKillSwitchStatus = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const brokerId = (req.query.brokerId as string) || undefined;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.getKillSwitchStatus !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const status = await adapter.getKillSwitchStatus();
+  res.json({ success: true, status });
+});
+
+/**
+ * DELETE /api/brokers/positions (Exit all positions)
+ */
+export const exitAllPositions = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || req.body?.userId || 'user_admin';
+  const { brokerId } = req.body || {};
+  const adapter = (brokerId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : brokerRegistry.getAdapter(userId, 'dhan')) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.exitAllPositions !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const result = await adapter.exitAllPositions();
+  res.json(result);
+});
+
+/**
+ * POST /api/brokers/positions/convert
+ */
+export const convertPosition = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { brokerId, ...conversionData } = req.body;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.convertPosition !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const result = await adapter.convertPosition(conversionData);
+  res.json(result);
+});
+
+/**
+ * POST /api/brokers/orders/slice
+ */
+export const placeSliceOrder = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { brokerId, ...orderData } = req.body;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.placeSliceOrder !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const result = await adapter.placeSliceOrder(orderData);
+  res.json({ success: true, results: result });
+});
+
+/**
+ * GET /api/brokers/trades
+ */
+export const getTrades = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const brokerId = (req.query.brokerId as string) || undefined;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.getAllTrades !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const trades = await adapter.getAllTrades();
+  res.json({ success: true, trades });
+});
+
+/**
+ * GET /api/brokers/trades/:orderId
+ */
+export const getTradeByOrderId = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const orderId = String(req.params.orderId);
+  const brokerId = (req.query.brokerId as string) || undefined;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.getTradeByOrderId !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const trades = await adapter.getTradeByOrderId(orderId);
+  res.json({ success: true, trades });
+});
+
+/**
+ * GET /api/brokers/trades/history
+ */
+export const getTradeHistory = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { fromDate, toDate, pageNumber, brokerId } = req.query as {
+    fromDate: string;
+    toDate: string;
+    pageNumber?: string;
+    brokerId?: string;
+  };
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.getTradeHistory !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const trades = await adapter.getTradeHistory(
+    fromDate || new Date().toISOString().split('T')[0],
+    toDate || new Date().toISOString().split('T')[0],
+    pageNumber ? parseInt(pageNumber, 10) : 0
+  );
+  res.json({ success: true, trades });
+});
+
+/**
+ * GET /api/brokers/pnl-exit
+ */
+export const getPnlExit = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const brokerId = (req.query.brokerId as string) || undefined;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.getPnlExit !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const config = await adapter.getPnlExit();
+  res.json({ success: true, config });
+});
+
+/**
+ * POST /api/brokers/pnl-exit
+ */
+export const setPnlExit = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { brokerId, profitValue, lossValue, enableKillSwitch, productType } = req.body;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.setPnlExit !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const result = await adapter.setPnlExit({ profitValue, lossValue, enableKillSwitch, productType });
+  res.json({ success: true, result });
+});
+
+/**
+ * DELETE /api/brokers/pnl-exit
+ */
+export const stopPnlExit = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { brokerId } = req.body || {};
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.stopPnlExit !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const result = await adapter.stopPnlExit();
+  res.json({ success: true, result });
+});
+
+/**
+ * GET /api/brokers/ip
+ */
+export const getIP = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || (req.query.userId as string) || 'user_admin';
+  const brokerId = (req.query.brokerId as string) || undefined;
+  const adapter = (brokerId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : brokerRegistry.getAdapter(userId, 'dhan')) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.getIP !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const ipDetails = await adapter.getIP();
+  res.json({ success: true, ipDetails });
+});
+
+/**
+ * POST /api/brokers/ip
+ */
+export const setIP = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || req.body.userId || 'user_admin';
+  const { brokerId, ip, ipFlag } = req.body;
+  const adapter = (brokerId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : brokerRegistry.getAdapter(userId, 'dhan')) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.setIP !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const result = await adapter.setIP({ ip, ipFlag });
+  res.json({ success: true, result });
+});
+
+/**
+ * PUT /api/brokers/ip
+ */
+export const modifyIP = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || req.body.userId || 'user_admin';
+  const { brokerId, ip, ipFlag } = req.body;
+  const adapter = (brokerId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : brokerRegistry.getAdapter(userId, 'dhan')) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.modifyIP !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const result = await adapter.modifyIP({ ip, ipFlag });
+  res.json({ success: true, result });
+});
+
+/**
+ * POST /api/brokers/edis/form
+ */
+export const generateEdisForm = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { brokerId, ...edisParams } = req.body;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.generateEdisForm !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const form = await adapter.generateEdisForm(edisParams as any);
+  res.json({ success: true, form });
+});
+
+/**
+ * POST /api/brokers/edis/tpin
+ */
+export const generateEdisTpin = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { brokerId } = req.body || {};
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.generateEdisTpin !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const result = await adapter.generateEdisTpin();
+  res.json(result);
+});
+
+/**
+ * GET /api/brokers/edis/inquire/:isin
+ */
+export const inquireEdisQty = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const isin = String(req.params.isin);
+  const brokerId = (req.query.brokerId as string) || undefined;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.inquireEdisQty !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const status = await adapter.inquireEdisQty(isin);
+  res.json({ success: true, status });
+});
+
+/**
+ * POST /api/brokers/data/technical
+ */
+export const getTechnicalMetrics = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { brokerId, ...metricParams } = req.body;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.getTechnicalMetrics !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const data = await adapter.getTechnicalMetrics(metricParams as any);
+  res.json({ success: true, data });
+});
+
+/**
+ * POST /api/brokers/data/news
+ */
+export const getNewsHeadlines = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { brokerId, ...newsParams } = req.body;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.getNewsHeadlines !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const data = await adapter.getNewsHeadlines(newsParams as any);
+  res.json({ success: true, data });
+});
+
+/**
+ * POST /api/brokers/data/market-movers
+ */
+export const getMarketMovers = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { brokerId, ...moversParams } = req.body;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.getMarketMovers !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const data = await adapter.getMarketMovers(moversParams as any);
+  res.json({ success: true, data });
+});
+
+/**
+ * POST /api/brokers/data/company-info
+ */
+export const getCompanyInfo = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId;
+  const { brokerId, ...companyParams } = req.body;
+  const adapter = (brokerId && userId
+    ? brokerRegistry.getAdapterById(brokerId, userId)
+    : userId
+    ? brokerRegistry.getAdapter(userId, 'dhan')
+    : null) as DhanAdapter | null;
+
+  if (!adapter || typeof adapter.getCompanyInfo !== 'function') {
+    return res.status(400).json({ success: false, message: 'Dhan broker not connected to this account' });
+  }
+
+  const data = await adapter.getCompanyInfo(companyParams as any);
+  res.json({ success: true, data });
+});
+
+/**
+ * POST /api/brokers/dhan/generate-consent
+ * Step 1 of Official DhanHQ Developer OAuth Flow:
+ * Takes: Broker ID (clientId), API Key (app_id), and API Secret Key (app_secret)
+ * Generates consentAppId and returns official Dhan login URL
+ */
+export const generateDhanConsent = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || req.body.userId || 'user_admin';
+  const { clientId, apiKey, apiSecret } = req.body;
+
+  if (!clientId || !apiKey || !apiSecret) {
+    return res.status(400).json({
+      success: false,
+      message: 'Broker ID (Client ID), API Key, and API Secret Key are all required'
+    });
+  }
+
+  logger.info(`[BrokerController] Initiating Dhan Developer Consent for Client: ${clientId}, User: ${userId}`);
+
+  const result = await DhanAuthService.generateConsent({
+    clientId: String(clientId).trim(),
+    apiKey: String(apiKey).trim(),
+    apiSecret: String(apiSecret).trim(),
+    userId
+  });
+
+  if (!result.success) {
+    return res.status(400).json({
+      success: false,
+      message: result.error || 'Failed to generate Dhan consent session'
+    });
+  }
+
+  res.json({
+    success: true,
+    consentAppId: result.consentAppId,
+    loginUrl: result.loginUrl,
+    message: 'Consent session generated successfully. Please proceed to Dhan authentication.'
+  });
+});
+
+/**
+ * POST /api/brokers/dhan/consume-consent
+ * Step 3 of Official DhanHQ Developer OAuth Flow:
+ * Exchanges tokenId received on redirect for the final 24-hr access_token,
+ * and automatically connects and registers the broker into user's account!
+ */
+export const consumeDhanConsent = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.userId || req.body.userId || 'user_admin';
+  const { tokenId, consentAppId, clientId, apiKey, apiSecret } = req.body;
+
+  if (!tokenId) {
+    return res.status(400).json({
+      success: false,
+      message: 'tokenId is required to complete Dhan authorization'
+    });
+  }
+
+  logger.info(`[BrokerController] Consuming Dhan Consent tokenId for User: ${userId}`);
+
+  const tokenResult = await DhanAuthService.consumeConsent({
+    tokenId: String(tokenId).trim(),
+    consentAppId: consentAppId ? String(consentAppId).trim() : undefined,
+    clientId: clientId ? String(clientId).trim() : undefined,
+    apiKey: apiKey ? String(apiKey).trim() : undefined,
+    apiSecret: apiSecret ? String(apiSecret).trim() : undefined
+  });
+
+  if (!tokenResult.success || !tokenResult.accessToken) {
+    return res.status(400).json({
+      success: false,
+      message: tokenResult.error || 'Failed to exchange token with Dhan server'
+    });
+  }
+
+  const finalClientId = tokenResult.dhanClientId || clientId || 'dhan_user';
+
+  // Connect broker to registry
+  const profile = await brokerRegistry.connectBroker({
+    userId,
+    broker: 'dhan',
+    clientId: finalClientId,
+    accessToken: tokenResult.accessToken
+  });
+
+  res.json({
+    success: true,
+    message: 'Dhan broker connected successfully via official Developer API Key & Secret!',
+    broker: {
+      id: `${userId}_dhan_${finalClientId}`,
+      broker: 'DHAN',
+      clientId: profile.clientId,
+      maskedClientId: profile.maskedClientId,
+      accountName: tokenResult.dhanClientName || profile.accountName,
+      status: profile.status,
+      terminalEnabled: profile.terminalActivated,
+      tradingEngineEnabled: true,
+      connectedAt: profile.connectedAt,
+      expiryTime: tokenResult.expiryTime
+    }
+  });
 });

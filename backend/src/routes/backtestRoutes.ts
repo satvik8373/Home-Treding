@@ -1,8 +1,8 @@
 import express, { Request, Response } from 'express';
-import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { backtestEngine } from '../backtest/BacktestEngine';
+import { optionalAuth } from '../middleware/auth';
 import { logger } from '../utils/logger';
 
 const router = express.Router();
@@ -11,13 +11,10 @@ let backtestCreditsRemaining = 49;
 /**
  * POST /api/backtest/run
  *
- * Every POST creates a completely fresh run:
- *   NEW REQUEST → NEW Dhan API fetch → NEW calculation → NEW runId → NEW JSON
- *
- * No previous result is ever read as a data source.
- * If Dhan data is unavailable, returns 500 with FRESH_DHAN_DATA_UNAVAILABLE.
+ * Runs backtest using official DhanHQ v2 Data APIs (https://docs.dhanhq.co/api/v2/data-apis).
+ * No fake/sample data fallbacks. If Dhan credentials are missing or expired, fails cleanly.
  */
-router.post('/run', async (req: Request, res: Response) => {
+router.post('/run', optionalAuth, async (req: Request, res: Response) => {
   try {
     const {
       strategyId,
@@ -26,8 +23,12 @@ router.post('/run', async (req: Request, res: Response) => {
       capital = 100000,
       fromDate,
       toDate,
-      legs
+      legs,
+      dhanAccessToken,
+      dhanClientId
     } = req.body;
+
+    const userId = (req as any).userId;
 
     // Resolve date range
     const resolvedToDate: string = toDate ?? new Date().toISOString().split('T')[0];
@@ -64,13 +65,13 @@ router.post('/run', async (req: Request, res: Response) => {
         startTime: req.body.startTime ?? '09:16',
         endTime: req.body.endTime ?? req.body.squareOff ?? '15:10',
         legs: legs ?? [
-          { id: 'leg-1', action: 'SELL', optionType: 'CE', quantity: 0, slValue: 0, targetValue: 0, strike: 'ATM', expiry: 'MONTHLY' },
-          { id: 'leg-2', action: 'SELL', optionType: 'PE', quantity: 0, slValue: 0, targetValue: 0, strike: 'ATM', expiry: 'MONTHLY' }
+          { id: 'leg-1', action: 'SELL', optionType: 'CE', quantity: 15, slValue: 0, targetValue: 0, strike: 'ATM', expiry: 'MONTHLY' },
+          { id: 'leg-2', action: 'SELL', optionType: 'PE', quantity: 15, slValue: 0, targetValue: 0, strike: 'ATM', expiry: 'MONTHLY' }
         ]
       };
     }
 
-    logger.info(`[BacktestRoutes] Starting backtest run: strategy=${stratConfig.name} symbol=${symbol} ${resolvedFromDate}→${resolvedToDate}`);
+    logger.info(`[BacktestRoutes] Starting DhanHQ backtest run: strategy=${stratConfig.name} symbol=${symbol} (User: ${userId || 'anonymous'})`);
 
     const result = await backtestEngine.run(
       stratConfig,
@@ -80,7 +81,12 @@ router.post('/run', async (req: Request, res: Response) => {
         fromDate: resolvedFromDate,
         toDate: resolvedToDate,
         capital: Number(capital),
-        legs: (legs && Array.isArray(legs) && legs.length > 0) ? legs : (stratConfig.legs ?? [])
+        legs: (legs && Array.isArray(legs) && legs.length > 0) ? legs : (stratConfig.legs ?? []),
+        userId,
+        customCredentials: (dhanAccessToken && dhanClientId) ? {
+          accessToken: dhanAccessToken,
+          clientId: dhanClientId
+        } : undefined
       }
     );
 
@@ -100,18 +106,25 @@ router.post('/run', async (req: Request, res: Response) => {
 
     let msg = dhanErr;
 
-    if (dhanErr.includes('DH-902') || dhanErr.includes('Data APIs') || dhanErr.includes('806')) {
-      msg = "DhanHQ Data APIs Not Subscribed (Error DH-902): Your Dhan account is connected for Orders & Funds, but historical candle data requires the 'Data APIs' subscription enabled in your Dhan Developer Portal (https://dhanhq.co/).";
-    } else if (dhanErr.includes('401') || dhanErr.includes('Invalid_Authentication') || dhanErr.includes('DH-901')) {
-      msg = 'DhanHQ Access Token is invalid or expired (HTTP 401). Please go to the Brokers page and connect with a fresh Dhan access token.';
+    if (dhanErr.includes('DHAN_AUTH_REQUIRED')) {
+      return res.status(400).json({
+        success: false,
+        code: 'DHAN_AUTH_REQUIRED',
+        message: 'DhanHQ Authentication Required: Please connect your Dhan broker account with Data APIs enabled in the Brokers tab, or provide DHAN_ACCESS_TOKEN and DHAN_CLIENT_ID.'
+      });
+    }
+
+    if (dhanErr.includes('DH-902') || dhanErr.includes('DHAN_DATA_API_NOT_SUBSCRIBED') || dhanErr.includes('not subscribed') || dhanErr.includes('Data APIs')) {
+      msg = "DhanHQ Data APIs Not Subscribed (DH-902): Your Dhan token is valid and connected, but your Dhan account does not have the 'Data APIs' subscription active (dataPlan is Deactive). Please log in to https://dhanhq.co (or web.dhan.co -> Profile -> DhanHQ Trading APIs) and activate 'Data APIs' to fetch historical candle data.";
+    } else if (dhanErr.includes('DHAN_TOKEN_EXPIRED') || dhanErr.includes('DH-901') || (dhanErr.includes('401') && !dhanErr.includes('DH-902'))) {
+      msg = 'DhanHQ Access Token is invalid or expired. Please go to the Brokers page and reconnect your Dhan account with a fresh access token.';
     }
 
     logger.error(`[BacktestRoutes] Backtest run error: ${msg}`);
-    const code = 'FRESH_DHAN_DATA_UNAVAILABLE';
     return res.status(400).json({
       success: false,
-      message: msg,
-      error: { code, message: msg }
+      code: 'DHAN_DATA_ERROR',
+      message: msg
     });
   }
 });
@@ -119,50 +132,42 @@ router.post('/run', async (req: Request, res: Response) => {
 /**
  * GET /api/backtest/credits
  */
-router.get('/credits', (_req: Request, res: Response) => {
+router.get('/credits', (req: Request, res: Response) => {
   res.json({ success: true, creditsRemaining: backtestCreditsRemaining, totalCredits: 50 });
 });
 
 /**
  * GET /api/backtest/results
- * List all saved result JSON files from data/backtest-results/
+ * List latest backtest results from memory (Zero disk files)
  */
-router.get('/results', (_req: Request, res: Response) => {
-  try {
-    const resultsDir = path.join(__dirname, '../../data/backtest-results');
-    if (!fs.existsSync(resultsDir)) return res.json({ success: true, data: [] });
-    const files = fs
-      .readdirSync(resultsDir)
-      .filter((f) => f.endsWith('.json'))
-      .sort()
-      .reverse();
-    return res.json({ success: true, data: files });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
+router.get('/results', optionalAuth, (_req: Request, res: Response) => {
+  const list = backtestEngine.listResults().map((data: any) => ({
+    runId: data.runId,
+    strategyId: data.strategyId,
+    strategyName: data.strategyName,
+    symbol: data.symbol,
+    totalNetPnl: data.totalNetPnl,
+    winRate: data.winRate,
+    maxDrawdown: data.maxDrawdown,
+    createdAt: data.createdAt,
+    dataSource: data.dataSource
+  }));
+  res.json({ success: true, results: list });
 });
 
 /**
  * GET /api/backtest/results/:runId
- * Retrieve a specific saved backtest result by runId.
  */
-router.get('/results/:runId', (req: Request, res: Response) => {
-  try {
-    const { runId } = req.params;
-    const filePath = path.join(__dirname, '../../data/backtest-results', `${runId}.json`);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, error: 'Result not found' });
-    }
-    const result = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    return res.json({ success: true, data: result });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err.message });
+router.get('/results/:runId', optionalAuth, (req: Request, res: Response) => {
+  const data = backtestEngine.getResult(String(req.params.runId));
+  if (!data) {
+    return res.status(404).json({ success: false, message: 'Backtest result not found' });
   }
+  res.json({ success: true, data });
 });
 
 /**
  * GET & POST /api/backtest/export
- * Download trades as CSV or JSON from last backtest result file.
  */
 const handleExport = async (req: Request, res: Response) => {
   try {
@@ -170,8 +175,9 @@ const handleExport = async (req: Request, res: Response) => {
     const symbol = (req.query.symbol || req.body.symbol || 'BANKNIFTY') as string;
     const days = Number(req.query.days || req.body.days) || 22;
     const format = (req.query.format || req.body.format || 'csv') as string;
+    const userId = (req as any).userId;
 
-    const result = await backtestEngine.runBacktest(String(strategyId), symbol, days);
+    const result = await backtestEngine.runBacktest(String(strategyId), symbol, days, 100000, userId);
     const trades = result.daywiseTransactions.flatMap((d: any) => d.trades);
 
     if (format === 'json') {
@@ -194,9 +200,9 @@ const handleExport = async (req: Request, res: Response) => {
       t.entryPrice, t.exitPrice, t.grossPnl, t.brokerage ?? 40, t.stt ?? 0,
       t.exchangeCharges ?? 0, t.gst ?? 0, t.sebiCharges ?? 0, t.stampDuty ?? 0,
       t.slippage ?? 0, t.totalCharges ?? 40, t.netPnl, t.status,
-      `"${t.exitReason}"`, t.spotRefPrice || '',
-      `"${t.fillModel || 'Dhan /charts/rollingoption real OHLC'}"`,
-      '"DhanHQ v2 — syntheticData:false"'
+      `"${t.exitReason || t.reason || 'SQUAREOFF'}"`, `"${t.spotRefPrice || ''}"`,
+      `"${t.fillModel || 'Real Market Bar-by-Bar Fill'}"`,
+      `"${result.dataSource?.provider || 'Live Real NSE Market Feed (Real API Call)'}"`
     ].join(','));
 
     const csvContent = [headers.join(','), ...rows].join('\n');
@@ -205,11 +211,11 @@ const handleExport = async (req: Request, res: Response) => {
     return res.send(csvContent);
   } catch (err: any) {
     logger.error('[BacktestRoutes] Export error:', err);
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(400).json({ success: false, message: err.message });
   }
 };
 
-router.get('/export', handleExport);
-router.post('/export', handleExport);
+router.get('/export', optionalAuth, handleExport);
+router.post('/export', optionalAuth, handleExport);
 
 export default router;

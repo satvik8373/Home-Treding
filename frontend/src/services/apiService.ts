@@ -18,10 +18,19 @@ class ApiService {
     // Request interceptor to add auth token
     this.api.interceptors.request.use(
       async (config) => {
-        const user = auth.currentUser;
-        if (user) {
-          const token = await user.getIdToken();
-          config.headers.Authorization = `Bearer ${token}`;
+        let token = typeof window !== 'undefined' ? localStorage.getItem('mavrix_auth_token') : null;
+        if (!token) {
+          const user = auth.currentUser;
+          if (user) {
+            try {
+              token = await user.getIdToken();
+            } catch (_) {}
+          }
+        }
+
+        if (token) {
+          config.headers = config.headers || {};
+          config.headers.Authorization = `Bearer ${token.trim()}`;
         }
         return config;
       },

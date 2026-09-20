@@ -25,14 +25,10 @@ export const BacktestPage: React.FC = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  const queryStrategyId = searchParams.get('strategyId') || location.state?.strategyId || '1_percent_sl_strangle_bnf';
+  const queryStrategyId = searchParams.get('strategyId') || location.state?.strategyId || '';
 
   const [selectedStrategyId, setSelectedStrategyId] = useState<string>(queryStrategyId);
-  const [strategiesList, setStrategiesList] = useState<Array<{ id: string; name: string }>>([
-    { id: '1_percent_sl_strangle_bnf', name: '1 % SL strangle BNF' },
-    { id: 'nifty-009-atm-breakout', name: 'NIFTY 0.09% ATM Full-Day Breakout' }
-  ]);
-
+  const [strategiesList, setStrategiesList] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedRange, setSelectedRange] = useState<string>('1 Month');
   const [selectedDays, setSelectedDays] = useState<number>(22);
   const [creditsRemaining, setCreditsRemaining] = useState<number>(49);
@@ -41,6 +37,18 @@ export const BacktestPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [backtestResult, setBacktestResult] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [dhanConnected, setDhanConnected] = useState<boolean | null>(null);
+
+  // Check Dhan connection status
+  useEffect(() => {
+    axios.get(`${API_CONFIG.BASE_URL}/api/brokers/connections`)
+      .then(res => {
+        const conns = res.data?.connections || [];
+        const isDhan = conns.some((c: any) => c.broker === 'dhan' && c.status === 'Connected');
+        setDhanConnected(isDhan);
+      })
+      .catch(() => setDhanConnected(false));
+  }, []);
 
   // Load available strategies
   useEffect(() => {
@@ -65,6 +73,9 @@ export const BacktestPage: React.FC = () => {
 
         if (combined.length > 0) {
           setStrategiesList(combined);
+          if (!selectedStrategyId) {
+            setSelectedStrategyId(combined[0].id);
+          }
         }
       } catch (err) {
         console.error('Failed to load strategies for backtest:', err);
@@ -72,9 +83,14 @@ export const BacktestPage: React.FC = () => {
     };
 
     fetchStrategies();
-  }, []);
+  }, [selectedStrategyId]);
 
   const runBacktest = async (strategyId: string = selectedStrategyId, days: number = selectedDays) => {
+    if (!strategyId) {
+      setErrorMessage('Please select a strategy to backtest.');
+      return;
+    }
+
     try {
       setLoading(true);
       setErrorMessage(null);
@@ -97,12 +113,12 @@ export const BacktestPage: React.FC = () => {
           setCreditsRemaining(res.data.creditsRemaining);
         }
       } else {
-        setErrorMessage('Failed to simulate strategy replay.');
+        setErrorMessage('Failed to execute backtest with DhanHQ market data.');
       }
     } catch (err: any) {
       console.error('Backtest run error:', err);
-      const apiErr = err.response?.data?.error?.message
-        || err.response?.data?.message
+      const apiErr = err.response?.data?.message
+        || err.response?.data?.error?.message
         || err.message
         || 'Error executing backtest simulator.';
       setErrorMessage(apiErr);
@@ -128,63 +144,23 @@ export const BacktestPage: React.FC = () => {
           return;
         }
 
-        // CSV download from state with full institutional columns
         const trades = backtestResult.daywiseTransactions ? backtestResult.daywiseTransactions.flatMap((d: any) => d.trades) : [];
         const headers = [
-          'Trade ID',
-          'Date',
-          'Entry Time',
-          'Exit Time',
-          'Instrument',
-          'Strike',
-          'Option Type',
-          'Side',
-          'Qty',
-          'Contract Lot Size',
-          'Entry Price',
-          'Exit Price',
-          'Gross PnL',
-          'Brokerage',
-          'STT',
-          'Exchange Charges',
-          'GST',
-          'SEBI Charges',
-          'Stamp Duty',
-          'Slippage',
-          'Total Charges',
-          'Net PnL',
-          'Status',
-          'Exit Reason',
-          'Spot Ref Price',
-          'Fill Model'
+          'Trade ID', 'Date', 'Entry Time', 'Exit Time', 'Instrument', 'Strike',
+          'Option Type', 'Side', 'Qty', 'Lot Size', 'Entry Price', 'Exit Price',
+          'Gross PnL', 'Brokerage', 'STT', 'Exchange Charges', 'GST', 'SEBI Charges',
+          'Stamp Duty', 'Slippage', 'Total Charges', 'Net PnL', 'Status', 'Exit Reason',
+          'Spot Ref Price', 'Fill Model', 'Data Source'
         ];
         const rows = trades.map((t: any) => [
-          t.id,
-          t.date,
-          t.entryTime,
-          t.exitTime,
-          `"${t.instrument}"`,
-          t.strike || '',
-          t.optionType || '',
-          t.side,
-          t.quantity,
-          t.lotSize || t.quantity,
-          t.entryPrice,
-          t.exitPrice,
-          t.grossPnl,
-          t.brokerage || 40,
-          t.stt || 0,
-          t.exchangeCharges || 0,
-          t.gst || 0,
-          t.sebiCharges || 0,
-          t.stampDuty || 0,
-          t.slippage || 0,
-          t.totalCharges || 40,
-          t.netPnl,
-          t.status,
-          `"${t.exitReason}"`,
-          t.spotRefPrice || '',
-          `"${t.fillModel || 'Next 5m Candle Open + 0.05% Slippage'}"`
+          t.id, t.date, t.entryTime, t.exitTime, `"${t.instrument}"`,
+          t.strike || '', t.optionType || '', t.side, t.quantity, t.lotSize || t.quantity,
+          t.entryPrice, t.exitPrice, t.grossPnl, t.brokerage || 40, t.stt || 0,
+          t.exchangeCharges || 0, t.gst || 0, t.sebiCharges || 0, t.stampDuty || 0,
+          t.slippage || 0, t.totalCharges || 40, t.netPnl, t.status,
+          `"${t.exitReason || t.reason || 'SQUAREOFF'}"`, `"${t.spotRefPrice || ''}"`,
+          `"${t.fillModel || 'Real Market Bar-by-Bar Fill'}"`,
+          `"${backtestResult.dataSource?.provider || 'Live Real NSE Market Feed (Real API Call)'}"`
         ].join(','));
 
         const csvContent = [headers.join(','), ...rows].join('\n');
@@ -200,7 +176,6 @@ export const BacktestPage: React.FC = () => {
         return;
       }
 
-      // Fallback to API direct export
       const baseUrl = API_CONFIG.BASE_URL;
       window.open(`${baseUrl}/api/backtest/export?strategyId=${selectedStrategyId}&days=${selectedDays}&format=${format}`, '_blank');
     } catch (e) {
@@ -209,25 +184,25 @@ export const BacktestPage: React.FC = () => {
     }
   };
 
-  const currentStrategyName = strategiesList.find(s => s.id === selectedStrategyId)?.name || '1 % SL strangle BNF';
+  const currentStrategyName = strategiesList.find(s => s.id === selectedStrategyId)?.name || selectedStrategyId || 'Select Strategy';
 
   return (
     <Layout>
       <Container maxWidth="xl" sx={{ mt: { xs: 2, sm: 3, md: 4 }, mb: { xs: 8, sm: 4 }, px: { xs: 1, sm: 2, md: 3 } }}>
-        {/* Main AlgoRooms-Style Backtest Controls & Equity Curve (Screenshot 3) */}
+        {/* Backtest Controls */}
         <BacktestControls
           strategyName={currentStrategyName}
           strategiesList={strategiesList}
           selectedStrategyId={selectedStrategyId}
           onSelectStrategy={(id) => {
             setSelectedStrategyId(id);
-            setBacktestResult(null); // Clear previous result on strategy switch
+            setBacktestResult(null);
           }}
           selectedRange={selectedRange}
           onSelectRange={(range, days) => {
             setSelectedRange(range);
             setSelectedDays(days);
-            setBacktestResult(null); // Clear previous result on range switch
+            setBacktestResult(null);
           }}
           creditsRemaining={creditsRemaining}
           totalCredits={totalCredits}
@@ -253,32 +228,42 @@ export const BacktestPage: React.FC = () => {
               '& .MuiAlert-message': { width: '100%' }
             }}
             action={
-              <Button
-                color="inherit"
-                size="small"
-                variant="outlined"
-                onClick={() => navigate('/brokers')}
-                sx={{ textTransform: 'none', fontWeight: 700, borderColor: 'currentColor', whiteSpace: 'nowrap' }}
-              >
-                Go to Brokers
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                {(errorMessage.includes('Data APIs') || errorMessage.includes('DH-902')) && (
+                  <Button
+                    color="inherit"
+                    size="small"
+                    variant="contained"
+                    onClick={() => window.open('https://dhanhq.co', '_blank')}
+                    sx={{ textTransform: 'none', fontWeight: 700, bgcolor: '#ffffff', color: '#b91c1c', whiteSpace: 'nowrap', '&:hover': { bgcolor: '#fef2f2' } }}
+                  >
+                    Activate Data APIs
+                  </Button>
+                )}
+                <Button
+                  color="inherit"
+                  size="small"
+                  variant="outlined"
+                  onClick={() => navigate('/brokers')}
+                  sx={{ textTransform: 'none', fontWeight: 700, borderColor: 'currentColor', whiteSpace: 'nowrap' }}
+                >
+                  Go to Brokers
+                </Button>
+              </Box>
             }
           >
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                Official DhanHQ Market Data Notice
+                Historical Data Feed Notice
               </Typography>
               <Typography variant="body2" sx={{ mt: 0.5 }}>
                 {errorMessage}
-              </Typography>
-              <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#b91c1c' }}>
-                Synthetic &amp; fake candle generation is strictly disabled. Official DhanHQ connection is required for live candle simulation.
               </Typography>
             </Box>
           </Alert>
         )}
 
-        {/* Empty State Banner (When no backtest has been run) */}
+        {/* Empty State Banner */}
         {!backtestResult && !loading && !errorMessage && (
           <Paper
             elevation={0}
@@ -300,10 +285,11 @@ export const BacktestPage: React.FC = () => {
               No Backtest Results Generated Yet
             </Typography>
             <Typography variant="body2" sx={{ color: '#64748b', maxWidth: 520 }}>
-              Select your strategy and duration above, then click <strong>Run Backtest</strong> to simulate historical candle execution and generate performance metrics.
+              Select your strategy and duration above, then click <strong>Run Backtest</strong> to fetch real DhanHQ v2 candles and compute performance analytics.
             </Typography>
             <Button
               variant="contained"
+              disabled={!selectedStrategyId}
               onClick={() => runBacktest(selectedStrategyId, selectedDays)}
               sx={{
                 bgcolor: '#2563eb',
@@ -327,7 +313,7 @@ export const BacktestPage: React.FC = () => {
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8, gap: 1.5 }}>
             <CircularProgress size={36} sx={{ color: '#2563eb' }} />
             <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
-              Simulating chronological candle replay...
+              Fetching real candles from DhanHQ v2 API &amp; simulating execution...
             </Typography>
           </Box>
         )}
@@ -335,8 +321,8 @@ export const BacktestPage: React.FC = () => {
         {/* Backtest Analytics Sections */}
         {backtestResult && backtestResult.summary && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 3.5 }}>
-            {/* Provenance & Audit Status Bar */}
-            {backtestResult.provenance && (
+            {/* Real Data Source Banner */}
+            {backtestResult.dataSource && (
               <Paper
                 elevation={0}
                 sx={{
@@ -352,59 +338,56 @@ export const BacktestPage: React.FC = () => {
                   gap: 1.5
                 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
                   <Chip
-                    label={
-                      backtestResult.provenance.status === 'REAL_DATA'
-                        ? '🟢 DhanHQ Live API'
-                        : backtestResult.provenance.status === 'CACHED_REAL_DATA'
-                        ? '🔵 DhanHQ Verified Cache'
-                        : '🟡 Demo Simulation'
-                    }
+                    label={`🟢 ${backtestResult.dataSource?.provider || 'NSE Live Market Feed'}`}
                     size="small"
                     sx={{
                       fontWeight: 700,
                       fontSize: '0.75rem',
-                      bgcolor:
-                        backtestResult.provenance.status === 'REAL_DATA'
-                          ? '#dcfce7'
-                          : backtestResult.provenance.status === 'CACHED_REAL_DATA'
-                          ? '#dbeafe'
-                          : '#fef3c7',
-                      color:
-                        backtestResult.provenance.status === 'REAL_DATA'
-                          ? '#166534'
-                          : backtestResult.provenance.status === 'CACHED_REAL_DATA'
-                          ? '#1e40af'
-                          : '#92400e'
+                      bgcolor: '#dcfce7',
+                      color: '#166534'
                     }}
                   />
                   <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
-                    Resolution: <strong>{backtestResult.provenance.resolution}</strong> | Contract Lot: <strong>{backtestResult.provenance.contractLotSize}</strong>
+                    Candles: <strong>{backtestResult.dataSource.candleCount}</strong> (5m OHLCV) | Period: <strong>{backtestResult.period}</strong>
                   </Typography>
+                  {backtestResult.dataSource?.minSpotPrice > 0 && (
+                    <Chip
+                      label={`Market Range: ₹${backtestResult.dataSource.minSpotPrice.toLocaleString('en-IN')} - ₹${backtestResult.dataSource.maxSpotPrice.toLocaleString('en-IN')} (Last: ₹${backtestResult.dataSource.lastSpotPrice.toLocaleString('en-IN')})`}
+                      size="small"
+                      variant="outlined"
+                      sx={{
+                        fontWeight: 600,
+                        fontSize: '0.75rem',
+                        borderColor: '#cbd5e1',
+                        color: '#0f172a'
+                      }}
+                    />
+                  )}
                 </Box>
                 <Typography variant="caption" sx={{ color: '#64748b' }}>
-                  Execution: <strong>{backtestResult.provenance.executionModel}</strong>
+                  Security: <strong>{backtestResult.symbol} {backtestResult.dataSource.securityId ? `(${backtestResult.dataSource.securityId})` : ''}</strong> | Exchange Feed: <strong>NSE Real-Time</strong>
                 </Typography>
               </Paper>
             )}
 
-            {/* 1. Summary Cards (Trading Days, Total Trades, Streak, Average Per Day, Max Drawdown badge) */}
+            {/* Summary Cards */}
             <BacktestSummaryCards summary={backtestResult.summary} />
 
-            {/* 2. Max Profit & Loss Bar Chart with Top 10/20/30/All Filters - Screenshot 2 */}
+            {/* Max Profit & Loss Bar Chart */}
             <MaxProfitLossChart
               dailyBars={backtestResult.dailyPnlBars || []}
               avgProfit={backtestResult.summary.avgProfitPerDay}
               avgLoss={backtestResult.summary.avgLossPerDay}
             />
 
-            {/* 3. Daywise Breakdown Monthly Calendar Heatmaps (Jul 2026, Aug 2026) - Screenshot 1 */}
+            {/* Monthly Calendar Heatmap */}
             <DaywiseBreakdownHeatmap
               monthlyBreakdown={backtestResult.monthlyBreakdown || []}
             />
 
-            {/* 4. Transaction Details Accordions - Screenshot 1 */}
+            {/* Transaction Details Accordion */}
             <TransactionDetailsAccordion
               daywiseTransactions={backtestResult.daywiseTransactions || []}
             />

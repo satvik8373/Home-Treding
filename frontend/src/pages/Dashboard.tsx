@@ -62,28 +62,7 @@ const Dashboard: React.FC = () => {
         axios.get(`${API_CONFIG.BASE_URL}/api/strategies/active`).catch(() => ({
           data: {
             success: true,
-            deployments: [
-              {
-                deploymentId: 'dep_dhokiya_1',
-                strategyId: 'dhokiya_99',
-                name: 'Dhokiya 0.09% Scalper',
-                symbol: 'NIFTY 50',
-                mode: 'paper',
-                status: 'RUNNING',
-                qtyMultiplier: 1,
-                tradesExecuted: 12
-              },
-              {
-                deploymentId: 'dep_banknifty_orb',
-                strategyId: 'bn_orb',
-                name: 'BankNifty 15m ORB Breakout',
-                symbol: 'BANKNIFTY',
-                mode: 'paper',
-                status: 'RUNNING',
-                qtyMultiplier: 2,
-                tradesExecuted: 8
-              }
-            ]
+            deployments: []
           }
         }))
       ]);

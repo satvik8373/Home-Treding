@@ -79,6 +79,51 @@ export class DhanConditionalTriggerService {
   }
 
   /**
+   * Fetch a single conditional trigger by ID
+   * GET /alerts/orders/{alertId} (DhanHQ OpenAPI 3.0.1)
+   */
+  public async getConditionalTriggerById(alertId: string): Promise<any> {
+    try {
+      return await this.client.get<any>(DHAN_CONFIG.ENDPOINTS.CONDITIONAL_TRIGGER_BY_ID(alertId));
+    } catch (error: any) {
+      return null;
+    }
+  }
+
+  /**
+   * Modify existing conditional trigger
+   * PUT /alerts/orders/{alertId} (DhanHQ OpenAPI 3.0.1)
+   */
+  public async modifyConditionalTrigger(alertId: string, params: any): Promise<any> {
+    try {
+      const payload = {
+        dhanClientId: this.client.getClientId(),
+        alertId,
+        ...params
+      };
+      return await this.client.put(DHAN_CONFIG.ENDPOINTS.CONDITIONAL_TRIGGER_BY_ID(alertId), payload);
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Failed to modify alert' };
+    }
+  }
+
+  /**
+   * Place multi order directly without conditions
+   * POST /alerts/multi/orders (DhanHQ OpenAPI 3.0.1)
+   */
+  public async placeMultiOrder(orders: any[]): Promise<any> {
+    try {
+      const payload = {
+        dhanClientId: this.client.getClientId(),
+        orders
+      };
+      return await this.client.post(DHAN_CONFIG.ENDPOINTS.MULTI_ORDERS, payload);
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Failed to place multi order' };
+    }
+  }
+
+  /**
    * Cancel a conditional trigger
    */
   public async cancelConditionalTrigger(alertId: string): Promise<boolean> {
@@ -90,3 +135,4 @@ export class DhanConditionalTriggerService {
     }
   }
 }
+

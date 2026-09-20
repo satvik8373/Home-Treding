@@ -1109,8 +1109,8 @@ const Strategies: React.FC = () => {
                   }}
                   creditsRemaining={creditsRemaining}
                   totalCredits={50}
-                  totalPnl={backtestResult ? backtestResult.totalNetPnl : 15702.4}
-                  maxDrawdown={backtestResult ? backtestResult.maxDrawdown : -6600.3}
+                  totalPnl={backtestResult ? backtestResult.totalNetPnl : null}
+                  maxDrawdown={backtestResult ? backtestResult.maxDrawdown : null}
                   equityCurve={backtestResult?.equityCurve || []}
                   loading={backtesting}
                   onRunBacktest={() => runQuickBacktest(btStrategy, btSymbol, btDays, btCapital)}

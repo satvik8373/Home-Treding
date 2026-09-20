@@ -1,0 +1,15 @@
+{
+  "initialCapital": 100000,
+  "availableCash": 100000,
+  "realizedPnl": 0,
+  "totalBrokerage": 0,
+  "totalSlippageCost": 0,
+  "winCount": 0,
+  "lossCount": 0,
+  "peakCapital": 100000,
+  "maxDrawdown": 0,
+  "orders": [],
+  "positions": [],
+  "trades": [],
+  "auditLogs": []
+}
