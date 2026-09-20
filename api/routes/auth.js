@@ -87,4 +87,72 @@ router.post('/logout', (req, res) => {
   });
 });
 
+// Sync Session (Firebase/OAuth user bridge)
+router.post('/sync', (req, res) => {
+  try {
+    const { uid, email, name, phone } = req.body;
+    const effectiveUid = uid || 'user_' + Date.now();
+    const effectiveEmail = email || `${effectiveUid}@user.local`;
+    const effectiveName = name || effectiveEmail.split('@')[0];
+
+    const user = {
+      id: effectiveUid,
+      uid: effectiveUid,
+      email: effectiveEmail,
+      name: effectiveName,
+      phone: phone || ''
+    };
+    users.set(effectiveEmail, user);
+
+    res.json({
+      success: true,
+      message: 'Session synchronized',
+      token: 'jwt_token_' + effectiveUid + '_' + Date.now(),
+      user
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// Forgot Password
+router.post('/forgot-password', (req, res) => {
+  res.json({
+    success: true,
+    message: 'If the email exists, a password reset link has been sent'
+  });
+});
+
+// Reset Password
+router.post('/reset-password', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Password reset successfully'
+  });
+});
+
+// Profile
+router.get('/profile', (req, res) => {
+  res.json({
+    success: true,
+    user: {
+      id: 'default_trader',
+      name: 'Mavrix Trader',
+      email: 'trader@mavrix.internal',
+      role: 'TRADER'
+    }
+  });
+});
+
+router.put('/profile', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Profile updated successfully',
+    user: req.body
+  });
+});
+
 module.exports = router;

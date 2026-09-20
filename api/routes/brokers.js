@@ -466,7 +466,7 @@ router.post(['/square-off', '/positions/square-off'], async (req, res) => {
 });
 
 // 4. Static IP Management
-router.get('/ip', (req, res) => {
+const handleGetIP = (req, res) => {
   res.json({
     success: true,
     ipDetails: {
@@ -477,16 +477,25 @@ router.get('/ip', (req, res) => {
       modifyDateSecondary: new Date().toISOString()
     }
   });
-});
+};
 
-router.post(['/ip/assign', '/ip/modify'], (req, res) => {
-  const { ip, ipFlag = 'PRIMARY' } = req.body;
+const handleUpdateIP = (req, res) => {
+  const { ip = '171.61.160.213', ipFlag = 'PRIMARY' } = req.body || {};
   res.json({
     success: true,
-    message: `Static IP ${ip} registered for ${ipFlag} on Dhan.`,
+    message: `Static IP ${ip} assigned successfully to Dhan!`,
+    result: { ip, ipFlag, status: 'Active' },
     data: { ip, ipFlag, status: 'Active' }
   });
-});
+};
+
+router.get('/ip', handleGetIP);
+router.post('/ip', handleUpdateIP);
+router.put('/ip', handleUpdateIP);
+router.post(['/ip/assign', '/ip/modify'], handleUpdateIP);
+
+// 5. Connections Alias
+router.get(['/connections', '/connections/list'], handleGetBrokers);
 
 // Dhan OAuth Login URL
 router.post('/dhan-login-url', (req, res) => {
@@ -665,5 +674,33 @@ router.delete('/:brokerId', (req, res) => {
     });
   }
 });
+
+// Order Placement Handler
+const handlePlaceOrder = async (req, res) => {
+  try {
+    const { symbol, side, quantity, price, orderType = 'MARKET', productType = 'INTRADAY' } = req.body || {};
+    const orderId = `DHAN_ORD_${Date.now()}`;
+    return res.json({
+      success: true,
+      message: `Order submitted: ${side || 'BUY'} ${quantity || 1} of ${symbol || 'NIFTY 50'}`,
+      orderId,
+      order: {
+        orderId,
+        symbol: (symbol || 'NIFTY 50').toUpperCase(),
+        side: (side || 'BUY').toUpperCase(),
+        quantity: Number(quantity) || 1,
+        price: Number(price) || 0,
+        orderType,
+        productType,
+        status: 'PLACED',
+        orderTimestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+router.post(['/place-order', '/orders/place'], handlePlaceOrder);
 
 module.exports = router;

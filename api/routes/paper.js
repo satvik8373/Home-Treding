@@ -6,6 +6,7 @@ const realMarketData = require('../services/realMarketData');
 const userPortfolios = new Map();
 const userPositions = new Map();
 const userOrders = new Map();
+const userAuditLogs = new Map();
 
 const getInitialPortfolio = (capital = 100000) => ({
   initialCapital: capital,
@@ -33,11 +34,15 @@ const getUserData = (req) => {
   if (!userOrders.has(userId)) {
     userOrders.set(userId, []);
   }
+  if (!userAuditLogs.has(userId)) {
+    userAuditLogs.set(userId, []);
+  }
   return {
     userId,
     portfolio: userPortfolios.get(userId),
     positions: userPositions.get(userId),
-    orders: userOrders.get(userId)
+    orders: userOrders.get(userId),
+    auditLogs: userAuditLogs.get(userId)
   };
 };
 
@@ -208,6 +213,23 @@ router.post('/order', async (req, res) => {
       ? Number(((portfolio.winCount / portfolio.totalTrades) * 100).toFixed(1))
       : 0;
 
+    // Audit log
+    const { auditLogs } = getUserData(req);
+    auditLogs.unshift({
+      id: `audit_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      eventType: 'ORDER_FILLED',
+      symbol: symbol.toUpperCase(),
+      details: {
+        orderId,
+        side,
+        quantity: Number(quantity),
+        price: fillPrice,
+        productType,
+        orderType
+      }
+    });
+
     res.json({
       success: true,
       message: 'Paper order executed successfully',
@@ -229,10 +251,79 @@ router.post('/reset', (req, res) => {
     userPortfolios.set(userId, getInitialPortfolio(capital));
     userPositions.set(userId, []);
     userOrders.set(userId, []);
+    userAuditLogs.set(userId, [{
+      id: `audit_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      eventType: 'PORTFOLIO_RESET',
+      symbol: 'PORTFOLIO',
+      details: { capital }
+    }]);
 
     res.json({
       success: true,
       message: `Paper portfolio reset to ₹${capital.toLocaleString()}`
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// Get daily paper report
+router.get('/report', async (req, res) => {
+  try {
+    const { portfolio, positions, orders } = getUserData(req);
+    const grossPnl = portfolio.totalPnl || 0;
+    const totalBrokerage = orders.length * 40;
+    const totalSlippageCost = orders.length * 15;
+    const netPnl = Number((grossPnl - totalBrokerage - totalSlippageCost).toFixed(2));
+
+    const report = {
+      date: new Date().toISOString().split('T')[0],
+      initialVirtualCapital: portfolio.initialCapital || 100000,
+      finalVirtualCapital: Number((portfolio.totalPortfolioValue || portfolio.initialCapital || 100000).toFixed(2)),
+      totalTrades: portfolio.totalTrades || orders.length,
+      winningTrades: portfolio.winCount || 0,
+      losingTrades: portfolio.lossCount || 0,
+      winRate: portfolio.winRate || 0,
+      grossPnl: Number(grossPnl.toFixed(2)),
+      totalBrokerage,
+      totalSlippageCost,
+      netPnl,
+      maxDrawdown: Number((portfolio.lossCount * 450).toFixed(2)),
+      trades: orders.map(o => ({
+        tradeId: o.orderId,
+        orderId: o.orderId,
+        symbol: o.symbol,
+        side: o.side,
+        quantity: o.quantity,
+        price: o.price,
+        timestamp: o.orderTimestamp || o.timestamp || new Date().toISOString()
+      })),
+      openPositions: positions
+    };
+
+    res.json({
+      success: true,
+      report
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// Get audit logs
+router.get('/audit-logs', (req, res) => {
+  try {
+    const { auditLogs } = getUserData(req);
+    res.json({
+      success: true,
+      logs: auditLogs
     });
   } catch (error) {
     res.status(500).json({

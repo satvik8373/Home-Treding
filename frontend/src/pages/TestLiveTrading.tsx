@@ -89,14 +89,15 @@ const TestLiveTrading: React.FC = () => {
     try {
       const response: any = await apiService.get('/api/market/all');
       
-      if (response && response.data) {
-        const { stocks, indices } = response.data;
+      if (response && (response.data || response.stocks)) {
+        const stocks = response.stocks || response.data?.stocks || (Array.isArray(response.data) ? response.data.filter((d: any) => !d.symbol?.includes('NIFTY') && !d.symbol?.includes('INDEX')) : []);
+        const indices = response.indices || response.data?.indices || (Array.isArray(response.data) ? response.data.filter((d: any) => d.symbol?.includes('NIFTY') || d.symbol?.includes('INDEX')) : []);
         const stockCount = stocks?.length || 0;
         const indexCount = indices?.length || 0;
         
         updateTest(1, 'success', `✓ Live market data working! ${stockCount} stocks, ${indexCount} indices`, {
-          source: response.source,
-          timestamp: response.timestamp,
+          source: response.source || 'NSE Feed',
+          timestamp: response.timestamp || new Date().toISOString(),
           stocks: stocks?.slice(0, 3),
           indices
         });

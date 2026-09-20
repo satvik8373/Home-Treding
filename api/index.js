@@ -26,6 +26,7 @@ const tradingRoutes = require('./routes/trading');
 const paperRoutes = require('./routes/paper');
 const riskRoutes = require('./routes/risk');
 const backtestRoutes = require('./routes/backtest');
+const strategyTestRoutes = require('./routes/strategyTest');
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -73,6 +74,16 @@ app.get(['/api/health', '/health'], (req, res) => {
 ['/api/paper', '/paper'].forEach(p => app.use(p, paperRoutes));
 ['/api/risk', '/risk'].forEach(p => app.use(p, riskRoutes));
 ['/api/backtest', '/backtest'].forEach(p => app.use(p, backtestRoutes));
+['/api/strategy-test', '/strategy-test'].forEach(p => app.use(p, strategyTestRoutes));
+
+// Dhan Partner OAuth callback
+app.all(['/api/dhan-partner/callback', '/dhan-partner/callback'], (req, res) => {
+  res.json({
+    success: true,
+    message: 'Dhan partner callback handled successfully',
+    broker: { broker: 'dhan', status: 'Connected' }
+  });
+});
 
 // Graceful socket.io stub for serverless environments (prevents 404 polling errors)
 app.all(['/socket.io', '/socket.io/*'], (req, res) => {

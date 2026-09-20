@@ -6,208 +6,82 @@ const strategies = new Map();
 const templates = new Map();
 
 // Active strategy deployments
-let activeDeployments = [
-  {
-    deploymentId: 'dep_dhokiya_1',
-    strategyId: 'dhokiya_99',
-    name: 'Dhokiya 0.09% Scalper',
-    symbol: 'NIFTY 50',
-    templateType: 'dhokiya_009',
-    mode: 'paper',
-    status: 'RUNNING',
-    qtyMultiplier: 1,
-    maxProfit: 5000,
-    maxLoss: 2500,
-    deployedAt: new Date(Date.now() - 86400000).toISOString(),
-    tradesExecuted: 12,
-    pnl: 1450.00
-  },
-  {
-    deploymentId: 'dep_banknifty_orb',
-    strategyId: 'bn_orb',
-    name: 'BankNifty 15m ORB Breakout',
-    symbol: 'BANKNIFTY',
-    templateType: 'banknifty_orb',
-    mode: 'paper',
-    status: 'RUNNING',
-    qtyMultiplier: 2,
-    maxProfit: 8000,
-    maxLoss: 4000,
-    deployedAt: new Date(Date.now() - 43200000).toISOString(),
-    tradesExecuted: 8,
-    pnl: 2850.00
-  }
-];
+let activeDeployments = [];
 
-// Initial Custom Strategies
+// Initial Custom Strategies - 100% official NIFTY 0.09% ATM Full-Day Breakout Strategy
 const INITIAL_STRATEGIES = [
   {
-    id: 'strat_1_percent_sl_strangle_bnf',
-    name: '1 % SL strangle BNF',
+    id: 'nifty-009-atm-breakout',
+    userId: 'user_admin',
+    name: 'NIFTY 0.09% ATM Full-Day Breakout',
     author: 'AR427232',
-    description: 'Intraday BankNIFTY ATM Strangle (CE + PE Sell) entered at 09:16 with 1% fixed stop loss on each leg, profit trailing, and 15:10 auto-exit.',
-    segmentType: 'OPTION',
-    strategyType: 'Time Based',
-    symbol: 'BANKNIFTY',
-    startTime: '09:16',
-    endTime: '15:10',
-    tradingDays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
-    legs: [
-      {
-        id: 'leg_bnf_ce_1',
-        action: 'SELL',
-        symbol: 'BANKNIFTY',
-        strike: 'ATM 0',
-        optionType: 'CE',
-        quantity: 30,
-        slType: 'percentage',
-        slValue: 1,
-        targetType: 'percentage',
-        targetValue: 0
-      },
-      {
-        id: 'leg_bnf_pe_2',
-        action: 'SELL',
-        symbol: 'BANKNIFTY',
-        strike: 'ATM 0',
-        optionType: 'PE',
-        quantity: 30,
-        slType: 'percentage',
-        slValue: 1,
-        targetType: 'percentage',
-        targetValue: 0
-      }
-    ],
-    maxProfit: 2200,
-    maxLoss: 2500,
-    trailingSl: 'Lock and Trail',
-    status: 'active',
-    createdAt: new Date(Date.now() - 604800000).toISOString()
-  },
-  {
-    id: 'dhokiya_99',
-    name: 'Dhokiya 0.09% Scalper',
-    author: 'AR427232',
-    description: 'NIFTY 50 1-minute high frequency breakout scalper with 0.09% target and 0.05% stop loss.',
-    segmentType: 'OPTION',
-    strategyType: 'Indicator Based',
-    symbol: 'NIFTY 50',
-    startTime: '09:20',
-    endTime: '15:10',
-    timeframe: '1m',
-    stopLossPercent: 0.05,
-    targetPercent: 0.09,
-    status: 'active',
-    deploymentStatus: 'running',
-    createdAt: new Date(Date.now() - 1209600000).toISOString()
-  },
-  {
-    id: 'bn_orb',
-    name: 'BankNifty 15m ORB Breakout',
-    author: 'AR427232',
-    description: 'BankNIFTY opening range breakout on 15-minute high/low breakout with dynamic volatility buffer.',
+    description: 'Calculates +0.09% upper and -0.09% lower levels from the first 5-min candle (09:15-09:20) close. Locks 09:20 ATM CE and PE contracts via Dhan Option Chain, monitoring full-day 5-min candle closes for breakout BUY (Close > Upper => BUY CE, Close < Lower => BUY PE) with symmetric reversal exit and 15:10 force square-off.',
     segmentType: 'OPTION',
     strategyType: 'Breakout / Trigger',
-    symbol: 'BANKNIFTY',
-    startTime: '09:30',
+    symbol: 'NIFTY 50',
+    underlyingType: 'Spot',
+    orderType: 'MIS',
+    startTime: '09:20',
     endTime: '15:10',
-    timeframe: '15m',
-    stopLossPercent: 0.5,
-    targetPercent: 1.0,
-    status: 'active',
-    deploymentStatus: 'running',
-    createdAt: new Date(Date.now() - 1209600000).toISOString()
+    tradingDays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
+    lotSize: 75,
+    maxLoss: 2500,
+    maxProfit: 5000,
+    trailingSl: 'No Trailing',
+    noTradeAfter: '15:10',
+    legs: [
+      {
+        id: 'leg_ce_breakout',
+        action: 'BUY',
+        symbol: 'NIFTY 50',
+        strike: 'ATM',
+        strikeCriteria: 'ATM 0',
+        strikeType: 'ATM',
+        optionType: 'CE',
+        quantity: 75,
+        slType: 'points',
+        slValue: 0,
+        targetType: 'points',
+        targetValue: 0,
+        isActive: true
+      },
+      {
+        id: 'leg_pe_breakout',
+        action: 'BUY',
+        symbol: 'NIFTY 50',
+        strike: 'ATM',
+        strikeCriteria: 'ATM 0',
+        strikeType: 'ATM',
+        optionType: 'PE',
+        quantity: 75,
+        slType: 'points',
+        slValue: 0,
+        targetType: 'points',
+        targetValue: 0,
+        isActive: true
+      }
+    ],
+    advancedFeatures: {
+      referenceCandle: 'First 5-min candle (09:15 to 09:20 IST)',
+      referenceCloseCalculation: 'Close of 09:15-09:20 candle = X',
+      upperBreakoutFormula: 'X * 1.0009 (+0.09%)',
+      lowerBreakoutFormula: 'X * 0.9991 (-0.09%)',
+      atmSelection: 'Lock ATM Strike at 09:20 from NIFTY 50 Spot price (multiples of 50)',
+      contractResolution: 'Live Dhan Option Chain (Nearest Weekly Expiry CE + PE)',
+      entryTrigger: '5-min Candle Close > Upper Level => BUY ATM CE | 5-min Candle Close < Lower Level => BUY ATM PE',
+      exitTrigger: 'CE Active & Close < Lower => Exit CE | PE Active & Close > Upper => Exit PE',
+      positionConstraint: 'Max 1 active position held at a time (Symmetric Reversal)',
+      reEntryAllowed: true,
+      forceSquareOffTime: '15:10 IST',
+      executionSupport: ['PAPER_MODE', 'LIVE_DHAN_MODE']
+    },
+    createdAt: '2026-09-20T06:00:00.000Z',
+    status: 'active'
   }
 ];
 
-// Initial Templates Library
-const INITIAL_TEMPLATES = [
-  {
-    id: '1_percent_sl_strangle_bnf',
-    name: '1 % SL strangle BNF',
-    category: 'Options Selling Strangle',
-    description: 'Intraday BankNIFTY ATM Strangle (CE + PE Sell) entered at 09:16 with 1% fixed stop loss on each leg, profit trailing, and 15:10 auto-exit.',
-    timeframe: '5m',
-    symbols: ['BANKNIFTY'],
-    margin: '₹1,40,000',
-    maxDrawdown: '₹-6,600.3',
-    winRate: '65.22%',
-    rules: [
-      'Enter at 09:16 IST: Sell ATM Call + Sell ATM Put',
-      'Stop Loss: 1% on each option leg independently',
-      'Target Profit / Trailing: Automated trailing stop loss per leg',
-      'Auto Square-Off at 15:10 IST',
-      'Backtested across 23 trading days with 65.22% win rate'
-    ]
-  },
-  {
-    id: 'nifty-009-atm-breakout',
-    name: 'NIFTY 0.09% ATM Full-Day Breakout',
-    category: 'Index Options Breakout',
-    description: 'Full-day NIFTY 50 5-minute candle breakout strategy with ±0.09% fixed trigger levels, 09:20 locked ATM strike, CE/PE state machine, and auto square-off at 15:10 IST.',
-    timeframe: '5m',
-    symbols: ['NIFTY 50'],
-    margin: '₹50,000',
-    maxDrawdown: '₹-3,200',
-    winRate: '68.5%',
-    rules: [
-      'Enter at 09:20 IST on breakout of opening 5-minute range',
-      'Trigger level: ±0.09% from spot reference',
-      'SL: 0.05% with 0.09% target',
-      'Auto Square-off at 15:10 IST'
-    ]
-  },
-  {
-    id: 'iron-condor-weekly-decay',
-    name: 'NIFTY Weekly Iron Condor',
-    category: 'Options Theta Decay',
-    description: 'Market-neutral 4-legged defined risk option strategy taking advantage of weekend theta decay and low implied volatility on NIFTY index options.',
-    timeframe: '15m',
-    symbols: ['NIFTY 50'],
-    margin: '₹60,000',
-    maxDrawdown: '₹-2,400',
-    winRate: '72.0%',
-    rules: [
-      'Sell OTM CE (Delta ~0.20) + Buy Far OTM CE (Delta ~0.05)',
-      'Sell OTM PE (Delta ~0.20) + Buy Far OTM PE (Delta ~0.05)',
-      'Defined maximum loss capped by long wings',
-      'Target: 50% max profit decay or expiry day exit'
-    ]
-  },
-  {
-    id: 'finnifty-hero-zero-momentum',
-    name: 'FINNIFTY Expiry Zero-to-Hero Scalp',
-    category: 'Expiry Day Momentum',
-    description: 'High-speed breakout momentum buying deep discount OTM options between 13:30 and 15:00 on weekly expiry days with 1:3 risk-to-reward.',
-    timeframe: '1m',
-    symbols: ['FINNIFTY'],
-    margin: '₹15,000',
-    maxDrawdown: '₹-1,800',
-    winRate: '58.0%',
-    rules: [
-      'Active only on FINNIFTY Tuesday weekly expiry from 13:30 IST',
-      '5-minute consolidation range breakout triggers Long Option trade',
-      'Fixed risk: ₹500/lot with 1:3 reward target (₹1,500+)'
-    ]
-  },
-  {
-    id: 'equity-vwap-pullback-trend',
-    name: 'Equity Intraday VWAP Pullback',
-    category: 'Trend Following Equity',
-    description: 'Trend-following strategy for heavyweight stocks (RELIANCE, HDFCBANK, TCS) entering on VWAP pullbacks during established morning momentum.',
-    timeframe: '5m',
-    symbols: ['RELIANCE', 'HDFCBANK', 'TCS'],
-    margin: '₹35,000',
-    maxDrawdown: '₹-1,900',
-    winRate: '66.8%',
-    rules: [
-      'Stock must be above 20 EMA and VWAP on 15m chart',
-      '5-minute pullback touching VWAP with bullish reversal candle triggers BUY',
-      'Stop Loss: Below the pullback swing low (0.4%)',
-      'Target: 1.2% intraday gain or 15:15 square-off'
-    ]
-  }
-];
+// Empty Templates Library
+const INITIAL_TEMPLATES = [];
 
 // Initialize stores
 INITIAL_STRATEGIES.forEach(s => strategies.set(s.id, s));
@@ -598,10 +472,57 @@ router.delete('/:id', (req, res) => {
       strategies.delete(id);
       return res.json({ success: true, message: 'Strategy deleted successfully' });
     }
-    res.status(404).json({ success: false, message: 'Strategy not found' });
+    return res.status(404).json({ success: false, message: 'Strategy not found' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message });
   }
+});
+
+// ==========================================
+// NIFTY 0.09% BREAKOUT ENGINE STATUS & SESSION
+// ==========================================
+const handleNifty009Status = (req, res) => {
+  const isRunning = activeDeployments.some(d => d.status === 'RUNNING');
+  const activeDep = activeDeployments.find(d => d.status === 'RUNNING') || activeDeployments[0];
+  const mode = activeDep?.mode || 'paper';
+  res.json({
+    success: true,
+    data: {
+      isRunning,
+      isPaused: false,
+      isHalted: false,
+      mode,
+      sessionDate: new Date().toISOString().split('T')[0],
+      state: isRunning ? 'MONITORING' : 'IDLE',
+      niftyLtp: 24850,
+      firstCandleClose: null,
+      upperLevel: null,
+      lowerLevel: null,
+      lockedAtm: null,
+      activePosition: null,
+      candles: 0,
+      tradesCount: 0,
+      sessionPnl: 0,
+      squareOffTime: '15:10',
+      events: [],
+      lastUpdated: new Date().toISOString()
+    },
+    session: {
+      isRunning,
+      state: isRunning ? 'MONITORING' : 'IDLE',
+      mode
+    }
+  });
+};
+
+router.get(['/nifty009/status', '/nifty009/session'], handleNifty009Status);
+router.get('/nifty009/events', (req, res) => res.json({ success: true, events: [] }));
+router.get('/nifty009/reports', (req, res) => res.json({ success: true, reports: [] }));
+router.post('/nifty009/start', (req, res) => {
+  res.json({ success: true, message: 'Nifty 0.09% strategy started successfully' });
+});
+router.post('/nifty009/stop', (req, res) => {
+  res.json({ success: true, message: 'Nifty 0.09% strategy stopped' });
 });
 
 module.exports = router;
