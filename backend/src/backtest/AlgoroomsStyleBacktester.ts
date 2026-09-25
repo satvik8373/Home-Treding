@@ -399,9 +399,10 @@ export class AlgoroomsStyleBacktester {
     const lower = trade.exits.find((e) => e.type === 'LOWER_EXIT');
     const force = trade.exits.find((e) => e.type === 'FORCE_EXIT');
     const finalExit = trade.exits[trade.exits.length - 1];
-    const entryTime = new Date(trade.entry.isoTime).getTime();
-    const exitTime = new Date((finalExit ? finalExit.time : trade.entry.time)).getTime();
-    const duration = Number.isFinite(entryTime) && Number.isFinite(exitTime) ? Math.max(0, Math.round((exitTime - entryTime) / 60000)) : 0;
+    const entryTimestamp = trade.entry.timestamp;
+    const exitCandle = leg.candles1m.find((c) => c.time === finalExit.time);
+    const exitTimestamp = exitCandle?.timestamp ?? entryTimestamp;
+    const duration = Math.max(0, Math.round((exitTimestamp - entryTimestamp) / 60));
 
     this.tradeLogs.push({
       id: trade.id,
@@ -448,7 +449,7 @@ export class AlgoroomsStyleBacktester {
       eodExitPnl: force?.pnl ?? 0,
       exitPrice: this.round(blendedExit),
       exitTime: finalExit.time,
-      exitTimestamp: trade.exits.length ? leg.candles1m.find((c) => c.time === finalExit.time)?.isoTime ?? trade.entry.isoTime : trade.entry.isoTime,
+      exitTimestamp: exitCandle?.isoTime ?? trade.entry.isoTime,
       exitReason: finalExit.type,
       durationMinutes: duration,
       grossPnl,
