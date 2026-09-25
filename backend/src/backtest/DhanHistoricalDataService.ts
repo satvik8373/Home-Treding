@@ -357,11 +357,11 @@ export class DhanHistoricalDataService {
     }
 
     const candles1m = Array.from(selected.values()).sort((a, b) => a.timestamp - b.timestamp);
-    const expectedMinutes = 355;
+    const expectedMinutes = 356;
     const dates = Object.keys(strikesByDate);
 
     for (const date of dates) {
-      const day = candles1m.filter((c) => c.date === date && c.time >= '09:15' && c.time <= '15:09');
+      const day = candles1m.filter((c) => c.date === date && c.time >= '09:15' && c.time <= '15:10');
       if (day.length < expectedMinutes) {
         throw new Error(
           `INCOMPLETE_OPTION_DATA: ${params.optionType} ${date} fixed strike ${strikesByDate[date]} has ${day.length}/${expectedMinutes} one-minute candles. Backtest stopped to avoid estimated or fabricated values.`
@@ -371,7 +371,7 @@ export class DhanHistoricalDataService {
 
     const fiveMinute = new Map<string, OptionCandle[]>();
     for (const candle of candles1m) {
-      if (candle.time < '09:15' || candle.time > '15:09') continue;
+      if (candle.time < '09:15' || candle.time > '15:10') continue;
       const minute = Number(candle.time.slice(3, 5));
       const bucketMinute = Math.floor(minute / 5) * 5;
       const bucketTime = `${candle.time.slice(0, 3)}${String(bucketMinute).padStart(2, '0')}`;
@@ -399,7 +399,7 @@ export class DhanHistoricalDataService {
     }
 
     return {
-      candles1m: candles1m.filter((c) => c.time >= '09:15' && c.time <= '15:09'),
+      candles1m: candles1m.filter((c) => c.time >= '09:15' && c.time <= '15:10'),
       candles5m: candles5m.sort((a, b) => a.timestamp - b.timestamp),
       strikesByDate
     };
