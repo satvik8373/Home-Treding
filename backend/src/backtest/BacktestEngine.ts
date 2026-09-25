@@ -32,6 +32,7 @@ export class OfficialBacktestEngine {
     const toDate = endDate ?? new Date().toISOString().slice(0, 10);
 
     const auth = DhanHistoricalDataService.resolveAuth(userId);
+    const apiToDate = this.nextDate(toDate);
     if (!auth) throw new Error('DHAN_CONNECTION_REQUIRED');
 
     const dhan = new DhanHistoricalDataService(auth);
@@ -42,7 +43,7 @@ export class OfficialBacktestEngine {
       exchangeSegment: meta.exchangeSegment,
       instrument: meta.instrument,
       fromDate,
-      toDate,
+      toDate: apiToDate,
       interval: 5
     });
     if (!spotCandles.length) throw new Error('NO_DHAN_SPOT_DATA');
@@ -50,7 +51,7 @@ export class OfficialBacktestEngine {
     const ce = await dhan.getFixedStrikeOptionSeries({
       symbol,
       fromDate,
-      toDate,
+      toDate: apiToDate,
       optionType: 'CE',
       strikeStep: 50,
       referenceTime: '09:15',
@@ -59,7 +60,7 @@ export class OfficialBacktestEngine {
     const pe = await dhan.getFixedStrikeOptionSeries({
       symbol,
       fromDate,
-      toDate,
+      toDate: apiToDate,
       optionType: 'PE',
       strikeStep: 50,
       referenceTime: '09:15',
@@ -172,6 +173,12 @@ export class OfficialBacktestEngine {
     if (!found) throw new Error(`STRATEGY_NOT_FOUND:${strategyId}`);
     if (found.symbol !== symbol) throw new Error(`STRATEGY_SYMBOL_MISMATCH:${found.symbol}`);
     return { name: found.name, chargeConfig: found.chargeConfig };
+  }
+
+  private nextDate(date: string): string {
+    const value = new Date(date + 'T00:00:00Z');
+    value.setUTCDate(value.getUTCDate() + 1);
+    return value.toISOString().slice(0, 10);
   }
 
   private defaultStartDate(days: number): string {
