@@ -30,8 +30,6 @@ interface BacktestControlsProps {
   onSelectStrategy: (id: string) => void;
   selectedRange: string;
   onSelectRange: (range: string, days: number) => void;
-  creditsRemaining: number;
-  totalCredits: number;
   totalPnl: number | null;
   maxDrawdown: number | null;
   equityCurve: EquityPoint[];
@@ -51,8 +49,6 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
   onSelectStrategy,
   selectedRange,
   onSelectRange,
-  creditsRemaining,
-  totalCredits,
   totalPnl,
   maxDrawdown,
   equityCurve,
@@ -278,7 +274,7 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
           </Box>
 
           <Typography sx={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-            Exact date-by-date tick execution & institutional CSV audit report will export for this period.
+            Official Dhan historical 1-minute execution data will be used for this period.
           </Typography>
         </Box>
       )}
@@ -314,13 +310,6 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
           mb: 3
         }}
       >
-        <Typography variant="body2" sx={{ color: '#334155', fontWeight: 600, fontSize: '0.85rem' }}>
-          Backtest Credit:{' '}
-          <span style={{ fontWeight: 800, color: '#0f172a' }}>
-            {creditsRemaining}/{totalCredits}
-          </span>
-        </Typography>
-
         <Box sx={{ display: 'flex', gap: 1.5 }}>
           {/* Download Trades Dropdown Button */}
           <Button
