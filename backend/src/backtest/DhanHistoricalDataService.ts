@@ -330,22 +330,21 @@ export class DhanHistoricalDataService {
     const optionType = params.optionType === 'CE' ? 'CALL' : 'PUT';
     const expiryFlag = params.expiryFlag ?? 'WEEK';
 
-    const series = await Promise.all(
-      offsets.map((offset) =>
-        this.getExpiredOptionCandles({
-          securityId: meta.securityId,
-          exchangeSegment: 'NSE_FNO',
-          instrument: 'OPTIDX',
-          expiryFlag,
-          expiryCode: 0,
-          strike: offset === 0 ? 'ATM' : offset > 0 ? `ATM+${offset}` : `ATM${offset}`,
-          optionType,
-          fromDate: params.fromDate,
-          toDate: params.toDate,
-          interval: 1
-        })
-      )
-    );
+    const series: OptionCandle[][] = [];
+    for (const offset of offsets) {
+      series.push(await this.getExpiredOptionCandles({
+        securityId: meta.securityId,
+        exchangeSegment: 'NSE_FNO',
+        instrument: 'OPTIDX',
+        expiryFlag,
+        expiryCode: 0,
+        strike: offset === 0 ? 'ATM' : offset > 0 ? `ATM+${offset}` : `ATM${offset}`,
+        optionType,
+        fromDate: params.fromDate,
+        toDate: params.toDate,
+        interval: 1
+      }));
+    }
 
     const selected = new Map<string, OptionCandle>();
     for (const candles of series) {
