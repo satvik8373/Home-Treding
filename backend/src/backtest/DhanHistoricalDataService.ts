@@ -361,9 +361,10 @@ export class DhanHistoricalDataService {
 
     for (const date of dates) {
       const day = candles1m.filter((c) => c.date === date && c.time >= '09:15' && c.time <= '15:10');
-      if (day.length < expectedMinutes) {
+      const fiveMinuteCount = candles1m.filter((c) => c.date === date && c.time >= '09:15' && c.time <= '15:05').length;
+      if (day.length < expectedMinutes || fiveMinuteCount < 71) {
         throw new Error(
-          `INCOMPLETE_OPTION_DATA: ${params.optionType} ${date} fixed strike ${strikesByDate[date]} has ${day.length}/${expectedMinutes} one-minute candles. Backtest stopped to avoid estimated or fabricated values.`
+          `INCOMPLETE_OPTION_DATA: ${params.optionType} ${date} fixed strike ${strikesByDate[date]} has ${day.length}/${expectedMinutes} one-minute candles and ${fiveMinuteCount}/356 expected signal-session minutes. Backtest stopped to avoid estimated or fabricated values.`
         );
       }
     }
