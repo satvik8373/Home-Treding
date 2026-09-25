@@ -3,7 +3,7 @@ import axios from 'axios';
 import { BrokerRegistry } from '../brokers/BrokerRegistry';
 import { isMarketOpen, getMarketStatus, formatISTTime } from '../utils/marketHours';
 
-interface IndianSymbolConfig {
+export interface IndianSymbolConfig {
   symbol: string;
   name: string;
   securityId: string;
@@ -11,7 +11,7 @@ interface IndianSymbolConfig {
   yahooSymbol: string;
 }
 
-const INDIAN_INSTRUMENTS: IndianSymbolConfig[] = [
+export const INDIAN_INSTRUMENTS: IndianSymbolConfig[] = [
   { symbol: 'NIFTY 50', name: 'NIFTY 50 Index', securityId: '13', exchangeSegment: 'IDX_I', yahooSymbol: '^NSEI' },
   { symbol: 'BANKNIFTY', name: 'NIFTY Bank Index', securityId: '25', exchangeSegment: 'IDX_I', yahooSymbol: '^NSEBANK' },
   { symbol: 'FINNIFTY', name: 'NIFTY Financial Services', securityId: '27', exchangeSegment: 'IDX_I', yahooSymbol: 'NIFTY_FIN_SERVICE.NS' },
@@ -172,21 +172,6 @@ export const getMarketDepth = async (req: Request, res: Response) => {
         const quote = await primaryAdapter.getQuote(inst.symbol, inst.securityId, 'NSE');
         if (quote && quote.ltp > 0) {
           const ltp = quote.ltp;
-          const buyDepth = [
-            { price: Number((ltp - 0.05).toFixed(2)), quantity: 1250, orders: 14 },
-            { price: Number((ltp - 0.10).toFixed(2)), quantity: 3400, orders: 28 },
-            { price: Number((ltp - 0.15).toFixed(2)), quantity: 5120, orders: 42 },
-            { price: Number((ltp - 0.20).toFixed(2)), quantity: 8900, orders: 67 },
-            { price: Number((ltp - 0.25).toFixed(2)), quantity: 14200, orders: 95 }
-          ];
-          const sellDepth = [
-            { price: Number((ltp + 0.05).toFixed(2)), quantity: 1800, orders: 19 },
-            { price: Number((ltp + 0.10).toFixed(2)), quantity: 4100, orders: 35 },
-            { price: Number((ltp + 0.15).toFixed(2)), quantity: 6300, orders: 51 },
-            { price: Number((ltp + 0.20).toFixed(2)), quantity: 9400, orders: 74 },
-            { price: Number((ltp + 0.25).toFixed(2)), quantity: 16800, orders: 110 }
-          ];
-
           return res.json({
             success: true,
             depth: {
@@ -202,12 +187,13 @@ export const getMarketDepth = async (req: Request, res: Response) => {
               change: quote.change,
               changePercent: quote.changePercent,
               volume: quote.volume,
-              buyDepth,
-              sellDepth,
-              totalBuyQty: buyDepth.reduce((a, b) => a + b.quantity, 0),
-              totalSellQty: sellDepth.reduce((a, b) => a + b.quantity, 0),
+              buyDepth: [],
+              sellDepth: [],
+              totalBuyQty: 0,
+              totalSellQty: 0,
+              depthAvailable: false,
               timestamp: new Date().toISOString(),
-              source: 'DhanHQ Full Depth'
+              source: 'DhanHQ Quote Feed'
             }
           });
         }
@@ -218,22 +204,14 @@ export const getMarketDepth = async (req: Request, res: Response) => {
 
     // 2. Fallback live quote
     const quote = await fetchLiveQuote(inst);
-    const ltp = quote ? quote.price : 2485;
-    const buyDepth = [
-      { price: Number((ltp - 0.05).toFixed(2)), quantity: 1200, orders: 12 },
-      { price: Number((ltp - 0.10).toFixed(2)), quantity: 2800, orders: 24 },
-      { price: Number((ltp - 0.15).toFixed(2)), quantity: 4600, orders: 38 },
-      { price: Number((ltp - 0.20).toFixed(2)), quantity: 7500, orders: 55 },
-      { price: Number((ltp - 0.25).toFixed(2)), quantity: 11200, orders: 80 }
-    ];
-    const sellDepth = [
-      { price: Number((ltp + 0.05).toFixed(2)), quantity: 1500, orders: 16 },
-      { price: Number((ltp + 0.10).toFixed(2)), quantity: 3200, orders: 30 },
-      { price: Number((ltp + 0.15).toFixed(2)), quantity: 5100, orders: 45 },
-      { price: Number((ltp + 0.20).toFixed(2)), quantity: 8200, orders: 62 },
-      { price: Number((ltp + 0.25).toFixed(2)), quantity: 13500, orders: 92 }
-    ];
+    if (!quote) {
+      return res.status(404).json({
+        success: false,
+        message: `Market data unavailable for ${inst.symbol}`
+      });
+    }
 
+    const ltp = quote.price;
     res.json({
       success: true,
       depth: {
@@ -241,20 +219,21 @@ export const getMarketDepth = async (req: Request, res: Response) => {
         name: inst.name,
         exchange: 'NSE',
         ltp,
-        open: quote?.open || ltp,
-        high: quote?.high || ltp,
-        low: quote?.low || ltp,
-        close: quote?.close || ltp,
-        prevClose: quote?.prevClose || ltp,
-        change: quote?.change || 0,
-        changePercent: quote?.changePercent || 0,
-        volume: quote?.volume || 0,
-        buyDepth,
-        sellDepth,
-        totalBuyQty: buyDepth.reduce((a, b) => a + b.quantity, 0),
-        totalSellQty: sellDepth.reduce((a, b) => a + b.quantity, 0),
+        open: quote.open,
+        high: quote.high,
+        low: quote.low,
+        close: quote.close,
+        prevClose: quote.prevClose,
+        change: quote.change,
+        changePercent: quote.changePercent,
+        volume: quote.volume,
+        buyDepth: [],
+        sellDepth: [],
+        totalBuyQty: 0,
+        totalSellQty: 0,
+        depthAvailable: false,
         timestamp: new Date().toISOString(),
-        source: 'Live NSE Market Depth'
+        source: quote.source || 'Live Market Feed'
       }
     });
   } catch (error: any) {
@@ -266,7 +245,7 @@ export const getMarketDepth = async (req: Request, res: Response) => {
   }
 };
 
-async function fetchLiveQuote(inst: IndianSymbolConfig) {
+export async function fetchLiveQuote(inst: IndianSymbolConfig) {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${inst.yahooSymbol}`;
     const response = await axios.get(url, {

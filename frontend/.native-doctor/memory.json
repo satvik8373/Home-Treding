@@ -1,0 +1,1495 @@
+{
+  "schemaVersion": "1.0.0",
+  "timestamp": "2026-09-25T12:10:37.456Z",
+  "project": {
+    "name": "frontend",
+    "root": "E:\\Mavrix Trading\\Home-Treding\\frontend",
+    "workflow": "unknown",
+    "reactNativeVersion": null,
+    "expoSdkVersion": null,
+    "reactVersion": "^19.2.0",
+    "engine": "hermes",
+    "newArchitecture": false
+  },
+  "scores": {
+    "overall": 78,
+    "technicalDebt": "HIGH",
+    "twelveDimensions": {
+      "performance": 10,
+      "smoothness": 100,
+      "memory": 100,
+      "cpuHeating": 100,
+      "battery": 100,
+      "startup": 100,
+      "network": 100,
+      "nativeIntegration": 100,
+      "correctness": 100,
+      "codeQuality": 10,
+      "architecture": 10,
+      "buildHealth": 100,
+      "overall": 78
+    }
+  },
+  "baseline": {
+    "routesCount": 0,
+    "screensCount": 0,
+    "componentsCount": 51,
+    "nativeModulesCount": 0,
+    "storageKeysCount": 0,
+    "permissionsCount": 0,
+    "expoPluginsCount": 0,
+    "androidServicesCount": 0,
+    "iosCapabilitiesCount": 0,
+    "routes": [],
+    "screens": [],
+    "nativeModules": [],
+    "permissions": [],
+    "storageKeys": []
+  },
+  "cleanup": {
+    "deadCodeCount": 25,
+    "unusedDependenciesCount": 0,
+    "duplicateLogicCount": 12,
+    "overComplexFunctionsCount": 48,
+    "unnecessaryAbstractionsCount": 0,
+    "organizationIssuesCount": 10
+  },
+  "preflightStatus": "PASS",
+  "diagnostics": [
+    {
+      "id": "REACT-SEQUENTIAL-AWAITS",
+      "ruleId": "REACT-SEQUENTIAL-AWAITS",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Sequential independent awaits (Run in parallel with Promise.all)",
+      "category": "performance",
+      "broken": "src/pages/TestLiveTrading.tsx:201",
+      "actual": "Sequential independent await expression detected.",
+      "relatedFiles": [
+        "src/pages/TestLiveTrading.tsx"
+      ],
+      "recommendation": "Wrap the independent awaits in Promise.all([ ... ]) so they run at the same time in parallel.",
+      "doNot": "Do not leave independent network requests or file reads waiting sequentially.",
+      "docs": "https://react.doctor/docs/rules/react-doctor/server-sequential-independent-await",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "REACT-SEQUENTIAL-AWAITS",
+      "ruleId": "REACT-SEQUENTIAL-AWAITS",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Sequential independent awaits (Run in parallel with Promise.all)",
+      "category": "performance",
+      "broken": "src/pages/TestLiveTrading.tsx:202",
+      "actual": "Sequential independent await expression detected.",
+      "relatedFiles": [
+        "src/pages/TestLiveTrading.tsx"
+      ],
+      "recommendation": "Wrap the independent awaits in Promise.all([ ... ]) so they run at the same time in parallel.",
+      "doNot": "Do not leave independent network requests or file reads waiting sequentially.",
+      "docs": "https://react.doctor/docs/rules/react-doctor/server-sequential-independent-await",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "REACT-SEQUENTIAL-AWAITS",
+      "ruleId": "REACT-SEQUENTIAL-AWAITS",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Sequential independent awaits (Run in parallel with Promise.all)",
+      "category": "performance",
+      "broken": "src/pages/TestLiveTrading.tsx:203",
+      "actual": "Sequential independent await expression detected.",
+      "relatedFiles": [
+        "src/pages/TestLiveTrading.tsx"
+      ],
+      "recommendation": "Wrap the independent awaits in Promise.all([ ... ]) so they run at the same time in parallel.",
+      "doNot": "Do not leave independent network requests or file reads waiting sequentially.",
+      "docs": "https://react.doctor/docs/rules/react-doctor/server-sequential-independent-await",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "REACT-SEQUENTIAL-AWAITS",
+      "ruleId": "REACT-SEQUENTIAL-AWAITS",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Sequential independent awaits (Run in parallel with Promise.all)",
+      "category": "performance",
+      "broken": "src/pages/TestLiveTrading.tsx:204",
+      "actual": "Sequential independent await expression detected.",
+      "relatedFiles": [
+        "src/pages/TestLiveTrading.tsx"
+      ],
+      "recommendation": "Wrap the independent awaits in Promise.all([ ... ]) so they run at the same time in parallel.",
+      "doNot": "Do not leave independent network requests or file reads waiting sequentially.",
+      "docs": "https://react.doctor/docs/rules/react-doctor/server-sequential-independent-await",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "REACT-SEQUENTIAL-AWAITS",
+      "ruleId": "REACT-SEQUENTIAL-AWAITS",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Sequential independent awaits (Run in parallel with Promise.all)",
+      "category": "performance",
+      "broken": "src/pages/TestLiveTrading.tsx:205",
+      "actual": "Sequential independent await expression detected.",
+      "relatedFiles": [
+        "src/pages/TestLiveTrading.tsx"
+      ],
+      "recommendation": "Wrap the independent awaits in Promise.all([ ... ]) so they run at the same time in parallel.",
+      "doNot": "Do not leave independent network requests or file reads waiting sequentially.",
+      "docs": "https://react.doctor/docs/rules/react-doctor/server-sequential-independent-await",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "REACT-SEQUENTIAL-AWAITS",
+      "ruleId": "REACT-SEQUENTIAL-AWAITS",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Sequential independent awaits (Run in parallel with Promise.all)",
+      "category": "performance",
+      "broken": "src/pages/TestLiveTrading.tsx:206",
+      "actual": "Sequential independent await expression detected.",
+      "relatedFiles": [
+        "src/pages/TestLiveTrading.tsx"
+      ],
+      "recommendation": "Wrap the independent awaits in Promise.all([ ... ]) so they run at the same time in parallel.",
+      "doNot": "Do not leave independent network requests or file reads waiting sequentially.",
+      "docs": "https://react.doctor/docs/rules/react-doctor/server-sequential-independent-await",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "REACT-SEQUENTIAL-AWAITS",
+      "ruleId": "REACT-SEQUENTIAL-AWAITS",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Sequential independent awaits (Run in parallel with Promise.all)",
+      "category": "performance",
+      "broken": "src/pages/TestLiveTrading.tsx:207",
+      "actual": "Sequential independent await expression detected.",
+      "relatedFiles": [
+        "src/pages/TestLiveTrading.tsx"
+      ],
+      "recommendation": "Wrap the independent awaits in Promise.all([ ... ]) so they run at the same time in parallel.",
+      "doNot": "Do not leave independent network requests or file reads waiting sequentially.",
+      "docs": "https://react.doctor/docs/rules/react-doctor/server-sequential-independent-await",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "REACT-SEQUENTIAL-AWAITS",
+      "ruleId": "REACT-SEQUENTIAL-AWAITS",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Sequential independent awaits (Run in parallel with Promise.all)",
+      "category": "performance",
+      "broken": "src/pages/TestLiveTrading.tsx:208",
+      "actual": "Sequential independent await expression detected.",
+      "relatedFiles": [
+        "src/pages/TestLiveTrading.tsx"
+      ],
+      "recommendation": "Wrap the independent awaits in Promise.all([ ... ]) so they run at the same time in parallel.",
+      "doNot": "Do not leave independent network requests or file reads waiting sequentially.",
+      "docs": "https://react.doctor/docs/rules/react-doctor/server-sequential-independent-await",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "REACT-SEQUENTIAL-AWAITS",
+      "ruleId": "REACT-SEQUENTIAL-AWAITS",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Sequential independent awaits (Run in parallel with Promise.all)",
+      "category": "performance",
+      "broken": "src/pages/TestLiveTrading.tsx:209",
+      "actual": "Sequential independent await expression detected.",
+      "relatedFiles": [
+        "src/pages/TestLiveTrading.tsx"
+      ],
+      "recommendation": "Wrap the independent awaits in Promise.all([ ... ]) so they run at the same time in parallel.",
+      "doNot": "Do not leave independent network requests or file reads waiting sequentially.",
+      "docs": "https://react.doctor/docs/rules/react-doctor/server-sequential-independent-await",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "REACT-SEQUENTIAL-AWAITS",
+      "ruleId": "REACT-SEQUENTIAL-AWAITS",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Sequential independent awaits (Run in parallel with Promise.all)",
+      "category": "performance",
+      "broken": "src/pages/TestLiveTrading.tsx:210",
+      "actual": "Sequential independent await expression detected.",
+      "relatedFiles": [
+        "src/pages/TestLiveTrading.tsx"
+      ],
+      "recommendation": "Wrap the independent awaits in Promise.all([ ... ]) so they run at the same time in parallel.",
+      "doNot": "Do not leave independent network requests or file reads waiting sequentially.",
+      "docs": "https://react.doctor/docs/rules/react-doctor/server-sequential-independent-await",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "REACT-UNMEMOIZED-CONTEXT-VALUE",
+      "ruleId": "REACT-UNMEMOIZED-CONTEXT-VALUE",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Unmemoized object/array in Context.Provider value (Cascading Re-renders)",
+      "category": "performance",
+      "broken": "src/context/TradingModeContext.tsx:99",
+      "actual": "Unmemoized inline object/array passed directly to Context.Provider value.",
+      "relatedFiles": [
+        "src/context/TradingModeContext.tsx"
+      ],
+      "recommendation": "Wrap the context value with useMemo: const value = useMemo(() => ({ ... }), [dependencies]); and pass <Provider value={value}>.",
+      "doNot": "Do not pass inline objects value={{ a, b }} directly into top-level context providers.",
+      "docs": "https://react.dev/reference/react/useMemo#memoizing-a-context-value",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "REACT-LAZY-STATE-INIT",
+      "ruleId": "REACT-LAZY-STATE-INIT",
+      "priority": "P2",
+      "severity": "warning",
+      "title": "Eager function call in useState initial state (Use Lazy Initial State)",
+      "category": "performance",
+      "broken": "src/hooks/useLiveMarketData.ts:46",
+      "actual": "Function call \"getMarketStatus()\" passed directly as useState initial argument.",
+      "relatedFiles": [
+        "src/hooks/useLiveMarketData.ts"
+      ],
+      "recommendation": "Convert eager call to lazy initializer: useState(() => getMarketStatus()).",
+      "doNot": "Do not pass expensive calculations, storage reads, or JSON.parse directly into useState.",
+      "docs": "https://react.dev/reference/react/useState#avoiding-recreating-the-initial-state",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "REACT-JS-SET-MAP-LOOKUPS",
+      "ruleId": "REACT-JS-SET-MAP-LOOKUPS",
+      "priority": "P2",
+      "severity": "warning",
+      "title": "Linear Array lookup inside loop (Use Set/Map for O(1) lookups)",
+      "category": "performance",
+      "broken": "src/components/OrderManagement.tsx:255",
+      "actual": "Array .includes() linear lookup inside loop iteration.",
+      "relatedFiles": [
+        "src/components/OrderManagement.tsx"
+      ],
+      "recommendation": "Construct a new Set(array) outside the loop and use set.has(item) instead of array.includes(item).",
+      "doNot": "Do not perform repeated array linear scans inside loops.",
+      "docs": "https://react.doctor/docs/rules/react-doctor/js-set-map-lookups",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "REACT-JS-SET-MAP-LOOKUPS",
+      "ruleId": "REACT-JS-SET-MAP-LOOKUPS",
+      "priority": "P2",
+      "severity": "warning",
+      "title": "Linear Array lookup inside loop (Use Set/Map for O(1) lookups)",
+      "category": "performance",
+      "broken": "src/hooks/useLiveMarketData.ts:98",
+      "actual": "Array .includes() linear lookup inside loop iteration.",
+      "relatedFiles": [
+        "src/hooks/useLiveMarketData.ts"
+      ],
+      "recommendation": "Construct a new Set(array) outside the loop and use set.has(item) instead of array.includes(item).",
+      "doNot": "Do not perform repeated array linear scans inside loops.",
+      "docs": "https://react.doctor/docs/rules/react-doctor/js-set-map-lookups",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "REACT-JS-SET-MAP-LOOKUPS",
+      "ruleId": "REACT-JS-SET-MAP-LOOKUPS",
+      "priority": "P2",
+      "severity": "warning",
+      "title": "Linear Array lookup inside loop (Use Set/Map for O(1) lookups)",
+      "category": "performance",
+      "broken": "src/pages/CreateStrategy.tsx:675",
+      "actual": "Array .includes() linear lookup inside loop iteration.",
+      "relatedFiles": [
+        "src/pages/CreateStrategy.tsx"
+      ],
+      "recommendation": "Construct a new Set(array) outside the loop and use set.has(item) instead of array.includes(item).",
+      "doNot": "Do not perform repeated array linear scans inside loops.",
+      "docs": "https://react.doctor/docs/rules/react-doctor/js-set-map-lookups",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "REACT-JS-FLATMAP-FILTER",
+      "ruleId": "REACT-JS-FLATMAP-FILTER",
+      "priority": "P2",
+      "severity": "warning",
+      "title": ".map().filter() chained iteration (Use flatMap or single loop)",
+      "category": "performance",
+      "broken": "src/pages/TestLiveTrading.tsx:76",
+      "actual": ".map().filter(Boolean) chained iteration loops over the array twice.",
+      "relatedFiles": [
+        "src/pages/TestLiveTrading.tsx"
+      ],
+      "recommendation": "Replace .map().filter(Boolean) with a single for...of loop, reduce, or .flatMap().",
+      "doNot": "Do not create intermediate array allocations in hot paths.",
+      "docs": "https://react.doctor/docs/rules/react-doctor/js-flatmap-filter",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/context/TradingModeContext.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/pages/Login.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/pages/Register.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/pages/Dashboard.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/pages/Brokers.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/pages/DhanCallback.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/pages/Strategies.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/pages/CreateStrategy.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/pages/Portfolio.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/pages/Reports.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/pages/TradingDashboard.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/pages/TestLiveTrading.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/pages/OptionChain.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/pages/BacktestPage.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/pages/LiveChartPage.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "LAYER-VIOLATION-SRC_APP_TSX",
+      "ruleId": "RNDOCTOR-LAYER-VIOLATION",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Architectural Layer Boundary Violation (DOMAIN → UI)",
+      "category": "architecture",
+      "broken": "src/App.tsx",
+      "actual": "src/App.tsx (DOMAIN) imports src/pages/Subscription.tsx (UI).",
+      "relatedFiles": [
+        "src/App.tsx"
+      ],
+      "recommendation": "Pass UI callbacks or handlers via function arguments or use event listeners / reactive hooks.",
+      "doNot": "Do not add a circular barrel export or import Screens directly into services.",
+      "fileCriticality": "ENTRY_POINT",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-BUILD_JS",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: build.js",
+      "category": "code",
+      "broken": "build.js",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "build.js"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_REACT_APP_ENV_D_TS",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/react-app-env.d.ts",
+      "category": "code",
+      "broken": "src/react-app-env.d.ts",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/react-app-env.d.ts"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_SETUPTESTS_TS",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/setupTests.ts",
+      "category": "code",
+      "broken": "src/setupTests.ts",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/setupTests.ts"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_COMPONENTS_ADDBROKERFORM_TSX",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/components/AddBrokerForm.tsx",
+      "category": "code",
+      "broken": "src/components/AddBrokerForm.tsx",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/components/AddBrokerForm.tsx"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_COMPONENTS_BROKERAGEFORM_TSX",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/components/BrokerageForm.tsx",
+      "category": "code",
+      "broken": "src/components/BrokerageForm.tsx",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/components/BrokerageForm.tsx"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_COMPONENTS_BROKERCARD_TSX",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/components/BrokerCard.tsx",
+      "category": "code",
+      "broken": "src/components/BrokerCard.tsx",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/components/BrokerCard.tsx"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_COMPONENTS_DHANTERMINAL_TSX",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/components/DhanTerminal.tsx",
+      "category": "code",
+      "broken": "src/components/DhanTerminal.tsx",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/components/DhanTerminal.tsx"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_COMPONENTS_LIVEMARKETTICKER_TSX",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/components/LiveMarketTicker.tsx",
+      "category": "code",
+      "broken": "src/components/LiveMarketTicker.tsx",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/components/LiveMarketTicker.tsx"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_COMPONENTS_MARKETDASHBOARD_TSX",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/components/MarketDashboard.tsx",
+      "category": "code",
+      "broken": "src/components/MarketDashboard.tsx",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/components/MarketDashboard.tsx"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_COMPONENTS_MARKETDATA_TSX",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/components/MarketData.tsx",
+      "category": "code",
+      "broken": "src/components/MarketData.tsx",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/components/MarketData.tsx"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_COMPONENTS_MARKETDATADISPLAY_TSX",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/components/MarketDataDisplay.tsx",
+      "category": "code",
+      "broken": "src/components/MarketDataDisplay.tsx",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/components/MarketDataDisplay.tsx"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_COMPONENTS_STRATEGYCONFIGPANEL_TSX",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/components/StrategyConfigPanel.tsx",
+      "category": "code",
+      "broken": "src/components/StrategyConfigPanel.tsx",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/components/StrategyConfigPanel.tsx"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_COMPONENTS_TRADINGVIEWCHART_TSX",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/components/TradingViewChart.tsx",
+      "category": "code",
+      "broken": "src/components/TradingViewChart.tsx",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/components/TradingViewChart.tsx"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_HOOKS_USELIVEMARKETDATA_TS",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/hooks/useLiveMarketData.ts",
+      "category": "code",
+      "broken": "src/hooks/useLiveMarketData.ts",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/hooks/useLiveMarketData.ts"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_HOOKS_USESTRATEGYCONFIG_TS",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/hooks/useStrategyConfig.ts",
+      "category": "code",
+      "broken": "src/hooks/useStrategyConfig.ts",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/hooks/useStrategyConfig.ts"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_SERVICES_DHANAPI_TS",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/services/dhanAPI.ts",
+      "category": "code",
+      "broken": "src/services/dhanAPI.ts",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/services/dhanAPI.ts"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_SERVICES_DHANSERVICE_TS",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/services/dhanService.ts",
+      "category": "code",
+      "broken": "src/services/dhanService.ts",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/services/dhanService.ts"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_SERVICES_LIVEMARKETSERVICE_TS",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/services/liveMarketService.ts",
+      "category": "code",
+      "broken": "src/services/liveMarketService.ts",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/services/liveMarketService.ts"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_SERVICES_MARKETDATASERVICE_TS",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/services/marketDataService.ts",
+      "category": "code",
+      "broken": "src/services/marketDataService.ts",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/services/marketDataService.ts"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_SERVICES_MARKETDATASTREAMSERVICE_TS",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/services/marketDataStreamService.ts",
+      "category": "code",
+      "broken": "src/services/marketDataStreamService.ts",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/services/marketDataStreamService.ts"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_COMPONENTS_BROKERS_CONNECTDHANMODAL_TSX",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/components/brokers/ConnectDhanModal.tsx",
+      "category": "code",
+      "broken": "src/components/brokers/ConnectDhanModal.tsx",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/components/brokers/ConnectDhanModal.tsx"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_COMPONENTS_BROKERS_DHANCONNECTIONCARD_TSX",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/components/brokers/DhanConnectionCard.tsx",
+      "category": "code",
+      "broken": "src/components/brokers/DhanConnectionCard.tsx",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/components/brokers/DhanConnectionCard.tsx"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_COMPONENTS_COMMON_EMERGENCYSTOPBUTTON_TSX",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/components/common/EmergencyStopButton.tsx",
+      "category": "code",
+      "broken": "src/components/common/EmergencyStopButton.tsx",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/components/common/EmergencyStopButton.tsx"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_COMPONENTS_COMMON_GLOBALTRADINGMODESWITCH_TSX",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/components/common/GlobalTradingModeSwitch.tsx",
+      "category": "code",
+      "broken": "src/components/common/GlobalTradingModeSwitch.tsx",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/components/common/GlobalTradingModeSwitch.tsx"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DEADCODE-FILE-SRC_COMPONENTS_COMMON_MODEBADGE_TSX",
+      "ruleId": "RNDOCTOR-DEADCODE-FILE",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Dead / Unused File: src/components/common/ModeBadge.tsx",
+      "category": "code",
+      "broken": "src/components/common/ModeBadge.tsx",
+      "expected": "All files in src/ should be reachable by the application or routes.",
+      "actual": "File is completely unreachable.",
+      "relatedFiles": [
+        "src/components/common/ModeBadge.tsx"
+      ],
+      "recommendation": "Safely delete this file or register its route in your navigation structure.",
+      "doNot": "Do not keep obsolete files for historical reasons — rely on version control (git).",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "SIMPLIFY-MAP-FILTER-SRC_PAGES_TESTLIVETRADING_TSX-L76",
+      "ruleId": "RNDOCTOR-SIMPLIFY-ARRAY-PIPELINE",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Chained .map().filter() Array Iteration",
+      "category": "performance",
+      "broken": "src/pages/TestLiveTrading.tsx:76",
+      "actual": "Detected array.map(...).filter(...) iterating twice over the same list.",
+      "relatedFiles": [
+        "src/pages/TestLiveTrading.tsx"
+      ],
+      "recommendation": "Combine into a single .flatMap(), .reduce(), or iterative for-of loop.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DUP-EXACT-HANDLESUBMIT",
+      "ruleId": "RNDOCTOR-DUP-EXACT",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Exact Duplicate Function Declaration: \"handleSubmit\"",
+      "category": "code",
+      "broken": "src/components/AddBrokerForm.tsx:61",
+      "actual": "Identical function symbol exists across multiple modules.",
+      "relatedFiles": [
+        "src/components/AddBrokerForm.tsx"
+      ],
+      "recommendation": "Consolidate \"handleSubmit\" into a shared module and import it.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DUP-EXACT-HANDLECLOSE",
+      "ruleId": "RNDOCTOR-DUP-EXACT",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Exact Duplicate Function Declaration: \"handleClose\"",
+      "category": "code",
+      "broken": "src/components/AddBrokerForm.tsx:133",
+      "actual": "Identical function symbol exists across multiple modules.",
+      "relatedFiles": [
+        "src/components/AddBrokerForm.tsx"
+      ],
+      "recommendation": "Consolidate \"handleClose\" into a shared module and import it.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DUP-EXACT-HANDLECHANGE",
+      "ruleId": "RNDOCTOR-DUP-EXACT",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Exact Duplicate Function Declaration: \"handleChange\"",
+      "category": "code",
+      "broken": "src/components/BrokerageForm.tsx:36",
+      "actual": "Identical function symbol exists across multiple modules.",
+      "relatedFiles": [
+        "src/components/BrokerageForm.tsx"
+      ],
+      "recommendation": "Consolidate \"handleChange\" into a shared module and import it.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DUP-EXACT-HANDLETOGGLETERMINAL",
+      "ruleId": "RNDOCTOR-DUP-EXACT",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Exact Duplicate Function Declaration: \"handleToggleTerminal\"",
+      "category": "code",
+      "broken": "src/components/BrokerCard.tsx:81",
+      "actual": "Identical function symbol exists across multiple modules.",
+      "relatedFiles": [
+        "src/components/BrokerCard.tsx"
+      ],
+      "recommendation": "Consolidate \"handleToggleTerminal\" into a shared module and import it.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DUP-EXACT-HANDLEMESSAGE",
+      "ruleId": "RNDOCTOR-DUP-EXACT",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Exact Duplicate Function Declaration: \"handleMessage\"",
+      "category": "code",
+      "broken": "src/components/BrokerCard.tsx:161",
+      "actual": "Identical function symbol exists across multiple modules.",
+      "relatedFiles": [
+        "src/components/BrokerCard.tsx"
+      ],
+      "recommendation": "Consolidate \"handleMessage\" into a shared module and import it.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DUP-EXACT-HANDLETOGGLETRADINGENGINE",
+      "ruleId": "RNDOCTOR-DUP-EXACT",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Exact Duplicate Function Declaration: \"handleToggleTradingEngine\"",
+      "category": "code",
+      "broken": "src/components/BrokerCard.tsx:245",
+      "actual": "Identical function symbol exists across multiple modules.",
+      "relatedFiles": [
+        "src/components/BrokerCard.tsx"
+      ],
+      "recommendation": "Consolidate \"handleToggleTradingEngine\" into a shared module and import it.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DUP-EXACT-FORMATPRICE",
+      "ruleId": "RNDOCTOR-DUP-EXACT",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Exact Duplicate Function Declaration: \"formatPrice\"",
+      "category": "code",
+      "broken": "src/components/NiftyIndependentBreakoutMonitor.tsx:133",
+      "actual": "Identical function symbol exists across multiple modules.",
+      "relatedFiles": [
+        "src/components/NiftyIndependentBreakoutMonitor.tsx"
+      ],
+      "recommendation": "Consolidate \"formatPrice\" into a shared module and import it.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DUP-EXACT-HANDLESQUAREOFF",
+      "ruleId": "RNDOCTOR-DUP-EXACT",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Exact Duplicate Function Declaration: \"handleSquareOff\"",
+      "category": "code",
+      "broken": "src/components/PortfolioDashboard.tsx:64",
+      "actual": "Identical function symbol exists across multiple modules.",
+      "relatedFiles": [
+        "src/components/PortfolioDashboard.tsx"
+      ],
+      "recommendation": "Consolidate \"handleSquareOff\" into a shared module and import it.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DUP-EXACT-HANDLECOPYREDIRECT",
+      "ruleId": "RNDOCTOR-DUP-EXACT",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Exact Duplicate Function Declaration: \"handleCopyRedirect\"",
+      "category": "code",
+      "broken": "src/pages/Brokers.tsx:207",
+      "actual": "Identical function symbol exists across multiple modules.",
+      "relatedFiles": [
+        "src/pages/Brokers.tsx"
+      ],
+      "recommendation": "Consolidate \"handleCopyRedirect\" into a shared module and import it.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DUP-EXACT-HANDLEDISCONNECT",
+      "ruleId": "RNDOCTOR-DUP-EXACT",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Exact Duplicate Function Declaration: \"handleDisconnect\"",
+      "category": "code",
+      "broken": "src/pages/Brokers.tsx:336",
+      "actual": "Identical function symbol exists across multiple modules.",
+      "relatedFiles": [
+        "src/pages/Brokers.tsx"
+      ],
+      "recommendation": "Consolidate \"handleDisconnect\" into a shared module and import it.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DUP-EXACT-FETCHSTATUS",
+      "ruleId": "RNDOCTOR-DUP-EXACT",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Exact Duplicate Function Declaration: \"fetchStatus\"",
+      "category": "code",
+      "broken": "src/pages/LiveChartPage.tsx:34",
+      "actual": "Identical function symbol exists across multiple modules.",
+      "relatedFiles": [
+        "src/pages/LiveChartPage.tsx"
+      ],
+      "recommendation": "Consolidate \"fetchStatus\" into a shared module and import it.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "DUP-EXACT-HANDLEGOOGLESIGNIN",
+      "ruleId": "RNDOCTOR-DUP-EXACT",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Exact Duplicate Function Declaration: \"handleGoogleSignIn\"",
+      "category": "code",
+      "broken": "src/pages/Login.tsx:61",
+      "actual": "Identical function symbol exists across multiple modules.",
+      "relatedFiles": [
+        "src/pages/Login.tsx"
+      ],
+      "recommendation": "Consolidate \"handleGoogleSignIn\" into a shared module and import it.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "ORG-MULTI-RESPONSIBILITY-SRC_COMPONENTS_ORDERMANAGEMENT_TSX",
+      "ruleId": "RNDOCTOR-ORG-MULTI-RESPONSIBILITY",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Multi-Responsibility Smells: OrderManagement.tsx (3 responsibilities)",
+      "category": "architecture",
+      "broken": "src/components/OrderManagement.tsx",
+      "actual": "Detected mixed responsibilities in src/components/OrderManagement.tsx (379 LOC): UI Presentation & Styling, Network / Remote Data Fetching, Application State Management.",
+      "relatedFiles": [
+        "src/components/OrderManagement.tsx"
+      ],
+      "recommendation": "Decompose into focused modules:\n  • OrderManagementView (UI components & presentation)\n  • OrderManagementService (network calls & lifecycle)\n  • OrderManagementStore (reactive state only)",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "ORG-GIANT-FILE-SRC_COMPONENTS_TRADINGVIEWLIVECHART_TSX",
+      "ruleId": "RNDOCTOR-ORG-GIANT-FILE",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Overly Large Source Module: TradingViewLiveChart.tsx (758 LOC)",
+      "category": "complexity",
+      "broken": "src/components/TradingViewLiveChart.tsx",
+      "actual": "src/components/TradingViewLiveChart.tsx has 758 lines of code.",
+      "relatedFiles": [
+        "src/components/TradingViewLiveChart.tsx"
+      ],
+      "recommendation": "Split hooks, helper utilities, and sub-components into dedicated submodules.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "ORG-MULTI-RESPONSIBILITY-SRC_PAGES_BROKERS_TSX",
+      "ruleId": "RNDOCTOR-ORG-MULTI-RESPONSIBILITY",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Multi-Responsibility Smells: Brokers.tsx (4 responsibilities)",
+      "category": "architecture",
+      "broken": "src/pages/Brokers.tsx",
+      "actual": "Detected mixed responsibilities in src/pages/Brokers.tsx (1031 LOC): UI Presentation & Styling, Network / Remote Data Fetching, Local Storage & Persistence, Application State Management.",
+      "relatedFiles": [
+        "src/pages/Brokers.tsx"
+      ],
+      "recommendation": "Decompose into focused modules:\n  • BrokersView (UI components & presentation)\n  • BrokersService (network calls & lifecycle)\n  • BrokersStore (reactive state only)",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "ORG-GIANT-FILE-SRC_PAGES_BROKERS_TSX",
+      "ruleId": "RNDOCTOR-ORG-GIANT-FILE",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Overly Large Source Module: Brokers.tsx (1031 LOC)",
+      "category": "complexity",
+      "broken": "src/pages/Brokers.tsx",
+      "actual": "src/pages/Brokers.tsx has 1031 lines of code.",
+      "relatedFiles": [
+        "src/pages/Brokers.tsx"
+      ],
+      "recommendation": "Split hooks, helper utilities, and sub-components into dedicated submodules.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "ORG-MULTI-RESPONSIBILITY-SRC_PAGES_CREATESTRATEGY_TSX",
+      "ruleId": "RNDOCTOR-ORG-MULTI-RESPONSIBILITY",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Multi-Responsibility Smells: CreateStrategy.tsx (3 responsibilities)",
+      "category": "architecture",
+      "broken": "src/pages/CreateStrategy.tsx",
+      "actual": "Detected mixed responsibilities in src/pages/CreateStrategy.tsx (1183 LOC): UI Presentation & Styling, Network / Remote Data Fetching, Application State Management.",
+      "relatedFiles": [
+        "src/pages/CreateStrategy.tsx"
+      ],
+      "recommendation": "Decompose into focused modules:\n  • CreateStrategyView (UI components & presentation)\n  • CreateStrategyService (network calls & lifecycle)\n  • CreateStrategyStore (reactive state only)",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "ORG-GIANT-FILE-SRC_PAGES_CREATESTRATEGY_TSX",
+      "ruleId": "RNDOCTOR-ORG-GIANT-FILE",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Overly Large Source Module: CreateStrategy.tsx (1183 LOC)",
+      "category": "complexity",
+      "broken": "src/pages/CreateStrategy.tsx",
+      "actual": "src/pages/CreateStrategy.tsx has 1183 lines of code.",
+      "relatedFiles": [
+        "src/pages/CreateStrategy.tsx"
+      ],
+      "recommendation": "Split hooks, helper utilities, and sub-components into dedicated submodules.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "ORG-GIANT-FILE-SRC_PAGES_DASHBOARD_TSX",
+      "ruleId": "RNDOCTOR-ORG-GIANT-FILE",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Overly Large Source Module: Dashboard.tsx (940 LOC)",
+      "category": "complexity",
+      "broken": "src/pages/Dashboard.tsx",
+      "actual": "src/pages/Dashboard.tsx has 940 lines of code.",
+      "relatedFiles": [
+        "src/pages/Dashboard.tsx"
+      ],
+      "recommendation": "Split hooks, helper utilities, and sub-components into dedicated submodules.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "ORG-MULTI-RESPONSIBILITY-SRC_PAGES_STRATEGIES_TSX",
+      "ruleId": "RNDOCTOR-ORG-MULTI-RESPONSIBILITY",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Multi-Responsibility Smells: Strategies.tsx (3 responsibilities)",
+      "category": "architecture",
+      "broken": "src/pages/Strategies.tsx",
+      "actual": "Detected mixed responsibilities in src/pages/Strategies.tsx (1489 LOC): UI Presentation & Styling, Network / Remote Data Fetching, Application State Management.",
+      "relatedFiles": [
+        "src/pages/Strategies.tsx"
+      ],
+      "recommendation": "Decompose into focused modules:\n  • StrategiesView (UI components & presentation)\n  • StrategiesService (network calls & lifecycle)\n  • StrategiesStore (reactive state only)",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "ORG-GIANT-FILE-SRC_PAGES_STRATEGIES_TSX",
+      "ruleId": "RNDOCTOR-ORG-GIANT-FILE",
+      "priority": "P2",
+      "severity": "MEDIUM",
+      "title": "Overly Large Source Module: Strategies.tsx (1489 LOC)",
+      "category": "complexity",
+      "broken": "src/pages/Strategies.tsx",
+      "actual": "src/pages/Strategies.tsx has 1489 lines of code.",
+      "relatedFiles": [
+        "src/pages/Strategies.tsx"
+      ],
+      "recommendation": "Split hooks, helper utilities, and sub-components into dedicated submodules.",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "ORG-MULTI-RESPONSIBILITY-SRC_COMPONENTS_BROKERS_CONNECTDHANMODAL_TSX",
+      "ruleId": "RNDOCTOR-ORG-MULTI-RESPONSIBILITY",
+      "priority": "P1",
+      "severity": "HIGH",
+      "title": "Multi-Responsibility Smells: ConnectDhanModal.tsx (3 responsibilities)",
+      "category": "architecture",
+      "broken": "src/components/brokers/ConnectDhanModal.tsx",
+      "actual": "Detected mixed responsibilities in src/components/brokers/ConnectDhanModal.tsx (645 LOC): UI Presentation & Styling, Local Storage & Persistence, Application State Management.",
+      "relatedFiles": [
+        "src/components/brokers/ConnectDhanModal.tsx"
+      ],
+      "recommendation": "Decompose into focused modules:\n  • ConnectDhanModalView (UI components & presentation)\n  • ConnectDhanModalService (network calls & lifecycle)\n  • ConnectDhanModalStore (reactive state only)",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false
+    },
+    {
+      "id": "PERF-EXPENSIVE-CALC-DASHBOARD",
+      "ruleId": "RNDOCTOR-PERF-RENDER-CALC",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Expensive chained array calculation in Dashboard render body",
+      "category": "performance",
+      "broken": "src/pages/Dashboard.tsx:261",
+      "actual": "Chained array transformation (.filter/.map/.sort) executed directly on every render without useMemo.",
+      "relatedFiles": [
+        "src/pages/Dashboard.tsx"
+      ],
+      "recommendation": "Wrap the chained calculation in useMemo(() => ..., [dependencies]) or move it to a selector/state slice.",
+      "docs": "https://react.dev/reference/react/useMemo",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false,
+      "performanceDomain": "RENDERING",
+      "runtimeImpact": "Increases component render time on the JS thread; causes UI input latency during typing or scrolling."
+    },
+    {
+      "id": "PERF-EXPENSIVE-CALC-DASHBOARD",
+      "ruleId": "RNDOCTOR-PERF-RENDER-CALC",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Expensive chained array calculation in Dashboard render body",
+      "category": "performance",
+      "broken": "src/pages/Dashboard.tsx:262",
+      "actual": "Chained array transformation (.filter/.map/.sort) executed directly on every render without useMemo.",
+      "relatedFiles": [
+        "src/pages/Dashboard.tsx"
+      ],
+      "recommendation": "Wrap the chained calculation in useMemo(() => ..., [dependencies]) or move it to a selector/state slice.",
+      "docs": "https://react.dev/reference/react/useMemo",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false,
+      "performanceDomain": "RENDERING",
+      "runtimeImpact": "Increases component render time on the JS thread; causes UI input latency during typing or scrolling."
+    },
+    {
+      "id": "PERF-EXPENSIVE-CALC-TESTLIVETRADING",
+      "ruleId": "RNDOCTOR-PERF-RENDER-CALC",
+      "priority": "P1",
+      "severity": "warning",
+      "title": "Expensive chained array calculation in TestLiveTrading render body",
+      "category": "performance",
+      "broken": "src/pages/TestLiveTrading.tsx:55",
+      "actual": "Chained array transformation (.filter/.map/.sort) executed directly on every render without useMemo.",
+      "relatedFiles": [
+        "src/pages/TestLiveTrading.tsx"
+      ],
+      "recommendation": "Wrap the chained calculation in useMemo(() => ..., [dependencies]) or move it to a selector/state slice.",
+      "docs": "https://react.dev/reference/react/useMemo",
+      "fileCriticality": "SAFE_SOURCE",
+      "hardLocked": false,
+      "performanceDomain": "RENDERING",
+      "runtimeImpact": "Increases component render time on the JS thread; causes UI input latency during typing or scrolling."
+    }
+  ]
+}

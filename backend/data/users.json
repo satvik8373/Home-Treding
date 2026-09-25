@@ -10,5 +10,17 @@
     "isVerified": true,
     "createdAt": "2026-09-20T05:22:41.821Z",
     "updatedAt": "2026-09-20T05:22:41.821Z"
+  },
+  {
+    "id": "OtI5tr8RTZV7ckV8AJKUGbDa7II2",
+    "uid": "OtI5tr8RTZV7ckV8AJKUGbDa7II2",
+    "email": "user@mavrix.com",
+    "name": "User Mavrix",
+    "phone": "",
+    "subscriptionPlan": "free",
+    "isActive": true,
+    "isVerified": true,
+    "createdAt": "2026-09-25T07:10:54.340Z",
+    "updatedAt": "2026-09-25T07:10:54.340Z"
   }
 ]

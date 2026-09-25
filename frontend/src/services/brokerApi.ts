@@ -16,6 +16,7 @@ export interface BrokerSummary {
   secondaryIp?: string;
   connectedAt?: string;
   lastActivity?: string;
+  funds?: BrokerFunds;
 }
 
 export interface BrokerFunds {
@@ -104,8 +105,21 @@ const createFreshPortfolio = (capital: number = 100000): PaperPortfolio => ({
   winRate: 0
 });
 
-// User-scoped in-memory state
-let localBrokers: BrokerSummary[] = [];
+// Load cached brokers from localStorage
+const loadCachedBrokers = (): BrokerSummary[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('mavrix_saved_brokers');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (_) {}
+  return [];
+};
+
+// User-scoped in-memory state initialized with cached data
+let localBrokers: BrokerSummary[] = loadCachedBrokers();
 let localPaperPortfolio: PaperPortfolio = createFreshPortfolio(100000);
 let localPositions: BrokerPosition[] = [];
 let localOrders: BrokerOrder[] = [];
@@ -117,6 +131,30 @@ export const brokerApi = {
     localPaperPortfolio = createFreshPortfolio(100000);
     localPositions = [];
     localOrders = [];
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('mavrix_saved_brokers');
+    }
+  },
+
+  hasActiveBroker(): boolean {
+    if (localBrokers.length > 0 && localBrokers.some(b => b.status === 'Connected')) return true;
+    const cached = loadCachedBrokers();
+    return cached.some(b => b.status === 'Connected');
+  },
+
+  getActiveBroker(): BrokerSummary | null {
+    if (localBrokers.length > 0) {
+      const active = localBrokers.find(b => b.status === 'Connected');
+      if (active) return active;
+      return localBrokers[0];
+    }
+    const cached = loadCachedBrokers();
+    if (cached.length > 0) {
+      const active = cached.find(b => b.status === 'Connected');
+      if (active) return active;
+      return cached[0];
+    }
+    return null;
   },
 
   // --- Broker Connections ---
@@ -144,14 +182,27 @@ export const brokerApi = {
       try {
         const res = await axios.get(url, { timeout: 6000 });
         if (res.data?.brokers && Array.isArray(res.data.brokers)) {
-          localBrokers = res.data.brokers;
-          return res.data.brokers;
+          if (res.data.brokers.length > 0) {
+            localBrokers = res.data.brokers;
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('mavrix_saved_brokers', JSON.stringify(res.data.brokers));
+            }
+            return res.data.brokers;
+          } else {
+            // Server returned empty list. If we have a cached connected broker, don't wipe it!
+            if (localBrokers.length > 0) {
+              return localBrokers;
+            }
+          }
         }
       } catch (err: any) {
         if (err.response?.status !== 404) break;
       }
     }
 
+    if (localBrokers.length === 0) {
+      localBrokers = loadCachedBrokers();
+    }
     return localBrokers;
   },
 
@@ -175,6 +226,9 @@ export const brokerApi = {
 
         if (res.data?.success && res.data?.broker) {
           localBrokers = [res.data.broker, ...localBrokers.filter(b => b.clientId !== params.clientId.trim())];
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('mavrix_saved_brokers', JSON.stringify(localBrokers));
+          }
           return res.data;
         }
 
@@ -231,6 +285,9 @@ export const brokerApi = {
     const res = await axios.post(`${getBaseUrl()}/api/brokers/dhan/consume-consent`, params, { timeout: 15000 });
     if (res.data?.success && res.data?.broker) {
       localBrokers = [res.data.broker, ...localBrokers.filter(b => b.clientId !== res.data.broker.clientId)];
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('mavrix_saved_brokers', JSON.stringify(localBrokers));
+      }
     }
     return res.data;
   },
@@ -321,6 +378,9 @@ export const brokerApi = {
     localStorage.removeItem('dhan_oauth_completed');
 
     localBrokers = [];
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('mavrix_saved_brokers');
+    }
     return true;
   },
 
@@ -472,5 +532,69 @@ export const brokerApi = {
     } catch (e: any) {
       return { success: false, message: e.message };
     }
+  },
+
+  // --- Global Trading Mode & Real Order helpers ---
+  async getTradingMode(): Promise<{ mode: 'paper' | 'live'; isLive: boolean; isPaper: boolean; brokerConnected: boolean; accountName?: string }> {
+    try {
+      const res = await axios.get(`${getBaseUrl()}/api/trading/mode`, { timeout: 5000 });
+      if (res.data?.success) {
+        return res.data;
+      }
+    } catch (_) {}
+
+    // Fallback to localStorage or default
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('mavrix_trading_mode') : null;
+    const mode = (saved === 'live') ? 'live' : 'paper';
+    return {
+      mode,
+      isLive: mode === 'live',
+      isPaper: mode === 'paper',
+      brokerConnected: brokerApi.hasActiveBroker()
+    };
+  },
+
+  async setTradingMode(mode: 'paper' | 'live'): Promise<{ success: boolean; mode: string; message: string; requiresBroker?: boolean }> {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('mavrix_trading_mode', mode);
+    }
+    try {
+      const res = await axios.post(`${getBaseUrl()}/api/trading/mode`, { mode }, { timeout: 6000 });
+      return res.data;
+    } catch (err: any) {
+      return {
+        success: false,
+        mode,
+        message: err.response?.data?.message || err.message || 'Failed to switch trading mode on backend',
+        requiresBroker: err.response?.data?.requiresBroker
+      };
+    }
+  },
+
+  async placeOrder(params: {
+    symbol: string;
+    side: 'BUY' | 'SELL';
+    quantity: number;
+    price?: number;
+    orderType?: string;
+    productType?: string;
+    securityId?: string;
+    mode?: 'paper' | 'live';
+  }): Promise<any> {
+    const urls = [
+      `${getBaseUrl()}/api/trading/orders`,
+      `${getBaseUrl()}/api/brokers/place-order`,
+      '/api/trading/orders',
+      '/api/brokers/place-order'
+    ];
+    for (const url of urls) {
+      try {
+        const res = await axios.post(url, params, { timeout: 15000 });
+        if (res.data) return res.data;
+      } catch (err: any) {
+        if (err.response?.status !== 404) throw err;
+      }
+    }
+    throw new Error('Order endpoints unreachable');
   }
 };

@@ -90,10 +90,8 @@ export const ConnectDhanModal: React.FC<ConnectDhanModalProps> = ({ open, onClos
     setError('');
 
     try {
-      // Store credentials locally for step 3 consumption
+      // Store pending client ID locally for step 3 consumption
       localStorage.setItem('dhan_pending_client_id', clientId.trim());
-      localStorage.setItem('dhan_pending_api_key', apiKey.trim());
-      localStorage.setItem('dhan_pending_api_secret', apiSecret.trim());
 
       const res = await brokerApi.generateDhanConsent({
         clientId: clientId.trim(),

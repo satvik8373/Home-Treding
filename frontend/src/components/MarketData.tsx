@@ -124,8 +124,8 @@ const MarketData: React.FC = () => {
       {/* Live Update Indicator */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
         <Refresh sx={{ fontSize: 16, color: 'success.main' }} />
-        <Typography variant="caption" color="success.main">
-          🔴 REAL-TIME • Updates every 2s • Last: {lastUpdate?.toLocaleTimeString()}
+        <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>
+          REAL-TIME • Updates every 2s • Last: {lastUpdate?.toLocaleTimeString()}
         </Typography>
       </Box>
 

@@ -46,7 +46,16 @@ export interface LoginData {
 
 class AuthService {
   private localUser: User | null = null;
+  private inMemoryToken: string | null = null;
   private authListeners: Array<(user: User | null) => void> = [];
+
+  getInMemoryToken(): string | null {
+    return this.inMemoryToken;
+  }
+
+  setInMemoryToken(token: string | null): void {
+    this.inMemoryToken = token;
+  }
 
   constructor() {
     // Restore persisted local session if available
@@ -70,9 +79,7 @@ class AuthService {
       }, { timeout: 8000 });
 
       if (res.data?.token) {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('mavrix_auth_token', res.data.token);
-        }
+        this.inMemoryToken = res.data.token;
         return res.data.token;
       }
     } catch (e) {
@@ -109,8 +116,8 @@ class AuthService {
       }
     } catch (_) {}
 
-    if (sessionToken && typeof window !== 'undefined') {
-      localStorage.setItem('mavrix_auth_token', sessionToken);
+    if (sessionToken) {
+      this.inMemoryToken = sessionToken;
     }
 
     const fakeUser: any = {
@@ -119,7 +126,7 @@ class AuthService {
       displayName: displayName,
       emailVerified: true,
       isAnonymous: false,
-      getIdToken: async () => sessionToken || (typeof window !== 'undefined' ? localStorage.getItem('mavrix_auth_token') : null) || 'local_token_' + Date.now(),
+      getIdToken: async () => sessionToken || this.inMemoryToken || 'local_token_' + Date.now(),
       reload: async () => {},
       toJSON: () => ({ email, displayName })
     };
@@ -157,9 +164,7 @@ class AuthService {
 
       try {
         const token = await userCredential.user.getIdToken();
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('mavrix_auth_token', token);
-        }
+        this.inMemoryToken = token;
       } catch (_) {}
 
       await this.syncBackendSession({
@@ -230,9 +235,7 @@ class AuthService {
 
       try {
         const token = await userCredential.user.getIdToken();
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('mavrix_auth_token', token);
-        }
+        this.inMemoryToken = token;
       } catch (_) {}
 
       await this.syncBackendSession({
@@ -296,9 +299,7 @@ class AuthService {
       const userCredential = await signInWithPopup(auth, provider);
       try {
         const token = await userCredential.user.getIdToken();
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('mavrix_auth_token', token);
-        }
+        this.inMemoryToken = token;
       } catch (_) {}
 
       await this.syncBackendSession({
@@ -325,9 +326,9 @@ class AuthService {
   async logout(): Promise<void> {
     try {
       this.localUser = null;
+      this.inMemoryToken = null;
       if (typeof window !== 'undefined') {
         try {
-          localStorage.removeItem('mavrix_auth_token');
           localStorage.removeItem('mavrix_local_user');
           localStorage.removeItem('mavrix_connected_brokers');
           localStorage.removeItem('dhan_connected_client_id');
@@ -405,9 +406,7 @@ class AuthService {
         try { localStorage.removeItem('mavrix_local_user'); } catch (_) {}
         try {
           const token = await user.getIdToken();
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('mavrix_auth_token', token);
-          }
+          this.inMemoryToken = token;
         } catch (_) {}
         callback(user);
       } else if (!this.localUser) {
@@ -428,17 +427,14 @@ class AuthService {
 
   // Get ID token
   async getIdToken(): Promise<string | null> {
-    if (typeof window !== 'undefined') {
-      const savedToken = localStorage.getItem('mavrix_auth_token');
-      if (savedToken) return savedToken;
-    }
+    if (this.inMemoryToken) return this.inMemoryToken;
 
     const user = this.getCurrentUser();
     if (user && typeof user.getIdToken === 'function') {
       try {
         const token = await user.getIdToken();
-        if (token && typeof window !== 'undefined') {
-          localStorage.setItem('mavrix_auth_token', token);
+        if (token) {
+          this.inMemoryToken = token;
         }
         return token;
       } catch (_) {}

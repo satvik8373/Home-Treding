@@ -14,7 +14,8 @@ import {
   IconButton,
   LinearProgress
 } from '@mui/material';
-import { TrendingUp, TrendingDown, Close, ChevronRight, FiberManualRecord } from '@mui/icons-material';
+import { TrendingUp, TrendingDown, Close, ChevronRight } from '@mui/icons-material';
+import { StatusBadge } from './ui';
 import { io, Socket } from 'socket.io-client';
 import axios from 'axios';
 import { API_CONFIG } from '../config/api';
@@ -166,7 +167,7 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
     fetchMarketFeed();
 
     // Standardized visibility-aware polling interval (4s)
-    pollInterval = setInterval(fetchMarketFeed, 4000);
+    pollInterval = setInterval(fetchMarketFeed, 8000);
 
     // 2. High-Frequency WebSocket Connection (Only when supported & enabled)
     if (API_CONFIG.ENABLE_WEBSOCKETS) {
@@ -298,32 +299,19 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
 
   return (
     <Paper sx={{ p: 0, borderRadius: 2.5, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', overflow: 'hidden' }}>
-      {/* Sleek Minimalist Header */}
-      <Box sx={{ px: 2.5, py: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+      <Box sx={{ px: 2.5, py: 1.8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em' }}>
             Market Feed
           </Typography>
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 0.6, 
-              bgcolor: isMarketOpen ? '#f0fdf4' : '#fef3c7', 
-              px: 1, 
-              py: 0.3, 
-              borderRadius: 4, 
-              border: isMarketOpen ? '1px solid #dcfce7' : '1px solid #fde68a' 
-            }}
-          >
-            <FiberManualRecord sx={{ fontSize: 8, color: isMarketOpen ? '#16a34a' : '#d97706' }} />
-            <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: isMarketOpen ? '#15803d' : '#92400e' }}>
-              {isMarketOpen ? (connectionStatus === 'connected' ? 'LIVE' : 'SYNCING') : 'MARKET CLOSED'}
-            </Typography>
-          </Box>
+          <StatusBadge
+            status={isMarketOpen ? (connectionStatus === 'connected' ? 'live' : 'syncing') : 'stopped'}
+            dot
+            label={isMarketOpen ? (connectionStatus === 'connected' ? 'LIVE' : 'SYNCING') : 'CLOSED'}
+          />
         </Box>
         <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>
-          {isMarketOpen ? 'NSE & DhanHQ Live' : (marketStatus?.nextOpen || 'NSE Close Prices Fixed')}
+          {isMarketOpen ? 'NSE & DhanHQ' : (marketStatus?.nextOpen || 'NSE Closed')}
         </Typography>
       </Box>
 
@@ -331,7 +319,7 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
       <TableContainer sx={{ maxHeight: 520 }}>
         <Table size="small" stickyHeader>
           <TableHead>
-            <TableRow sx={{ '& th': { bgcolor: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: '0.75rem', py: 1.2, borderBottom: '1px solid #e2e8f0' } }}>
+            <TableRow>
               <TableCell sx={{ pl: 2.5 }}>Instrument</TableCell>
               <TableCell align="right">LTP (₹)</TableCell>
               <TableCell align="right">Change</TableCell>
@@ -510,13 +498,19 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
                   <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#16a34a', mb: 1 }}>
                     BIDS (BUYERS)
                   </Typography>
-                  {selectedDepth.buyDepth.map((b, i) => (
-                    <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.3 }}>
-                      <Typography sx={{ fontSize: '0.72rem', color: '#94a3b8' }}>{b.orders}</Typography>
-                      <Typography sx={{ fontSize: '0.72rem', color: '#475569', fontFamily: 'monospace' }}>{b.quantity}</Typography>
-                      <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>₹{formatPrice(b.price)}</Typography>
-                    </Box>
-                  ))}
+                  {selectedDepth.buyDepth && selectedDepth.buyDepth.length > 0 ? (
+                    selectedDepth.buyDepth.map((b, i) => (
+                      <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.3 }}>
+                        <Typography sx={{ fontSize: '0.72rem', color: '#94a3b8' }}>{b.orders}</Typography>
+                        <Typography sx={{ fontSize: '0.72rem', color: '#475569', fontFamily: 'monospace' }}>{b.quantity}</Typography>
+                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace' }}>₹{formatPrice(b.price)}</Typography>
+                      </Box>
+                    ))
+                  ) : (
+                    <Typography sx={{ fontSize: '0.72rem', color: '#94a3b8', py: 1 }}>
+                      Depth available during live NSE market hours via Dhan broker.
+                    </Typography>
+                  )}
                 </Box>
 
                 {/* Asks */}
@@ -524,13 +518,19 @@ const RealTimeMarketData: React.FC<MarketDataProps> = ({
                   <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#dc2626', mb: 1 }}>
                     ASKS (SELLERS)
                   </Typography>
-                  {selectedDepth.sellDepth.map((a, i) => (
-                    <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.3 }}>
-                      <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#dc2626', fontFamily: 'monospace' }}>₹{formatPrice(a.price)}</Typography>
-                      <Typography sx={{ fontSize: '0.72rem', color: '#475569', fontFamily: 'monospace' }}>{a.quantity}</Typography>
-                      <Typography sx={{ fontSize: '0.72rem', color: '#94a3b8' }}>{a.orders}</Typography>
-                    </Box>
-                  ))}
+                  {selectedDepth.sellDepth && selectedDepth.sellDepth.length > 0 ? (
+                    selectedDepth.sellDepth.map((a, i) => (
+                      <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.3 }}>
+                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#dc2626', fontFamily: 'monospace' }}>₹{formatPrice(a.price)}</Typography>
+                        <Typography sx={{ fontSize: '0.72rem', color: '#475569', fontFamily: 'monospace' }}>{a.quantity}</Typography>
+                        <Typography sx={{ fontSize: '0.72rem', color: '#94a3b8' }}>{a.orders}</Typography>
+                      </Box>
+                    ))
+                  ) : (
+                    <Typography sx={{ fontSize: '0.72rem', color: '#94a3b8', py: 1 }}>
+                      Depth available during live NSE market hours via Dhan broker.
+                    </Typography>
+                  )}
                 </Box>
               </Box>
 

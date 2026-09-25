@@ -18,11 +18,13 @@ import {
   MenuItem,
   IconButton
 } from '@mui/material';
-import { Add as AddIcon, Refresh as RefreshIcon, Close } from '@mui/icons-material';
-import { StatusBadge } from './ui';
+import { Add as AddIcon, Refresh as RefreshIcon, Close, ReceiptLong } from '@mui/icons-material';
+import { StatusBadge, EmptyState } from './ui';
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
 import { API_CONFIG } from '../config/api';
+import { useTradingMode } from '../context/TradingModeContext';
+import { Alert } from '@mui/material';
 
 interface Order {
   id: string;
@@ -45,9 +47,13 @@ interface OrderManagementProps {
 }
 
 const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
+  const { isLive } = useTradingMode();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [showOrderForm, setShowOrderForm] = useState(false);
+  const [, setSubmittingOrder] = useState(false);
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [orderError, setOrderError] = useState('');
   const [orderForm, setOrderForm] = useState({
     symbol: '',
     side: 'BUY',
@@ -101,6 +107,12 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
   }, [loadOrders]);
 
   const handlePlaceOrder = async () => {
+    if (!orderForm.symbol.trim()) {
+      setOrderError('Please enter a symbol');
+      return;
+    }
+    setSubmittingOrder(true);
+    setOrderError('');
     try {
       const res = await axios.post(`${API_CONFIG.BASE_URL}/api/trading/orders`, {
         symbol: orderForm.symbol.toUpperCase(),
@@ -108,16 +120,39 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
         quantity: Number(orderForm.quantity),
         price: orderForm.price,
         orderType: orderForm.orderType,
-        productType: orderForm.productType
+        productType: orderForm.productType,
+        brokerId,
+        mode: isLive ? 'live' : 'paper'
       });
 
       if (res.data?.success) {
         setShowOrderForm(false);
         setOrderForm({ symbol: '', side: 'BUY', quantity: 10, price: 0, orderType: 'MARKET', productType: 'INTRADAY' });
         await loadOrders();
+      } else {
+        setOrderError(res.data?.message || 'Failed to place order');
       }
-    } catch (e) {
-      // Handled
+    } catch (e: any) {
+      setOrderError(e.response?.data?.message || e.message || 'Error executing order');
+    } finally {
+      setSubmittingOrder(false);
+    }
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    if (!orderId) return;
+    try {
+      setCancellingOrderId(orderId);
+      const res = await axios.delete(`${API_CONFIG.BASE_URL}/api/trading/orders/${orderId}`);
+      if (res.data?.success) {
+        await loadOrders();
+      } else {
+        alert(res.data?.message || 'Failed to cancel order');
+      }
+    } catch (e: any) {
+      alert(e.response?.data?.message || e.message || 'Error cancelling order');
+    } finally {
+      setCancellingOrderId(null);
     }
   };
 
@@ -156,19 +191,18 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
             startIcon={<AddIcon sx={{ fontSize: 16 }} />}
             onClick={() => setShowOrderForm(true)}
             size="small"
-            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, fontSize: '0.8rem', bgcolor: '#0f172a', color: '#fff', '&:hover': { bgcolor: '#1e293b' } }}
+            sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.8rem' }}
           >
             Place Order
           </Button>
         </Box>
       </Box>
 
-      {/* Orders Table */}
-      <Paper sx={{ borderRadius: 2.5, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', overflow: 'hidden' }}>
+      <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
         <TableContainer>
           <Table size="small">
             <TableHead>
-              <TableRow sx={{ '& th': { bgcolor: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: '0.75rem', py: 1.2, borderBottom: '1px solid #e2e8f0' } }}>
+              <TableRow>
                 <TableCell sx={{ pl: 2.5 }}>Order ID</TableCell>
                 <TableCell>Symbol</TableCell>
                 <TableCell>Side</TableCell>
@@ -176,14 +210,20 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
                 <TableCell align="right">Fill Price (₹)</TableCell>
                 <TableCell>Type</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell align="right" sx={{ pr: 2.5 }}>Time</TableCell>
+                <TableCell align="right">Time</TableCell>
+                <TableCell align="center" sx={{ pr: 2.5 }}>Action</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {orders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 6, color: '#94a3b8', fontSize: '0.85rem' }}>
-                    No orders in the book.
+                  <TableCell colSpan={9} sx={{ p: 0, border: 0 }}>
+                    <EmptyState
+                      icon={<ReceiptLong sx={{ fontSize: 26 }} />}
+                      title="No orders in the book"
+                      description="Place a paper or live order using the button above."
+                      compact
+                    />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -193,33 +233,49 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
                   const price = o.averagePrice || o.price || 0;
 
                   return (
-                    <TableRow key={id} hover sx={{ '& td': { py: 1.2, borderBottom: '1px solid #f8fafc' } }}>
-                      <TableCell sx={{ pl: 2.5, fontFamily: 'monospace', color: '#64748b', fontSize: '0.75rem' }}>
-                        {id}
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
-                        {o.symbol}
-                      </TableCell>
+                    <TableRow key={id} hover>
+                      <TableCell sx={{ pl: 2.5, fontFamily: 'monospace', fontSize: '0.75rem' }}>{id}</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>{o.symbol}</TableCell>
                       <TableCell>
                         <StatusBadge status={o.side === 'BUY' ? 'live' : 'halted'} label={o.side} />
                       </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                        {o.quantity}
-                      </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '0.85rem', color: '#0f172a' }}>
-                        ₹{formatPrice(price)}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: '0.75rem', color: '#64748b' }}>
-                        {o.orderType}
-                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600, fontFamily: 'monospace', fontSize: '0.85rem' }}>{o.quantity}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700, fontFamily: 'monospace', fontSize: '0.85rem', color: '#0f172a' }}>₹{formatPrice(price)}</TableCell>
+                      <TableCell sx={{ fontSize: '0.75rem', color: '#64748b' }}>{o.orderType}</TableCell>
                       <TableCell>
                         <StatusBadge
-                          status={o.status === 'FILLED' ? 'live' : o.status === 'CANCELLED' ? 'halted' : 'paper'}
+                          status={o.status === 'FILLED' ? 'filled' : o.status === 'CANCELLED' ? 'cancelled' : 'pending'}
                           label={o.status}
                         />
                       </TableCell>
-                      <TableCell align="right" sx={{ pr: 2.5, color: '#64748b', fontSize: '0.75rem' }}>
+                      <TableCell align="right" sx={{ color: '#64748b', fontSize: '0.75rem' }}>
                         {new Date(time).toLocaleTimeString()}
+                      </TableCell>
+                      <TableCell align="center" sx={{ pr: 2.5 }}>
+                        {['OPEN', 'PENDING', 'TRIGGERED', 'TRANSIT', 'PLACED'].includes(o.status?.toUpperCase()) ? (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleCancelOrder(String(id || ''))}
+                            disabled={cancellingOrderId === id}
+                            sx={{
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              py: 0.2,
+                              px: 1.2,
+                              borderRadius: 1.5,
+                              textTransform: 'none',
+                              borderColor: '#fca5a5',
+                              color: '#dc2626',
+                              bgcolor: '#fef2f2',
+                              '&:hover': { bgcolor: '#fee2e2', borderColor: '#ef4444' }
+                            }}
+                          >
+                            {cancellingOrderId === id ? 'Cancelling...' : 'Cancel'}
+                          </Button>
+                        ) : (
+                          <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8' }}>—</Typography>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -239,14 +295,24 @@ const OrderManagement: React.FC<OrderManagementProps> = ({ brokerId }) => {
         PaperProps={{ sx: { borderRadius: 3, p: 0, overflow: 'hidden' } }}
       >
         <Box sx={{ p: 2.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #f1f5f9' }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a' }}>
-            Place Trading Order
-          </Typography>
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a' }}>
+              Place {isLive ? 'Live' : 'Paper'} Order
+            </Typography>
+            <Typography sx={{ fontSize: '0.72rem', color: isLive ? '#dc2626' : '#16a34a', fontWeight: 700 }}>
+              {isLive ? 'Real funds — DhanHQ execution' : 'Virtual simulation — no real capital'}
+            </Typography>
+          </Box>
           <IconButton size="small" onClick={() => setShowOrderForm(false)} sx={{ color: '#94a3b8' }}>
             <Close sx={{ fontSize: 18 }} />
           </IconButton>
         </Box>
         <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {orderError && (
+            <Alert severity="error" sx={{ borderRadius: 2, fontSize: '0.78rem' }}>
+              {orderError}
+            </Alert>
+          )}
           <TextField
             label="Symbol"
             value={orderForm.symbol}

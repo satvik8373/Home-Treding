@@ -1,22 +1,31 @@
 import React, { useState } from 'react';
 import {
-  Container,
   Box,
   TextField,
   Button,
   Typography,
-  Link,
   Alert,
   Paper,
   CircularProgress,
+  InputAdornment,
+  IconButton,
   Divider
 } from '@mui/material';
-import { TrendingUp } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import {
+  Visibility,
+  VisibilityOff,
+  PersonOutline,
+  EmailOutlined,
+  PhoneOutlined,
+  LockOutlined,
+  ShowChart
+} from '@mui/icons-material';
+import { useNavigate, Link } from 'react-router-dom';
 import authService from '../services/authService';
 
+// Official Google SVG — no emojis
 const GoogleIcon: React.FC = () => (
-  <svg width="20" height="20" viewBox="0 0 48 48">
+  <svg width="18" height="18" viewBox="0 0 48 48">
     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
     <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
     <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
@@ -38,6 +47,7 @@ const Register: React.FC = () => {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -51,14 +61,13 @@ const Register: React.FC = () => {
     setError('');
     setSuccess('');
 
-    // Validation
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setError('Passwords do not match.');
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError('Password must be at least 6 characters.');
       return;
     }
 
@@ -71,14 +80,13 @@ const Register: React.FC = () => {
         phone: formData.phone,
         password: formData.password
       });
-      
-      setSuccess('Registration successful! Redirecting to dashboard...');
+
+      setSuccess('Account created successfully. Redirecting to dashboard...');
       setTimeout(() => {
         navigate('/dashboard');
       }, 1200);
     } catch (err: any) {
-      const errorMessage = err.message || 'Registration failed';
-      setError(errorMessage);
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -87,12 +95,11 @@ const Register: React.FC = () => {
   const handleGoogleSignIn = async () => {
     setError('');
     setGoogleLoading(true);
-
     try {
       await authService.loginWithGoogle();
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'Google Sign-In failed');
+      setError(err.message || 'Google Sign-In failed.');
     } finally {
       setGoogleLoading(false);
     }
@@ -103,200 +110,307 @@ const Register: React.FC = () => {
       sx={{
         minHeight: '100vh',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        bgcolor: '#f8fafc',
-        px: 2,
-        py: 4
+        bgcolor: '#f0f4f8'
       }}
     >
-      <Container maxWidth="sm">
-        <Paper
-          elevation={0}
-          sx={{
-            p: { xs: 3, sm: 5 },
-            borderRadius: 3,
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05)'
-          }}
-        >
-          {/* Logo & Header */}
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Box
-              sx={{
-                width: 56,
-                height: 56,
-                borderRadius: 2.5,
-                bgcolor: '#2563eb',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mb: 1.5,
-                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)'
-              }}
-            >
-              <TrendingUp sx={{ fontSize: 32, color: 'white' }} />
-            </Box>
-            <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a' }}>
-              Create Account
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#64748b' }}>
-              Start your algorithmic trading journey with Mavrix
-            </Typography>
-          </Box>
-
-          {error && (
-            <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2 }}>
-              {error}
-            </Alert>
-          )}
-
-          {success && (
-            <Alert severity="success" sx={{ mb: 2.5, borderRadius: 2 }}>
-              {success}
-            </Alert>
-          )}
-
-          {/* Google Sign-In Button */}
-          <Button
-            fullWidth
-            variant="outlined"
-            size="large"
-            onClick={handleGoogleSignIn}
-            disabled={loading || googleLoading}
-            startIcon={googleLoading ? <CircularProgress size={20} /> : <GoogleIcon />}
+      {/* Left Brand Panel — desktop only */}
+      <Box
+        sx={{
+          display: { xs: 'none', lg: 'flex' },
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'flex-start',
+          width: 420,
+          flexShrink: 0,
+          bgcolor: '#0f172a',
+          px: 6,
+          py: 8
+        }}
+      >
+        {/* Logo */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 6 }}>
+          <Box
             sx={{
-              py: 1.3,
-              fontSize: '0.9375rem',
-              fontWeight: 600,
-              textTransform: 'none',
-              borderRadius: 2.5,
-              borderColor: '#e2e8f0',
-              color: '#1e293b',
-              bgcolor: '#ffffff',
-              boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1)',
-              '&:hover': {
-                bgcolor: '#f8fafc',
-                borderColor: '#cbd5e1'
-              }
+              width: 40,
+              height: 40,
+              borderRadius: 2,
+              bgcolor: '#4f46e5',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}
           >
-            {googleLoading ? 'Connecting to Google...' : 'Sign up with Google'}
-          </Button>
+            <ShowChart sx={{ color: '#fff', fontSize: 22 }} />
+          </Box>
+          <Typography sx={{ fontWeight: 800, color: '#f1f5f9', fontSize: '1.15rem' }}>
+            Mavrix Trading
+          </Typography>
+        </Box>
 
-          <Divider sx={{ my: 2.5 }}>
-            <Typography variant="caption" sx={{ color: '#94a3b8', px: 1, fontWeight: 600, textTransform: 'uppercase' }}>
-              Or register with email
+        <Typography sx={{ fontWeight: 800, color: '#f1f5f9', fontSize: '1.75rem', lineHeight: 1.25, mb: 2 }}>
+          Institutional-grade trading automation
+        </Typography>
+        <Typography sx={{ color: '#94a3b8', fontSize: '0.92rem', lineHeight: 1.7 }}>
+          Create your account to execute live algorithms, manage multi-broker portfolios, and view real-time market data with sub-millisecond precision.
+        </Typography>
+
+        {/* Feature list */}
+        {[
+          { title: 'DhanHQ Direct Connect', desc: 'Execute orders directly via official Dhan v2 REST & WebSocket feeds' },
+          { title: 'Isolated Paper Engine', desc: 'Safely test and benchmark strategies with realistic slippage modeling' },
+          { title: 'Sub-Millisecond Engine', desc: 'Real-time order routing, position tracking, and risk controls' }
+        ].map((f, i) => (
+          <Box key={i} sx={{ mt: 3.5 }}>
+            <Typography sx={{ fontWeight: 700, color: '#e2e8f0', fontSize: '0.9rem', mb: 0.3 }}>
+              {f.title}
             </Typography>
-          </Divider>
+            <Typography sx={{ color: '#64748b', fontSize: '0.82rem', lineHeight: 1.5 }}>
+              {f.desc}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
 
-          <Box component="form" onSubmit={handleSubmit}>
-            <TextField
-              margin="dense"
-              required
-              fullWidth
-              id="name"
-              label="Full Name"
-              name="name"
-              autoComplete="name"
-              value={formData.name}
-              onChange={handleChange}
-              size="small"
-              sx={{ mb: 1.5 }}
-            />
-            <TextField
-              margin="dense"
-              required
-              fullWidth
-              id="email"
-              label="Email Address"
-              name="email"
-              autoComplete="email"
-              value={formData.email}
-              onChange={handleChange}
-              size="small"
-              sx={{ mb: 1.5 }}
-            />
-            <TextField
-              margin="dense"
-              fullWidth
-              id="phone"
-              label="Phone Number"
-              name="phone"
-              autoComplete="tel"
-              value={formData.phone}
-              onChange={handleChange}
-              size="small"
-              sx={{ mb: 1.5 }}
-            />
-            <TextField
-              margin="dense"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type="password"
-              id="password"
-              autoComplete="new-password"
-              value={formData.password}
-              onChange={handleChange}
-              size="small"
-              sx={{ mb: 1.5 }}
-            />
-            <TextField
-              margin="dense"
-              required
-              fullWidth
-              name="confirmPassword"
-              label="Confirm Password"
-              type="password"
-              id="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              size="small"
-              sx={{ mb: 2 }}
-            />
+      {/* Right Register Panel */}
+      <Box
+        sx={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          px: { xs: 2, sm: 3 },
+          py: { xs: 4, sm: 6 }
+        }}
+      >
+        <Box sx={{ width: '100%', maxWidth: 440 }}>
+          {/* Mobile logo */}
+          <Box sx={{ display: { xs: 'flex', lg: 'none' }, alignItems: 'center', gap: 1.2, mb: 3 }}>
+            <Box sx={{ width: 36, height: 36, borderRadius: 1.5, bgcolor: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShowChart sx={{ color: '#fff', fontSize: 18 }} />
+            </Box>
+            <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem' }}>
+              Mavrix Trading
+            </Typography>
+          </Box>
 
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 3, sm: 4 },
+              borderRadius: 2.5,
+              border: '1px solid #e2e8f0',
+              bgcolor: '#ffffff',
+              boxShadow: '0 4px 16px -4px rgb(0 0 0 / 0.08)'
+            }}
+          >
+            <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a', mb: 0.5 }}>
+              Create an account
+            </Typography>
+            <Typography sx={{ color: '#64748b', fontSize: '0.875rem', mb: 2.5 }}>
+              Start your automated trading journey
+            </Typography>
+
+            {error && (
+              <Alert
+                severity="error"
+                onClose={() => setError('')}
+                sx={{ mb: 2, borderRadius: 1.5, fontSize: '0.82rem' }}
+              >
+                {error}
+              </Alert>
+            )}
+
+            {success && (
+              <Alert
+                severity="success"
+                sx={{ mb: 2, borderRadius: 1.5, fontSize: '0.82rem' }}
+              >
+                {success}
+              </Alert>
+            )}
+
+            {/* Google sign-up */}
             <Button
-              type="submit"
               fullWidth
-              variant="contained"
-              size="large"
+              variant="outlined"
+              onClick={handleGoogleSignIn}
               disabled={loading || googleLoading}
+              startIcon={googleLoading ? <CircularProgress size={16} /> : <GoogleIcon />}
               sx={{
-                py: 1.4,
-                fontWeight: 700,
-                fontSize: '0.95rem',
-                borderRadius: 2,
-                bgcolor: '#2563eb',
-                boxShadow: 'none',
-                '&:hover': { bgcolor: '#1d4ed8', boxShadow: 'none' }
+                py: 1.1,
+                mb: 2,
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                textTransform: 'none',
+                borderColor: '#e2e8f0',
+                color: '#1e293b',
+                bgcolor: '#ffffff',
+                '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' }
               }}
             >
-              {loading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Create Account'}
+              {googleLoading ? 'Connecting...' : 'Sign up with Google'}
             </Button>
 
-            <Box sx={{ textAlign: 'center', mt: 2 }}>
-              <Typography variant="body2" sx={{ color: '#64748b' }}>
+            <Divider sx={{ mb: 2 }}>
+              <Typography sx={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', px: 1 }}>
+                or with email
+              </Typography>
+            </Divider>
+
+            {/* Form */}
+            <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 1.8 }}>
+              <TextField
+                required
+                fullWidth
+                id="name"
+                label="Full Name"
+                name="name"
+                autoComplete="name"
+                autoFocus
+                size="small"
+                value={formData.name}
+                onChange={handleChange}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <PersonOutline sx={{ color: '#94a3b8', fontSize: 18 }} />
+                    </InputAdornment>
+                  )
+                }}
+              />
+
+              <TextField
+                required
+                fullWidth
+                id="email"
+                label="Email Address"
+                name="email"
+                type="email"
+                autoComplete="email"
+                size="small"
+                value={formData.email}
+                onChange={handleChange}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <EmailOutlined sx={{ color: '#94a3b8', fontSize: 18 }} />
+                    </InputAdornment>
+                  )
+                }}
+              />
+
+              <TextField
+                fullWidth
+                id="phone"
+                label="Phone Number"
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                size="small"
+                value={formData.phone}
+                onChange={handleChange}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <PhoneOutlined sx={{ color: '#94a3b8', fontSize: 18 }} />
+                    </InputAdornment>
+                  )
+                }}
+              />
+
+              <TextField
+                required
+                fullWidth
+                name="password"
+                label="Password"
+                type={showPassword ? 'text' : 'password'}
+                id="password"
+                autoComplete="new-password"
+                size="small"
+                value={formData.password}
+                onChange={handleChange}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LockOutlined sx={{ color: '#94a3b8', fontSize: 18 }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                        size="small"
+                        aria-label="toggle password visibility"
+                      >
+                        {showPassword ? <VisibilityOff sx={{ fontSize: 18, color: '#94a3b8' }} /> : <Visibility sx={{ fontSize: 18, color: '#94a3b8' }} />}
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }}
+              />
+
+              <TextField
+                required
+                fullWidth
+                name="confirmPassword"
+                label="Confirm Password"
+                type={showPassword ? 'text' : 'password'}
+                id="confirmPassword"
+                autoComplete="new-password"
+                size="small"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <LockOutlined sx={{ color: '#94a3b8', fontSize: 18 }} />
+                    </InputAdornment>
+                  )
+                }}
+              />
+
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                disabled={loading || googleLoading}
+                sx={{
+                  mt: 0.5,
+                  py: 1.2,
+                  fontWeight: 700,
+                  fontSize: '0.875rem',
+                  borderRadius: 1.5,
+                  bgcolor: '#4f46e5',
+                  boxShadow: 'none',
+                  textTransform: 'none',
+                  '&:hover': { bgcolor: '#4338ca', boxShadow: 'none' }
+                }}
+              >
+                {loading ? <CircularProgress size={20} sx={{ color: '#fff' }} /> : 'Create Account'}
+              </Button>
+            </Box>
+
+            <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid #f1f5f9', textAlign: 'center' }}>
+              <Typography sx={{ color: '#64748b', fontSize: '0.82rem' }}>
                 Already have an account?{' '}
-                <Link
-                  href="/login"
+                <Box
+                  component={Link}
+                  to="/login"
                   sx={{
-                    color: '#2563eb',
-                    textDecoration: 'none',
+                    color: '#4f46e5',
                     fontWeight: 700,
-                    '&:hover': {
-                      textDecoration: 'underline'
-                    }
+                    textDecoration: 'none',
+                    '&:hover': { textDecoration: 'underline' }
                   }}
                 >
-                  Sign In
-                </Link>
+                  Sign in
+                </Box>
               </Typography>
             </Box>
-          </Box>
-        </Paper>
-      </Container>
+          </Paper>
+        </Box>
+      </Box>
     </Box>
   );
 };

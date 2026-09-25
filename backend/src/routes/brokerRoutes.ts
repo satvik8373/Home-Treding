@@ -60,21 +60,21 @@ router.post('/dhan-callback', authenticate, handleDhanCallback);
 router.post('/terminal-status', authenticate, checkTerminalStatus);
 router.post('/activate-terminal', authenticate, checkTerminalStatus);
 
-// 4. Account & Portfolio Operations (Strictly Authenticated)
-router.get('/funds', authenticate, getFunds);
-router.get('/funds/:brokerId', authenticate, getFunds);
-router.get('/positions', authenticate, getPositions);
+// 4. Account & Portfolio Operations
+router.get('/funds', optionalAuth, getFunds);
+router.get('/funds/:brokerId', optionalAuth, getFunds);
+router.get('/positions', optionalAuth, getPositions);
 router.delete('/positions', optionalAuth, exitAllPositions);
 router.post('/square-off', optionalAuth, exitAllPositions);
-router.post('/positions/convert', authenticate, convertPosition);
+router.post('/positions/convert', optionalAuth, convertPosition);
 
 // 4. Orders & Tradebook
-router.get('/orders', authenticate, getOrders);
-router.get('/orders/:brokerId', authenticate, getOrders);
-router.post('/orders/slice', authenticate, placeSliceOrder);
-router.get('/trades', authenticate, getTrades);
-router.get('/trades/history', authenticate, getTradeHistory);
-router.get('/trades/:orderId', authenticate, getTradeByOrderId);
+router.get('/orders', optionalAuth, getOrders);
+router.get('/orders/:brokerId', optionalAuth, getOrders);
+router.post('/orders/slice', optionalAuth, placeSliceOrder);
+router.get('/trades', optionalAuth, getTrades);
+router.get('/trades/history', optionalAuth, getTradeHistory);
+router.get('/trades/:orderId', optionalAuth, getTradeByOrderId);
 
 // 5. DhanHQ v2 Option Chain & Expiries
 router.post('/option-chain', optionalAuth, getOptionChain);

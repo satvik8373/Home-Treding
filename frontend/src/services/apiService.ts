@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { auth } from '../config/firebase';
 import { API_CONFIG } from '../config/api';
+import authService from './authService';
 
 const API_URL = API_CONFIG.BASE_URL;
 
@@ -18,7 +19,7 @@ class ApiService {
     // Request interceptor to add auth token
     this.api.interceptors.request.use(
       async (config) => {
-        let token = typeof window !== 'undefined' ? localStorage.getItem('mavrix_auth_token') : null;
+        let token = authService.getInMemoryToken();
         if (!token) {
           const user = auth.currentUser;
           if (user) {

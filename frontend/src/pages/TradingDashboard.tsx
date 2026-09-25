@@ -21,6 +21,8 @@ import PortfolioDashboard from '../components/PortfolioDashboard';
 import { PageHeader, StatCard, StatusBadge } from '../components/ui';
 import axios from 'axios';
 import { API_CONFIG } from '../config/api';
+import { useTradingMode } from '../context/TradingModeContext';
+import { brokerApi } from '../services/brokerApi';
 
 const TradingDashboard: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
@@ -66,8 +68,13 @@ const TradingDashboard: React.FC = () => {
     }
   };
 
+  const { mode } = useTradingMode();
+  const isLive = mode === 'live';
+
   const connectedBrokers = brokers.filter(b => b.status === 'Connected');
-  const activeBroker = connectedBrokers.length > 0 ? connectedBrokers[0] : null;
+  const cachedBroker = brokerApi.getActiveBroker();
+  const activeBroker = connectedBrokers.length > 0 ? connectedBrokers[0] : cachedBroker;
+  const isBrokerReady = Boolean(activeBroker);
 
   return (
     <Layout>
@@ -80,7 +87,6 @@ const TradingDashboard: React.FC = () => {
             <StatusBadge
               status={engineStatus?.isRunning ? 'live' : 'stopped'}
               dot
-              pulse
               label={engineStatus?.isRunning ? 'ENGINE ACTIVE' : 'ENGINE PAUSED'}
             />
           }
@@ -110,58 +116,47 @@ const TradingDashboard: React.FC = () => {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
           <StatCard
             label="Trading Mode"
-            value="Paper Forward"
-            subtext="Zero Capital Risk"
-            icon={<ShowChart sx={{ fontSize: 18 }} />}
+            value={isLive ? 'Live Trading' : 'Paper Mode'}
+            subtext={isLive ? 'Real capital via DhanHQ' : 'Zero capital risk'}
+            color={isLive ? '#dc2626' : '#16a34a'}
+            icon={<ShowChart sx={{ fontSize: 17 }} />}
           />
 
           <StatCard
             label="Broker Status"
-            value={connectedBrokers.length > 0 ? 'Dhan Connected' : 'Paper Only'}
-            subtext={activeBroker?.maskedClientId || 'Virtual Ledger'}
-            icon={<AccountBalance sx={{ fontSize: 18 }} />}
+            value={isBrokerReady ? (activeBroker?.brokerName || 'Dhan') : 'Not Connected'}
+            subtext={activeBroker?.maskedClientId ? `Client: ${activeBroker.maskedClientId}` : 'Virtual ledger active'}
+            color={isBrokerReady ? '#4f46e5' : '#64748b'}
+            icon={<AccountBalance sx={{ fontSize: 17 }} />}
           />
 
           <StatCard
             label="Kill Switch"
             value={engineStatus?.killSwitch?.isHalted ? 'HALTED' : 'NORMAL'}
-            subtext="Risk Engine Guard"
+            subtext="Risk engine guard"
             color={engineStatus?.killSwitch?.isHalted ? '#dc2626' : '#16a34a'}
-            icon={<TrendingUp sx={{ fontSize: 18 }} />}
+            icon={<TrendingUp sx={{ fontSize: 17 }} />}
           />
 
           <StatCard
-            label="Live Data Stream"
-            value="800ms Ticks"
-            subtext="Sub-Second Latency"
-            icon={<ReceiptLong sx={{ fontSize: 18 }} />}
+            label="Engine Status"
+            value={engineStatus?.isRunning ? 'Running' : 'Paused'}
+            subtext={`Orders processed: ${engineStatus?.ordersProcessed ?? 0}`}
+            icon={<ReceiptLong sx={{ fontSize: 17 }} />}
           />
         </Box>
 
         {/* Main Tabbed Container */}
-        <Paper sx={{ borderRadius: 2.5, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.02)', overflow: 'hidden' }}>
+        <Paper elevation={0} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
           <Tabs
             value={tabValue}
             onChange={(_, val) => setTabValue(val)}
-            sx={{
-              borderBottom: '1px solid #f1f5f9',
-              bgcolor: '#f8fafc',
-              px: 2,
-              '& .MuiTab-root': {
-                fontWeight: 700,
-                fontSize: '0.82rem',
-                textTransform: 'none',
-                minHeight: 48,
-                color: '#64748b',
-                '&.Mui-selected': { color: '#0f172a' }
-              }
-            }}
+            sx={{ borderBottom: '1px solid #f1f5f9', bgcolor: '#f8fafc', px: 1.5 }}
           >
-            <Tab label="Live Market Data" />
-            <Tab label="Order Management" />
-            <Tab label="Active Positions" />
+            <Tab label="Market Feed" />
+            <Tab label="Order Book" />
+            <Tab label="Positions" />
           </Tabs>
-
           <Box sx={{ p: tabValue === 0 ? 0 : 2.5 }}>
             {tabValue === 0 && <RealTimeMarketData />}
             {tabValue === 1 && <OrderManagement brokerId={activeBroker?.id} />}

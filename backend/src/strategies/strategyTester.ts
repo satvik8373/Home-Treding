@@ -2,6 +2,7 @@
  * Strategy Testing & Backtest Engine
  * Evaluates real trading strategies against 60-day historical candle data
  */
+import { resolveLotSize, getStrategyConfig } from '../config/strategyConfig';
 
 export interface CandleData {
   timestamp: Date;
@@ -82,7 +83,7 @@ export class StrategyTester {
 
     const isIndex = symbol.toUpperCase().includes('NIFTY') || symbol.toUpperCase().includes('BANK');
     const isBankNifty = symbol.toUpperCase().includes('BANK');
-    const lotSize = isBankNifty ? 15 : isIndex ? 50 : 25;
+    const lotSize = resolveLotSize(symbol); // from centralized config (NSE 2026 revision)
 
     switch (strategyType) {
       case 'ema_crossover':

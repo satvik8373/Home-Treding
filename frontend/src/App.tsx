@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, CssBaseline, Box } from '@mui/material';
 import { theme } from './theme';
+import { TradingModeProvider } from './context/TradingModeContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -14,23 +15,29 @@ import TradingDashboard from './pages/TradingDashboard';
 import TestLiveTrading from './pages/TestLiveTrading';
 import OptionChain from './pages/OptionChain';
 import BacktestPage from './pages/BacktestPage';
+import LiveChartPage from './pages/LiveChartPage';
+import Subscription from './pages/Subscription';
 
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{
-        width: '100%',
-        maxWidth: '100vw',
-        overflowX: 'hidden',
-        position: 'relative'
-      }}>
-        <Router>
+      <TradingModeProvider>
+        <Box sx={{
+          width: '100%',
+          maxWidth: '100vw',
+          overflowX: 'hidden',
+          position: 'relative'
+        }}>
+          <Router>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/chart" element={<LiveChartPage />} />
+            <Route path="/charts" element={<Navigate to="/chart" replace />} />
+            <Route path="/live-chart" element={<Navigate to="/chart" replace />} />
             <Route path="/trading-dashboard" element={<TradingDashboard />} />
             <Route path="/brokers" element={<Brokers />} />
             <Route path="/strategies" element={<Strategies />} />
@@ -41,6 +48,7 @@ function App() {
             <Route path="/option-chain" element={<OptionChain />} />
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/subscription" element={<Subscription />} />
             <Route path="/dhan-connect" element={<DhanCallback />} />
             <Route path="/dhan-callback" element={<DhanCallback />} />
             <Route path="/connect-broker" element={<DhanCallback />} />
@@ -50,6 +58,7 @@ function App() {
           </Routes>
         </Router>
       </Box>
+      </TradingModeProvider>
     </ThemeProvider>
   );
 }

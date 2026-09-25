@@ -1,1 +1,85 @@
-[]
+[
+  {
+    "deploymentId": "dep_1790332249912_9j62l7",
+    "strategyId": "nifty-009-atm-breakout",
+    "userId": "cxZXNhj2HmbnZRhR5lCI29iKT2N2",
+    "name": "NIFTY 0.09% ATM Full-Day Breakout",
+    "symbol": "NIFTY 50",
+    "templateType": "nifty-009-atm-breakout",
+    "mode": "paper",
+    "status": "RUNNING",
+    "qtyMultiplier": 1,
+    "maxProfit": 5000,
+    "maxLoss": 2500,
+    "deployedAt": "2026-09-25T10:30:49.912Z",
+    "tradesExecuted": 4,
+    "pnl": 0,
+    "config": {
+      "broker": "paper",
+      "type": "paper",
+      "squareOff": "15:10",
+      "startTime": "09:20",
+      "tradingDays": [
+        "MON",
+        "TUE",
+        "WED",
+        "THU",
+        "FRI"
+      ],
+      "legs": [
+        {
+          "id": "leg_ce_breakout",
+          "action": "BUY",
+          "symbol": "NIFTY 50",
+          "strike": "ATM",
+          "strikeCriteria": "ATM 0",
+          "strikeType": "ATM",
+          "optionType": "CE",
+          "quantity": 65,
+          "slType": "points",
+          "slValue": 0,
+          "targetType": "points",
+          "targetValue": 0,
+          "isActive": true
+        },
+        {
+          "id": "leg_pe_breakout",
+          "action": "BUY",
+          "symbol": "NIFTY 50",
+          "strike": "ATM",
+          "strikeCriteria": "ATM 0",
+          "strikeType": "ATM",
+          "optionType": "PE",
+          "quantity": 65,
+          "slType": "points",
+          "slValue": 0,
+          "targetType": "points",
+          "targetValue": 0,
+          "isActive": true
+        }
+      ],
+      "lotSize": 65,
+      "orderType": "MIS",
+      "underlyingType": "Spot",
+      "trailingSl": "No Trailing",
+      "advancedFeatures": {
+        "referenceCandle": "First 5-min candle (09:15 to 09:20 IST)",
+        "referenceCloseCalculation": "Close of 09:15-09:20 candle = X",
+        "upperBreakoutFormula": "X * 1.0009 (+0.09%)",
+        "lowerBreakoutFormula": "X * 0.9991 (-0.09%)",
+        "atmSelection": "Lock ATM Strike at 09:20 from NIFTY 50 Spot price (multiples of 50)",
+        "contractResolution": "Live Dhan Option Chain (Nearest Weekly Expiry CE + PE)",
+        "entryTrigger": "5-min Candle Close > Upper Level => BUY ATM CE | 5-min Candle Close < Lower Level => BUY ATM PE",
+        "exitTrigger": "CE Active & Close < Lower => Exit CE | PE Active & Close > Upper => Exit PE",
+        "positionConstraint": "Max 1 active position held at a time (Symmetric Reversal)",
+        "reEntryAllowed": true,
+        "forceSquareOffTime": "15:10 IST",
+        "executionSupport": [
+          "PAPER_MODE",
+          "LIVE_DHAN_MODE"
+        ]
+      }
+    },
+    "lastTriggerAt": "2026-09-25T11:06:54.605Z"
+  }
+]

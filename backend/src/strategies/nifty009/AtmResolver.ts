@@ -1,5 +1,7 @@
 import { BrokerRegistry } from '../../brokers/BrokerRegistry';
 import { logger } from '../../utils/logger';
+import { getStrategyConfig } from '../../config/strategyConfig';
+import { calculateOptionPricing } from '../../utils/blackScholes';
 
 export interface LockedAtm {
   atmStrike: number;
@@ -58,23 +60,29 @@ export class AtmResolver {
   /**
    * Resolve and lock ATM strike at 09:20 IST.
    */
-  public async resolveAndLockAtm(spotPrice: number, defaultLotSize: number = 75, userId?: string): Promise<LockedAtm> {
+  public async resolveAndLockAtm(spotPrice: number, defaultLotSize?: number, userId?: string): Promise<LockedAtm> {
     if (this.lockedAtm) {
-      logger.info(`[AtmResolver] ATM already locked at ${this.lockedAtm.atmStrike}. Re-using locked strike.`);
-      return this.lockedAtm;
+      if (Math.abs(this.lockedAtm.spotPriceAtResolution - spotPrice) > 500) {
+        logger.warn(`[AtmResolver] Stale locked ATM (${this.lockedAtm.atmStrike}) deviates >500pts from current spot (${spotPrice}). Re-resolving.`);
+        this.lockedAtm = null;
+      } else {
+        logger.info(`[AtmResolver] ATM already locked at ${this.lockedAtm.atmStrike}. Re-using locked strike.`);
+        return this.lockedAtm;
+      }
     }
 
     const atmStrike = this.getNearestStrike(spotPrice);
     const expiry = this.getNearestWeeklyExpiry();
-    const lotSize = defaultLotSize || 75; // NIFTY standard lot size
+    const lotSize = defaultLotSize || getStrategyConfig().niftyLotSize;
 
     const ceSymbol = `NIFTY ${expiry} ${atmStrike} CE`;
     const peSymbol = `NIFTY ${expiry} ${atmStrike} PE`;
 
     let ceSecurityId = `NIFTY_${atmStrike}_CE`;
     let peSecurityId = `NIFTY_${atmStrike}_PE`;
-    let ceLtp = Math.max(20, Math.round((spotPrice * 0.007) * 10) / 10);
-    let peLtp = Math.max(20, Math.round((spotPrice * 0.007) * 10) / 10);
+    const initialPricing = calculateOptionPricing(spotPrice, atmStrike);
+    let ceLtp = initialPricing.callPrice;
+    let peLtp = initialPricing.putPrice;
 
     try {
       const brokerRegistry = BrokerRegistry.getInstance();

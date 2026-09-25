@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, Paper } from '@mui/material';
 
 interface PageHeaderProps {
   title: string;
@@ -10,14 +10,21 @@ interface PageHeaderProps {
 
 export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, badge, action }) => {
   return (
-    <Box
+    <Paper
+      elevation={0}
       sx={{
         display: 'flex',
         flexDirection: { xs: 'column', sm: 'row' },
         justifyContent: 'space-between',
         alignItems: { xs: 'flex-start', sm: 'center' },
         gap: 1.5,
-        mb: 3
+        mb: 2.5,
+        px: { xs: 2, sm: 2.5 },
+        py: { xs: 1.5, sm: 2 },
+        bgcolor: '#ffffff',
+        border: '1px solid #e2e8f0',
+        borderRadius: 2.5,
+        boxShadow: '0 1px 3px 0 rgba(15,23,42,0.04)'
       }}
     >
       <Box>
@@ -28,7 +35,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, badge, 
               fontWeight: 800,
               color: '#0f172a',
               letterSpacing: '-0.02em',
-              fontSize: { xs: '1.25rem', md: '1.45rem' }
+              fontSize: { xs: '1.1rem', md: '1.3rem' }
             }}
           >
             {title}
@@ -42,6 +49,6 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, badge, 
         )}
       </Box>
       {action && <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>{action}</Box>}
-    </Box>
+    </Paper>
   );
 };

@@ -10,6 +10,7 @@ import {
   BacktestLegRule
 } from './AlgoroomsStyleBacktester';
 import { ChargeConfig, DEFAULT_CHARGES } from './ChargesEngine';
+import { resolveLotSize } from '../config/strategyConfig';
 
 export interface BacktestLegConfig {
   id: string;
@@ -176,7 +177,11 @@ export class OfficialBacktestEngine {
       strategyId: params.strategyId,
       strategyName: strategyConfig.name,
       symbol: params.symbol,
-      period: `${spotCandles[0].date} to ${spotCandles[spotCandles.length - 1].date}`,
+      period: {
+        startDate: spotCandles[0]?.date || fromDate,
+        endDate: spotCandles[spotCandles.length - 1]?.date || toDate,
+        totalDays: report.summary.tradingDays
+      },
       initialCapital: params.capital,
       finalBalance: report.summary.finalBalance,
       totalNetPnl: report.summary.netProfit,
@@ -206,7 +211,18 @@ export class OfficialBacktestEngine {
         minSpotPrice: minSpot,
         maxSpotPrice: maxSpot
       },
+      provenance: {
+        status: 'REAL_DATA',
+        resolution: '5m Bar-by-Bar',
+        contractLotSize: resolveLotSize(params.symbol),
+        executionModel: '5m Candle Breakout Execution + Real Historical Feed'
+      },
       summary: {
+        initialCapital: params.capital,
+        finalBalance: report.summary.finalBalance,
+        netProfit: report.summary.netProfit,
+        grossProfit: report.summary.grossProfit,
+        totalCharges: report.summary.totalCharges,
         tradingDays: report.summary.tradingDays,
         winDays: report.summary.winDays,
         winDaysPercent: report.summary.winDaysPct,
@@ -224,12 +240,25 @@ export class OfficialBacktestEngine {
         winStreak: report.summary.winStreak,
         lossStreak: report.summary.lossStreak,
         profitFactor: report.summary.profitFactor,
-        maxDrawdownFromPeak: report.summary.maxDrawdown
+        maxDrawdownFromPeak: Math.abs(report.summary.maxDrawdown),
+        maxDrawdown: report.summary.maxDrawdown,
+        maxDrawdownPct: report.summary.maxDrawdownPct,
+        winRatePct: report.summary.winRatePct,
+        ceTrades: report.summary.ceTrades,
+        peTrades: report.summary.peTrades,
+        target1Hits: report.summary.target1Hits,
+        target2Hits: report.summary.target2Hits,
+        lowerLevelExits: report.summary.lowerLevelExits,
+        forceExits: report.summary.forceExits,
+        avgWin: report.summary.avgWin,
+        avgLoss: report.summary.avgLoss,
+        maxConsecutiveLosses: report.summary.maxConsecutiveLosses
       },
       equityCurve: report.equityCurve,
       dailyPnlBars,
       daywiseTransactions: report.daywiseTransactions,
       monthlyBreakdown: report.monthlyBreakdown,
+      trades: report.trades,
       createdAt: new Date().toISOString()
     };
 
@@ -244,7 +273,9 @@ export class OfficialBacktestEngine {
     symbol: string,
     days: number = 22,
     capital: number = 100000,
-    userId?: string
+    userId?: string,
+    startDate?: string,
+    endDate?: string
   ): Promise<any> {
     let strategyConfig: BacktestStrategyConfig | null = null;
     try {
@@ -282,16 +313,20 @@ export class OfficialBacktestEngine {
         startTime: '09:16',
         endTime: '15:10',
         legs: [
-          { id: 'leg-1', action: 'SELL', optionType: 'CE', quantity: 15, slValue: 0, targetValue: 0, strike: 'ATM', expiry: 'MONTHLY' },
-          { id: 'leg-2', action: 'SELL', optionType: 'PE', quantity: 15, slValue: 0, targetValue: 0, strike: 'ATM', expiry: 'MONTHLY' }
+          { id: 'leg-1', action: 'BUY', optionType: 'CE', quantity: 195, slValue: 0, targetValue: 0, strike: 'ATM', expiry: 'WEEKLY' },
+          { id: 'leg-2', action: 'BUY', optionType: 'PE', quantity: 195, slValue: 0, targetValue: 0, strike: 'ATM', expiry: 'WEEKLY' }
         ]
       };
     }
 
-    const d = new Date();
-    d.setDate(d.getDate() - Math.round(Number(days) * 1.55));
-    const fromDate = d.toISOString().split('T')[0];
-    const toDate = new Date().toISOString().split('T')[0];
+    let fromDate = startDate;
+    let toDate = endDate;
+    if (!fromDate || !toDate) {
+      const d = new Date();
+      d.setDate(d.getDate() - Math.round(Number(days) * 1.55));
+      fromDate = d.toISOString().split('T')[0];
+      toDate = new Date().toISOString().split('T')[0];
+    }
 
     return this.run(strategyConfig, {
       strategyId,

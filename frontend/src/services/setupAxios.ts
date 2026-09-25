@@ -1,4 +1,5 @@
 import axios from 'axios';
+import authService from './authService';
 
 let isInterceptorConfigured = false;
 
@@ -9,14 +10,12 @@ export function configureAxiosAuthInterceptor(): void {
   // Request Interceptor: Attach Bearer token to all outgoing requests
   axios.interceptors.request.use(
     (config) => {
-      if (typeof window !== 'undefined') {
-        const token = localStorage.getItem('mavrix_auth_token');
-        if (token) {
-          config.headers = config.headers || {};
-          // Only add Authorization if not already explicitly provided
-          if (!config.headers.Authorization) {
-            config.headers.Authorization = `Bearer ${token.trim()}`;
-          }
+      const token = authService.getInMemoryToken();
+      if (token) {
+        config.headers = config.headers || {};
+        // Only add Authorization if not already explicitly provided
+        if (!config.headers.Authorization) {
+          config.headers.Authorization = `Bearer ${token.trim()}`;
         }
       }
       return config;

@@ -76,6 +76,7 @@ import strategyTestRoutes from './routes/strategyTest';
 import strategyRoutes from './routes/strategyRoutes';
 import tradingRoutes from './routes/tradingRoutes';
 import backtestRoutes from './routes/backtestRoutes';
+import configRoutes from './routes/configRoutes';
 
 // API Info Route
 app.get('/api', (_req, res) => {
@@ -91,7 +92,8 @@ app.get('/api', (_req, res) => {
             market: '/api/market',
             strategies: '/api/strategies',
             trading: '/api/trading',
-            backtest: '/api/backtest'
+            backtest: '/api/backtest',
+            config: '/api/config'
         }
     });
 });
@@ -108,6 +110,7 @@ app.use('/api/strategy-test', strategyTestRoutes);
 app.use('/api/strategies', strategyRoutes);
 app.use('/api/trading', tradingRoutes);
 app.use('/api/backtest', backtestRoutes);
+app.use('/api/config', configRoutes);
 
 // Socket.IO event handling
 import { verifyAuthToken } from './middleware/auth';
@@ -197,12 +200,16 @@ const startServer = async () => {
             logger.info(`📊 NIFTY 0.09% Strategy: http://localhost:${PORT}/api/strategies/nifty009/status`);
             logger.info(`====================================================`);
 
-            // Start high-frequency live market tick broadcasting (800ms)
+            // Start high-frequency live market tick broadcasting (250ms sub-second updates)
             const streamer = new MarketStreamer(io);
-            streamer.start(800);
+            streamer.start(250);
         });
 
         // Wire Nifty009Engine events to Socket.IO
+        nifty009Engine.on('strategy_tick', (tick: any) => {
+            io.emit('strategy_tick', tick);
+        });
+
         nifty009Engine.on('status', (status: any) => {
             io.emit('nifty009:status', status);
         });

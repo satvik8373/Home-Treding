@@ -39,6 +39,9 @@ interface BacktestControlsProps {
   onRunBacktest: () => void;
   onExportTrades: (format: 'csv' | 'json') => void;
   onBack?: () => void;
+  customStartDate?: string;
+  customEndDate?: string;
+  onChangeCustomDates?: (start: string, end: string) => void;
 }
 
 export const BacktestControls: React.FC<BacktestControlsProps> = ({
@@ -56,7 +59,10 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
   loading,
   onRunBacktest,
   onExportTrades,
-  onBack
+  onBack,
+  customStartDate,
+  customEndDate,
+  onChangeCustomDates
 }) => {
   const [downloadAnchor, setDownloadAnchor] = useState<null | HTMLElement>(null);
   const [strategyMenuAnchor, setStrategyMenuAnchor] = useState<null | HTMLElement>(null);
@@ -215,6 +221,67 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
           })}
         </Box>
       </Box>
+
+      {/* Custom Date Range Selector (When Custom Range is Selected) */}
+      {selectedRange === 'Custom Range' && (
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            mb: 2,
+            p: 1.5,
+            bgcolor: '#f8fafc',
+            borderRadius: 2,
+            border: '1px solid #e2e8f0',
+            flexWrap: 'wrap'
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+              From Date:
+            </Typography>
+            <input
+              type="date"
+              value={customStartDate || ''}
+              onChange={(e) => onChangeCustomDates && onChangeCustomDates(e.target.value, customEndDate || '')}
+              style={{
+                padding: '5px 10px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                fontSize: '0.82rem',
+                fontFamily: 'inherit',
+                color: '#0f172a',
+                backgroundColor: '#ffffff'
+              }}
+            />
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+              To Date:
+            </Typography>
+            <input
+              type="date"
+              value={customEndDate || ''}
+              onChange={(e) => onChangeCustomDates && onChangeCustomDates(customStartDate || '', e.target.value)}
+              style={{
+                padding: '5px 10px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                fontSize: '0.82rem',
+                fontFamily: 'inherit',
+                color: '#0f172a',
+                backgroundColor: '#ffffff'
+              }}
+            />
+          </Box>
+
+          <Typography sx={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
+            Exact date-by-date tick execution & institutional CSV audit report will export for this period.
+          </Typography>
+        </Box>
+      )}
 
       {/* Selected Tag Chip */}
       <Box sx={{ mb: 2 }}>

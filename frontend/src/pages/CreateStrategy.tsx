@@ -412,7 +412,7 @@ export const CreateStrategy: React.FC = () => {
 
   return (
     <Layout>
-      <Container maxWidth="xl" sx={{ mt: { xs: 2, sm: 3 }, mb: { xs: 8, sm: 4 }, px: { xs: 1.5, sm: 2.5, md: 3 } }}>
+      <Box sx={{ maxWidth: 1080, mx: 'auto' }}>
         {/* Top Navigation & Status Bar */}
         <Box sx={{ mb: 2.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
           <Button
@@ -687,7 +687,7 @@ export const CreateStrategy: React.FC = () => {
                           fontSize: '0.8rem',
                           bgcolor: isSelected ? '#eff6ff' : 'transparent',
                           color: isSelected ? '#2563eb' : '#64748b',
-                          borderColor: isSelected ? '#3b82f6' : '#e2e8f0',
+                          borderColor: isSelected ? '#2563eb' : '#e2e8f0',
                           boxShadow: 'none',
                           '&:hover': { bgcolor: isSelected ? '#dbeafe' : '#f8fafc', boxShadow: 'none' }
                         }}
@@ -1159,8 +1159,8 @@ export const CreateStrategy: React.FC = () => {
                   textTransform: 'none',
                   borderRadius: 2.5,
                   py: 1.4,
-                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-                  '&:hover': { bgcolor: '#1d4ed8', boxShadow: '0 6px 16px rgba(37, 99, 235, 0.35)' }
+                  boxShadow: 'none',
+                  '&:hover': { bgcolor: '#1d4ed8', boxShadow: 'none' }
                 }}
               >
                 {loading ? (
@@ -1174,7 +1174,7 @@ export const CreateStrategy: React.FC = () => {
             </Paper>
           </Box>
         </Box>
-      </Container>
+      </Box>
     </Layout>
   );
 };

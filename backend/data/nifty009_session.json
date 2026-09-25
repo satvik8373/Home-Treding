@@ -1,0 +1,127 @@
+{
+  "isRunning": false,
+  "isPaused": false,
+  "isHalted": false,
+  "mode": "paper",
+  "niftyLtp": 23140.5,
+  "ceLtp": 167.46,
+  "peLtp": 152.24,
+  "sessionPnl": 0,
+  "events": [
+    {
+      "timestamp": "2026-09-25T12:02:36.589Z",
+      "type": "STRATEGY_STOPPED",
+      "data": {
+        "reason": "Manual stop via API",
+        "sessionPnl": 0
+      }
+    },
+    {
+      "timestamp": "2026-09-25T12:02:31.140Z",
+      "type": "LEVELS_CALCULATED",
+      "data": {
+        "leg": "PE",
+        "reference": 152.24,
+        "upper": 152.38,
+        "lower": 152.1
+      }
+    },
+    {
+      "timestamp": "2026-09-25T12:02:31.139Z",
+      "type": "LEVELS_CALCULATED",
+      "data": {
+        "leg": "CE",
+        "reference": 167.46,
+        "upper": 167.61,
+        "lower": 167.31
+      }
+    },
+    {
+      "timestamp": "2026-09-25T12:02:31.139Z",
+      "type": "REFERENCE_LOCKED",
+      "data": {
+        "strike": 23150,
+        "expiry": "01-OCT-2026",
+        "ce": "NIFTY 01-OCT-2026 23150 CE",
+        "pe": "NIFTY 01-OCT-2026 23150 PE"
+      }
+    },
+    {
+      "timestamp": "2026-09-25T12:02:31.034Z",
+      "type": "STRATEGY_STARTED",
+      "data": {
+        "mode": "PAPER",
+        "config": {
+          "lotMultiplier": 2,
+          "squareOffTime": "15:10",
+          "maxDailyLoss": 10000,
+          "enableReEntry": true
+        }
+      }
+    }
+  ],
+  "lastUpdated": "2026-09-25T12:02:36.589Z",
+  "strategyName": "NIFTY ATM CE/PE Independent Breakout",
+  "status": "ACTIVE_TRADING",
+  "sessionDate": "2026-09-25",
+  "tradingWindow": "09:20–15:10",
+  "lockedAtm": {
+    "atmStrike": 23150,
+    "expiry": "01-OCT-2026",
+    "ceSecurityId": "NIFTY_23150_CE",
+    "ceSymbol": "NIFTY 01-OCT-2026 23150 CE",
+    "ceLtp": 167.46,
+    "peSecurityId": "NIFTY_23150_PE",
+    "peSymbol": "NIFTY 01-OCT-2026 23150 PE",
+    "peLtp": 152.24,
+    "lotSize": 65,
+    "spotPriceAtResolution": 23140.5,
+    "resolvedAt": "2026-09-25T12:02:31.138Z"
+  },
+  "ce": {
+    "symbol": "NIFTY 01-OCT-2026 23150 CE",
+    "strike": "23150 CE",
+    "state": "FLAT",
+    "referenceClose": 167.46,
+    "upperLevel": 167.61,
+    "lowerLevel": 167.31,
+    "currentLtp": 167.46,
+    "position": null,
+    "entryCount": 0,
+    "exitCount": 0,
+    "lastCandleTime": "",
+    "lastSignal": null
+  },
+  "pe": {
+    "symbol": "NIFTY 01-OCT-2026 23150 PE",
+    "strike": "23150 PE",
+    "state": "FLAT",
+    "referenceClose": 152.24,
+    "upperLevel": 152.38,
+    "lowerLevel": 152.1,
+    "currentLtp": 152.24,
+    "position": null,
+    "entryCount": 0,
+    "exitCount": 0,
+    "lastCandleTime": "",
+    "lastSignal": null
+  },
+  "combined": {
+    "activePositionsCount": 0,
+    "totalUnrealizedPnl": 0,
+    "totalTrades": 0,
+    "ceTrades": 0,
+    "peTrades": 0,
+    "lastSignal": null,
+    "totalPnl": 0,
+    "timeRemaining": "Session Closed",
+    "lastExecutionTime": "2026-09-25"
+  },
+  "firstCandleClose": 23140.5,
+  "upperLevel": 167.61,
+  "lowerLevel": 152.1,
+  "spotUpperLevel": 23161.33,
+  "spotLowerLevel": 23119.67,
+  "state": "ACTIVE_TRADING",
+  "activePosition": null
+}

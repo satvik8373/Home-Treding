@@ -1,0 +1,1149 @@
+{
+  "schemaVersion": "1.0.0",
+  "symbols": {
+    "App": {
+      "file": "src/App.tsx",
+      "line": 21,
+      "kind": "component"
+    },
+    "reportWebVitals": {
+      "file": "src/reportWebVitals.ts",
+      "line": 3,
+      "kind": "function"
+    },
+    "AddBrokerForm": {
+      "file": "src/components/AddBrokerForm.tsx",
+      "line": 44,
+      "kind": "component"
+    },
+    "handleInputChange": {
+      "file": "src/components/AddBrokerForm.tsx",
+      "line": 53,
+      "kind": "function"
+    },
+    "handleSubmit": {
+      "file": "src/pages/Register.tsx",
+      "line": 59,
+      "kind": "function"
+    },
+    "handleClose": {
+      "file": "src/components/brokers/ConnectDhanModal.tsx",
+      "line": 165,
+      "kind": "function"
+    },
+    "BrokerageForm": {
+      "file": "src/components/BrokerageForm.tsx",
+      "line": 26,
+      "kind": "component"
+    },
+    "handleChange": {
+      "file": "src/pages/Register.tsx",
+      "line": 52,
+      "kind": "function"
+    },
+    "BrokerCard": {
+      "file": "src/components/BrokerCard.tsx",
+      "line": 50,
+      "kind": "component"
+    },
+    "updateBrokerToggle": {
+      "file": "src/components/BrokerCard.tsx",
+      "line": 55,
+      "kind": "function"
+    },
+    "handleToggleTerminal": {
+      "file": "src/pages/Dashboard.tsx",
+      "line": 223,
+      "kind": "function"
+    },
+    "handleMessage": {
+      "file": "src/components/brokers/ConnectDhanModal.tsx",
+      "line": 65,
+      "kind": "function"
+    },
+    "handleToggleTradingEngine": {
+      "file": "src/pages/Brokers.tsx",
+      "line": 156,
+      "kind": "function"
+    },
+    "handleReconnect": {
+      "file": "src/components/BrokerCard.tsx",
+      "line": 249,
+      "kind": "function"
+    },
+    "handleDelete": {
+      "file": "src/components/BrokerCard.tsx",
+      "line": 270,
+      "kind": "function"
+    },
+    "DhanTerminal": {
+      "file": "src/components/DhanTerminal.tsx",
+      "line": 59,
+      "kind": "component"
+    },
+    "fetchTerminalData": {
+      "file": "src/components/DhanTerminal.tsx",
+      "line": 89,
+      "kind": "function"
+    },
+    "LiveIndicesSidebar": {
+      "file": "src/components/Layout.tsx",
+      "line": 65,
+      "kind": "component"
+    },
+    "applyFeed": {
+      "file": "src/components/Layout.tsx",
+      "line": 73,
+      "kind": "function"
+    },
+    "fetchRest": {
+      "file": "src/components/Layout.tsx",
+      "line": 93,
+      "kind": "function"
+    },
+    "Layout": {
+      "file": "src/components/Layout.tsx",
+      "line": 187,
+      "kind": "component"
+    },
+    "handleDrawerToggle": {
+      "file": "src/components/Layout.tsx",
+      "line": 196,
+      "kind": "function"
+    },
+    "handleNavigation": {
+      "file": "src/components/Layout.tsx",
+      "line": 198,
+      "kind": "function"
+    },
+    "handleMenuOpen": {
+      "file": "src/components/Layout.tsx",
+      "line": 203,
+      "kind": "function"
+    },
+    "handleMenuClose": {
+      "file": "src/components/Layout.tsx",
+      "line": 204,
+      "kind": "function"
+    },
+    "handleLogout": {
+      "file": "src/components/Layout.tsx",
+      "line": 206,
+      "kind": "function"
+    },
+    "LiveMarketTicker": {
+      "file": "src/components/LiveMarketTicker.tsx",
+      "line": 12,
+      "kind": "component"
+    },
+    "MarketDashboard": {
+      "file": "src/components/MarketDashboard.tsx",
+      "line": 4,
+      "kind": "component"
+    },
+    "MarketData": {
+      "file": "src/components/MarketData.tsx",
+      "line": 16,
+      "kind": "component"
+    },
+    "fetchData": {
+      "file": "src/components/MarketData.tsx",
+      "line": 28,
+      "kind": "function"
+    },
+    "renderCard": {
+      "file": "src/components/MarketData.tsx",
+      "line": 70,
+      "kind": "function"
+    },
+    "MarketDataDisplay": {
+      "file": "src/components/MarketDataDisplay.tsx",
+      "line": 11,
+      "kind": "component"
+    },
+    "NiftyIndependentBreakoutMonitor": {
+      "file": "src/components/NiftyIndependentBreakoutMonitor.tsx",
+      "line": 124,
+      "kind": "component"
+    },
+    "formatPrice": {
+      "file": "src/pages/Reports.tsx",
+      "line": 130,
+      "kind": "function"
+    },
+    "OrderManagement": {
+      "file": "src/components/OrderManagement.tsx",
+      "line": 49,
+      "kind": "component"
+    },
+    "handlePlaceOrder": {
+      "file": "src/components/OrderManagement.tsx",
+      "line": 109,
+      "kind": "function"
+    },
+    "handleCancelOrder": {
+      "file": "src/components/OrderManagement.tsx",
+      "line": 142,
+      "kind": "function"
+    },
+    "PortfolioDashboard": {
+      "file": "src/components/PortfolioDashboard.tsx",
+      "line": 29,
+      "kind": "component"
+    },
+    "handleSquareOff": {
+      "file": "src/pages/Brokers.tsx",
+      "line": 350,
+      "kind": "function"
+    },
+    "RealTimeMarketData": {
+      "file": "src/components/RealTimeMarketData.tsx",
+      "line": 72,
+      "kind": "component"
+    },
+    "fetchMarketFeed": {
+      "file": "src/components/RealTimeMarketData.tsx",
+      "line": 94,
+      "kind": "function"
+    },
+    "openMarketDepth": {
+      "file": "src/components/RealTimeMarketData.tsx",
+      "line": 271,
+      "kind": "function"
+    },
+    "StrategyConfigPanel": {
+      "file": "src/components/StrategyConfigPanel.tsx",
+      "line": 81,
+      "kind": "component"
+    },
+    "handleSave": {
+      "file": "src/components/StrategyConfigPanel.tsx",
+      "line": 112,
+      "kind": "function"
+    },
+    "handleReset": {
+      "file": "src/components/StrategyConfigPanel.tsx",
+      "line": 123,
+      "kind": "function"
+    },
+    "isDefaultValue": {
+      "file": "src/components/StrategyConfigPanel.tsx",
+      "line": 132,
+      "kind": "function"
+    },
+    "renderField": {
+      "file": "src/components/StrategyConfigPanel.tsx",
+      "line": 136,
+      "kind": "function"
+    },
+    "TradingViewLiveChart": {
+      "file": "src/components/TradingViewLiveChart.tsx",
+      "line": 33,
+      "kind": "component"
+    },
+    "updateTime": {
+      "file": "src/components/TradingViewLiveChart.tsx",
+      "line": 81,
+      "kind": "function"
+    },
+    "handleTick": {
+      "file": "src/components/TradingViewLiveChart.tsx",
+      "line": 381,
+      "kind": "function"
+    },
+    "stripTrailingSlash": {
+      "file": "src/config/api.ts",
+      "line": 2,
+      "kind": "function"
+    },
+    "getApiUrl": {
+      "file": "src/config/api.ts",
+      "line": 9,
+      "kind": "function"
+    },
+    "getWsUrl": {
+      "file": "src/config/api.ts",
+      "line": 25,
+      "kind": "function"
+    },
+    "isServerlessEnvironment": {
+      "file": "src/config/api.ts",
+      "line": 42,
+      "kind": "function"
+    },
+    "TradingModeProvider": {
+      "file": "src/context/TradingModeContext.tsx",
+      "line": 20,
+      "kind": "component"
+    },
+    "setMode": {
+      "file": "src/context/TradingModeContext.tsx",
+      "line": 61,
+      "kind": "function"
+    },
+    "toggleMode": {
+      "file": "src/context/TradingModeContext.tsx",
+      "line": 93,
+      "kind": "function"
+    },
+    "useTradingMode": {
+      "file": "src/context/TradingModeContext.tsx",
+      "line": 117,
+      "kind": "hook"
+    },
+    "useLiveMarketData": {
+      "file": "src/hooks/useLiveMarketData.ts",
+      "line": 36,
+      "kind": "hook"
+    },
+    "useWatchlist": {
+      "file": "src/hooks/useLiveMarketData.ts",
+      "line": 152,
+      "kind": "hook"
+    },
+    "useSymbol": {
+      "file": "src/hooks/useLiveMarketData.ts",
+      "line": 159,
+      "kind": "hook"
+    },
+    "useStrategyConfig": {
+      "file": "src/hooks/useStrategyConfig.ts",
+      "line": 52,
+      "kind": "hook"
+    },
+    "clearMessages": {
+      "file": "src/hooks/useStrategyConfig.ts",
+      "line": 60,
+      "kind": "function"
+    },
+    "BacktestPage": {
+      "file": "src/pages/BacktestPage.tsx",
+      "line": 23,
+      "kind": "component"
+    },
+    "fetchStrategies": {
+      "file": "src/pages/BacktestPage.tsx",
+      "line": 57,
+      "kind": "function"
+    },
+    "runBacktest": {
+      "file": "src/pages/BacktestPage.tsx",
+      "line": 90,
+      "kind": "function"
+    },
+    "handleExportTrades": {
+      "file": "src/pages/BacktestPage.tsx",
+      "line": 139,
+      "kind": "function"
+    },
+    "Brokers": {
+      "file": "src/pages/Brokers.tsx",
+      "line": 67,
+      "kind": "component"
+    },
+    "handleStorage": {
+      "file": "src/pages/Brokers.tsx",
+      "line": 189,
+      "kind": "function"
+    },
+    "handleCopyRedirect": {
+      "file": "src/components/brokers/ConnectDhanModal.tsx",
+      "line": 75,
+      "kind": "function"
+    },
+    "handleDirectTokenSubmit": {
+      "file": "src/pages/Brokers.tsx",
+      "line": 256,
+      "kind": "function"
+    },
+    "handleTestConnection": {
+      "file": "src/pages/Brokers.tsx",
+      "line": 290,
+      "kind": "function"
+    },
+    "handleDisconnect": {
+      "file": "src/components/brokers/DhanConnectionCard.tsx",
+      "line": 70,
+      "kind": "function"
+    },
+    "handleDeleteBroker": {
+      "file": "src/pages/Brokers.tsx",
+      "line": 370,
+      "kind": "function"
+    },
+    "CreateStrategy": {
+      "file": "src/pages/CreateStrategy.tsx",
+      "line": 63,
+      "kind": "component"
+    },
+    "fetchToEdit": {
+      "file": "src/pages/CreateStrategy.tsx",
+      "line": 148,
+      "kind": "function"
+    },
+    "handleInstrumentChange": {
+      "file": "src/pages/CreateStrategy.tsx",
+      "line": 266,
+      "kind": "function"
+    },
+    "handleDayToggle": {
+      "file": "src/pages/CreateStrategy.tsx",
+      "line": 282,
+      "kind": "function"
+    },
+    "handleAddLeg": {
+      "file": "src/pages/CreateStrategy.tsx",
+      "line": 288,
+      "kind": "function"
+    },
+    "handleCopyLeg": {
+      "file": "src/pages/CreateStrategy.tsx",
+      "line": 308,
+      "kind": "function"
+    },
+    "handleRemoveLeg": {
+      "file": "src/pages/CreateStrategy.tsx",
+      "line": 320,
+      "kind": "function"
+    },
+    "handleUpdateLeg": {
+      "file": "src/pages/CreateStrategy.tsx",
+      "line": 329,
+      "kind": "function"
+    },
+    "Dashboard": {
+      "file": "src/pages/Dashboard.tsx",
+      "line": 63,
+      "kind": "component"
+    },
+    "handleRefresh": {
+      "file": "src/pages/Dashboard.tsx",
+      "line": 118,
+      "kind": "function"
+    },
+    "handleToggleEngine": {
+      "file": "src/pages/Dashboard.tsx",
+      "line": 230,
+      "kind": "function"
+    },
+    "DhanCallback": {
+      "file": "src/pages/DhanCallback.tsx",
+      "line": 16,
+      "kind": "component"
+    },
+    "handleCallback": {
+      "file": "src/pages/DhanCallback.tsx",
+      "line": 30,
+      "kind": "function"
+    },
+    "LiveChartPage": {
+      "file": "src/pages/LiveChartPage.tsx",
+      "line": 29,
+      "kind": "component"
+    },
+    "fetchStatus": {
+      "file": "src/components/common/EmergencyStopButton.tsx",
+      "line": 26,
+      "kind": "function"
+    },
+    "GoogleIcon": {
+      "file": "src/pages/Register.tsx",
+      "line": 27,
+      "kind": "component"
+    },
+    "Login": {
+      "file": "src/pages/Login.tsx",
+      "line": 35,
+      "kind": "component"
+    },
+    "handleGoogleSignIn": {
+      "file": "src/pages/Register.tsx",
+      "line": 95,
+      "kind": "function"
+    },
+    "OptionChainPage": {
+      "file": "src/pages/OptionChain.tsx",
+      "line": 69,
+      "kind": "component"
+    },
+    "checkConnection": {
+      "file": "src/pages/OptionChain.tsx",
+      "line": 103,
+      "kind": "function"
+    },
+    "fetchExpiries": {
+      "file": "src/pages/OptionChain.tsx",
+      "line": 120,
+      "kind": "function"
+    },
+    "openTradeModal": {
+      "file": "src/pages/OptionChain.tsx",
+      "line": 189,
+      "kind": "function"
+    },
+    "executeOptionOrder": {
+      "file": "src/pages/OptionChain.tsx",
+      "line": 205,
+      "kind": "function"
+    },
+    "Portfolio": {
+      "file": "src/pages/Portfolio.tsx",
+      "line": 6,
+      "kind": "component"
+    },
+    "Register": {
+      "file": "src/pages/Register.tsx",
+      "line": 37,
+      "kind": "component"
+    },
+    "Reports": {
+      "file": "src/pages/Reports.tsx",
+      "line": 67,
+      "kind": "component"
+    },
+    "handleExportCSV": {
+      "file": "src/pages/Reports.tsx",
+      "line": 138,
+      "kind": "function"
+    },
+    "Strategies": {
+      "file": "src/pages/Strategies.tsx",
+      "line": 109,
+      "kind": "component"
+    },
+    "handleOpenDeployModal": {
+      "file": "src/pages/Strategies.tsx",
+      "line": 195,
+      "kind": "function"
+    },
+    "handleConfirmDeploy": {
+      "file": "src/pages/Strategies.tsx",
+      "line": 208,
+      "kind": "function"
+    },
+    "handleToggleTradeEngine": {
+      "file": "src/pages/Strategies.tsx",
+      "line": 244,
+      "kind": "function"
+    },
+    "handleToggleDeploymentMode": {
+      "file": "src/pages/Strategies.tsx",
+      "line": 262,
+      "kind": "function"
+    },
+    "handleToggleDeploymentStatus": {
+      "file": "src/pages/Strategies.tsx",
+      "line": 275,
+      "kind": "function"
+    },
+    "handleSquareOffDeployment": {
+      "file": "src/pages/Strategies.tsx",
+      "line": 288,
+      "kind": "function"
+    },
+    "handleDeleteDeployment": {
+      "file": "src/pages/Strategies.tsx",
+      "line": 304,
+      "kind": "function"
+    },
+    "toggleExpandDeployment": {
+      "file": "src/pages/Strategies.tsx",
+      "line": 320,
+      "kind": "function"
+    },
+    "handleDuplicateStrategy": {
+      "file": "src/pages/Strategies.tsx",
+      "line": 328,
+      "kind": "function"
+    },
+    "handleDeleteStrategy": {
+      "file": "src/pages/Strategies.tsx",
+      "line": 345,
+      "kind": "function"
+    },
+    "Subscription": {
+      "file": "src/pages/Subscription.tsx",
+      "line": 21,
+      "kind": "component"
+    },
+    "TestLiveTrading": {
+      "file": "src/pages/TestLiveTrading.tsx",
+      "line": 36,
+      "kind": "component"
+    },
+    "updateTest": {
+      "file": "src/pages/TestLiveTrading.tsx",
+      "line": 48,
+      "kind": "function"
+    },
+    "testInstrumentStorage": {
+      "file": "src/pages/TestLiveTrading.tsx",
+      "line": 55,
+      "kind": "function"
+    },
+    "testLiveMarketData": {
+      "file": "src/pages/TestLiveTrading.tsx",
+      "line": 87,
+      "kind": "function"
+    },
+    "testTemplateData": {
+      "file": "src/pages/TestLiveTrading.tsx",
+      "line": 113,
+      "kind": "function"
+    },
+    "testDhanConnection": {
+      "file": "src/pages/TestLiveTrading.tsx",
+      "line": 136,
+      "kind": "function"
+    },
+    "testOrderPlacement": {
+      "file": "src/pages/TestLiveTrading.tsx",
+      "line": 168,
+      "kind": "function"
+    },
+    "testWebSocket": {
+      "file": "src/pages/TestLiveTrading.tsx",
+      "line": 185,
+      "kind": "function"
+    },
+    "runAllTests": {
+      "file": "src/pages/TestLiveTrading.tsx",
+      "line": 198,
+      "kind": "function"
+    },
+    "getStatusIcon": {
+      "file": "src/pages/TestLiveTrading.tsx",
+      "line": 214,
+      "kind": "function"
+    },
+    "getStatusColor": {
+      "file": "src/pages/TestLiveTrading.tsx",
+      "line": 227,
+      "kind": "function"
+    },
+    "TradingDashboard": {
+      "file": "src/pages/TradingDashboard.tsx",
+      "line": 27,
+      "kind": "component"
+    },
+    "loadDashboardData": {
+      "file": "src/pages/TradingDashboard.tsx",
+      "line": 41,
+      "kind": "function"
+    },
+    "handleEngineToggle": {
+      "file": "src/pages/TradingDashboard.tsx",
+      "line": 59,
+      "kind": "function"
+    },
+    "ApiService": {
+      "file": "src/services/apiService.ts",
+      "line": 7,
+      "kind": "service"
+    },
+    "AuthService": {
+      "file": "src/services/authService.ts",
+      "line": 47,
+      "kind": "service"
+    },
+    "getBaseUrl": {
+      "file": "src/services/brokerApi.ts",
+      "line": 4,
+      "kind": "function"
+    },
+    "createFreshPortfolio": {
+      "file": "src/services/brokerApi.ts",
+      "line": 93,
+      "kind": "function"
+    },
+    "loadCachedBrokers": {
+      "file": "src/services/brokerApi.ts",
+      "line": 109,
+      "kind": "function"
+    },
+    "DhanAPIService": {
+      "file": "src/services/dhanAPI.ts",
+      "line": 30,
+      "kind": "service"
+    },
+    "DhanService": {
+      "file": "src/services/dhanService.ts",
+      "line": 37,
+      "kind": "service"
+    },
+    "FirestoreService": {
+      "file": "src/services/firestoreService.ts",
+      "line": 60,
+      "kind": "service"
+    },
+    "LiveMarketService": {
+      "file": "src/services/liveMarketService.ts",
+      "line": 40,
+      "kind": "service"
+    },
+    "MarketDataService": {
+      "file": "src/services/marketDataService.ts",
+      "line": 74,
+      "kind": "service"
+    },
+    "MarketDataStreamService": {
+      "file": "src/services/marketDataStreamService.ts",
+      "line": 26,
+      "kind": "service"
+    },
+    "configureAxiosAuthInterceptor": {
+      "file": "src/services/setupAxios.ts",
+      "line": 5,
+      "kind": "function"
+    },
+    "BacktestControls": {
+      "file": "src/components/backtest/BacktestControls.tsx",
+      "line": 47,
+      "kind": "component"
+    },
+    "InteractiveEquitySvgChart": {
+      "file": "src/components/backtest/BacktestControls.tsx",
+      "line": 462,
+      "kind": "component"
+    },
+    "BacktestSummaryCards": {
+      "file": "src/components/backtest/BacktestSummaryCards.tsx",
+      "line": 30,
+      "kind": "component"
+    },
+    "formatK": {
+      "file": "src/components/backtest/BacktestSummaryCards.tsx",
+      "line": 31,
+      "kind": "function"
+    },
+    "DaywiseBreakdownHeatmap": {
+      "file": "src/components/backtest/DaywiseBreakdownHeatmap.tsx",
+      "line": 34,
+      "kind": "component"
+    },
+    "renderMonthCalendar": {
+      "file": "src/components/backtest/DaywiseBreakdownHeatmap.tsx",
+      "line": 41,
+      "kind": "function"
+    },
+    "MaxProfitLossChart": {
+      "file": "src/components/backtest/MaxProfitLossChart.tsx",
+      "line": 24,
+      "kind": "component"
+    },
+    "InteractiveDailyPnlSvgChart": {
+      "file": "src/components/backtest/MaxProfitLossChart.tsx",
+      "line": 125,
+      "kind": "component"
+    },
+    "TransactionDetailsAccordion": {
+      "file": "src/components/backtest/TransactionDetailsAccordion.tsx",
+      "line": 53,
+      "kind": "component"
+    },
+    "formatDisplayDate": {
+      "file": "src/components/backtest/TransactionDetailsAccordion.tsx",
+      "line": 61,
+      "kind": "function"
+    },
+    "handleAccordionChange": {
+      "file": "src/components/backtest/TransactionDetailsAccordion.tsx",
+      "line": 70,
+      "kind": "function"
+    },
+    "ConnectDhanModal": {
+      "file": "src/components/brokers/ConnectDhanModal.tsx",
+      "line": 39,
+      "kind": "component"
+    },
+    "handleSubmitOAuth": {
+      "file": "src/components/brokers/ConnectDhanModal.tsx",
+      "line": 82,
+      "kind": "function"
+    },
+    "handleSubmitDirectToken": {
+      "file": "src/components/brokers/ConnectDhanModal.tsx",
+      "line": 136,
+      "kind": "function"
+    },
+    "DhanConnectionCard": {
+      "file": "src/components/brokers/DhanConnectionCard.tsx",
+      "line": 34,
+      "kind": "component"
+    },
+    "EmptyState": {
+      "file": "src/components/ui/EmptyState.tsx",
+      "line": 18,
+      "kind": "component"
+    },
+    "PageHeader": {
+      "file": "src/components/ui/PageHeader.tsx",
+      "line": 11,
+      "kind": "component"
+    },
+    "SectionCard": {
+      "file": "src/components/ui/SectionCard.tsx",
+      "line": 14,
+      "kind": "component"
+    },
+    "StatCard": {
+      "file": "src/components/ui/StatCard.tsx",
+      "line": 15,
+      "kind": "component"
+    },
+    "StatusBadge": {
+      "file": "src/components/ui/StatusBadge.tsx",
+      "line": 40,
+      "kind": "component"
+    },
+    "EmergencyStopButton": {
+      "file": "src/components/common/EmergencyStopButton.tsx",
+      "line": 15,
+      "kind": "component"
+    },
+    "handleToggle": {
+      "file": "src/components/common/EmergencyStopButton.tsx",
+      "line": 38,
+      "kind": "function"
+    },
+    "GlobalTradingModeSwitch": {
+      "file": "src/components/common/GlobalTradingModeSwitch.tsx",
+      "line": 22,
+      "kind": "component"
+    },
+    "handleSelectMode": {
+      "file": "src/components/common/GlobalTradingModeSwitch.tsx",
+      "line": 29,
+      "kind": "function"
+    },
+    "handleConfirmLive": {
+      "file": "src/components/common/GlobalTradingModeSwitch.tsx",
+      "line": 43,
+      "kind": "function"
+    },
+    "ModeBadge": {
+      "file": "src/components/common/ModeBadge.tsx",
+      "line": 9,
+      "kind": "component"
+    }
+  },
+  "routes": {},
+  "nativeModules": {},
+  "issueLookup": {
+    "REACT-SEQUENTIAL-AWAITS": {
+      "index": 9,
+      "priority": "P1",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    "REACT-UNMEMOIZED-CONTEXT-VALUE": {
+      "index": 10,
+      "priority": "P1",
+      "file": "src/context/TradingModeContext.tsx"
+    },
+    "REACT-LAZY-STATE-INIT": {
+      "index": 11,
+      "priority": "P2",
+      "file": "src/hooks/useLiveMarketData.ts"
+    },
+    "REACT-JS-SET-MAP-LOOKUPS": {
+      "index": 14,
+      "priority": "P2",
+      "file": "src/pages/CreateStrategy.tsx"
+    },
+    "REACT-JS-FLATMAP-FILTER": {
+      "index": 15,
+      "priority": "P2",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    "RNDOCTOR-LAYER-VIOLATION": {
+      "index": 31,
+      "priority": "P1",
+      "file": "src/App.tsx"
+    },
+    "LAYER-VIOLATION-SRC_APP_TSX": {
+      "index": 31,
+      "priority": "P1",
+      "file": "src/App.tsx"
+    },
+    "RNDOCTOR-DEADCODE-FILE": {
+      "index": 56,
+      "priority": "P1",
+      "file": "src/components/common/ModeBadge.tsx"
+    },
+    "DEADCODE-FILE-BUILD_JS": {
+      "index": 32,
+      "priority": "P1",
+      "file": "build.js"
+    },
+    "DEADCODE-FILE-SRC_REACT_APP_ENV_D_TS": {
+      "index": 33,
+      "priority": "P1",
+      "file": "src/react-app-env.d.ts"
+    },
+    "DEADCODE-FILE-SRC_SETUPTESTS_TS": {
+      "index": 34,
+      "priority": "P1",
+      "file": "src/setupTests.ts"
+    },
+    "DEADCODE-FILE-SRC_COMPONENTS_ADDBROKERFORM_TSX": {
+      "index": 35,
+      "priority": "P1",
+      "file": "src/components/AddBrokerForm.tsx"
+    },
+    "DEADCODE-FILE-SRC_COMPONENTS_BROKERAGEFORM_TSX": {
+      "index": 36,
+      "priority": "P1",
+      "file": "src/components/BrokerageForm.tsx"
+    },
+    "DEADCODE-FILE-SRC_COMPONENTS_BROKERCARD_TSX": {
+      "index": 37,
+      "priority": "P1",
+      "file": "src/components/BrokerCard.tsx"
+    },
+    "DEADCODE-FILE-SRC_COMPONENTS_DHANTERMINAL_TSX": {
+      "index": 38,
+      "priority": "P1",
+      "file": "src/components/DhanTerminal.tsx"
+    },
+    "DEADCODE-FILE-SRC_COMPONENTS_LIVEMARKETTICKER_TSX": {
+      "index": 39,
+      "priority": "P1",
+      "file": "src/components/LiveMarketTicker.tsx"
+    },
+    "DEADCODE-FILE-SRC_COMPONENTS_MARKETDASHBOARD_TSX": {
+      "index": 40,
+      "priority": "P1",
+      "file": "src/components/MarketDashboard.tsx"
+    },
+    "DEADCODE-FILE-SRC_COMPONENTS_MARKETDATA_TSX": {
+      "index": 41,
+      "priority": "P1",
+      "file": "src/components/MarketData.tsx"
+    },
+    "DEADCODE-FILE-SRC_COMPONENTS_MARKETDATADISPLAY_TSX": {
+      "index": 42,
+      "priority": "P1",
+      "file": "src/components/MarketDataDisplay.tsx"
+    },
+    "DEADCODE-FILE-SRC_COMPONENTS_STRATEGYCONFIGPANEL_TSX": {
+      "index": 43,
+      "priority": "P1",
+      "file": "src/components/StrategyConfigPanel.tsx"
+    },
+    "DEADCODE-FILE-SRC_COMPONENTS_TRADINGVIEWCHART_TSX": {
+      "index": 44,
+      "priority": "P1",
+      "file": "src/components/TradingViewChart.tsx"
+    },
+    "DEADCODE-FILE-SRC_HOOKS_USELIVEMARKETDATA_TS": {
+      "index": 45,
+      "priority": "P1",
+      "file": "src/hooks/useLiveMarketData.ts"
+    },
+    "DEADCODE-FILE-SRC_HOOKS_USESTRATEGYCONFIG_TS": {
+      "index": 46,
+      "priority": "P1",
+      "file": "src/hooks/useStrategyConfig.ts"
+    },
+    "DEADCODE-FILE-SRC_SERVICES_DHANAPI_TS": {
+      "index": 47,
+      "priority": "P1",
+      "file": "src/services/dhanAPI.ts"
+    },
+    "DEADCODE-FILE-SRC_SERVICES_DHANSERVICE_TS": {
+      "index": 48,
+      "priority": "P1",
+      "file": "src/services/dhanService.ts"
+    },
+    "DEADCODE-FILE-SRC_SERVICES_LIVEMARKETSERVICE_TS": {
+      "index": 49,
+      "priority": "P1",
+      "file": "src/services/liveMarketService.ts"
+    },
+    "DEADCODE-FILE-SRC_SERVICES_MARKETDATASERVICE_TS": {
+      "index": 50,
+      "priority": "P1",
+      "file": "src/services/marketDataService.ts"
+    },
+    "DEADCODE-FILE-SRC_SERVICES_MARKETDATASTREAMSERVICE_TS": {
+      "index": 51,
+      "priority": "P1",
+      "file": "src/services/marketDataStreamService.ts"
+    },
+    "DEADCODE-FILE-SRC_COMPONENTS_BROKERS_CONNECTDHANMODAL_TSX": {
+      "index": 52,
+      "priority": "P1",
+      "file": "src/components/brokers/ConnectDhanModal.tsx"
+    },
+    "DEADCODE-FILE-SRC_COMPONENTS_BROKERS_DHANCONNECTIONCARD_TSX": {
+      "index": 53,
+      "priority": "P1",
+      "file": "src/components/brokers/DhanConnectionCard.tsx"
+    },
+    "DEADCODE-FILE-SRC_COMPONENTS_COMMON_EMERGENCYSTOPBUTTON_TSX": {
+      "index": 54,
+      "priority": "P1",
+      "file": "src/components/common/EmergencyStopButton.tsx"
+    },
+    "DEADCODE-FILE-SRC_COMPONENTS_COMMON_GLOBALTRADINGMODESWITCH_TSX": {
+      "index": 55,
+      "priority": "P1",
+      "file": "src/components/common/GlobalTradingModeSwitch.tsx"
+    },
+    "DEADCODE-FILE-SRC_COMPONENTS_COMMON_MODEBADGE_TSX": {
+      "index": 56,
+      "priority": "P1",
+      "file": "src/components/common/ModeBadge.tsx"
+    },
+    "RNDOCTOR-SIMPLIFY-ARRAY-PIPELINE": {
+      "index": 57,
+      "priority": "P2",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    "SIMPLIFY-MAP-FILTER-SRC_PAGES_TESTLIVETRADING_TSX-L76": {
+      "index": 57,
+      "priority": "P2",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    "RNDOCTOR-DUP-EXACT": {
+      "index": 69,
+      "priority": "P2",
+      "file": "src/pages/Login.tsx"
+    },
+    "DUP-EXACT-HANDLESUBMIT": {
+      "index": 58,
+      "priority": "P2",
+      "file": "src/components/AddBrokerForm.tsx"
+    },
+    "DUP-EXACT-HANDLECLOSE": {
+      "index": 59,
+      "priority": "P2",
+      "file": "src/components/AddBrokerForm.tsx"
+    },
+    "DUP-EXACT-HANDLECHANGE": {
+      "index": 60,
+      "priority": "P2",
+      "file": "src/components/BrokerageForm.tsx"
+    },
+    "DUP-EXACT-HANDLETOGGLETERMINAL": {
+      "index": 61,
+      "priority": "P2",
+      "file": "src/components/BrokerCard.tsx"
+    },
+    "DUP-EXACT-HANDLEMESSAGE": {
+      "index": 62,
+      "priority": "P2",
+      "file": "src/components/BrokerCard.tsx"
+    },
+    "DUP-EXACT-HANDLETOGGLETRADINGENGINE": {
+      "index": 63,
+      "priority": "P2",
+      "file": "src/components/BrokerCard.tsx"
+    },
+    "DUP-EXACT-FORMATPRICE": {
+      "index": 64,
+      "priority": "P2",
+      "file": "src/components/NiftyIndependentBreakoutMonitor.tsx"
+    },
+    "DUP-EXACT-HANDLESQUAREOFF": {
+      "index": 65,
+      "priority": "P2",
+      "file": "src/components/PortfolioDashboard.tsx"
+    },
+    "DUP-EXACT-HANDLECOPYREDIRECT": {
+      "index": 66,
+      "priority": "P2",
+      "file": "src/pages/Brokers.tsx"
+    },
+    "DUP-EXACT-HANDLEDISCONNECT": {
+      "index": 67,
+      "priority": "P2",
+      "file": "src/pages/Brokers.tsx"
+    },
+    "DUP-EXACT-FETCHSTATUS": {
+      "index": 68,
+      "priority": "P2",
+      "file": "src/pages/LiveChartPage.tsx"
+    },
+    "DUP-EXACT-HANDLEGOOGLESIGNIN": {
+      "index": 69,
+      "priority": "P2",
+      "file": "src/pages/Login.tsx"
+    },
+    "RNDOCTOR-ORG-MULTI-RESPONSIBILITY": {
+      "index": 79,
+      "priority": "P1",
+      "file": "src/components/brokers/ConnectDhanModal.tsx"
+    },
+    "ORG-MULTI-RESPONSIBILITY-SRC_COMPONENTS_ORDERMANAGEMENT_TSX": {
+      "index": 70,
+      "priority": "P1",
+      "file": "src/components/OrderManagement.tsx"
+    },
+    "RNDOCTOR-ORG-GIANT-FILE": {
+      "index": 78,
+      "priority": "P2",
+      "file": "src/pages/Strategies.tsx"
+    },
+    "ORG-GIANT-FILE-SRC_COMPONENTS_TRADINGVIEWLIVECHART_TSX": {
+      "index": 71,
+      "priority": "P2",
+      "file": "src/components/TradingViewLiveChart.tsx"
+    },
+    "ORG-MULTI-RESPONSIBILITY-SRC_PAGES_BROKERS_TSX": {
+      "index": 72,
+      "priority": "P1",
+      "file": "src/pages/Brokers.tsx"
+    },
+    "ORG-GIANT-FILE-SRC_PAGES_BROKERS_TSX": {
+      "index": 73,
+      "priority": "P2",
+      "file": "src/pages/Brokers.tsx"
+    },
+    "ORG-MULTI-RESPONSIBILITY-SRC_PAGES_CREATESTRATEGY_TSX": {
+      "index": 74,
+      "priority": "P1",
+      "file": "src/pages/CreateStrategy.tsx"
+    },
+    "ORG-GIANT-FILE-SRC_PAGES_CREATESTRATEGY_TSX": {
+      "index": 75,
+      "priority": "P2",
+      "file": "src/pages/CreateStrategy.tsx"
+    },
+    "ORG-GIANT-FILE-SRC_PAGES_DASHBOARD_TSX": {
+      "index": 76,
+      "priority": "P2",
+      "file": "src/pages/Dashboard.tsx"
+    },
+    "ORG-MULTI-RESPONSIBILITY-SRC_PAGES_STRATEGIES_TSX": {
+      "index": 77,
+      "priority": "P1",
+      "file": "src/pages/Strategies.tsx"
+    },
+    "ORG-GIANT-FILE-SRC_PAGES_STRATEGIES_TSX": {
+      "index": 78,
+      "priority": "P2",
+      "file": "src/pages/Strategies.tsx"
+    },
+    "ORG-MULTI-RESPONSIBILITY-SRC_COMPONENTS_BROKERS_CONNECTDHANMODAL_TSX": {
+      "index": 79,
+      "priority": "P1",
+      "file": "src/components/brokers/ConnectDhanModal.tsx"
+    },
+    "RNDOCTOR-PERF-RENDER-CALC": {
+      "index": 82,
+      "priority": "P1",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    "PERF-EXPENSIVE-CALC-DASHBOARD": {
+      "index": 81,
+      "priority": "P1",
+      "file": "src/pages/Dashboard.tsx"
+    },
+    "PERF-EXPENSIVE-CALC-TESTLIVETRADING": {
+      "index": 82,
+      "priority": "P1",
+      "file": "src/pages/TestLiveTrading.tsx"
+    }
+  }
+}

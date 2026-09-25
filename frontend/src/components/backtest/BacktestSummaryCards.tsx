@@ -24,6 +24,15 @@ interface BacktestSummaryProps {
     avgProfitPerDay: number;
     avgLossPerDay: number;
     maxDrawdownFromPeak: number;
+    ceTrades?: number;
+    peTrades?: number;
+    target1Hits?: number;
+    target2Hits?: number;
+    lowerLevelExits?: number;
+    forceExits?: number;
+    avgWin?: number;
+    avgLoss?: number;
+    maxConsecutiveLosses?: number;
   };
 }
 
@@ -35,6 +44,8 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
     }
     return abs.toFixed(0);
   };
+
+  const hasStrategyBreakdown = summary.ceTrades !== undefined || summary.target1Hits !== undefined;
 
   return (
     <Box sx={{ mb: 4 }}>
@@ -55,7 +66,8 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
         sx={{
           display: 'grid',
           gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
-          gap: 2
+          gap: 2,
+          mb: hasStrategyBreakdown ? 2 : 0
         }}
       >
         {/* CARD 1: TRADING DAYS */}
@@ -235,17 +247,16 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
             </Typography>
           </Box>
 
-          {/* Circular Red Drawdown Badge (Matching Screenshot 2) */}
           <Box
             sx={{
               width: 72,
               height: 72,
               borderRadius: '50%',
-              border: '3px solid #ef4444',
+              border: '2px solid #ef4444',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              bgcolor: 'rgba(239, 68, 68, 0.04)',
+              bgcolor: '#ffffff',
               ml: 1.5
             }}
           >
@@ -263,6 +274,121 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
           </Box>
         </Paper>
       </Box>
+
+      {/* INSTITUTIONAL BREAKDOWN ROW (CE/PE Splits, Targets & Exit Reasons) */}
+      {hasStrategyBreakdown && (
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
+            gap: 2
+          }}
+        >
+          {/* LEG DISTRIBUTION */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              borderRadius: 3,
+              border: '1px solid #e2e8f0',
+              bgcolor: '#ffffff'
+            }}
+          >
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Leg Distribution
+            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
+              <Box>
+                <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>CE Trades</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 700, color: '#0f172a' }}>{summary.ceTrades ?? '—'}</Typography>
+              </Box>
+              <Box sx={{ textAlign: 'right' }}>
+                <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>PE Trades</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 700, color: '#0f172a' }}>{summary.peTrades ?? '—'}</Typography>
+              </Box>
+            </Box>
+          </Paper>
+
+          {/* TARGET COMPLETION */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              borderRadius: 3,
+              border: '1px solid #e2e8f0',
+              bgcolor: '#ffffff'
+            }}
+          >
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Targets Reached
+            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
+              <Box>
+                <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>Target 1 (+₹20)</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 700, color: '#16a34a' }}>{summary.target1Hits ?? 0} hits</Typography>
+              </Box>
+              <Box sx={{ textAlign: 'right' }}>
+                <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>Target 2 (+₹40)</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 700, color: '#16a34a' }}>{summary.target2Hits ?? 0} hits</Typography>
+              </Box>
+            </Box>
+          </Paper>
+
+          {/* STOP & FORCE EXITS */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              borderRadius: 3,
+              border: '1px solid #e2e8f0',
+              bgcolor: '#ffffff'
+            }}
+          >
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Risk & Cutoff Exits
+            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
+              <Box>
+                <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>Lower-Level Exits</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 700, color: '#dc2626' }}>{summary.lowerLevelExits ?? 0}</Typography>
+              </Box>
+              <Box sx={{ textAlign: 'right' }}>
+                <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>15:10 Force Exits</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 700, color: '#475569' }}>{summary.forceExits ?? 0}</Typography>
+              </Box>
+            </Box>
+          </Paper>
+
+          {/* AVERAGE TRADE P&L */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              borderRadius: 3,
+              border: '1px solid #e2e8f0',
+              bgcolor: '#ffffff'
+            }}
+          >
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Average Trade P&L
+            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
+              <Box>
+                <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>Avg Win</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 700, color: '#16a34a' }}>
+                  {summary.avgWin !== undefined ? `₹${summary.avgWin.toLocaleString('en-IN')}` : '—'}
+                </Typography>
+              </Box>
+              <Box sx={{ textAlign: 'right' }}>
+                <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>Avg Loss</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 700, color: '#dc2626' }}>
+                  {summary.avgLoss !== undefined ? `₹${summary.avgLoss.toLocaleString('en-IN')}` : '—'}
+                </Typography>
+              </Box>
+            </Box>
+          </Paper>
+        </Box>
+      )}
     </Box>
   );
 };

@@ -5,6 +5,14 @@ import './services/setupAxios';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+// Suppress benign cross-origin errors from external widgets (e.g. TradingView embed)
+window.addEventListener('error', (e) => {
+  if (e.message === 'Script error.' || e.filename?.includes('tradingview.com')) {
+    e.stopImmediatePropagation();
+    e.preventDefault();
+  }
+});
+
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );

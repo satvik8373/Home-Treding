@@ -2,6 +2,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { logger } from '../utils/logger';
+import { resolveLotSize as centralResolveLotSize, getStrategyConfig } from '../config/strategyConfig';
 
 export interface DhanInstrumentRecord {
   securityId: string;
@@ -62,7 +63,7 @@ export class InstrumentMasterService {
   public ensureDefaults(): void {
     if (this.instruments.size === 0) {
       const defaults: DhanInstrumentRecord[] = [
-        { securityId: '13', exchangeSegment: 'IDX_I', symbol: 'NIFTY 50', tradingSymbol: 'NIFTY 50', instrument: 'INDEX', lotSize: 50, tickSize: 0.05 },
+        { securityId: '13', exchangeSegment: 'IDX_I', symbol: 'NIFTY 50', tradingSymbol: 'NIFTY 50', instrument: 'INDEX', lotSize: 65, tickSize: 0.05 },
         { securityId: '25', exchangeSegment: 'IDX_I', symbol: 'NIFTY BANK', tradingSymbol: 'BANKNIFTY', instrument: 'INDEX', lotSize: 30, tickSize: 0.05 },
         { securityId: '27', exchangeSegment: 'IDX_I', symbol: 'FINNIFTY', tradingSymbol: 'FINNIFTY', instrument: 'INDEX', lotSize: 40, tickSize: 0.05 },
         { securityId: '2885', exchangeSegment: 'NSE_EQ', symbol: 'RELIANCE', tradingSymbol: 'RELIANCE-EQ', instrument: 'EQUITY', lotSize: 1, tickSize: 0.05 },
@@ -156,24 +157,8 @@ export class InstrumentMasterService {
    * (e.g. NIFTY revised to 65, BANKNIFTY 30/35, FINNIFTY 60, MIDCPNIFTY 120 per NSE circulars)
    */
   public resolveLotSize(symbol: string, _dateStr?: string): number {
-    const sym = symbol.toUpperCase().replace(/\s+/g, '_');
-    if (sym.includes('BANK') || sym.includes('BNF')) {
-      return 35; // Standard BNF market lot
-    }
-    if (sym.includes('FIN')) {
-      return 60; // FINNIFTY market lot (revised)
-    }
-    if (sym.includes('MIDCAP') || sym.includes('MIDCP')) {
-      return 120; // MIDCPNIFTY market lot (revised)
-    }
-    if (sym.includes('SENSEX')) {
-      return 10; // BSE SENSEX market lot
-    }
-    if (sym.includes('NIFTY')) {
-      return 65; // NIFTY 50 official 2026 market lot (revised from 75 -> 65)
-    }
-    // Equities
-    return 1;
+    // Delegates to centralized config — single source of truth for NSE lot sizes
+    return centralResolveLotSize(symbol);
   }
 
   /**

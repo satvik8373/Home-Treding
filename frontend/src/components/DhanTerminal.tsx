@@ -167,7 +167,7 @@ const DhanTerminal: React.FC<DhanTerminalProps> = ({ open, onClose, broker }) =>
             sx={{ 
               bgcolor: 'success.main',
               color: 'white',
-              animation: 'pulse 2s infinite'
+              fontWeight: 700
             }}
           />
         </Box>

@@ -17,7 +17,8 @@ export class DhanHttpClient {
       headers: {
         ...DHAN_CONFIG.DEFAULT_HEADERS,
         'access-token': accessToken,
-        'client-id': clientId
+        'client-id': clientId,
+        'dhanClientId': clientId
       }
     });
 
@@ -44,6 +45,21 @@ export class DhanHttpClient {
       (error) => {
         const status = error.response?.status;
         const data = error.response?.data;
+
+        // Check for Dhan's specific "Data APIs not Subscribed" message (code 806)
+        const isDataSubNotice = Boolean(
+          data?.data?.['806'] ||
+          (typeof data === 'object' && JSON.stringify(data).includes('Data APIs not Subscribed'))
+        );
+
+        if (isDataSubNotice) {
+          logger.debug('[Dhan Client] Account does not have optional paid Data API add-on. Platform fallback feed is active.');
+          const subError = new Error('Data APIs not Subscribed (Trading APIs remain 100% active)');
+          (subError as any).statusCode = 403;
+          (subError as any).isDataSubscriptionNotice = true;
+          return Promise.reject(subError);
+        }
+
         logger.error(`[Dhan API Error] Status: ${status}`, {
           url: error.config?.url,
           data: data || error.message

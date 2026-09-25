@@ -11,30 +11,22 @@ import {
   TextField,
   InputAdornment,
   Tooltip,
-  Snackbar,
   Alert,
-  styled,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions
+  styled
 } from '@mui/material';
 import {
   MoreVert as MoreVertIcon,
   ContentCopy,
   Check,
-  Close,
-  InfoOutlined,
   Visibility,
   VisibilityOff,
-  Refresh,
-  DeleteOutline,
-  VpnKey,
-  ArrowBack,
-  AccountCircle
+  ArrowBack
 } from '@mui/icons-material';
+import { useLocation } from 'react-router-dom';
+import axios from 'axios';
 import Layout from '../components/Layout';
 import { brokerApi, BrokerSummary } from '../services/brokerApi';
+import { API_CONFIG } from '../config/api';
 
 // iOS-style clean switch matching Screenshot 1
 const CustomSwitch = styled((props: any) => (
@@ -76,49 +68,34 @@ export const Brokers: React.FC = () => {
   const [brokers, setBrokers] = useState<BrokerSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'add' | 'profile'>('list');
-  const [selectedProfileBroker, setSelectedProfileBroker] = useState<BrokerSummary | null>(null);
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const initialMethod = searchParams.get('method') === 'token' ? 'token' : 'developer';
 
   // Form Fields (Matching Screenshot 2) - retain previous input for easy re-auth
-  const [clientId, setClientId] = useState(() => localStorage.getItem('dhan_pending_client_id') || '');
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('dhan_pending_api_key') || '');
-  const [apiSecret, setApiSecret] = useState(() => localStorage.getItem('dhan_pending_api_secret') || '');
+  const [clientId, setClientId] = useState(() => localStorage.getItem('dhan_pending_client_id') || localStorage.getItem('dhan_saved_client_id') || '');
+  const [apiKey, setApiKey] = useState('');
+  const [apiSecret, setApiSecret] = useState('');
+  const [accessToken, setAccessToken] = useState('');
+  const [authMethod, setAuthMethod] = useState<'developer' | 'token'>(initialMethod);
   const [showSecret, setShowSecret] = useState(false);
+  const [testingPing, setTestingPing] = useState(false);
+  const [pingLatency, setPingLatency] = useState<number | null>(null);
 
   // Status & Feedback
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [copied, setCopied] = useState(false);
-  const [showGuide, setShowGuide] = useState(false);
 
   // Switch states
-  const [terminalStates, setTerminalStates] = useState<Record<string, boolean>>({});
   const [tradingEngineStates, setTradingEngineStates] = useState<Record<string, boolean>>({});
-
-  // Static IP Management
-  const [ipDetails, setIpDetails] = useState<{
-    primaryIP?: string;
-    secondaryIP?: string;
-    detectedIP?: string;
-    modifyDatePrimary?: string;
-    modifyDateSecondary?: string;
-    ipMatchStatus?: 'MATCH' | 'MISMATCH';
-    ordersAllowed?: boolean;
-  } | null>(null);
-  const [showIpManager, setShowIpManager] = useState(false);
-  const [updatingIp, setUpdatingIp] = useState(false);
-  const [ipActionMessage, setIpActionMessage] = useState('');
+  const [terminalStates, setTerminalStates] = useState<Record<string, boolean>>({});
 
   // 3-dots Menu & Actions
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedBroker, setSelectedBroker] = useState<BrokerSummary | null>(null);
-  const [assignIpDialogOpen, setAssignIpDialogOpen] = useState(false);
-  const [staticIpInput, setStaticIpInput] = useState('171.61.160.213');
-  const [assigningIp, setAssigningIp] = useState(false);
-  const [copiedIp, setCopiedIp] = useState(false);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'info' | 'error' | 'warning'>('success');
+  const [actionFeedback, setActionFeedback] = useState<{ message: string; severity: 'success' | 'info' | 'error' | 'warning' } | null>(null);
 
   const redirectUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/dhan-connect`
@@ -126,39 +103,73 @@ export const Brokers: React.FC = () => {
 
   const fetchBrokers = useCallback(async () => {
     try {
-      const list = await brokerApi.getBrokers();
+      const [list, engineRes] = await Promise.all([
+        brokerApi.getBrokers(),
+        axios.get(`${API_CONFIG.BASE_URL}/api/trading/engine/status`).catch(() => ({ data: { success: false, isRunning: false } }))
+      ]);
+
       setBrokers(list);
 
-      const terms: Record<string, boolean> = {};
+      const isRunning = engineRes.data?.isRunning ?? false;
       const engines: Record<string, boolean> = {};
+      const terminals: Record<string, boolean> = {};
 
       list.forEach((b) => {
-        terms[b.id] = b.terminalEnabled ?? (b.status === 'Connected');
-        engines[b.id] = b.tradingEngineEnabled ?? (b.status === 'Connected');
+        engines[b.id] = isRunning;
+        terminals[b.id] = b.terminalEnabled ?? true;
       });
 
-      setTerminalStates(terms);
       setTradingEngineStates(engines);
+      setTerminalStates(terminals);
 
-      // If connected brokers exist, show the broker list view and fetch live Static IP!
       if (list.length > 0) {
         setViewMode('list');
         setFormSuccess('');
-        try {
-          const ipRes = await brokerApi.getStaticIP();
-          if (ipRes.success && ipRes.ipDetails) {
-            setIpDetails(ipRes.ipDetails);
-          }
-        } catch (_) {}
       } else {
-        setViewMode('add');
+        const cached = brokerApi.getActiveBroker();
+        if (cached) {
+          setBrokers([cached]);
+          setViewMode('list');
+        } else {
+          setViewMode('add');
+        }
       }
     } catch (error) {
       console.error('Failed to fetch brokers:', error);
+      const cached = brokerApi.getActiveBroker();
+      if (cached) {
+        setBrokers([cached]);
+        setViewMode('list');
+      }
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const handleToggleTerminal = (brokerId: string) => {
+    setTerminalStates((prev) => ({
+      ...prev,
+      [brokerId]: !(prev[brokerId] ?? true)
+    }));
+  };
+
+  const handleToggleTradingEngine = async (brokerId: string) => {
+    const current = tradingEngineStates[brokerId] ?? false;
+    const next = !current;
+    setTradingEngineStates((prev) => ({ ...prev, [brokerId]: next }));
+    try {
+      if (next) {
+        await axios.post(`${API_CONFIG.BASE_URL}/api/trading/engine/start`);
+        setActionFeedback({ message: 'Trading Engine enabled and running.', severity: 'success' });
+      } else {
+        await axios.post(`${API_CONFIG.BASE_URL}/api/trading/engine/stop`);
+        setActionFeedback({ message: 'Trading Engine stopped.', severity: 'info' });
+      }
+    } catch (e: any) {
+      setTradingEngineStates((prev) => ({ ...prev, [brokerId]: current }));
+      setActionFeedback({ message: 'Failed to toggle trading engine.', severity: 'error' });
+    }
+  };
 
   useEffect(() => {
     fetchBrokers();
@@ -212,8 +223,7 @@ export const Brokers: React.FC = () => {
 
     try {
       localStorage.setItem('dhan_pending_client_id', clientId.trim());
-      localStorage.setItem('dhan_pending_api_key', apiKey.trim());
-      localStorage.setItem('dhan_pending_api_secret', apiSecret.trim());
+      localStorage.setItem('dhan_saved_client_id', clientId.trim());
 
       const res = await brokerApi.generateDhanConsent({
         clientId: clientId.trim(),
@@ -226,37 +236,9 @@ export const Brokers: React.FC = () => {
           localStorage.setItem('dhan_pending_consent_id', res.consentAppId);
         }
 
-        setFormSuccess('Redirecting to Dhan authentication...');
-        const width = 600;
-        const height = 750;
-        const left = window.screenX + (window.outerWidth - width) / 2;
-        const top = window.screenY + (window.outerHeight - height) / 2;
-
-        const popup = window.open(
-          res.loginUrl,
-          'DhanLogin',
-          `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes`
-        );
-
-        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-          window.location.href = res.loginUrl;
-        }
-
-        // Active background poller in case popup cross-origin communication is blocked
-        const pollInterval = setInterval(async () => {
-          try {
-            const freshList = await brokerApi.getBrokers();
-            if (freshList && freshList.length > 0) {
-              clearInterval(pollInterval);
-              setBrokers(freshList);
-              setViewMode('list');
-              setSubmitting(false);
-              setFormSuccess('');
-            }
-          } catch (_) {}
-        }, 2000);
-
-        setTimeout(() => clearInterval(pollInterval), 150000);
+        setFormSuccess('Redirecting to official Dhan login...');
+        // Clean direct redirect - official Dhan OAuth flow
+        window.location.href = res.loginUrl;
       } else {
         setFormError(res.message || 'Failed to initiate Dhan authorization session.');
         setSubmitting(false);
@@ -264,6 +246,85 @@ export const Brokers: React.FC = () => {
     } catch (err: any) {
       setFormError(err.response?.data?.message || err.message || 'Connection failed.');
       setSubmitting(false);
+    }
+  };
+
+  const handleDirectTokenSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientId.trim() || !accessToken.trim()) {
+      setFormError('Both Client ID and 24-Hour Access Token are required.');
+      return;
+    }
+    setSubmitting(true);
+    setFormError('');
+    setFormSuccess('');
+
+    try {
+      localStorage.setItem('dhan_saved_client_id', clientId.trim());
+
+      const res = await brokerApi.connectDhan({
+        clientId: clientId.trim(),
+        accessToken: accessToken.trim()
+      });
+
+      if (res.success && res.broker) {
+        setFormSuccess('Dhan account verified with live API and connected successfully!');
+        setSubmitting(false);
+        await fetchBrokers();
+        setViewMode('list');
+      } else {
+        setFormError(res.message || 'Verification failed. Please check your credentials.');
+        setSubmitting(false);
+      }
+    } catch (err: any) {
+      setFormError(err.response?.data?.message || err.message || 'Failed to connect Dhan broker.');
+      setSubmitting(false);
+    }
+  };
+
+  const handleTestConnection = async (brokerId: string) => {
+    setTestingPing(true);
+    const start = Date.now();
+    try {
+      const f = await brokerApi.getFunds(brokerId);
+      const elapsed = Date.now() - start;
+      setPingLatency(elapsed);
+
+      // Immediately promote broker status to 'Connected' in state & localStorage
+      setBrokers((prev) =>
+        prev.map((b) => {
+          if (b.id === brokerId || !brokerId || prev.length === 1) {
+            return { ...b, status: 'Connected' as const, funds: f || b.funds };
+          }
+          return b;
+        })
+      );
+
+      const cached = brokerApi.getActiveBroker();
+      if (cached) {
+        cached.status = 'Connected';
+        if (f) cached.funds = f;
+        localStorage.setItem('mavrix_saved_brokers', JSON.stringify([cached]));
+      }
+
+      if (f) {
+        setActionFeedback({
+          message: `Verified DhanHQ Live Connection (${elapsed}ms). Total Balance: ₹${(f.totalAccountBalance || f.availableMargin || 0).toLocaleString()}`,
+          severity: 'success'
+        });
+      } else {
+        setActionFeedback({
+          message: `Connection responsive & verified (${elapsed}ms)`,
+          severity: 'success'
+        });
+      }
+    } catch (e: any) {
+      setActionFeedback({
+        message: `Dhan Connection Notice: ${e.message}`,
+        severity: 'warning'
+      });
+    } finally {
+      setTestingPing(false);
     }
   };
 
@@ -286,60 +347,20 @@ export const Brokers: React.FC = () => {
     setMenuAnchorEl(null);
     if (!brokerToSquare) return;
     try {
-      setSnackbarMessage('Triggering Square Off on Dhan...');
-      setSnackbarSeverity('info');
-      setSnackbarOpen(true);
+      setActionFeedback({ message: 'Triggering Square Off on Dhan...', severity: 'info' });
 
       const res = await brokerApi.squareOff(brokerToSquare.id);
       if (res.success) {
-        setSnackbarMessage(res.message || 'All open positions squared off successfully!');
-        setSnackbarSeverity('success');
+        setActionFeedback({ message: res.message || 'All open positions squared off successfully!', severity: 'success' });
       } else {
-        setSnackbarMessage(res.message || 'Square Off completed (no active positions).');
-        setSnackbarSeverity('info');
+        setActionFeedback({ message: res.message || 'Square Off completed (no active positions).', severity: 'info' });
       }
     } catch (err: any) {
-      setSnackbarMessage(err.response?.data?.message || err.message || 'Square Off failed.');
-      setSnackbarSeverity('error');
-    } finally {
-      setSnackbarOpen(true);
+      setActionFeedback({ message: err.response?.data?.message || err.message || 'Square Off failed.', severity: 'error' });
     }
   };
 
-  const handleOpenAssignIp = () => {
-    const broker = selectedBroker;
-    setMenuAnchorEl(null);
-    setStaticIpInput(broker?.staticIp || ipDetails?.primaryIP || '171.61.160.213');
-    setAssignIpDialogOpen(true);
-  };
 
-  const handleSaveStaticIp = async () => {
-    if (!staticIpInput.trim()) return;
-    setAssigningIp(true);
-    try {
-      const res = await brokerApi.updateStaticIP({
-        ip: staticIpInput.trim(),
-        ipFlag: 'PRIMARY',
-        brokerId: selectedBroker?.id,
-        isModify: Boolean(selectedBroker?.staticIp && selectedBroker.staticIp !== 'Not Assigned')
-      });
-      if (res.success) {
-        setSnackbarMessage('Static IP assigned successfully to Dhan!');
-        setSnackbarSeverity('success');
-        setAssignIpDialogOpen(false);
-        fetchBrokers();
-      } else {
-        setSnackbarMessage(res.message || 'Failed to assign Static IP on Dhan.');
-        setSnackbarSeverity('error');
-      }
-    } catch (err: any) {
-      setSnackbarMessage(err.response?.data?.message || err.message || 'Failed to assign Static IP.');
-      setSnackbarSeverity('error');
-    } finally {
-      setAssigningIp(false);
-      setSnackbarOpen(true);
-    }
-  };
 
   const handleDeleteBroker = async () => {
     const brokerToDelete = selectedBroker;
@@ -347,13 +368,9 @@ export const Brokers: React.FC = () => {
     if (!brokerToDelete) return;
     try {
       await handleDisconnect(brokerToDelete.id);
-      setSnackbarMessage('Broker deleted successfully.');
-      setSnackbarSeverity('success');
-      setSnackbarOpen(true);
+      setActionFeedback({ message: 'Broker disconnected successfully.', severity: 'success' });
     } catch (err: any) {
-      setSnackbarMessage('Failed to delete broker.');
-      setSnackbarSeverity('error');
-      setSnackbarOpen(true);
+      setActionFeedback({ message: 'Failed to disconnect broker.', severity: 'error' });
     }
   };
 
@@ -363,26 +380,21 @@ export const Brokers: React.FC = () => {
         /* ========================================================= */
         /* VIEW 1: BROKER LIST (Matching Screenshot 1)               */
         /* ========================================================= */
-        <Box
-          sx={{
-            width: '100%',
-            maxWidth: 960,
-            mx: 'auto',
-            bgcolor: '#ffffff',
-            borderRadius: { xs: 3, sm: 4 },
-            border: '1px solid #eef2f6',
-            boxShadow: '0 2px 12px -2px rgba(0, 0, 0, 0.04)',
-            p: { xs: 2.5, sm: 4 }
-          }}
-        >
+        <Box sx={{ maxWidth: 1080, mx: 'auto' }}>
           {/* Header */}
           <Box
             sx={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              mb: 3,
-              gap: 1.5
+              mb: 2,
+              gap: 1.5,
+              bgcolor: '#ffffff',
+              border: '1px solid #e2e8f0',
+              borderRadius: 2.5,
+              px: { xs: 2, sm: 2.5 },
+              py: { xs: 1.5, sm: 2 },
+              boxShadow: '0 1px 3px 0 rgba(15,23,42,0.04)'
             }}
           >
             <Box>
@@ -391,7 +403,7 @@ export const Brokers: React.FC = () => {
                 sx={{
                   fontWeight: 800,
                   color: '#0f172a',
-                  fontSize: { xs: '1.25rem', sm: '1.45rem' },
+                  fontSize: { xs: '1.1rem', sm: '1.3rem' },
                   lineHeight: 1.2
                 }}
               >
@@ -399,10 +411,10 @@ export const Brokers: React.FC = () => {
               </Typography>
               <Typography
                 sx={{
-                  color: '#94a3b8',
-                  fontSize: '0.85rem',
+                  color: '#64748b',
+                  fontSize: '0.82rem',
                   fontWeight: 500,
-                  mt: 0.3
+                  mt: 0.2
                 }}
               >
                 Manage your connected brokers
@@ -424,7 +436,7 @@ export const Brokers: React.FC = () => {
                 textTransform: 'none',
                 px: { xs: 2, sm: 2.5 },
                 py: 1,
-                borderRadius: '10px',
+                borderRadius: '8px',
                 boxShadow: 'none',
                 '&:hover': { bgcolor: '#1d4ed8', boxShadow: 'none' }
               }}
@@ -432,6 +444,17 @@ export const Brokers: React.FC = () => {
               + Add Broker
             </Button>
           </Box>
+
+          {/* Action Feedback Banner */}
+          {actionFeedback && (
+            <Alert
+              severity={actionFeedback.severity}
+              onClose={() => setActionFeedback(null)}
+              sx={{ mb: 2.5, borderRadius: '8px', fontSize: '0.85rem' }}
+            >
+              {actionFeedback.message}
+            </Alert>
+          )}
 
           {/* Brokers Content */}
           {loading ? (
@@ -446,7 +469,7 @@ export const Brokers: React.FC = () => {
               <Button
                 variant="contained"
                 onClick={() => setViewMode('add')}
-                sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, borderRadius: '10px' }}
+                sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, borderRadius: '8px', '&:hover': { bgcolor: '#1d4ed8' } }}
               >
                 + Add Broker
               </Button>
@@ -455,363 +478,110 @@ export const Brokers: React.FC = () => {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {brokers.map((broker) => {
                 const isConnected = broker.status === 'Connected';
-                const terminalOn = terminalStates[broker.id] ?? isConnected;
-                const tradingEngineOn = tradingEngineStates[broker.id] ?? isConnected;
+                const terminalOn = terminalStates[broker.id] ?? true;
+                const tradingEngineOn = tradingEngineStates[broker.id] ?? false;
 
                 return (
-                  <React.Fragment key={broker.id}>
-                    <Box
-                      sx={{
-                        p: { xs: 2, sm: 2.5 },
-                        borderRadius: '14px',
-                        border: '1px solid #eaedf0',
-                        bgcolor: '#ffffff',
-                        display: 'flex',
-                        flexDirection: { xs: 'column', md: 'row' },
-                        alignItems: { xs: 'stretch', md: 'center' },
-                        justifyContent: 'space-between',
-                        gap: { xs: 2, md: 3 },
-                        transition: 'all 0.15s ease',
-                        '&:hover': {
-                          borderColor: '#cbd5e1'
-                        }
-                      }}
-                    >
-                      {/* Left: Dhan Avatar + Name + Client ID + Static IP + Status */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Box
-                          sx={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: '50%',
-                            bgcolor: '#00A25B',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#ffffff',
-                            fontWeight: 900,
-                            fontSize: '1.4rem',
-                            fontFamily: 'serif',
-                            flexShrink: 0
-                          }}
-                        >
-                          ध
-                        </Box>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem', lineHeight: 1.2 }}>
-                            {broker.broker || 'Dhan'}
-                          </Typography>
-                          <Typography sx={{ color: '#64748b', fontWeight: 500, fontSize: '0.8rem', mt: 0.2 }}>
-                            {broker.clientId}
-                          </Typography>
-                          <Typography sx={{ color: '#94a3b8', fontSize: '0.78rem', mt: 0.3, fontWeight: 500 }}>
-                            Static IP: {broker.staticIp || (ipDetails?.primaryIP ? ipDetails.primaryIP : 'Not Assigned')}
-                          </Typography>
-                          <Typography
-                            sx={{
-                              color: isConnected ? '#16a34a' : '#ef4444',
-                              fontWeight: 600,
-                              fontSize: '0.75rem',
-                              mt: 0.2
-                            }}
-                          >
-                            {isConnected ? 'Connected' : 'Not Connected'}
-                          </Typography>
-                        </Box>
-                      </Box>
-
-                      {/* Middle & Right section */}
+                  <Box
+                    key={broker.id}
+                    sx={{
+                      p: { xs: 2, sm: 2.5 },
+                      borderRadius: '12px',
+                      border: '1px solid #e2e8f0',
+                      bgcolor: '#ffffff',
+                      display: 'flex',
+                      flexDirection: { xs: 'column', sm: 'row' },
+                      alignItems: { xs: 'flex-start', sm: 'center' },
+                      justifyContent: 'space-between',
+                      gap: { xs: 2, sm: 3 },
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                      transition: 'border-color 0.2s ease',
+                      '&:hover': {
+                        borderColor: '#cbd5e1'
+                      }
+                    }}
+                  >
+                    {/* Left: Logo + Broker Name + Client ID + Connected */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <Box
                         sx={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: '10px',
+                          bgcolor: '#00A25B',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: { xs: 'space-between', md: 'flex-end' },
-                          gap: { xs: 2, md: 5 },
-                          width: { xs: '100%', md: 'auto' },
-                          pt: { xs: 1.5, md: 0 },
-                          borderTop: { xs: '1px solid #f1f5f9', md: 'none' }
+                          justifyContent: 'center',
+                          color: '#ffffff',
+                          fontWeight: 900,
+                          fontSize: '1.3rem',
+                          fontFamily: 'serif',
+                          flexShrink: 0
                         }}
                       >
-                        {/* Strategy Performance */}
-                        <Box sx={{ textAlign: { xs: 'left', md: 'center' } }}>
-                          <Typography sx={{ color: '#94a3b8', fontWeight: 500, fontSize: '0.75rem', display: 'block' }}>
-                            Strategy Performance
-                          </Typography>
-                          <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1.1rem', mt: 0.2 }}>
-                            0.00
-                          </Typography>
-                        </Box>
-
-                        {/* Switches & Dots Menu */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 2, sm: 3 } }}>
-                          {/* Terminal Switch */}
-                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-                            <Typography sx={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 500 }}>
-                              Terminal
-                            </Typography>
-                            <CustomSwitch
-                              checked={terminalOn}
-                              onChange={() => setTerminalStates(prev => ({ ...prev, [broker.id]: !prev[broker.id] }))}
-                            />
-                          </Box>
-
-                          {/* Trading Engine Switch */}
-                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-                            <Typography sx={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 500 }}>
-                              Trading Engine
-                            </Typography>
-                            <CustomSwitch
-                              checked={tradingEngineOn}
-                              onChange={() => setTradingEngineStates(prev => ({ ...prev, [broker.id]: !prev[broker.id] }))}
-                            />
-                          </Box>
-
-                          {/* 3-dots Menu Button */}
-                          <Box
-                            onClick={(e) => {
-                              setMenuAnchorEl(e.currentTarget);
-                              setSelectedBroker(broker);
-                            }}
-                            sx={{
-                              bgcolor: '#f1f5f9',
-                              borderRadius: '8px',
-                              width: 32,
-                              height: 32,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
-                              '&:hover': { bgcolor: '#e2e8f0' }
-                            }}
-                          >
-                            <MoreVertIcon sx={{ fontSize: 18, color: '#64748b' }} />
-                          </Box>
-                        </Box>
+                        ध
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem', lineHeight: 1.2 }}>
+                          {broker.broker || 'DHAN'}
+                        </Typography>
+                        <Typography sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.82rem', mt: 0.3 }}>
+                          {broker.clientId || '1108893841'}
+                        </Typography>
+                        <Typography sx={{ color: '#16a34a', fontWeight: 700, fontSize: '0.78rem', mt: 0.2 }}>
+                          {isConnected ? 'Connected' : 'Disconnected'}
+                        </Typography>
                       </Box>
                     </Box>
-                  </React.Fragment>
+
+                    {/* Center: Strategy Performance */}
+                    <Box sx={{ textAlign: { xs: 'left', sm: 'center' }, minWidth: 120 }}>
+                      <Typography sx={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 600 }}>
+                        Strategy Performance
+                      </Typography>
+                      <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem', mt: 0.2 }}>
+                        0.00
+                      </Typography>
+                    </Box>
+
+                    {/* Right: Terminal toggle, Trading Engine toggle, 3 dots menu */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 2.5, sm: 3 } }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.4 }}>
+                        <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>
+                          Terminal
+                        </Typography>
+                        <CustomSwitch
+                          checked={terminalOn}
+                          onChange={() => handleToggleTerminal(broker.id)}
+                        />
+                      </Box>
+
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.4 }}>
+                        <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>
+                          Trading Engine
+                        </Typography>
+                        <CustomSwitch
+                          checked={tradingEngineOn}
+                          onChange={() => handleToggleTradingEngine(broker.id)}
+                        />
+                      </Box>
+
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          setMenuAnchorEl(e.currentTarget);
+                          setSelectedBroker(broker);
+                        }}
+                        sx={{ color: '#94a3b8', '&:hover': { color: '#0f172a' } }}
+                      >
+                        <MoreVertIcon sx={{ fontSize: 20 }} />
+                      </IconButton>
+                    </Box>
+                  </Box>
                 );
               })}
             </Box>
           )}
-        </Box>
-      ) : viewMode === 'profile' ? (
-        /* ========================================================= */
-        /* VIEW 3: BROKER PROFILE & STATIC IP                        */
-        /* ========================================================= */
-        <Box
-          sx={{
-            width: '100%',
-            maxWidth: 520,
-            mx: 'auto',
-            bgcolor: '#ffffff',
-            borderRadius: { xs: 3, sm: 4 },
-            border: '1px solid #eef2f6',
-            boxShadow: '0 2px 12px -2px rgba(0, 0, 0, 0.04)',
-            p: { xs: 2.5, sm: 4 }
-          }}
-        >
-          {/* Back Button */}
-          <Button
-            size="small"
-            startIcon={<ArrowBack sx={{ fontSize: 16 }} />}
-            onClick={() => setViewMode('list')}
-            sx={{
-              mb: 2.5,
-              textTransform: 'none',
-              fontWeight: 600,
-              fontSize: '0.8rem',
-              color: '#64748b',
-              p: 0,
-              '&:hover': { bgcolor: 'transparent', color: '#2563eb' }
-            }}
-          >
-            Back to Brokers
-          </Button>
-
-          {/* Profile Header */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-            <Box
-              sx={{
-                width: 52,
-                height: 52,
-                borderRadius: '50%',
-                bgcolor: '#00A25B',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff',
-                fontWeight: 900,
-                fontSize: '1.6rem',
-                fontFamily: 'serif',
-                flexShrink: 0
-              }}
-            >
-              ध
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1.2rem', lineHeight: 1.2 }}>
-                  Dhan Account Profile
-                </Typography>
-                <Box
-                  sx={{
-                    px: 1,
-                    py: 0.2,
-                    borderRadius: '12px',
-                    bgcolor: '#dcfce7',
-                    color: '#16a34a',
-                    fontWeight: 700,
-                    fontSize: '0.72rem'
-                  }}
-                >
-                  Connected
-                </Box>
-              </Box>
-              <Typography sx={{ color: '#64748b', fontSize: '0.82rem', mt: 0.3 }}>
-                Client ID: {selectedProfileBroker?.clientId || brokers[0]?.clientId || '1108893841'}
-              </Typography>
-            </Box>
-          </Box>
-
-          {/* Profile Details List */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 3 }}>
-            {/* Primary Static IP Row */}
-            <Box
-              sx={{
-                p: 2,
-                borderRadius: '12px',
-                bgcolor: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-            >
-              <Box>
-                <Typography sx={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 600 }}>
-                  Primary Static IP (SEBI Whitelisted)
-                </Typography>
-                <Typography sx={{ color: '#2563eb', fontWeight: 800, fontSize: '1.1rem', mt: 0.3, letterSpacing: '0.02em' }}>
-                  171.61.160.213
-                </Typography>
-                <Typography sx={{ color: '#16a34a', fontSize: '0.72rem', fontWeight: 600, mt: 0.2 }}>
-                  ● Active &amp; Whitelisted on DhanHQ
-                </Typography>
-              </Box>
-              <Tooltip title={copied ? 'Copied!' : 'Copy IP'} arrow>
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    navigator.clipboard.writeText('171.61.160.213');
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                  sx={{ bgcolor: '#ffffff', border: '1px solid #e2e8f0', p: 1 }}
-                >
-                  {copied ? <Check sx={{ fontSize: 18, color: '#16a34a' }} /> : <ContentCopy sx={{ fontSize: 18, color: '#64748b' }} />}
-                </IconButton>
-              </Tooltip>
-            </Box>
-
-            {/* Secondary IP Row */}
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: '10px',
-                bgcolor: '#ffffff',
-                border: '1px solid #eef2f6'
-              }}
-            >
-              <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>
-                Secondary IP (IPv6 Egress)
-              </Typography>
-              <Typography sx={{ color: '#334155', fontWeight: 600, fontSize: '0.8rem', mt: 0.2, wordBreak: 'break-all' }}>
-                2401:4900:8fed:3ec7:f129:9d2e:a131:74ea
-              </Typography>
-            </Box>
-
-            {/* Trading Authorization */}
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: '10px',
-                bgcolor: '#ffffff',
-                border: '1px solid #eef2f6',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-            >
-              <Box>
-                <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600 }}>
-                  Order Placement Status
-                </Typography>
-                <Typography sx={{ color: '#16a34a', fontWeight: 700, fontSize: '0.85rem' }}>
-                  Live Trading Authorized
-                </Typography>
-              </Box>
-              <Box
-                sx={{
-                  px: 1.2,
-                  py: 0.3,
-                  borderRadius: '8px',
-                  bgcolor: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  color: '#16a34a',
-                  fontWeight: 700,
-                  fontSize: '0.72rem'
-                }}
-              >
-                Whitelisted
-              </Box>
-            </Box>
-          </Box>
-
-          {/* Action Buttons */}
-          <Box sx={{ display: 'flex', gap: 1.5 }}>
-            <Button
-              variant="contained"
-              fullWidth
-              onClick={() => {
-                fetchBrokers();
-                setViewMode('list');
-              }}
-              sx={{
-                py: 1.2,
-                borderRadius: '10px',
-                bgcolor: '#2563eb',
-                color: '#ffffff',
-                fontWeight: 700,
-                fontSize: '0.875rem',
-                textTransform: 'none',
-                boxShadow: 'none',
-                '&:hover': { bgcolor: '#1d4ed8', boxShadow: 'none' }
-              }}
-            >
-              Done / Return to Brokers
-            </Button>
-            <Button
-              variant="outlined"
-              href="https://web.dhan.co"
-              target="_blank"
-              rel="noopener noreferrer"
-              sx={{
-                py: 1.2,
-                borderRadius: '10px',
-                borderColor: '#e2e8f0',
-                color: '#334155',
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                textTransform: 'none',
-                whiteSpace: 'nowrap',
-                '&:hover': { borderColor: '#cbd5e1', bgcolor: '#f8fafc' }
-              }}
-            >
-              web.dhan.co ↗
-            </Button>
-          </Box>
         </Box>
       ) : (
         /* ========================================================= */
@@ -820,13 +590,13 @@ export const Brokers: React.FC = () => {
         <Box
           sx={{
             width: '100%',
-            maxWidth: 460,
+            maxWidth: 500,
             mx: 'auto',
             bgcolor: '#ffffff',
             borderRadius: { xs: 3, sm: 4 },
-            border: '1px solid #eef2f6',
-            boxShadow: '0 2px 12px -2px rgba(0, 0, 0, 0.04)',
-            p: { xs: 2.5, sm: 4 }
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.05)',
+            p: { xs: 2.5, sm: 3.5 }
           }}
         >
           {/* Back Button if brokers exist */}
@@ -859,18 +629,18 @@ export const Brokers: React.FC = () => {
               lineHeight: 1.2
             }}
           >
-            Add Your Broker Detail
+            Connect Dhan Broker
           </Typography>
           <Typography
             sx={{
               color: '#64748b',
-              fontSize: '0.8125rem',
+              fontSize: '0.82rem',
               mt: 0.5,
               mb: 2.5,
               lineHeight: 1.4
             }}
           >
-            Enter the login information or tokens required by your broker so we can finish the setup.
+            Authenticate with DhanHQ to enable live algorithmic trading and position tracking.
           </Typography>
 
           {/* Dhan Brand Card */}
@@ -882,79 +652,89 @@ export const Brokers: React.FC = () => {
               mb: 2.5,
               borderRadius: '14px',
               border: '1px solid #e2e8f0',
-              bgcolor: '#ffffff',
+              bgcolor: '#f8fafc',
               gap: 2
             }}
           >
             <Box
               sx={{
-                width: 48,
-                height: 48,
-                borderRadius: '50%',
+                width: 44,
+                height: 44,
+                borderRadius: '12px',
                 bgcolor: '#00A25B',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#ffffff',
                 fontWeight: 900,
-                fontSize: '1.5rem',
+                fontSize: '1.35rem',
                 fontFamily: 'serif',
                 flexShrink: 0
               }}
             >
               ध
             </Box>
-            <Box>
-              <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem', lineHeight: 1.2 }}>
-                Dhan
+            <Box sx={{ flexGrow: 1 }}>
+              <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem', lineHeight: 1.2 }}>
+                DhanHQ Official Broker
               </Typography>
-              <Box
-                onClick={() => setShowGuide(!showGuide)}
-                sx={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 0.8,
-                  cursor: 'pointer',
-                  mt: 0.5,
-                  '&:hover': { opacity: 0.8 }
-                }}
-              >
-                <Typography sx={{ color: '#64748b', fontSize: '0.78rem', fontWeight: 500 }}>
-                  How to add Dhan?
-                </Typography>
-                <Box
-                  sx={{
-                    width: 18,
-                    height: 13,
-                    bgcolor: '#ef4444',
-                    borderRadius: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: 0,
-                      height: 0,
-                      borderTop: '3px solid transparent',
-                      borderBottom: '3px solid transparent',
-                      borderLeft: '5px solid #ffffff'
-                    }}
-                  />
-                </Box>
-              </Box>
+              <Typography sx={{ color: '#64748b', fontSize: '0.78rem', mt: 0.2 }}>
+                Real-time NSE/BSE Trading & Execution API
+              </Typography>
             </Box>
           </Box>
 
-          {/* Guide Alert */}
-          {showGuide && (
-            <Alert severity="info" sx={{ mb: 2.5, borderRadius: '10px', fontSize: '0.78rem' }}>
-              1. Go to <strong>web.dhan.co</strong> → Profile → <strong>Access DhanHQ APIs</strong>.<br />
-              2. Select <strong>API Key</strong>, enter your App Name, and paste the Redirect URL below.<br />
-              3. Generate the 12-month key &amp; secret and paste them below!
-            </Alert>
-          )}
+          {/* Connection Method Tabs */}
+          <Box
+            sx={{
+              display: 'flex',
+              p: 0.5,
+              mb: 2.5,
+              bgcolor: '#f1f5f9',
+              borderRadius: '10px'
+            }}
+          >
+            <Button
+              fullWidth
+              size="small"
+              onClick={() => { setAuthMethod('developer'); setFormError(''); }}
+              sx={{
+                borderRadius: '8px',
+                textTransform: 'none',
+                fontWeight: 700,
+                fontSize: '0.78rem',
+                py: 0.8,
+                bgcolor: authMethod === 'developer' ? '#ffffff' : 'transparent',
+                color: authMethod === 'developer' ? '#0f172a' : '#64748b',
+                boxShadow: authMethod === 'developer' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                '&:hover': {
+                  bgcolor: authMethod === 'developer' ? '#ffffff' : '#e2e8f0'
+                }
+              }}
+            >
+              Developer API Key (12-Mo)
+            </Button>
+            <Button
+              fullWidth
+              size="small"
+              onClick={() => { setAuthMethod('token'); setFormError(''); }}
+              sx={{
+                borderRadius: '8px',
+                textTransform: 'none',
+                fontWeight: 700,
+                fontSize: '0.78rem',
+                py: 0.8,
+                bgcolor: authMethod === 'token' ? '#ffffff' : 'transparent',
+                color: authMethod === 'token' ? '#0f172a' : '#64748b',
+                boxShadow: authMethod === 'token' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                '&:hover': {
+                  bgcolor: authMethod === 'token' ? '#ffffff' : '#e2e8f0'
+                }
+              }}
+            >
+              Direct Access Token (24-Hr)
+            </Button>
+          </Box>
 
           {formError && (
             <Alert severity="error" sx={{ mb: 2, borderRadius: '10px', fontSize: '0.8rem' }}>
@@ -969,27 +749,36 @@ export const Brokers: React.FC = () => {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit}>
+          <form
+            onSubmit={authMethod === 'token' ? handleDirectTokenSubmit : handleSubmit}
+            autoComplete="off"
+          >
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {/* Field 1: Broker ID */}
               <Box>
                 <Typography sx={{ fontWeight: 700, color: '#1e293b', display: 'block', mb: 0.6, fontSize: '0.82rem' }}>
-                  Broker ID
+                  Broker ID (Dhan Client ID)
                 </Typography>
                 <TextField
-                  placeholder="Enter Broker ID"
+                  placeholder="e.g. 1108893841"
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
                   required
                   fullWidth
                   size="small"
+                  name="dhan_client_id_no_autofill"
+                  autoComplete="off"
+                  inputProps={{
+                    autoComplete: 'off',
+                    spellCheck: 'false'
+                  }}
                   InputProps={{
                     sx: {
                       borderRadius: '10px',
-                      bgcolor: '#f4f7fb',
+                      bgcolor: '#f8fafc',
                       border: '1px solid #e2e8f0',
                       '& fieldset': { border: 'none' },
-                      '&:hover': { bgcolor: '#edf2f7' },
+                      '&:hover': { bgcolor: '#f1f5f9' },
                       '&.Mui-focused': { bgcolor: '#ffffff', border: '1.5px solid #2563eb' },
                       fontSize: '0.875rem'
                     }
@@ -997,124 +786,185 @@ export const Brokers: React.FC = () => {
                 />
               </Box>
 
-              {/* Field 2: API Key */}
-              <Box>
-                <Typography sx={{ fontWeight: 700, color: '#1e293b', display: 'block', mb: 0.6, fontSize: '0.82rem' }}>
-                  API Key
-                </Typography>
-                <TextField
-                  placeholder="API Key"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  required
-                  fullWidth
-                  size="small"
-                  InputProps={{
-                    sx: {
-                      borderRadius: '10px',
-                      bgcolor: '#f4f7fb',
-                      border: '1px solid #e2e8f0',
-                      '& fieldset': { border: 'none' },
-                      '&:hover': { bgcolor: '#edf2f7' },
-                      '&.Mui-focused': { bgcolor: '#ffffff', border: '1.5px solid #2563eb' },
-                      fontSize: '0.875rem'
-                    }
-                  }}
-                />
-              </Box>
-
-              {/* Field 3: API Secret Key */}
-              <Box>
-                <Typography sx={{ fontWeight: 700, color: '#1e293b', display: 'block', mb: 0.6, fontSize: '0.82rem' }}>
-                  API Secret Key
-                </Typography>
-                <TextField
-                  placeholder="API Secret Key"
-                  type={showSecret ? 'text' : 'password'}
-                  value={apiSecret}
-                  onChange={(e) => setApiSecret(e.target.value)}
-                  required
-                  fullWidth
-                  size="small"
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton onClick={() => setShowSecret(!showSecret)} edge="end" size="small">
-                          {showSecret ? <VisibilityOff sx={{ fontSize: 18 }} /> : <Visibility sx={{ fontSize: 18 }} />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                    sx: {
-                      borderRadius: '10px',
-                      bgcolor: '#f4f7fb',
-                      border: '1px solid #e2e8f0',
-                      '& fieldset': { border: 'none' },
-                      '&:hover': { bgcolor: '#edf2f7' },
-                      '&.Mui-focused': { bgcolor: '#ffffff', border: '1.5px solid #2563eb' },
-                      fontSize: '0.875rem'
-                    }
-                  }}
-                />
-              </Box>
-
-              {/* Redirect URL matching Screenshot 2 */}
-              <Box sx={{ mt: 0.5 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, mb: 0.5 }}>
-                  <Typography sx={{ color: '#64748b', fontSize: '0.8rem', fontWeight: 500 }}>
-                    Redirect Url:
+              {authMethod === 'token' ? (
+                /* Direct 24-hr Access Token Input */
+                <Box>
+                  <Typography sx={{ fontWeight: 700, color: '#1e293b', display: 'block', mb: 0.6, fontSize: '0.82rem' }}>
+                    24-Hour Access Token
                   </Typography>
-                  <Tooltip title="Copy this exact redirect URL to your DhanHQ developer portal app settings." arrow>
-                    <InfoOutlined sx={{ fontSize: 15, color: '#64748b', cursor: 'pointer' }} />
-                  </Tooltip>
-                </Box>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 1
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      color: '#2563eb',
-                      fontSize: '0.82rem',
-                      fontWeight: 500,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
+                  <TextField
+                    placeholder="Paste Dhan Access Token from web.dhan.co"
+                    type={showSecret ? 'text' : 'password'}
+                    value={accessToken}
+                    onChange={(e) => setAccessToken(e.target.value)}
+                    required
+                    fullWidth
+                    size="small"
+                    multiline
+                    rows={3}
+                    name="dhan_access_token_no_autofill"
+                    autoComplete="new-password"
+                    inputProps={{
+                      autoComplete: 'new-password',
+                      spellCheck: 'false'
                     }}
-                  >
-                    {redirectUrl}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end" sx={{ alignSelf: 'flex-start', mt: 1 }}>
+                          <IconButton onClick={() => setShowSecret(!showSecret)} edge="end" size="small">
+                            {showSecret ? <VisibilityOff sx={{ fontSize: 18 }} /> : <Visibility sx={{ fontSize: 18 }} />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                      sx: {
+                        borderRadius: '10px',
+                        bgcolor: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        '& fieldset': { border: 'none' },
+                        '&:hover': { bgcolor: '#f1f5f9' },
+                        '&.Mui-focused': { bgcolor: '#ffffff', border: '1.5px solid #2563eb' },
+                        fontSize: '0.82rem'
+                      }
+                    }}
+                  />
+                  <Typography sx={{ color: '#94a3b8', fontSize: '0.72rem', mt: 0.5 }}>
+                    Generate directly from Dhan Web → Profile → Access DhanHQ APIs → Access Token.
                   </Typography>
-                  <Tooltip title={copied ? 'Copied!' : 'Copy URL'} arrow>
-                    <IconButton size="small" onClick={handleCopyRedirect} sx={{ color: copied ? '#16a34a' : '#64748b', p: 0.5, flexShrink: 0 }}>
-                      {copied ? <Check sx={{ fontSize: 18 }} /> : <ContentCopy sx={{ fontSize: 18 }} />}
-                    </IconButton>
-                  </Tooltip>
                 </Box>
-              </Box>
+              ) : (
+                /* Developer API Key & Secret Inputs */
+                <>
+                  {/* Field 2: API Key */}
+                  <Box>
+                    <Typography sx={{ fontWeight: 700, color: '#1e293b', display: 'block', mb: 0.6, fontSize: '0.82rem' }}>
+                      API Key
+                    </Typography>
+                    <TextField
+                      placeholder="Paste Dhan API Key"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      required
+                      fullWidth
+                      size="small"
+                      name="dhan_api_key_no_autofill"
+                      autoComplete="new-password"
+                      inputProps={{
+                        autoComplete: 'new-password',
+                        spellCheck: 'false'
+                      }}
+                      InputProps={{
+                        sx: {
+                          borderRadius: '10px',
+                          bgcolor: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          '& fieldset': { border: 'none' },
+                          '&:hover': { bgcolor: '#f1f5f9' },
+                          '&.Mui-focused': { bgcolor: '#ffffff', border: '1.5px solid #2563eb' },
+                          fontSize: '0.875rem'
+                        }
+                      }}
+                    />
+                  </Box>
+
+                  {/* Field 3: API Secret Key */}
+                  <Box>
+                    <Typography sx={{ fontWeight: 700, color: '#1e293b', display: 'block', mb: 0.6, fontSize: '0.82rem' }}>
+                      API Secret Key
+                    </Typography>
+                    <TextField
+                      placeholder="Paste Dhan API Secret Key"
+                      type={showSecret ? 'text' : 'password'}
+                      value={apiSecret}
+                      onChange={(e) => setApiSecret(e.target.value)}
+                      required
+                      fullWidth
+                      size="small"
+                      name="dhan_api_secret_no_autofill"
+                      autoComplete="new-password"
+                      inputProps={{
+                        autoComplete: 'new-password',
+                        spellCheck: 'false'
+                      }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton onClick={() => setShowSecret(!showSecret)} edge="end" size="small">
+                              {showSecret ? <VisibilityOff sx={{ fontSize: 18 }} /> : <Visibility sx={{ fontSize: 18 }} />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                        sx: {
+                          borderRadius: '10px',
+                          bgcolor: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          '& fieldset': { border: 'none' },
+                          '&:hover': { bgcolor: '#f1f5f9' },
+                          '&.Mui-focused': { bgcolor: '#ffffff', border: '1.5px solid #2563eb' },
+                          fontSize: '0.875rem'
+                        }
+                      }}
+                    />
+                  </Box>
+
+                  {/* Redirect URL Box */}
+                  <Box sx={{ mt: 0.5, p: 1.5, bgcolor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                      <Typography sx={{ color: '#64748b', fontSize: '0.74rem', fontWeight: 600 }}>
+                        Redirect URL for Dhan Developer App
+                      </Typography>
+                      <Tooltip title={copied ? 'Copied!' : 'Copy URL'} arrow>
+                        <IconButton size="small" onClick={handleCopyRedirect} sx={{ color: copied ? '#16a34a' : '#64748b', p: 0.4 }}>
+                          {copied ? <Check sx={{ fontSize: 16 }} /> : <ContentCopy sx={{ fontSize: 16 }} />}
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                    <Typography
+                      sx={{
+                        color: '#2563eb',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        fontFamily: 'monospace',
+                        wordBreak: 'break-all'
+                      }}
+                    >
+                      {redirectUrl}
+                    </Typography>
+                  </Box>
+                </>
+              )}
 
               {/* Submit Button */}
               <Button
                 type="submit"
+                disabled={submitting}
                 variant="contained"
-                disabled={submitting || !clientId || !apiKey || !apiSecret}
+                fullWidth
                 sx={{
-                  mt: 1.5,
-                  height: 48,
-                  borderRadius: '12px',
+                  mt: 1,
+                  py: 1.2,
+                  borderRadius: '10px',
                   bgcolor: '#2563eb',
                   color: '#ffffff',
                   fontWeight: 700,
-                  fontSize: '0.95rem',
+                  fontSize: '0.88rem',
                   textTransform: 'none',
                   boxShadow: 'none',
                   '&:hover': { bgcolor: '#1d4ed8', boxShadow: 'none' },
-                  '&.Mui-disabled': { bgcolor: '#93c5fd', color: '#ffffff' }
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1
                 }}
               >
-                {submitting ? <CircularProgress size={22} sx={{ color: '#ffffff' }} /> : 'Submit'}
+                {submitting ? (
+                  <>
+                    <CircularProgress size={18} sx={{ color: '#ffffff' }} />
+                    Verifying with DhanHQ...
+                  </>
+                ) : authMethod === 'token' ? (
+                  'Connect with Access Token'
+                ) : (
+                  'Connect to Dhan Broker'
+                )}
               </Button>
             </Box>
           </form>
@@ -1146,136 +996,29 @@ export const Brokers: React.FC = () => {
         }}
       >
         <MenuItem
-          onClick={handleSquareOff}
-          sx={{ fontSize: '0.85rem', fontWeight: 500, color: '#1e293b', py: 0.8, px: 2 }}
+          onClick={() => {
+            if (selectedBroker) handleTestConnection(selectedBroker.id);
+            setMenuAnchorEl(null);
+          }}
+          sx={{ fontSize: '0.82rem', fontWeight: 600, color: '#0f172a', py: 1, px: 2 }}
         >
-          Square Off
+          Ping & Verify API
         </MenuItem>
 
         <MenuItem
-          onClick={handleOpenAssignIp}
-          sx={{ fontSize: '0.85rem', fontWeight: 500, color: '#1e293b', py: 0.8, px: 2 }}
+          onClick={handleSquareOff}
+          sx={{ fontSize: '0.82rem', fontWeight: 600, color: '#0f172a', py: 1, px: 2 }}
         >
-          Assign Static IP
+          Square Off Positions
         </MenuItem>
 
         <MenuItem
           onClick={handleDeleteBroker}
-          sx={{ fontSize: '0.85rem', fontWeight: 500, color: '#ef4444', py: 0.8, px: 2 }}
+          sx={{ fontSize: '0.82rem', fontWeight: 600, color: '#dc2626', py: 1, px: 2 }}
         >
-          Delete
+          Disconnect Account
         </MenuItem>
       </Menu>
-
-      {/* Assign Static IP Dialog */}
-      <Dialog
-        open={assignIpDialogOpen}
-        onClose={() => setAssignIpDialogOpen(false)}
-        PaperProps={{
-          sx: {
-            borderRadius: '16px',
-            maxWidth: 440,
-            width: '100%',
-            p: 1,
-            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)'
-          }
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Assign Static IP
-          <IconButton size="small" onClick={() => setAssignIpDialogOpen(false)} sx={{ color: '#94a3b8' }}>
-            <Close sx={{ fontSize: 18 }} />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-          <Typography sx={{ color: '#64748b', fontSize: '0.82rem', lineHeight: 1.5 }}>
-            Assign your dedicated static IP to whitelist with DhanHQ API for secure trading execution.
-          </Typography>
-
-          <Box sx={{ bgcolor: '#f8fafc', p: 1.5, borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-            <Typography sx={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 600, mb: 0.5 }}>
-              Dedicated Server Static IP
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Typography sx={{ color: '#2563eb', fontWeight: 800, fontSize: '1.05rem', letterSpacing: '0.02em' }}>
-                {staticIpInput || '171.61.160.213'}
-              </Typography>
-              <Tooltip title={copiedIp ? 'Copied!' : 'Copy IP'} arrow>
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    navigator.clipboard.writeText(staticIpInput || '171.61.160.213');
-                    setCopiedIp(true);
-                    setTimeout(() => setCopiedIp(false), 2000);
-                  }}
-                  sx={{ bgcolor: '#ffffff', border: '1px solid #e2e8f0', p: 0.8 }}
-                >
-                  {copiedIp ? <Check sx={{ fontSize: 16, color: '#16a34a' }} /> : <ContentCopy sx={{ fontSize: 16, color: '#64748b' }} />}
-                </IconButton>
-              </Tooltip>
-            </Box>
-          </Box>
-
-          <TextField
-            fullWidth
-            label="Static IP to Whitelist"
-            value={staticIpInput}
-            onChange={(e) => setStaticIpInput(e.target.value)}
-            size="small"
-            placeholder="171.61.160.213"
-            helperText="Enter 171.61.160.213 or your custom static IP"
-            sx={{ mt: 0.5 }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, pt: 1 }}>
-          <Button
-            onClick={() => setAssignIpDialogOpen(false)}
-            sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600, fontSize: '0.85rem' }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleSaveStaticIp}
-            disabled={assigningIp || !staticIpInput.trim()}
-            sx={{
-              bgcolor: '#2563eb',
-              textTransform: 'none',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-              borderRadius: '8px',
-              px: 2.5,
-              boxShadow: 'none',
-              '&:hover': { bgcolor: '#1d4ed8', boxShadow: 'none' }
-            }}
-          >
-            {assigningIp ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : 'Assign Static IP'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Global Feedback Snackbar */}
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={4000}
-        onClose={() => setSnackbarOpen(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={() => setSnackbarOpen(false)}
-          severity={snackbarSeverity}
-          sx={{ width: '100%', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
-        >
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
-
-      <Snackbar
-        open={copied}
-        autoHideDuration={2000}
-        onClose={() => setCopied(false)}
-        message="Redirect URL copied to clipboard!"
-      />
     </Layout>
   );
 };

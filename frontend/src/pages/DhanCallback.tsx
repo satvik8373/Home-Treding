@@ -6,175 +6,114 @@ import {
   Alert,
   Card,
   CardContent,
-  TextField,
-  Button,
-  IconButton,
-  InputAdornment
+  Button
 } from '@mui/material';
-import { CheckCircle, Error, Visibility, VisibilityOff, AccountBalance, Check } from '@mui/icons-material';
-import { useLocation } from 'react-router-dom';
+import { CheckCircle, Error, ArrowBack } from '@mui/icons-material';
+import { useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { API_CONFIG } from '../config/api';
 
 const DhanCallback: React.FC = () => {
   const location = useLocation();
-  const [status, setStatus] = useState<'loading' | 'prompt_creds' | 'success' | 'error'>('loading');
+  const navigate = useNavigate();
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Processing Dhan authentication...');
+  const [brokerInfo, setBrokerInfo] = useState<any>(null);
 
   const urlParams = new URLSearchParams(location.search);
   const tokenId = urlParams.get('tokenId') || urlParams.get('token_id') || '';
-  const code = urlParams.get('code');
-  const state = urlParams.get('state');
-  const errorParam = urlParams.get('error');
-
-  // Manual fallback inputs if localStorage is empty
-  const [clientId, setClientId] = useState(localStorage.getItem('dhan_pending_client_id') || '');
-  const [apiKey, setApiKey] = useState(localStorage.getItem('dhan_pending_api_key') || '');
-  const [apiSecret, setApiSecret] = useState(localStorage.getItem('dhan_pending_api_secret') || '');
-  const [showSecret, setShowSecret] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const errorParam = urlParams.get('error') || urlParams.get('error_description');
 
   useEffect(() => {
     let isMounted = true;
-    let timer: NodeJS.Timeout | null = null;
 
     const handleCallback = async () => {
-      try {
-        if (errorParam) {
-          if (isMounted) {
-            setStatus('error');
-            setMessage(`Dhan authorization rejected: ${errorParam}`);
-          }
-          return;
-        }
-
-        // 1. Handle Official DhanHQ Developer Flow with tokenId
-        if (tokenId) {
-          if (isMounted) {
-            setMessage('Exchanging Dhan Token ID with official DhanHQ servers...');
-          }
-
-          const consentAppId = localStorage.getItem('dhan_pending_consent_id') || undefined;
-          const storedApiKey = localStorage.getItem('dhan_pending_api_key') || undefined;
-          const storedApiSecret = localStorage.getItem('dhan_pending_api_secret') || undefined;
-          const storedClientId = localStorage.getItem('dhan_pending_client_id') || undefined;
-
-          try {
-            const response = await axios.post(`${API_CONFIG.BASE_URL}/api/brokers/dhan/consume-consent`, {
-              tokenId,
-              consentAppId,
-              clientId: storedClientId,
-              apiKey: storedApiKey,
-              apiSecret: storedApiSecret
-            });
-
-            if (response.data.success) {
-              localStorage.removeItem('dhan_pending_consent_id');
-              localStorage.removeItem('dhan_pending_api_key');
-              localStorage.removeItem('dhan_pending_api_secret');
-              localStorage.removeItem('dhan_pending_client_id');
-
-              if (isMounted) {
-                setStatus('success');
-                setMessage('Dhan Account successfully authorized and connected!');
-              }
-
-              localStorage.setItem('dhan_oauth_completed', String(Date.now()));
-
-              if (window.opener) {
-                try {
-                  window.opener.postMessage({
-                    type: 'DHAN_OAUTH_SUCCESS',
-                    broker: response.data.broker
-                  }, '*');
-                } catch (_) {}
-              }
-
-              timer = setTimeout(() => {
-                try {
-                  if (window.opener && !window.opener.closed) {
-                    window.close();
-                    return;
-                  }
-                } catch (_) {}
-                window.location.href = '/brokers';
-              }, 1200);
-              return;
-            } else {
-              // If backend needed credentials
-              if (isMounted) {
-                setStatus('prompt_creds');
-                setMessage('Please provide your API Key and Secret to finish authorizing this token.');
-              }
-              return;
-            }
-          } catch (err: any) {
-            // Need credentials
-            if (isMounted) {
-              setStatus('prompt_creds');
-              setMessage('Enter your API credentials below to complete authorization for this Token ID.');
-            }
-            return;
-          }
-        }
-
-        // 2. Handle Legacy Partner OAuth Flow (code + state)
-        if (code && state) {
-          if (isMounted) {
-            setMessage('Processing Dhan Partner OAuth callback...');
-          }
-
-          const connectionId = localStorage.getItem('dhan_connection_id');
-          if (!connectionId) {
-            if (isMounted) {
-              setStatus('error');
-              setMessage('Connection session not found. Please try connecting again.');
-            }
-            return;
-          }
-
-          const response = await axios.post(`${API_CONFIG.BASE_URL}/api/dhan-partner/callback`, {
-            code,
-            state,
-            connectionId
-          });
-
-          if (response.data.success) {
-            if (isMounted) {
-              setStatus('success');
-              setMessage('Dhan Partner connected successfully. Terminal activated.');
-            }
-
-            if (window.opener) {
-              window.opener.postMessage({
-                type: 'DHAN_PARTNER_SUCCESS',
-                data: response.data.broker
-              }, '*');
-            }
-
-            timer = setTimeout(() => {
-              if (window.opener) {
-                window.close();
-              } else {
-                window.location.href = '/brokers';
-              }
-            }, 2500);
-          } else {
-            if (isMounted) {
-              setStatus('error');
-              setMessage(`Dhan Partner connection failed: ${response.data.message}`);
-            }
-          }
-        } else if (!tokenId) {
-          if (isMounted) {
-            setStatus('error');
-            setMessage('No tokenId or authorization code found in URL.');
-          }
-        }
-      } catch (error: any) {
+      if (errorParam) {
         if (isMounted) {
           setStatus('error');
-          setMessage(`OAuth processing failed: ${error.response?.data?.message || error.message}`);
+          setMessage(`Dhan authentication rejected: ${errorParam}`);
+        }
+        return;
+      }
+
+      if (!tokenId) {
+        if (isMounted) {
+          setStatus('error');
+          setMessage('No Dhan authorization Token ID found in URL.');
+        }
+        return;
+      }
+
+      try {
+        if (isMounted) {
+          setMessage('Exchanging Token ID with official DhanHQ servers...');
+        }
+
+        const storedClientId = localStorage.getItem('dhan_pending_client_id') || localStorage.getItem('dhan_saved_client_id') || undefined;
+        const consentAppId = localStorage.getItem('dhan_pending_consent_id') || undefined;
+
+        const ep = `${API_CONFIG.BASE_URL}/api/brokers/dhan/consume-consent`;
+        const response = await axios.post(ep, {
+          tokenId,
+          consentAppId,
+          clientId: storedClientId
+        }, { timeout: 15000 });
+
+        if (response?.data?.success) {
+          const broker = response.data.broker;
+          setBrokerInfo(broker);
+
+          // Retain verified client ID in localStorage
+          if (storedClientId) localStorage.setItem('dhan_saved_client_id', storedClientId);
+
+          if (broker) {
+            localStorage.setItem('mavrix_saved_brokers', JSON.stringify([broker]));
+          }
+          localStorage.setItem('dhan_oauth_completed', String(Date.now()));
+
+          if (isMounted) {
+            setStatus('success');
+            setMessage('Dhan broker connected and verified successfully!');
+          }
+
+          // If opened as popup, notify parent
+          if (window.opener) {
+            try {
+              window.opener.postMessage({
+                type: 'DHAN_OAUTH_SUCCESS',
+                broker
+              }, '*');
+            } catch (_) {}
+          }
+
+          // Redirect to /brokers after brief success display
+          setTimeout(() => {
+            try {
+              if (window.opener && !window.opener.closed) {
+                window.close();
+                return;
+              }
+            } catch (_) {}
+            navigate('/brokers', { replace: true });
+          }, 1500);
+        } else {
+          const errDetail = response?.data?.message || 'Failed to exchange token with DhanHQ';
+          if (isMounted) {
+            setStatus('error');
+            setMessage(errDetail);
+          }
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setStatus('error');
+          const code = err.response?.status;
+          if (code === 401) {
+            setMessage('Dhan authorization token has expired (single-use 60s TTL) or your API Key / Secret needs refresh. Please start a fresh login or connect using your 24-hr Direct Access Token.');
+          } else if (code === 404) {
+            setMessage('Unable to reach broker consent endpoint. Please return to Brokers to reconnect.');
+          } else {
+            setMessage(err.response?.data?.message || 'Authorization failed with Dhan server. Please try again.');
+          }
         }
       }
     };
@@ -183,56 +122,12 @@ const DhanCallback: React.FC = () => {
 
     return () => {
       isMounted = false;
-      if (timer) clearTimeout(timer);
     };
-  }, [location.search, tokenId, code, state, errorParam]);
+  }, [tokenId, errorParam, navigate]);
 
-  const handleManualSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!apiKey.trim() || !apiSecret.trim()) return;
-
-    setSubmitting(true);
-    try {
-      const response = await axios.post(`${API_CONFIG.BASE_URL}/api/brokers/dhan/consume-consent`, {
-        tokenId,
-        clientId: clientId.trim() || undefined,
-        apiKey: apiKey.trim(),
-        apiSecret: apiSecret.trim()
-      });
-
-      if (response.data.success) {
-        setStatus('success');
-        setMessage('Dhan Account successfully authorized and connected!');
-
-        localStorage.setItem('dhan_oauth_completed', String(Date.now()));
-
-        if (window.opener) {
-          try {
-            window.opener.postMessage({
-              type: 'DHAN_OAUTH_SUCCESS',
-              broker: response.data.broker
-            }, '*');
-          } catch (_) {}
-        }
-
-        setTimeout(() => {
-          try {
-            if (window.opener && !window.opener.closed) {
-              window.close();
-              return;
-            }
-          } catch (_) {}
-          window.location.href = '/brokers';
-        }, 1200);
-      } else {
-        setMessage(response.data.message || 'Verification failed. Please check credentials.');
-      }
-    } catch (err: any) {
-      setMessage(err.response?.data?.message || err.message || 'Verification failed.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const isProductionDomain = typeof window !== 'undefined' &&
+    !window.location.hostname.includes('localhost') &&
+    !window.location.hostname.includes('127.0.0.1');
 
   return (
     <Box sx={{
@@ -245,9 +140,37 @@ const DhanCallback: React.FC = () => {
     }}>
       <Card sx={{ maxWidth: 440, width: '100%', textAlign: 'center', borderRadius: 3, boxShadow: '0 20px 45px -10px rgba(0,0,0,0.1)' }}>
         <CardContent sx={{ p: 4 }}>
+          {isProductionDomain && tokenId && (
+            <Box sx={{ mb: 2.5, p: 1.5, bgcolor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 2, textAlign: 'left' }}>
+              <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: '#1e40af' }}>
+                Testing on Localhost?
+              </Typography>
+              <Typography sx={{ fontSize: '0.74rem', color: '#1d4ed8', mb: 1, mt: 0.2 }}>
+                Dhan redirected to the production domain configured in your Dhan developer account.
+              </Typography>
+              <Button
+                size="small"
+                variant="contained"
+                onClick={() => {
+                  window.location.href = `http://localhost:3000/dhan-connect?tokenId=${encodeURIComponent(tokenId)}`;
+                }}
+                sx={{
+                  bgcolor: '#4f46e5',
+                  fontSize: '0.75rem',
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  borderRadius: 1.5,
+                  '&:hover': { bgcolor: '#4338ca' }
+                }}
+              >
+                Forward to http://localhost:3000
+              </Button>
+            </Box>
+          )}
+
           {status === 'loading' && (
             <>
-              <CircularProgress size={44} sx={{ color: '#2563eb', mb: 2.5 }} />
+              <CircularProgress size={44} sx={{ color: '#4f46e5', mb: 2.5 }} />
               <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', mb: 1 }}>
                 Authorizing Dhan Connection
               </Typography>
@@ -257,132 +180,75 @@ const DhanCallback: React.FC = () => {
             </>
           )}
 
-          {status === 'prompt_creds' && (
-            <Box component="form" onSubmit={handleManualSubmit} sx={{ textAlign: 'left' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#00A25B', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '1.25rem' }}>
-                  ध
-                </Box>
-                <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0f172a' }}>
-                    Complete Dhan Connection
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#64748b' }}>
-                    Token ID detected from Dhan login
-                  </Typography>
-                </Box>
-              </Box>
-
-              <Alert severity="info" sx={{ mb: 2.5, borderRadius: 2, fontSize: '0.75rem' }}>
-                Dhan Token ID: <code>{tokenId.slice(0, 16)}...</code>
-              </Alert>
-
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#334155', display: 'block', mb: 0.5 }}>
-                    Broker ID (Client ID)
-                  </Typography>
-                  <TextField
-                    placeholder="Enter Broker ID"
-                    value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
-                    fullWidth
-                    size="small"
-                    InputProps={{ sx: { borderRadius: 2, bgcolor: '#f8fafc', fontSize: '0.875rem' } }}
-                  />
-                </Box>
-
-                <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#334155', display: 'block', mb: 0.5 }}>
-                    API Key
-                  </Typography>
-                  <TextField
-                    placeholder="Enter API Key"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    required
-                    fullWidth
-                    size="small"
-                    InputProps={{ sx: { borderRadius: 2, bgcolor: '#f8fafc', fontSize: '0.875rem' } }}
-                  />
-                </Box>
-
-                <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 700, color: '#334155', display: 'block', mb: 0.5 }}>
-                    API Secret Key
-                  </Typography>
-                  <TextField
-                    placeholder="Enter API Secret Key"
-                    type={showSecret ? 'text' : 'password'}
-                    value={apiSecret}
-                    onChange={(e) => setApiSecret(e.target.value)}
-                    required
-                    fullWidth
-                    size="small"
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton onClick={() => setShowSecret(!showSecret)} edge="end" size="small">
-                            {showSecret ? <VisibilityOff sx={{ fontSize: 18 }} /> : <Visibility sx={{ fontSize: 18 }} />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                      sx: { borderRadius: 2, bgcolor: '#f8fafc', fontSize: '0.875rem' }
-                    }}
-                  />
-                </Box>
-
-                <Button
-                  type="submit"
-                  variant="contained"
-                  disabled={submitting || !apiKey || !apiSecret}
-                  sx={{
-                    mt: 1,
-                    py: 1.2,
-                    borderRadius: 2.5,
-                    bgcolor: '#2563eb',
-                    fontWeight: 700,
-                    textTransform: 'none',
-                    '&:hover': { bgcolor: '#1d4ed8' }
-                  }}
-                >
-                  {submitting ? <CircularProgress size={20} sx={{ color: '#fff' }} /> : 'Complete Setup & Connect'}
-                </Button>
-              </Box>
-            </Box>
-          )}
-
           {status === 'success' && (
             <>
               <CheckCircle sx={{ fontSize: 56, color: '#16a34a', mb: 2 }} />
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#16a34a', mb: 1 }}>
-                Login Successful!
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', mb: 0.5 }}>
+                Connected & Verified!
               </Typography>
-              <Typography variant="body2" sx={{ color: '#64748b' }}>
+              <Typography variant="body2" sx={{ color: '#16a34a', fontWeight: 600, mb: 2 }}>
                 {message}
               </Typography>
-              <Typography variant="caption" display="block" sx={{ mt: 2, color: '#94a3b8' }}>
-                Redirecting to your dashboard...
+              {brokerInfo && (
+                <Box sx={{ bgcolor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 2, p: 2, mb: 2, textAlign: 'left' }}>
+                  <Typography sx={{ fontSize: '0.8rem', color: '#166534', fontWeight: 700 }}>
+                    Broker: {brokerInfo.broker || 'DHAN'}
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.8rem', color: '#166534' }}>
+                    Client ID: {brokerInfo.clientId}
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.75rem', color: '#15803d', mt: 0.5 }}>
+                    Status: Verified & Ready for live trading
+                  </Typography>
+                </Box>
+              )}
+              <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                Returning to Brokers dashboard...
               </Typography>
             </>
           )}
 
           {status === 'error' && (
             <>
-              <Error sx={{ fontSize: 56, color: '#ef4444', mb: 2 }} />
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#ef4444', mb: 1 }}>
-                Authorization Failed
+              <Error sx={{ fontSize: 56, color: '#dc2626', mb: 2 }} />
+              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', mb: 1 }}>
+                Connection Failed
               </Typography>
-              <Alert severity="error" sx={{ mt: 2, mb: 2, borderRadius: 2, fontSize: '0.8rem' }}>
+              <Alert severity="error" sx={{ mb: 3, textAlign: 'left', borderRadius: 2, fontSize: '0.8rem' }}>
                 {message}
               </Alert>
-              <Button
-                variant="outlined"
-                onClick={() => window.location.href = '/brokers'}
-                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
-              >
-                Back to Brokers
-              </Button>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                <Button
+                  variant="contained"
+                  startIcon={<ArrowBack />}
+                  onClick={() => navigate('/brokers', { replace: true })}
+                  sx={{
+                    bgcolor: '#4f46e5',
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    borderRadius: 2,
+                    py: 1,
+                    '&:hover': { bgcolor: '#4338ca' }
+                  }}
+                >
+                  Back to Brokers (Fresh Login)
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate('/brokers?method=token', { replace: true })}
+                  sx={{
+                    borderColor: '#c7d2fe',
+                    color: '#4f46e5',
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    borderRadius: 2,
+                    py: 1,
+                    '&:hover': { bgcolor: '#eef2ff', borderColor: '#4f46e5' }
+                  }}
+                >
+                  Connect via Direct Access Token (Instant)
+                </Button>
+              </Box>
             </>
           )}
         </CardContent>

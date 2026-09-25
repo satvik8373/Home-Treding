@@ -26,9 +26,13 @@ export class DhanOrdersService {
         exchangeSegment = 'MCX_COMM';
       }
 
+      // Dhan limits correlationId to 25 alphanumeric characters
+      const rawCorrelation = String(order.correlationId || order.id || `ord_${Date.now()}`);
+      const cleanCorrelationId = rawCorrelation.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 25);
+
       const payload: DhanOrderRequest = {
         dhanClientId: this.client.getClientId(),
-        correlationId: order.correlationId || order.id || `ord_${Date.now()}`,
+        correlationId: cleanCorrelationId,
         transactionType: order.side,
         exchangeSegment: exchangeSegment,
         productType: order.productType as any || 'INTRADAY',
@@ -169,9 +173,12 @@ export class DhanOrdersService {
         exchangeSegment = 'MCX_COMM';
       }
 
+      const rawSliceCorrelation = String(order.correlationId || order.id || `slc_${Date.now()}`);
+      const cleanSliceCorrelationId = rawSliceCorrelation.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 25);
+
       const payload: DhanOrderRequest = {
         dhanClientId: this.client.getClientId(),
-        correlationId: order.correlationId || order.id || `slc_${Date.now()}`,
+        correlationId: cleanSliceCorrelationId,
         transactionType: order.side,
         exchangeSegment: exchangeSegment,
         productType: (order.productType as any) || 'INTRADAY',

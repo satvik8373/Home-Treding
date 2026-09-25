@@ -1,8 +1,9 @@
 .live-ticker {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  border-radius: 12px;
+  background: #0f172a;
+  border-radius: 8px;
   padding: 16px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #1e293b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   overflow: hidden;
 }
 
@@ -12,7 +13,7 @@
   gap: 12px;
   margin-bottom: 12px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid #1e293b;
 }
 
 .status-indicator {
@@ -22,41 +23,31 @@
   font-size: 12px;
   font-weight: 600;
   padding: 4px 12px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  background: #1e293b;
 }
 
 .status-indicator.live {
-  background: rgba(239, 68, 68, 0.2);
+  background: #1e293b;
   color: #ef4444;
-  animation: pulse 2s infinite;
 }
 
 .status-indicator.paused {
-  background: rgba(156, 163, 175, 0.2);
+  background: #1e293b;
   color: #9ca3af;
 }
 
 .status-indicator.closed {
-  background: rgba(245, 158, 11, 0.2);
+  background: #1e293b;
   color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.4);
+  border: 1px solid #334155;
 }
 
 .ticker-ist-time {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  color: #94a3b8;
   margin-left: auto;
   font-family: 'Courier New', monospace;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
 }
 
 .update-rate {

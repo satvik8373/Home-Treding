@@ -317,9 +317,16 @@ export class DhanAuthService {
       };
     } catch (error: any) {
       logger.error('[Dhan Consume Consent Error]', error.response?.data || error.message);
+      const status = error.response?.status;
+      let errorMsg = error.response?.data?.remarks || error.response?.data?.message || error.message || 'Failed to exchange token with Dhan';
+      
+      if (status === 401) {
+        errorMsg = 'Dhan authorization rejected (401). This Token ID has either expired (single-use token expires in 60 seconds), or your API Key / Secret Key does not match the Dhan app. Please click "Back to Brokers" to start a fresh login or use your 24-hr Direct Access Token.';
+      }
+
       return {
         success: false,
-        error: error.response?.data?.remarks || error.response?.data?.message || error.message || 'Failed to exchange token with Dhan'
+        error: errorMsg
       };
     }
   }

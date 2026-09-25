@@ -1,0 +1,1527 @@
+{
+  "schemaVersion": "1.0.0",
+  "nodes": [
+    {
+      "id": "App",
+      "kind": "component",
+      "file": "src/App.tsx"
+    },
+    {
+      "id": "reportWebVitals",
+      "kind": "component",
+      "file": "src/reportWebVitals.ts"
+    },
+    {
+      "id": "AddBrokerForm",
+      "kind": "component",
+      "file": "src/components/AddBrokerForm.tsx"
+    },
+    {
+      "id": "handleInputChange",
+      "kind": "component",
+      "file": "src/components/AddBrokerForm.tsx"
+    },
+    {
+      "id": "handleSubmit",
+      "kind": "component",
+      "file": "src/components/AddBrokerForm.tsx"
+    },
+    {
+      "id": "handleClose",
+      "kind": "component",
+      "file": "src/components/AddBrokerForm.tsx"
+    },
+    {
+      "id": "BrokerageForm",
+      "kind": "component",
+      "file": "src/components/BrokerageForm.tsx"
+    },
+    {
+      "id": "handleChange",
+      "kind": "component",
+      "file": "src/components/BrokerageForm.tsx"
+    },
+    {
+      "id": "BrokerCard",
+      "kind": "component",
+      "file": "src/components/BrokerCard.tsx"
+    },
+    {
+      "id": "updateBrokerToggle",
+      "kind": "component",
+      "file": "src/components/BrokerCard.tsx"
+    },
+    {
+      "id": "handleToggleTerminal",
+      "kind": "component",
+      "file": "src/components/BrokerCard.tsx"
+    },
+    {
+      "id": "handleMessage",
+      "kind": "component",
+      "file": "src/components/BrokerCard.tsx"
+    },
+    {
+      "id": "handleToggleTradingEngine",
+      "kind": "component",
+      "file": "src/components/BrokerCard.tsx"
+    },
+    {
+      "id": "handleReconnect",
+      "kind": "component",
+      "file": "src/components/BrokerCard.tsx"
+    },
+    {
+      "id": "handleDelete",
+      "kind": "component",
+      "file": "src/components/BrokerCard.tsx"
+    },
+    {
+      "id": "DhanTerminal",
+      "kind": "component",
+      "file": "src/components/DhanTerminal.tsx"
+    },
+    {
+      "id": "fetchTerminalData",
+      "kind": "component",
+      "file": "src/components/DhanTerminal.tsx"
+    },
+    {
+      "id": "LiveIndicesSidebar",
+      "kind": "component",
+      "file": "src/components/Layout.tsx"
+    },
+    {
+      "id": "applyFeed",
+      "kind": "component",
+      "file": "src/components/Layout.tsx"
+    },
+    {
+      "id": "fetchRest",
+      "kind": "component",
+      "file": "src/components/Layout.tsx"
+    },
+    {
+      "id": "Layout",
+      "kind": "component",
+      "file": "src/components/Layout.tsx"
+    },
+    {
+      "id": "handleDrawerToggle",
+      "kind": "component",
+      "file": "src/components/Layout.tsx"
+    },
+    {
+      "id": "handleNavigation",
+      "kind": "component",
+      "file": "src/components/Layout.tsx"
+    },
+    {
+      "id": "handleMenuOpen",
+      "kind": "component",
+      "file": "src/components/Layout.tsx"
+    },
+    {
+      "id": "handleMenuClose",
+      "kind": "component",
+      "file": "src/components/Layout.tsx"
+    },
+    {
+      "id": "handleLogout",
+      "kind": "component",
+      "file": "src/components/Layout.tsx"
+    },
+    {
+      "id": "LiveMarketTicker",
+      "kind": "component",
+      "file": "src/components/LiveMarketTicker.tsx"
+    },
+    {
+      "id": "MarketDashboard",
+      "kind": "component",
+      "file": "src/components/MarketDashboard.tsx"
+    },
+    {
+      "id": "MarketData",
+      "kind": "component",
+      "file": "src/components/MarketData.tsx"
+    },
+    {
+      "id": "fetchData",
+      "kind": "component",
+      "file": "src/components/MarketData.tsx"
+    },
+    {
+      "id": "renderCard",
+      "kind": "component",
+      "file": "src/components/MarketData.tsx"
+    },
+    {
+      "id": "MarketDataDisplay",
+      "kind": "component",
+      "file": "src/components/MarketDataDisplay.tsx"
+    },
+    {
+      "id": "NiftyIndependentBreakoutMonitor",
+      "kind": "component",
+      "file": "src/components/NiftyIndependentBreakoutMonitor.tsx"
+    },
+    {
+      "id": "formatPrice",
+      "kind": "component",
+      "file": "src/components/NiftyIndependentBreakoutMonitor.tsx"
+    },
+    {
+      "id": "OrderManagement",
+      "kind": "component",
+      "file": "src/components/OrderManagement.tsx"
+    },
+    {
+      "id": "handlePlaceOrder",
+      "kind": "component",
+      "file": "src/components/OrderManagement.tsx"
+    },
+    {
+      "id": "handleCancelOrder",
+      "kind": "component",
+      "file": "src/components/OrderManagement.tsx"
+    },
+    {
+      "id": "PortfolioDashboard",
+      "kind": "component",
+      "file": "src/components/PortfolioDashboard.tsx"
+    },
+    {
+      "id": "handleSquareOff",
+      "kind": "component",
+      "file": "src/components/PortfolioDashboard.tsx"
+    },
+    {
+      "id": "RealTimeMarketData",
+      "kind": "component",
+      "file": "src/components/RealTimeMarketData.tsx"
+    },
+    {
+      "id": "fetchMarketFeed",
+      "kind": "component",
+      "file": "src/components/RealTimeMarketData.tsx"
+    },
+    {
+      "id": "openMarketDepth",
+      "kind": "component",
+      "file": "src/components/RealTimeMarketData.tsx"
+    },
+    {
+      "id": "StrategyConfigPanel",
+      "kind": "component",
+      "file": "src/components/StrategyConfigPanel.tsx"
+    },
+    {
+      "id": "handleSave",
+      "kind": "component",
+      "file": "src/components/StrategyConfigPanel.tsx"
+    },
+    {
+      "id": "handleReset",
+      "kind": "component",
+      "file": "src/components/StrategyConfigPanel.tsx"
+    },
+    {
+      "id": "isDefaultValue",
+      "kind": "component",
+      "file": "src/components/StrategyConfigPanel.tsx"
+    },
+    {
+      "id": "renderField",
+      "kind": "component",
+      "file": "src/components/StrategyConfigPanel.tsx"
+    },
+    {
+      "id": "TradingViewLiveChart",
+      "kind": "component",
+      "file": "src/components/TradingViewLiveChart.tsx"
+    },
+    {
+      "id": "updateTime",
+      "kind": "component",
+      "file": "src/components/TradingViewLiveChart.tsx"
+    },
+    {
+      "id": "handleTick",
+      "kind": "component",
+      "file": "src/components/TradingViewLiveChart.tsx"
+    },
+    {
+      "id": "stripTrailingSlash",
+      "kind": "component",
+      "file": "src/config/api.ts"
+    },
+    {
+      "id": "getApiUrl",
+      "kind": "component",
+      "file": "src/config/api.ts"
+    },
+    {
+      "id": "getWsUrl",
+      "kind": "component",
+      "file": "src/config/api.ts"
+    },
+    {
+      "id": "isServerlessEnvironment",
+      "kind": "component",
+      "file": "src/config/api.ts"
+    },
+    {
+      "id": "TradingModeProvider",
+      "kind": "component",
+      "file": "src/context/TradingModeContext.tsx"
+    },
+    {
+      "id": "setMode",
+      "kind": "component",
+      "file": "src/context/TradingModeContext.tsx"
+    },
+    {
+      "id": "toggleMode",
+      "kind": "component",
+      "file": "src/context/TradingModeContext.tsx"
+    },
+    {
+      "id": "useTradingMode",
+      "kind": "hook",
+      "file": "src/context/TradingModeContext.tsx"
+    },
+    {
+      "id": "useLiveMarketData",
+      "kind": "hook",
+      "file": "src/hooks/useLiveMarketData.ts"
+    },
+    {
+      "id": "useWatchlist",
+      "kind": "hook",
+      "file": "src/hooks/useLiveMarketData.ts"
+    },
+    {
+      "id": "useSymbol",
+      "kind": "hook",
+      "file": "src/hooks/useLiveMarketData.ts"
+    },
+    {
+      "id": "useStrategyConfig",
+      "kind": "hook",
+      "file": "src/hooks/useStrategyConfig.ts"
+    },
+    {
+      "id": "clearMessages",
+      "kind": "component",
+      "file": "src/hooks/useStrategyConfig.ts"
+    },
+    {
+      "id": "BacktestPage",
+      "kind": "component",
+      "file": "src/pages/BacktestPage.tsx"
+    },
+    {
+      "id": "fetchStrategies",
+      "kind": "component",
+      "file": "src/pages/BacktestPage.tsx"
+    },
+    {
+      "id": "runBacktest",
+      "kind": "component",
+      "file": "src/pages/BacktestPage.tsx"
+    },
+    {
+      "id": "handleExportTrades",
+      "kind": "component",
+      "file": "src/pages/BacktestPage.tsx"
+    },
+    {
+      "id": "Brokers",
+      "kind": "component",
+      "file": "src/pages/Brokers.tsx"
+    },
+    {
+      "id": "handleStorage",
+      "kind": "component",
+      "file": "src/pages/Brokers.tsx"
+    },
+    {
+      "id": "handleCopyRedirect",
+      "kind": "component",
+      "file": "src/pages/Brokers.tsx"
+    },
+    {
+      "id": "handleDirectTokenSubmit",
+      "kind": "component",
+      "file": "src/pages/Brokers.tsx"
+    },
+    {
+      "id": "handleTestConnection",
+      "kind": "component",
+      "file": "src/pages/Brokers.tsx"
+    },
+    {
+      "id": "handleDisconnect",
+      "kind": "component",
+      "file": "src/pages/Brokers.tsx"
+    },
+    {
+      "id": "handleDeleteBroker",
+      "kind": "component",
+      "file": "src/pages/Brokers.tsx"
+    },
+    {
+      "id": "CreateStrategy",
+      "kind": "component",
+      "file": "src/pages/CreateStrategy.tsx"
+    },
+    {
+      "id": "fetchToEdit",
+      "kind": "component",
+      "file": "src/pages/CreateStrategy.tsx"
+    },
+    {
+      "id": "handleInstrumentChange",
+      "kind": "component",
+      "file": "src/pages/CreateStrategy.tsx"
+    },
+    {
+      "id": "handleDayToggle",
+      "kind": "component",
+      "file": "src/pages/CreateStrategy.tsx"
+    },
+    {
+      "id": "handleAddLeg",
+      "kind": "component",
+      "file": "src/pages/CreateStrategy.tsx"
+    },
+    {
+      "id": "handleCopyLeg",
+      "kind": "component",
+      "file": "src/pages/CreateStrategy.tsx"
+    },
+    {
+      "id": "handleRemoveLeg",
+      "kind": "component",
+      "file": "src/pages/CreateStrategy.tsx"
+    },
+    {
+      "id": "handleUpdateLeg",
+      "kind": "component",
+      "file": "src/pages/CreateStrategy.tsx"
+    },
+    {
+      "id": "Dashboard",
+      "kind": "component",
+      "file": "src/pages/Dashboard.tsx"
+    },
+    {
+      "id": "handleRefresh",
+      "kind": "component",
+      "file": "src/pages/Dashboard.tsx"
+    },
+    {
+      "id": "handleToggleEngine",
+      "kind": "component",
+      "file": "src/pages/Dashboard.tsx"
+    },
+    {
+      "id": "DhanCallback",
+      "kind": "component",
+      "file": "src/pages/DhanCallback.tsx"
+    },
+    {
+      "id": "handleCallback",
+      "kind": "component",
+      "file": "src/pages/DhanCallback.tsx"
+    },
+    {
+      "id": "LiveChartPage",
+      "kind": "component",
+      "file": "src/pages/LiveChartPage.tsx"
+    },
+    {
+      "id": "fetchStatus",
+      "kind": "component",
+      "file": "src/pages/LiveChartPage.tsx"
+    },
+    {
+      "id": "GoogleIcon",
+      "kind": "component",
+      "file": "src/pages/Login.tsx"
+    },
+    {
+      "id": "Login",
+      "kind": "component",
+      "file": "src/pages/Login.tsx"
+    },
+    {
+      "id": "handleGoogleSignIn",
+      "kind": "component",
+      "file": "src/pages/Login.tsx"
+    },
+    {
+      "id": "OptionChainPage",
+      "kind": "component",
+      "file": "src/pages/OptionChain.tsx"
+    },
+    {
+      "id": "checkConnection",
+      "kind": "component",
+      "file": "src/pages/OptionChain.tsx"
+    },
+    {
+      "id": "fetchExpiries",
+      "kind": "component",
+      "file": "src/pages/OptionChain.tsx"
+    },
+    {
+      "id": "openTradeModal",
+      "kind": "component",
+      "file": "src/pages/OptionChain.tsx"
+    },
+    {
+      "id": "executeOptionOrder",
+      "kind": "component",
+      "file": "src/pages/OptionChain.tsx"
+    },
+    {
+      "id": "Portfolio",
+      "kind": "component",
+      "file": "src/pages/Portfolio.tsx"
+    },
+    {
+      "id": "Register",
+      "kind": "component",
+      "file": "src/pages/Register.tsx"
+    },
+    {
+      "id": "Reports",
+      "kind": "component",
+      "file": "src/pages/Reports.tsx"
+    },
+    {
+      "id": "handleExportCSV",
+      "kind": "component",
+      "file": "src/pages/Reports.tsx"
+    },
+    {
+      "id": "Strategies",
+      "kind": "component",
+      "file": "src/pages/Strategies.tsx"
+    },
+    {
+      "id": "handleOpenDeployModal",
+      "kind": "component",
+      "file": "src/pages/Strategies.tsx"
+    },
+    {
+      "id": "handleConfirmDeploy",
+      "kind": "component",
+      "file": "src/pages/Strategies.tsx"
+    },
+    {
+      "id": "handleToggleTradeEngine",
+      "kind": "component",
+      "file": "src/pages/Strategies.tsx"
+    },
+    {
+      "id": "handleToggleDeploymentMode",
+      "kind": "component",
+      "file": "src/pages/Strategies.tsx"
+    },
+    {
+      "id": "handleToggleDeploymentStatus",
+      "kind": "component",
+      "file": "src/pages/Strategies.tsx"
+    },
+    {
+      "id": "handleSquareOffDeployment",
+      "kind": "component",
+      "file": "src/pages/Strategies.tsx"
+    },
+    {
+      "id": "handleDeleteDeployment",
+      "kind": "component",
+      "file": "src/pages/Strategies.tsx"
+    },
+    {
+      "id": "toggleExpandDeployment",
+      "kind": "component",
+      "file": "src/pages/Strategies.tsx"
+    },
+    {
+      "id": "handleDuplicateStrategy",
+      "kind": "component",
+      "file": "src/pages/Strategies.tsx"
+    },
+    {
+      "id": "handleDeleteStrategy",
+      "kind": "component",
+      "file": "src/pages/Strategies.tsx"
+    },
+    {
+      "id": "Subscription",
+      "kind": "component",
+      "file": "src/pages/Subscription.tsx"
+    },
+    {
+      "id": "TestLiveTrading",
+      "kind": "component",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    {
+      "id": "updateTest",
+      "kind": "component",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    {
+      "id": "testInstrumentStorage",
+      "kind": "component",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    {
+      "id": "testLiveMarketData",
+      "kind": "component",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    {
+      "id": "testTemplateData",
+      "kind": "component",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    {
+      "id": "testDhanConnection",
+      "kind": "component",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    {
+      "id": "testOrderPlacement",
+      "kind": "component",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    {
+      "id": "testWebSocket",
+      "kind": "component",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    {
+      "id": "runAllTests",
+      "kind": "component",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    {
+      "id": "getStatusIcon",
+      "kind": "component",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    {
+      "id": "getStatusColor",
+      "kind": "component",
+      "file": "src/pages/TestLiveTrading.tsx"
+    },
+    {
+      "id": "TradingDashboard",
+      "kind": "component",
+      "file": "src/pages/TradingDashboard.tsx"
+    },
+    {
+      "id": "loadDashboardData",
+      "kind": "component",
+      "file": "src/pages/TradingDashboard.tsx"
+    },
+    {
+      "id": "handleEngineToggle",
+      "kind": "component",
+      "file": "src/pages/TradingDashboard.tsx"
+    },
+    {
+      "id": "ApiService",
+      "kind": "service",
+      "file": "src/services/apiService.ts"
+    },
+    {
+      "id": "AuthService",
+      "kind": "service",
+      "file": "src/services/authService.ts"
+    },
+    {
+      "id": "getBaseUrl",
+      "kind": "component",
+      "file": "src/services/brokerApi.ts"
+    },
+    {
+      "id": "createFreshPortfolio",
+      "kind": "component",
+      "file": "src/services/brokerApi.ts"
+    },
+    {
+      "id": "loadCachedBrokers",
+      "kind": "component",
+      "file": "src/services/brokerApi.ts"
+    },
+    {
+      "id": "DhanAPIService",
+      "kind": "service",
+      "file": "src/services/dhanAPI.ts"
+    },
+    {
+      "id": "DhanService",
+      "kind": "service",
+      "file": "src/services/dhanService.ts"
+    },
+    {
+      "id": "FirestoreService",
+      "kind": "service",
+      "file": "src/services/firestoreService.ts"
+    },
+    {
+      "id": "LiveMarketService",
+      "kind": "service",
+      "file": "src/services/liveMarketService.ts"
+    },
+    {
+      "id": "MarketDataService",
+      "kind": "service",
+      "file": "src/services/marketDataService.ts"
+    },
+    {
+      "id": "MarketDataStreamService",
+      "kind": "service",
+      "file": "src/services/marketDataStreamService.ts"
+    },
+    {
+      "id": "configureAxiosAuthInterceptor",
+      "kind": "component",
+      "file": "src/services/setupAxios.ts"
+    },
+    {
+      "id": "BacktestControls",
+      "kind": "component",
+      "file": "src/components/backtest/BacktestControls.tsx"
+    },
+    {
+      "id": "InteractiveEquitySvgChart",
+      "kind": "component",
+      "file": "src/components/backtest/BacktestControls.tsx"
+    },
+    {
+      "id": "BacktestSummaryCards",
+      "kind": "component",
+      "file": "src/components/backtest/BacktestSummaryCards.tsx"
+    },
+    {
+      "id": "formatK",
+      "kind": "component",
+      "file": "src/components/backtest/BacktestSummaryCards.tsx"
+    },
+    {
+      "id": "DaywiseBreakdownHeatmap",
+      "kind": "component",
+      "file": "src/components/backtest/DaywiseBreakdownHeatmap.tsx"
+    },
+    {
+      "id": "renderMonthCalendar",
+      "kind": "component",
+      "file": "src/components/backtest/DaywiseBreakdownHeatmap.tsx"
+    },
+    {
+      "id": "MaxProfitLossChart",
+      "kind": "component",
+      "file": "src/components/backtest/MaxProfitLossChart.tsx"
+    },
+    {
+      "id": "InteractiveDailyPnlSvgChart",
+      "kind": "component",
+      "file": "src/components/backtest/MaxProfitLossChart.tsx"
+    },
+    {
+      "id": "TransactionDetailsAccordion",
+      "kind": "component",
+      "file": "src/components/backtest/TransactionDetailsAccordion.tsx"
+    },
+    {
+      "id": "formatDisplayDate",
+      "kind": "component",
+      "file": "src/components/backtest/TransactionDetailsAccordion.tsx"
+    },
+    {
+      "id": "handleAccordionChange",
+      "kind": "component",
+      "file": "src/components/backtest/TransactionDetailsAccordion.tsx"
+    },
+    {
+      "id": "ConnectDhanModal",
+      "kind": "component",
+      "file": "src/components/brokers/ConnectDhanModal.tsx"
+    },
+    {
+      "id": "handleSubmitOAuth",
+      "kind": "component",
+      "file": "src/components/brokers/ConnectDhanModal.tsx"
+    },
+    {
+      "id": "handleSubmitDirectToken",
+      "kind": "component",
+      "file": "src/components/brokers/ConnectDhanModal.tsx"
+    },
+    {
+      "id": "DhanConnectionCard",
+      "kind": "component",
+      "file": "src/components/brokers/DhanConnectionCard.tsx"
+    },
+    {
+      "id": "EmptyState",
+      "kind": "component",
+      "file": "src/components/ui/EmptyState.tsx"
+    },
+    {
+      "id": "PageHeader",
+      "kind": "component",
+      "file": "src/components/ui/PageHeader.tsx"
+    },
+    {
+      "id": "SectionCard",
+      "kind": "component",
+      "file": "src/components/ui/SectionCard.tsx"
+    },
+    {
+      "id": "StatCard",
+      "kind": "component",
+      "file": "src/components/ui/StatCard.tsx"
+    },
+    {
+      "id": "StatusBadge",
+      "kind": "component",
+      "file": "src/components/ui/StatusBadge.tsx"
+    },
+    {
+      "id": "EmergencyStopButton",
+      "kind": "component",
+      "file": "src/components/common/EmergencyStopButton.tsx"
+    },
+    {
+      "id": "handleToggle",
+      "kind": "component",
+      "file": "src/components/common/EmergencyStopButton.tsx"
+    },
+    {
+      "id": "GlobalTradingModeSwitch",
+      "kind": "component",
+      "file": "src/components/common/GlobalTradingModeSwitch.tsx"
+    },
+    {
+      "id": "handleSelectMode",
+      "kind": "component",
+      "file": "src/components/common/GlobalTradingModeSwitch.tsx"
+    },
+    {
+      "id": "handleConfirmLive",
+      "kind": "component",
+      "file": "src/components/common/GlobalTradingModeSwitch.tsx"
+    },
+    {
+      "id": "ModeBadge",
+      "kind": "component",
+      "file": "src/components/common/ModeBadge.tsx"
+    }
+  ],
+  "edges": [
+    {
+      "from": "src/App.tsx",
+      "to": "src/theme.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/context/TradingModeContext.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Login.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Register.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Dashboard.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Brokers.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/DhanCallback.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Strategies.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/CreateStrategy.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Portfolio.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Reports.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/TradingDashboard.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/TestLiveTrading.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/OptionChain.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/BacktestPage.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/LiveChartPage.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Subscription.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/index.tsx",
+      "to": "src/services/setupAxios.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/index.tsx",
+      "to": "src/App.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/index.tsx",
+      "to": "src/reportWebVitals.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/AddBrokerForm.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/BrokerageForm.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/BrokerCard.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/DhanTerminal.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/config/firebase.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/services/authService.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/LiveMarketTicker.tsx",
+      "to": "src/hooks/useLiveMarketData.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/MarketData.tsx",
+      "to": "src/services/apiService.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/NiftyIndependentBreakoutMonitor.tsx",
+      "to": "src/components/ui/index.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/OrderManagement.tsx",
+      "to": "src/components/ui/index.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/OrderManagement.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/OrderManagement.tsx",
+      "to": "src/context/TradingModeContext.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/PortfolioDashboard.tsx",
+      "to": "src/services/brokerApi.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/PortfolioDashboard.tsx",
+      "to": "src/components/ui/index.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/PortfolioDashboard.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/PortfolioDashboard.tsx",
+      "to": "src/context/TradingModeContext.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/RealTimeMarketData.tsx",
+      "to": "src/components/ui/index.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/RealTimeMarketData.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/StrategyConfigPanel.tsx",
+      "to": "src/hooks/useStrategyConfig.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/TradingViewChart.tsx",
+      "to": "src/components/TradingViewLiveChart.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/TradingViewChart.tsx",
+      "to": "src/components/TradingViewLiveChart.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/TradingViewLiveChart.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/TradingViewLiveChart.tsx",
+      "to": "src/components/ui/StatusBadge.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/TradingViewLiveChart.tsx",
+      "to": "src/components/OriginalTradingViewWidget.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/context/TradingModeContext.tsx",
+      "to": "src/services/brokerApi.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/hooks/useLiveMarketData.ts",
+      "to": "src/services/liveMarketService.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/hooks/useStrategyConfig.ts",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/BacktestPage.tsx",
+      "to": "src/components/Layout.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/BacktestPage.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/BacktestPage.tsx",
+      "to": "src/components/backtest/BacktestControls.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/BacktestPage.tsx",
+      "to": "src/components/backtest/BacktestSummaryCards.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/BacktestPage.tsx",
+      "to": "src/components/backtest/MaxProfitLossChart.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/BacktestPage.tsx",
+      "to": "src/components/backtest/DaywiseBreakdownHeatmap.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/BacktestPage.tsx",
+      "to": "src/components/backtest/TransactionDetailsAccordion.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/BacktestPage.tsx",
+      "to": "src/components/ui/index.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Brokers.tsx",
+      "to": "src/components/Layout.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Brokers.tsx",
+      "to": "src/services/brokerApi.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Brokers.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/CreateStrategy.tsx",
+      "to": "src/components/Layout.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/CreateStrategy.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Dashboard.tsx",
+      "to": "src/services/authService.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Dashboard.tsx",
+      "to": "src/components/Layout.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Dashboard.tsx",
+      "to": "src/services/brokerApi.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Dashboard.tsx",
+      "to": "src/components/ui/index.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Dashboard.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Dashboard.tsx",
+      "to": "src/context/TradingModeContext.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Dashboard.tsx",
+      "to": "src/components/NiftyIndependentBreakoutMonitor.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Dashboard.tsx",
+      "to": "src/components/TradingViewLiveChart.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/DhanCallback.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/LiveChartPage.tsx",
+      "to": "src/components/Layout.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/LiveChartPage.tsx",
+      "to": "src/components/TradingViewLiveChart.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/LiveChartPage.tsx",
+      "to": "src/components/ui/index.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/LiveChartPage.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Login.tsx",
+      "to": "src/services/authService.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/OptionChain.tsx",
+      "to": "src/components/Layout.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/OptionChain.tsx",
+      "to": "src/components/ui/index.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/OptionChain.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Portfolio.tsx",
+      "to": "src/components/Layout.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Portfolio.tsx",
+      "to": "src/components/PortfolioDashboard.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Register.tsx",
+      "to": "src/services/authService.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Reports.tsx",
+      "to": "src/components/Layout.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Reports.tsx",
+      "to": "src/components/ui/index.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Reports.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Reports.tsx",
+      "to": "src/context/TradingModeContext.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Reports.tsx",
+      "to": "src/services/brokerApi.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Strategies.tsx",
+      "to": "src/components/Layout.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Strategies.tsx",
+      "to": "src/components/ui/index.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Strategies.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/Subscription.tsx",
+      "to": "src/components/Layout.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/TestLiveTrading.tsx",
+      "to": "src/components/Layout.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/TestLiveTrading.tsx",
+      "to": "src/services/apiService.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/TestLiveTrading.tsx",
+      "to": "src/services/firestoreService.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/TestLiveTrading.tsx",
+      "to": "src/config/firebase.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/TradingDashboard.tsx",
+      "to": "src/components/Layout.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/TradingDashboard.tsx",
+      "to": "src/components/RealTimeMarketData.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/TradingDashboard.tsx",
+      "to": "src/components/OrderManagement.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/TradingDashboard.tsx",
+      "to": "src/components/PortfolioDashboard.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/TradingDashboard.tsx",
+      "to": "src/components/ui/index.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/TradingDashboard.tsx",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/TradingDashboard.tsx",
+      "to": "src/context/TradingModeContext.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/pages/TradingDashboard.tsx",
+      "to": "src/services/brokerApi.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/services/apiService.ts",
+      "to": "src/config/firebase.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/services/apiService.ts",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/services/authService.ts",
+      "to": "src/config/firebase.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/services/authService.ts",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/services/authService.ts",
+      "to": "src/services/brokerApi.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/services/brokerApi.ts",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/services/dhanService.ts",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/services/firestoreService.ts",
+      "to": "src/config/firebase.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/services/liveMarketService.ts",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/services/marketDataService.ts",
+      "to": "src/services/apiService.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/services/marketDataStreamService.ts",
+      "to": "src/config/api.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/brokers/ConnectDhanModal.tsx",
+      "to": "src/services/brokerApi.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/brokers/DhanConnectionCard.tsx",
+      "to": "src/services/brokerApi.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/brokers/DhanConnectionCard.tsx",
+      "to": "src/components/ui/index.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/ui/index.ts",
+      "to": "src/components/ui/PageHeader.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/ui/index.ts",
+      "to": "src/components/ui/StatCard.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/ui/index.ts",
+      "to": "src/components/ui/SectionCard.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/ui/index.ts",
+      "to": "src/components/ui/StatusBadge.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/ui/index.ts",
+      "to": "src/components/ui/EmptyState.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/common/EmergencyStopButton.tsx",
+      "to": "src/services/brokerApi.ts",
+      "kind": "imports"
+    },
+    {
+      "from": "src/components/common/GlobalTradingModeSwitch.tsx",
+      "to": "src/context/TradingModeContext.tsx",
+      "kind": "imports"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/context/TradingModeContext.tsx",
+      "kind": "violates-boundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Login.tsx",
+      "kind": "violates-boundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Register.tsx",
+      "kind": "violates-boundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Dashboard.tsx",
+      "kind": "violates-boundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Brokers.tsx",
+      "kind": "violates-boundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/DhanCallback.tsx",
+      "kind": "violates-boundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Strategies.tsx",
+      "kind": "violates-boundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/CreateStrategy.tsx",
+      "kind": "violates-boundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Portfolio.tsx",
+      "kind": "violates-boundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Reports.tsx",
+      "kind": "violates-boundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/TradingDashboard.tsx",
+      "kind": "violates-boundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/TestLiveTrading.tsx",
+      "kind": "violates-boundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/OptionChain.tsx",
+      "kind": "violates-boundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/BacktestPage.tsx",
+      "kind": "violates-boundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/LiveChartPage.tsx",
+      "kind": "violates-boundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/pages/Subscription.tsx",
+      "kind": "violates-boundary"
+    }
+  ]
+}

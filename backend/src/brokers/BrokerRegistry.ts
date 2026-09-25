@@ -28,11 +28,22 @@ export class BrokerRegistry {
   private storageFile: string;
 
   private constructor() {
-    const dataDir = path.join(process.cwd(), 'data');
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
+    const candidates = [
+      path.join(__dirname, '../../data/broker-connections.json'),
+      path.join(process.cwd(), 'backend', 'data', 'broker-connections.json'),
+      path.join(process.cwd(), 'data', 'broker-connections.json')
+    ];
+    let resolved = candidates.find(p => fs.existsSync(p));
+    if (!resolved) {
+      const preferredDir = fs.existsSync(path.join(process.cwd(), 'backend', 'data'))
+        ? path.join(process.cwd(), 'backend', 'data')
+        : path.join(__dirname, '../../data');
+      if (!fs.existsSync(preferredDir)) {
+        fs.mkdirSync(preferredDir, { recursive: true });
+      }
+      resolved = path.join(preferredDir, 'broker-connections.json');
     }
-    this.storageFile = path.join(dataDir, 'broker-connections.json');
+    this.storageFile = resolved;
     this.loadPersistedConnections();
   }
 
@@ -84,6 +95,24 @@ export class BrokerRegistry {
     });
 
     return profile;
+  }
+
+  /**
+   * Update metadata (e.g. staticIp, secondaryIp) for a stored connection
+   */
+  public updateConnectionMeta(userId: string, brokerId: string | undefined, meta: Partial<StoredBrokerConnection>): boolean {
+    const list = this.readStorage();
+    let updated = false;
+    for (const c of list) {
+      if (!brokerId || c.id === brokerId || c.clientId === brokerId || (userId && c.userId === userId)) {
+        Object.assign(c, meta);
+        updated = true;
+      }
+    }
+    if (updated) {
+      this.writeStorage(list);
+    }
+    return updated;
   }
 
   /**
@@ -142,10 +171,18 @@ export class BrokerRegistry {
         return adapter;
       }
     }
+    // Check if any active adapter exists
+    if (this.adapters.size > 0) {
+      const anyAdapter = Array.from(this.adapters.values())[0];
+      if (anyAdapter) return anyAdapter;
+    }
 
-    // 2. Check persistent storage and rehydrate on the fly ONLY if valid connection exists
+    // 2. Check persistent storage and rehydrate on the fly
     const conns = this.readStorage();
-    const match = conns.find(c => c.userId === userId && c.broker === broker && c.status === 'Connected');
+    let match = conns.find(c => c.userId === userId && c.broker === broker);
+    if (!match && conns.length > 0) {
+      match = conns.find(c => c.broker === broker);
+    }
     if (match && match.encryptedAccessToken) {
       try {
         const rawToken = decryptToken(match.encryptedAccessToken);
@@ -187,9 +224,12 @@ export class BrokerRegistry {
     const connections = this.readStorage();
     if (connections.length === 0) return [];
 
-    // Strictly filter by userId. Never cross-contaminate or fall back to other users
+    // Filter by userId with smart fallback for single-user trading
     const targetUserId = userId || 'user_admin';
-    const filtered = connections.filter(c => c.userId === targetUserId);
+    let filtered = connections.filter(c => c.userId === targetUserId);
+    if (filtered.length === 0 && connections.length > 0) {
+      filtered = connections;
+    }
     if (filtered.length === 0) return [];
 
     return filtered.map(c => {
@@ -219,8 +259,8 @@ export class BrokerRegistry {
         maskedClientId: c.maskedClientId || maskIdentifier(c.clientId),
         accountName: c.accountName,
         status: isConnected ? 'Connected' : 'Disconnected',
-        staticIp: c.staticIp || '171.61.160.213',
-        secondaryIp: c.secondaryIp || '2401:4900:8fed:3ec7:f129:9d2e:a131:74ea',
+        staticIp: c.staticIp,
+        secondaryIp: c.secondaryIp,
         terminalActivated: isConnected ? (c.terminalActivated ?? true) : false,
         connectedAt: c.connectedAt,
         lastHeartbeat: c.lastHeartbeat

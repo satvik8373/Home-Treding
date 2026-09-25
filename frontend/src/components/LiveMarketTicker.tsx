@@ -31,7 +31,7 @@ export const LiveMarketTicker: React.FC<LiveMarketTickerProps> = ({
     <div className="live-ticker">
       <div className="ticker-status">
         <span className={`status-indicator ${isMarketOpen ? (isPolling ? 'live' : 'paused') : 'closed'}`}>
-          {isMarketOpen ? (isPolling ? '🔴 LIVE' : '⏸️ PAUSED') : '⏸️ MARKET CLOSED'}
+          {isMarketOpen ? (isPolling ? 'LIVE' : 'PAUSED') : 'MARKET CLOSED'}
         </span>
         <span className="update-rate">
           {isMarketOpen ? `${interval / 1000}s updates` : (marketStatus?.nextOpen || 'NSE/BSE Closing Prices')}

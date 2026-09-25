@@ -1,15 +1,149 @@
 {
   "initialCapital": 100000,
-  "availableCash": 100000,
+  "availableCash": 87452.18,
   "realizedPnl": 0,
-  "totalBrokerage": 0,
-  "totalSlippageCost": 0,
+  "totalBrokerage": 41.57,
+  "totalSlippageCost": 6.249999999999645,
   "winCount": 0,
   "lossCount": 0,
   "peakCapital": 100000,
-  "maxDrawdown": 0,
-  "orders": [],
-  "positions": [],
-  "trades": [],
-  "auditLogs": []
+  "maxDrawdown": 41.570000000006985,
+  "orders": [
+    [
+      "paper_ord_1790320200065_2jrimz",
+      {
+        "orderId": "paper_ord_1790320200065_2jrimz",
+        "brokerOrderId": "virt_paper_ord_1790320200065_2jrimz",
+        "symbol": "NIFTY 01-OCT-2026 24850 CE",
+        "exchange": "NSE",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 75,
+        "filledQuantity": 75,
+        "pendingQuantity": 0,
+        "price": 100.05,
+        "averagePrice": 100.05,
+        "status": "FILLED",
+        "orderTimestamp": "2026-09-25T07:10:00.065Z",
+        "executionTimestamp": "2026-09-25T07:10:00.065Z",
+        "strategyId": "nifty-009-atm-breakout"
+      }
+    ],
+    [
+      "paper_ord_1790321100172_db6h3l",
+      {
+        "orderId": "paper_ord_1790321100172_db6h3l",
+        "brokerOrderId": "virt_paper_ord_1790321100172_db6h3l",
+        "symbol": "NIFTY 01-OCT-2026 24100 CE",
+        "exchange": "NSE",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 50,
+        "filledQuantity": 50,
+        "pendingQuantity": 0,
+        "price": 100.05,
+        "averagePrice": 100.05,
+        "status": "FILLED",
+        "orderTimestamp": "2026-09-25T07:25:00.172Z",
+        "executionTimestamp": "2026-09-25T07:25:00.172Z",
+        "strategyId": "nifty-009-atm-breakout"
+      }
+    ]
+  ],
+  "positions": [
+    [
+      "NIFTY 01-OCT-2026 24850 CE",
+      {
+        "positionId": "paper_pos_NIFTY 01-OCT-2026 24850 CE",
+        "symbol": "NIFTY 01-OCT-2026 24850 CE",
+        "exchange": "NSE",
+        "segment": "EQ",
+        "productType": "INTRADAY",
+        "quantity": 75,
+        "buyQuantity": 75,
+        "sellQuantity": 0,
+        "buyAvgPrice": 0,
+        "sellAvgPrice": 0,
+        "netAvgPrice": 100.05,
+        "ltp": 100.05,
+        "realizedPnl": 0,
+        "unrealizedPnl": 0,
+        "totalPnl": 0
+      }
+    ],
+    [
+      "NIFTY 01-OCT-2026 24100 CE",
+      {
+        "positionId": "paper_pos_NIFTY 01-OCT-2026 24100 CE",
+        "symbol": "NIFTY 01-OCT-2026 24100 CE",
+        "exchange": "NSE",
+        "segment": "EQ",
+        "productType": "INTRADAY",
+        "quantity": 50,
+        "buyQuantity": 50,
+        "sellQuantity": 0,
+        "buyAvgPrice": 0,
+        "sellAvgPrice": 0,
+        "netAvgPrice": 100.05,
+        "ltp": 100.05,
+        "realizedPnl": 0,
+        "unrealizedPnl": 0,
+        "totalPnl": 0
+      }
+    ]
+  ],
+  "trades": [
+    {
+      "tradeId": "trade_1790320200066",
+      "orderId": "paper_ord_1790320200065_2jrimz",
+      "symbol": "NIFTY 01-OCT-2026 24850 CE",
+      "side": "BUY",
+      "quantity": 75,
+      "price": 100.05,
+      "timestamp": "2026-09-25T07:10:00.066Z",
+      "strategyId": "nifty-009-atm-breakout"
+    },
+    {
+      "tradeId": "trade_1790321100174",
+      "orderId": "paper_ord_1790321100172_db6h3l",
+      "symbol": "NIFTY 01-OCT-2026 24100 CE",
+      "side": "BUY",
+      "quantity": 50,
+      "price": 100.05,
+      "timestamp": "2026-09-25T07:25:00.174Z",
+      "strategyId": "nifty-009-atm-breakout"
+    }
+  ],
+  "auditLogs": [
+    {
+      "id": "audit_1790320200066_35grp9",
+      "timestamp": "2026-09-25T07:10:00.066Z",
+      "eventType": "ORDER_FILLED",
+      "symbol": "NIFTY 01-OCT-2026 24850 CE",
+      "details": {
+        "side": "BUY",
+        "qty": 75,
+        "price": 100.05,
+        "brokerage": 20.94,
+        "slippageCost": 3.749999999999787
+      }
+    },
+    {
+      "id": "audit_1790321100174_fu9bgr",
+      "timestamp": "2026-09-25T07:25:00.174Z",
+      "eventType": "ORDER_FILLED",
+      "symbol": "NIFTY 01-OCT-2026 24100 CE",
+      "details": {
+        "side": "BUY",
+        "qty": 50,
+        "price": 100.05,
+        "brokerage": 20.63,
+        "slippageCost": 2.499999999999858
+      }
+    }
+  ]
 }
