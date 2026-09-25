@@ -348,7 +348,6 @@ export class AlgoroomsStyleBacktester {
   }
 
   private openTrade(leg: LegState, bar: OptionCandle, date: string): void {
-    const strategy = getStrategyConfig();
     leg.entryPrice = bar.close;
     leg.entryTime = bar.time;
     leg.remainingQty = this.qty;
