@@ -205,7 +205,7 @@ export function updateStrategyConfig(
 
   const pct = updates.breakoutPct;
   if (pct !== undefined && (typeof pct !== 'number' || pct <= 0 || pct >= 1)) {
-    errors.push(`breakoutPct must be between 0 and 1 (e.g. 0.0009 for 0.09%; got: ${pct})`);
+    errors.push(`breakoutPct must be between 0 and 1 (e.g. 0.009 for 0.9%; got: ${pct})`);
   }
 
   if (errors.length > 0) {
