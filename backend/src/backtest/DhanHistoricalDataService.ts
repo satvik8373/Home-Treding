@@ -289,6 +289,122 @@ export class DhanHistoricalDataService {
     });
   }
 
+
+  /**
+   * Resolve the fixed ATM option selected at the first 5-minute candle close.
+   * Dhan's rolling-options API is relative to ATM, so we request ATM +/- 10
+   * strikes and select the exact strike for each historical minute.
+   */
+  async getFixedStrikeOptionSeries(params: {
+    symbol: string;
+    fromDate: string;
+    toDate: string;
+    optionType: 'CE' | 'PE';
+    strikeStep: number;
+    referenceTime?: string;
+    expiryFlag?: 'WEEK' | 'MONTH';
+  }): Promise<{ candles1m: OptionCandle[]; candles5m: OptionCandle[]; strikesByDate: Record<string, number> }> {
+    const meta = DhanHistoricalDataService.getSecurityMetadata(params.symbol);
+    if (meta.exchangeSegment !== 'IDX_I') {
+      throw new Error('FIXED_ATM_OPTIONS_UNSUPPORTED: This backtest currently supports index options only.');
+    }
+
+    const spot = await this.getIntradayCandles({
+      securityId: meta.securityId,
+      exchangeSegment: meta.exchangeSegment,
+      instrument: meta.instrument,
+      fromDate: params.fromDate,
+      toDate: params.toDate,
+      interval: 5
+    });
+
+    const referenceTime = params.referenceTime ?? '09:15';
+    const strikesByDate: Record<string, number> = {};
+    for (const candle of spot) {
+      if (candle.time === referenceTime && strikesByDate[candle.date] === undefined) {
+        strikesByDate[candle.date] = Math.round(candle.close / params.strikeStep) * params.strikeStep;
+      }
+    }
+
+    const offsets = Array.from({ length: 21 }, (_, i) => i - 10);
+    const optionType = params.optionType === 'CE' ? 'CALL' : 'PUT';
+    const expiryFlag = params.expiryFlag ?? 'WEEK';
+
+    const series = await Promise.all(
+      offsets.map((offset) =>
+        this.getExpiredOptionCandles({
+          securityId: meta.securityId,
+          exchangeSegment: 'NSE_FNO',
+          instrument: 'OPTIDX',
+          expiryFlag,
+          expiryCode: 0,
+          strike: offset === 0 ? 'ATM' : offset > 0 ? `ATM+${offset}` : `ATM${offset}`,
+          optionType,
+          fromDate: params.fromDate,
+          toDate: params.toDate,
+          interval: 1
+        })
+      )
+    );
+
+    const selected = new Map<string, OptionCandle>();
+    for (const candles of series) {
+      for (const candle of candles) {
+        const targetStrike = strikesByDate[candle.date];
+        if (targetStrike === undefined || candle.strike !== targetStrike) continue;
+        selected.set(`${candle.date}:${candle.timestamp}`, candle);
+      }
+    }
+
+    const candles1m = Array.from(selected.values()).sort((a, b) => a.timestamp - b.timestamp);
+    const expectedMinutes = 355;
+    const dates = Object.keys(strikesByDate);
+
+    for (const date of dates) {
+      const day = candles1m.filter((c) => c.date === date && c.time >= '09:15' && c.time <= '15:09');
+      if (day.length < expectedMinutes) {
+        throw new Error(
+          `INCOMPLETE_OPTION_DATA: ${params.optionType} ${date} fixed strike ${strikesByDate[date]} has ${day.length}/${expectedMinutes} one-minute candles. Backtest stopped to avoid estimated or fabricated values.`
+        );
+      }
+    }
+
+    const fiveMinute = new Map<string, OptionCandle[]>();
+    for (const candle of candles1m) {
+      if (candle.time < '09:15' || candle.time > '15:09') continue;
+      const minute = Number(candle.time.slice(3, 5));
+      const bucketMinute = Math.floor(minute / 5) * 5;
+      const bucketTime = `${candle.time.slice(0, 3)}${String(bucketMinute).padStart(2, '0')}`;
+      const key = `${candle.date}:${bucketTime}`;
+      const bucket = fiveMinute.get(key) ?? [];
+      bucket.push(candle);
+      fiveMinute.set(key, bucket);
+    }
+
+    const candles5m: OptionCandle[] = [];
+    for (const bucket of fiveMinute.values()) {
+      bucket.sort((a, b) => a.timestamp - b.timestamp);
+      if (bucket.length !== 5) continue;
+      candles5m.push({
+        ...bucket[0],
+        open: bucket[0].open,
+        high: Math.max(...bucket.map((c) => c.high)),
+        low: Math.min(...bucket.map((c) => c.low)),
+        close: bucket[bucket.length - 1].close,
+        volume: bucket.reduce((sum, c) => sum + c.volume, 0),
+        oi: bucket[bucket.length - 1].oi,
+        iv: bucket[bucket.length - 1].iv,
+        spot: bucket[bucket.length - 1].spot
+      });
+    }
+
+    return {
+      candles1m: candles1m.filter((c) => c.time >= '09:15' && c.time <= '15:09'),
+      candles5m: candles5m.sort((a, b) => a.timestamp - b.timestamp),
+      strikesByDate
+    };
+  }
+
   private handleDhanError(err: any, endpoint: string): never {
     const status = err.response?.status;
     const data = err.response?.data;
