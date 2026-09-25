@@ -117,8 +117,6 @@ export const BacktestPage: React.FC = () => {
             setSelectedDays(days);
             setResult(null);
           }}
-          creditsRemaining={undefined}
-          totalCredits={undefined}
           totalPnl={result?.summary?.netProfit ?? null}
           maxDrawdown={result?.summary?.maxDrawdown ?? null}
           equityCurve={result?.equityCurve || []}
