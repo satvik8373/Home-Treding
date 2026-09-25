@@ -1,10 +1,9 @@
 [
   {
-    "id": "nifty-009-atm-breakout",
-    "userId": "user_admin",
-    "name": "NIFTY 0.09% ATM Full-Day Breakout",
-    "author": "AR427232",
-    "description": "Calculates +0.09% upper and -0.09% lower levels from the first 5-min candle (09:15-09:20) close. Locks 09:20 ATM CE and PE contracts via Dhan Option Chain, monitoring full-day 5-min candle closes for breakout BUY (Close > Upper => BUY CE, Close < Lower => BUY PE) with symmetric reversal exit and 15:10 force square-off.",
+    "id": "nifty-atm-independent-breakout",
+    "userId": "system",
+    "name": "NIFTY ATM CE/PE Independent 0.9% Breakout",
+    "description": "Independent ATM CE and ATM PE premium breakout strategy using the 09:15-09:20 option close as each leg's reference. Upper/lower levels are ±0.9%. Each leg can independently enter, partially exit at +20 and +40 points, exit below its lower level, re-enter after becoming flat, and square off at 15:10 IST.",
     "segmentType": "OPTION",
     "strategyType": "Breakout / Trigger",
     "symbol": "NIFTY 50",
@@ -12,59 +11,56 @@
     "orderType": "MIS",
     "startTime": "09:20",
     "endTime": "15:10",
-    "tradingDays": ["MON", "TUE", "WED", "THU", "FRI"],
+    "tradingDays": [
+      "MON",
+      "TUE",
+      "WED",
+      "THU",
+      "FRI"
+    ],
     "lotSize": 65,
-    "maxLoss": 2500,
-    "maxProfit": 5000,
-    "trailingSl": "No Trailing",
-    "noTradeAfter": "15:10",
+    "entryLots": 3,
+    "maxLoss": 0,
+    "maxProfit": 0,
     "legs": [
       {
-        "id": "leg_ce_breakout",
+        "id": "ce",
         "action": "BUY",
         "symbol": "NIFTY 50",
         "strike": "ATM",
-        "strikeCriteria": "ATM 0",
         "strikeType": "ATM",
         "optionType": "CE",
-        "quantity": 65,
-        "slType": "points",
-        "slValue": 0,
-        "targetType": "points",
-        "targetValue": 0,
+        "quantity": 195,
         "isActive": true
       },
       {
-        "id": "leg_pe_breakout",
+        "id": "pe",
         "action": "BUY",
         "symbol": "NIFTY 50",
         "strike": "ATM",
-        "strikeCriteria": "ATM 0",
         "strikeType": "ATM",
         "optionType": "PE",
-        "quantity": 65,
-        "slType": "points",
-        "slValue": 0,
-        "targetType": "points",
-        "targetValue": 0,
+        "quantity": 195,
         "isActive": true
       }
     ],
-    "advancedFeatures": {
-      "referenceCandle": "First 5-min candle (09:15 to 09:20 IST)",
-      "referenceCloseCalculation": "Close of 09:15-09:20 candle = X",
-      "upperBreakoutFormula": "X * 1.0009 (+0.09%)",
-      "lowerBreakoutFormula": "X * 0.9991 (-0.09%)",
-      "atmSelection": "Lock ATM Strike at 09:20 from NIFTY 50 Spot price (multiples of 50)",
-      "contractResolution": "Live Dhan Option Chain (Nearest Weekly Expiry CE + PE)",
-      "entryTrigger": "5-min Candle Close > Upper Level => BUY ATM CE | 5-min Candle Close < Lower Level => BUY ATM PE",
-      "exitTrigger": "CE Active & Close < Lower => Exit CE | PE Active & Close > Upper => Exit PE",
-      "positionConstraint": "Max 1 active position held at a time (Symmetric Reversal)",
-      "reEntryAllowed": true,
-      "forceSquareOffTime": "15:10 IST",
-      "executionSupport": ["PAPER_MODE", "LIVE_DHAN_MODE"]
+    "parameters": {
+      "breakoutPct": 0.009,
+      "target1Pts": 20,
+      "target2Pts": 40,
+      "referenceCandle": "09:15-09:20",
+      "forceSquareOffTime": "15:10",
+      "entryLots": 3,
+      "lotSize": 65
     },
-    "createdAt": "2026-09-20T06:00:00.000Z",
+    "advancedFeatures": {
+      "referenceCandle": "09:15-09:20 NIFTY 5-minute close",
+      "signalSource": "ATM CE and ATM PE option premium closes",
+      "contractResolution": "Lock 09:20 ATM strike and nearest weekly expiry",
+      "executionResolution": "1-minute OHLC for target fills; 5-minute close for lower-level exit",
+      "reEntryAllowed": true,
+      "positionConstraint": "CE and PE are independent"
+    },
     "status": "active"
   }
 ]
