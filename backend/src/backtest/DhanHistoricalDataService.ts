@@ -351,7 +351,9 @@ export class DhanHistoricalDataService {
       for (const candle of candles) {
         const targetStrike = strikesByDate[candle.date];
         if (targetStrike === undefined || candle.strike !== targetStrike) continue;
-        selected.set(`${candle.date}:${candle.timestamp}`, candle);
+        const key = `${candle.date}:${candle.timestamp}`;
+        if (selected.has(key)) throw new Error(`DUPLICATE_OPTION_CANDLE:${key}`);
+        selected.set(key, candle);
       }
     }
 
@@ -364,7 +366,7 @@ export class DhanHistoricalDataService {
       const fiveMinuteCount = candles1m.filter((c) => c.date === date && c.time >= '09:15' && c.time <= '15:05').length;
       if (day.length < expectedMinutes || fiveMinuteCount < 71) {
         throw new Error(
-          `INCOMPLETE_OPTION_DATA: ${params.optionType} ${date} fixed strike ${strikesByDate[date]} has ${day.length}/${expectedMinutes} one-minute candles and ${fiveMinuteCount}/356 expected signal-session minutes. Backtest stopped to avoid estimated or fabricated values.`
+          `INCOMPLETE_OPTION_DATA: ${params.optionType} ${date} fixed strike ${strikesByDate[date]} has ${day.length}/${expectedMinutes} one-minute candles and ${fiveMinuteCount}/351 signal minutes before the 15:10 square-off. Backtest stopped to avoid estimated or fabricated values.`
         );
       }
     }
