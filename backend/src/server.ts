@@ -197,7 +197,7 @@ const startServer = async () => {
             logger.info(`🛡️ Mode: ${process.env.TRADING_MODE || 'paper'} (Live Enabled: ${process.env.LIVE_TRADING_ENABLED === 'true'})`);
             logger.info(`🔗 Brokers API: http://localhost:${PORT}/api/brokers/list`);
             logger.info(`📝 Paper API: http://localhost:${PORT}/api/paper/portfolio`);
-            logger.info(`📊 NIFTY 0.09% Strategy: http://localhost:${PORT}/api/strategies/nifty009/status`);
+            logger.info(`📊 NIFTY ATM CE/PE Independent 0.9% Strategy: http://localhost:${PORT}/api/strategies/nifty009/status`);
             logger.info(`====================================================`);
 
             // Start high-frequency live market tick broadcasting (250ms sub-second updates)
