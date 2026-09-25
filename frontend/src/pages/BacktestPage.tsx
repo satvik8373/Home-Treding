@@ -36,7 +36,7 @@ export const BacktestPage: React.FC = () => {
     axios.get(`${API_CONFIG.BASE_URL}/api/strategies/templates`)
       .then(({ data }) => {
         const options = (data?.templates || []).map((s: any) => ({ id: s.id, name: s.name }));
-        if (options.length) setStrategies(options);
+        setStrategies(options.length ? options : [{ id: 'nifty-atm-independent-breakout', name: 'NIFTY ATM CE/PE Independent 0.9% Breakout' }]);
       })
       .catch(() => setStrategies([{ id: 'nifty-atm-independent-breakout', name: 'NIFTY ATM CE/PE Independent 0.9% Breakout' }]));
   }, []);
