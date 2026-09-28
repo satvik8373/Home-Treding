@@ -12,7 +12,7 @@ import { MarketStreamer } from '../../services/marketStreamer';
 import fs from 'fs';
 import path from 'path';
 
-const STRATEGY_ID = 'nifty-009-atm-breakout';
+const STRATEGY_ID = 'nifty-atm-independent-breakout';
 const SESSION_FILE = path.join(__dirname, '../../../data/nifty009_session.json');
 
 export interface StrategyEvent {

@@ -130,14 +130,14 @@ const deploymentsFile = path.join(__dirname, '../../data/active-deployments.json
 const strategiesFile = path.join(__dirname, '../../data/strategies.json');
 const templatesFile = path.join(__dirname, '../../data/templates.json');
 
-// Default initial custom strategy: Official NIFTY 0.09% ATM Full-Day Breakout Strategy
+// Authoritative strategy — single source of truth, mirrors backend/data/strategies.json.
 const INITIAL_STRATEGIES: CustomStrategy[] = [
   {
-    id: 'nifty-009-atm-breakout',
-    userId: 'user_admin',
-    name: 'NIFTY 0.09% ATM Full-Day Breakout',
+    id: 'nifty-atm-independent-breakout',
+    userId: 'system',
+    name: 'NIFTY ATM CE/PE Independent 0.9% Breakout',
     author: 'AR427232',
-    description: 'Calculates +0.09% upper and -0.09% lower levels from the first 5-min candle (09:15-09:20) close. Locks 09:20 ATM CE and PE contracts via Dhan Option Chain, monitoring full-day 5-min candle closes for breakout BUY (Close > Upper => BUY CE, Close < Lower => BUY PE) with symmetric reversal exit and 15:10 force square-off.',
+    description: 'Independent ATM CE and ATM PE premium breakout strategy. Reference candle: 09:15–09:20 option candle High/Low. Upper = H × 1.009 (+0.9%); Lower = L × 0.991 (−0.9%). Partial exits at +₹20 (1 lot) and +₹40 (remaining 2 lots). Lower-level close triggers exit. Re-entry allowed. Force square-off at 15:10 IST.',
     segmentType: 'OPTION',
     strategyType: 'Breakout / Trigger',
     symbol: 'NIFTY 50',
@@ -147,53 +147,41 @@ const INITIAL_STRATEGIES: CustomStrategy[] = [
     endTime: '15:10',
     tradingDays: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
     lotSize: 65,
-    maxLoss: 2500,
-    maxProfit: 5000,
-    trailingSl: 'No Trailing',
-    noTradeAfter: '15:10',
+    maxLoss: 0,
+    maxProfit: 0,
     legs: [
       {
-        id: 'leg_ce_breakout',
+        id: 'ce',
         action: 'BUY',
         symbol: 'NIFTY 50',
         strike: 'ATM',
-        strikeCriteria: 'ATM 0',
         strikeType: 'ATM',
         optionType: 'CE',
-        quantity: 65,
-        slType: 'points',
-        slValue: 0,
-        targetType: 'points',
-        targetValue: 0,
+        quantity: 195,
         isActive: true
       },
       {
-        id: 'leg_pe_breakout',
+        id: 'pe',
         action: 'BUY',
         symbol: 'NIFTY 50',
         strike: 'ATM',
-        strikeCriteria: 'ATM 0',
         strikeType: 'ATM',
         optionType: 'PE',
-        quantity: 65,
-        slType: 'points',
-        slValue: 0,
-        targetType: 'points',
-        targetValue: 0,
+        quantity: 195,
         isActive: true
       }
     ],
     advancedFeatures: {
-      referenceCandle: 'First 5-min candle (09:15 to 09:20 IST)',
-      referenceCloseCalculation: 'Close of 09:15-09:20 candle = X',
-      upperBreakoutFormula: 'X * 1.0009 (+0.09%)',
-      lowerBreakoutFormula: 'X * 0.9991 (-0.09%)',
-      atmSelection: 'Lock ATM Strike at 09:20 from NIFTY 50 Spot price (multiples of 50)',
-      contractResolution: 'Live Dhan Option Chain (Nearest Weekly Expiry CE + PE)',
-      entryTrigger: '5-min Candle Close > Upper Level => BUY ATM CE | 5-min Candle Close < Lower Level => BUY ATM PE',
-      exitTrigger: 'CE Active & Close < Lower => Exit CE | PE Active & Close > Upper => Exit PE',
-      positionConstraint: 'Max 1 active position held at a time (Symmetric Reversal)',
+      referenceCandle: '09:15–09:20 NIFTY 5-minute option candle',
+      signalSource: 'ATM CE and ATM PE option premium closes (independent legs)',
+      upperBreakoutFormula: 'refHigh × 1.009 (+0.9%)',
+      lowerExitFormula: 'refLow × 0.991 (−0.9%)',
+      target1: '+₹20 (exit 1 lot / 65 qty)',
+      target2: '+₹40 (exit remaining 2 lots / 130 qty)',
+      contractResolution: 'Lock 09:20 ATM strike, nearest weekly expiry CE + PE',
+      executionResolution: '1-minute OHLC for target fills; 5-minute close for signal and lower-level exit',
       reEntryAllowed: true,
+      positionConstraint: 'CE and PE legs are fully independent',
       forceSquareOffTime: '15:10 IST',
       executionSupport: ['PAPER_MODE', 'LIVE_DHAN_MODE']
     },
@@ -1064,21 +1052,21 @@ router.post('/deploy', optionalAuth, async (req: AuthRequest, res: Response) => 
     activeDeployments.set(deploymentId, deployment);
     saveDeployments();
 
-    // If deploying NIFTY 0.09% breakout, activate the state-machine engine
-    if (targetStrategyId === 'nifty-009-atm-breakout' || templateType === 'nifty-009-atm-breakout') {
+    // If deploying the NIFTY ATM CE/PE breakout, activate the live/paper engine
+    if (targetStrategyId === 'nifty-atm-independent-breakout' || templateType === 'nifty-atm-independent-breakout') {
       try {
         await nifty009Engine.start(
           {
-            lotSize: (deployment.config?.lotSize || 75) * multiplier,
+            lotSize: (deployment.config?.lotSize || 65) * multiplier,
             maxDailyLoss: deployment.maxLoss,
             squareOffTime: deployment.config?.squareOff || '15:10'
           },
           deployment.mode,
           userId
         );
-        logger.info(`[Nifty009 Engine] Auto-started for deployment ${deploymentId} (${deployment.mode.toUpperCase()} mode)`);
+        logger.info(`[Strategy Engine] Auto-started for deployment ${deploymentId} (${deployment.mode.toUpperCase()} mode)`);
       } catch (err: any) {
-        logger.error(`[Nifty009 Engine] Failed to auto-start: ${err.message}`);
+        logger.error(`[Strategy Engine] Failed to auto-start: ${err.message}`);
       }
     }
 
@@ -1383,11 +1371,11 @@ router.post('/stop', optionalAuth, async (req: AuthRequest, res: Response) => {
   activeDeployments.set(deploymentId, deployment);
   saveDeployments();
 
-  if (deployment.strategyId === 'nifty-009-atm-breakout' || deployment.templateType === 'nifty-009-atm-breakout') {
+  if (deployment.strategyId === 'nifty-atm-independent-breakout' || deployment.templateType === 'nifty-atm-independent-breakout') {
     try {
       await nifty009Engine.stop('User stopped deployment');
     } catch (e: any) {
-      logger.warn('[Stop deployment] nifty009Engine stop notice:', e.message);
+      logger.warn('[Stop deployment] Strategy engine stop notice:', e.message);
     }
   }
 
@@ -1424,7 +1412,7 @@ router.get('/:id', (req: Request, res: Response) => {
 });
 
 // ============================================================
-// NIFTY 0.09% ATM FULL-DAY BREAKOUT STRATEGY ENGINE ROUTES
+// NIFTY ATM CE/PE INDEPENDENT 0.9% BREAKOUT — ENGINE ROUTES
 // ============================================================
 
 import { nifty009Engine } from '../strategies/nifty009/Nifty009Engine';

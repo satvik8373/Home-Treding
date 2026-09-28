@@ -34,7 +34,7 @@ export const TradingViewLiveChart: React.FC<TradingViewLiveChartProps> = ({
   symbol = 'NIFTY 50',
   height = 460,
   levels: propLevels,
-  strategyName = 'NIFTY 0.09% Breakout',
+  strategyName = 'NIFTY ATM CE/PE 0.9% Breakout',
   isSeparateScreen = false,
   onRefresh
 }) => {
@@ -119,7 +119,7 @@ export const TradingViewLiveChart: React.FC<TradingViewLiveChartProps> = ({
       if (upperLineRef.current) {
         upperLineRef.current.applyOptions({
           price: newUpper,
-          title: `BUY CALL (+0.09%): ₹${newUpper.toFixed(2)}`
+          title: `BUY CALL (+0.9%): ₹${newUpper.toFixed(2)}`
         });
       } else {
         upperLineRef.current = series.createPriceLine({
@@ -128,7 +128,7 @@ export const TradingViewLiveChart: React.FC<TradingViewLiveChartProps> = ({
           lineWidth: 2,
           lineStyle: LineStyle.Dashed,
           axisLabelVisible: true,
-          title: `BUY CALL (+0.09%): ₹${newUpper.toFixed(2)}`
+          title: `BUY CALL (+0.9%): ₹${newUpper.toFixed(2)}`
         });
       }
     } else if (upperLineRef.current) {
@@ -141,7 +141,7 @@ export const TradingViewLiveChart: React.FC<TradingViewLiveChartProps> = ({
       if (lowerLineRef.current) {
         lowerLineRef.current.applyOptions({
           price: newLower,
-          title: `BUY PUT (-0.09%): ₹${newLower.toFixed(2)}`
+          title: `BUY PUT (-0.9%): ₹${newLower.toFixed(2)}`
         });
       } else {
         lowerLineRef.current = series.createPriceLine({
@@ -150,7 +150,7 @@ export const TradingViewLiveChart: React.FC<TradingViewLiveChartProps> = ({
           lineWidth: 2,
           lineStyle: LineStyle.Dashed,
           axisLabelVisible: true,
-          title: `BUY PUT (-0.09%): ₹${newLower.toFixed(2)}`
+          title: `BUY PUT (-0.9%): ₹${newLower.toFixed(2)}`
         });
       }
     } else if (lowerLineRef.current) {
@@ -734,7 +734,7 @@ export const TradingViewLiveChart: React.FC<TradingViewLiveChartProps> = ({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 }, flexWrap: 'wrap' }}>
             {activeLevels.upperLevel ? (
               <Typography sx={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>
-                SPOT BUY CALL (+0.09%): ₹{activeLevels.upperLevel.toFixed(2)}
+                SPOT BUY CALL (+0.9%): ₹{activeLevels.upperLevel.toFixed(2)}
               </Typography>
             ) : null}
             {activeLevels.spotBase ? (
@@ -744,7 +744,7 @@ export const TradingViewLiveChart: React.FC<TradingViewLiveChartProps> = ({
             ) : null}
             {activeLevels.lowerLevel ? (
               <Typography sx={{ fontSize: '0.68rem', color: '#dc2626', fontWeight: 700 }}>
-                SPOT BUY PUT (-0.09%): ₹{activeLevels.lowerLevel.toFixed(2)}
+                SPOT BUY PUT (-0.9%): ₹{activeLevels.lowerLevel.toFixed(2)}
               </Typography>
             ) : null}
           </Box>

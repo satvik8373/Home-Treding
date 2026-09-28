@@ -47,7 +47,7 @@ const FIELD_GROUPS: { title: string; fields: FieldDef[] }[] = [
   {
     title: 'ATM Breakout Strategy',
     fields: [
-      { key: 'breakoutPct',         label: 'Breakout %',           type: 'number', unit: '%', min: 0.0001, max: 0.1, step: 0.0001, description: 'Premium breakout threshold (e.g. 0.0009 = 0.09%)' },
+      { key: 'breakoutPct',         label: 'Breakout %',           type: 'number', unit: '%', min: 0.0001, max: 0.1, step: 0.0001, description: 'Premium breakout threshold (e.g. 0.009 = 0.9%)' },
       { key: 'referenceCandleStart',label: 'Ref Candle Open',      type: 'time',   description: 'Start of reference candle (IST HH:MM)' },
       { key: 'referenceCandleEnd',  label: 'Ref Candle Close',     type: 'time',   description: 'End of reference candle — levels locked here (IST HH:MM)' },
       { key: 'tradingStartTime',    label: 'Trading Start',        type: 'time',   description: 'Strategy starts watching for breakout (IST HH:MM)' },

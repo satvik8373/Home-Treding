@@ -65,7 +65,7 @@ export const LiveChartPage: React.FC = () => {
         {/* Page Top Header */}
         <PageHeader
           title="Live TradingView Terminal"
-          subtitle="Real-time multi-asset institutional charting engine with independent 0.09% strategy trigger overlays"
+          subtitle="Real-time multi-asset institutional charting engine with independent 0.9% ATM CE/PE breakout strategy trigger overlays"
           badge={
             <StatusBadge
               status={niftyStatus?.isRunning ? 'live' : 'paper'}
@@ -226,7 +226,7 @@ export const LiveChartPage: React.FC = () => {
           {/* Metric 2: Call Breakout Level */}
           <Box sx={{ p: 1.5, bgcolor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 2 }}>
             <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>
-              ATM CE TRIGGER (+0.09%)
+              ATM CE TRIGGER (+0.9%)
             </Typography>
             <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: '#16a34a', fontFamily: 'monospace' }}>
               {niftyStatus?.ce?.upperLevel ? `₹${niftyStatus.ce.upperLevel.toFixed(2)}` : niftyStatus?.upperLevel ? `₹${niftyStatus.upperLevel.toFixed(2)}` : '—'}
@@ -239,7 +239,7 @@ export const LiveChartPage: React.FC = () => {
           {/* Metric 3: Put Breakout Level */}
           <Box sx={{ p: 1.5, bgcolor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 2 }}>
             <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: '#dc2626', textTransform: 'uppercase' }}>
-              ATM PE TRIGGER (-0.09%)
+              ATM PE TRIGGER (-0.9%)
             </Typography>
             <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: '#dc2626', fontFamily: 'monospace' }}>
               {niftyStatus?.pe?.lowerLevel ? `₹${niftyStatus.pe.lowerLevel.toFixed(2)}` : niftyStatus?.lowerLevel ? `₹${niftyStatus.lowerLevel.toFixed(2)}` : '—'}
@@ -269,7 +269,7 @@ export const LiveChartPage: React.FC = () => {
             symbol={selectedSymbol}
             height="calc(100vh - 280px)"
             levels={strategyLevels}
-            strategyName="NIFTY 0.09% Breakout"
+            strategyName="NIFTY ATM CE/PE 0.9% Breakout"
             isSeparateScreen={true}
             onRefresh={fetchStatus}
           />

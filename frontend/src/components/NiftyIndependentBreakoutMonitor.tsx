@@ -166,7 +166,7 @@ export const NiftyIndependentBreakoutMonitor: React.FC<Props> = ({
       >
         <EmptyState
           title="Breakout Strategy Inactive"
-          description="Monitors independent 09:15–09:20 5-minute candle closes for ATM CE and PE (+0.09% breakout) with automated execution and 15:10 force square-off."
+          description="Monitors independent 09:15–09:20 5-minute option candle closes for ATM CE and PE (+0.9% breakout) with automated partial exits at +₹20 and +₹40, and 15:10 force square-off."
           actionLabel="Deploy Strategy"
           onAction={onDeploy}
           compact
@@ -341,7 +341,7 @@ export const NiftyIndependentBreakoutMonitor: React.FC<Props> = ({
               </Box>
               <Box sx={{ textAlign: 'center' }}>
                 <Typography sx={{ fontSize: '0.65rem', color: '#16a34a', fontWeight: 700, textTransform: 'uppercase' }}>
-                  Buy Breakout (+0.09%)
+                  Buy Breakout (+0.9%)
                 </Typography>
                 <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace', mt: 0.3 }}>
                   ₹{formatPrice(ceUpper)}
@@ -434,7 +434,7 @@ export const NiftyIndependentBreakoutMonitor: React.FC<Props> = ({
               </Box>
               <Box sx={{ textAlign: 'center' }}>
                 <Typography sx={{ fontSize: '0.65rem', color: '#16a34a', fontWeight: 700, textTransform: 'uppercase' }}>
-                  Buy Breakout (+0.09%)
+                  Buy Breakout (+0.9%)
                 </Typography>
                 <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#16a34a', fontFamily: 'monospace', mt: 0.3 }}>
                   ₹{formatPrice(peUpper)}

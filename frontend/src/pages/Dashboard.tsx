@@ -211,8 +211,8 @@ const Dashboard: React.FC = () => {
     (val ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const spotBase = niftyStatus?.firstCandleClose || niftyStatus?.niftyLtp || 0;
-  const upperLvl = (niftyStatus as any)?.spotUpperLevel || niftyStatus?.upperLevel || (spotBase > 0 ? Number((spotBase * 1.0009).toFixed(2)) : 0);
-  const lowerLvl = (niftyStatus as any)?.spotLowerLevel || niftyStatus?.lowerLevel || (spotBase > 0 ? Number((spotBase * 0.9991).toFixed(2)) : 0);
+  const upperLvl = (niftyStatus as any)?.spotUpperLevel || niftyStatus?.upperLevel || (spotBase > 0 ? Number((spotBase * 1.009).toFixed(2)) : 0);
+  const lowerLvl = (niftyStatus as any)?.spotLowerLevel || niftyStatus?.lowerLevel || (spotBase > 0 ? Number((spotBase * 0.991).toFixed(2)) : 0);
   const strategyLevels: StrategyLevels = {
     spotBase: spotBase,
     upperLevel: upperLvl,
@@ -256,18 +256,18 @@ const Dashboard: React.FC = () => {
 
   const allStrategiesWithPnl = [
     ...activeDeployments.map(d => ({ name: d.name, pnl: d.pnl ?? 0 })),
-    ...(isEngineRunning ? [{ name: niftyStatus?.strategyName || 'NIFTY 0.09% ATM Breakout', pnl: enginePnl }] : [])
+    ...(isEngineRunning ? [{ name: niftyStatus?.strategyName || 'NIFTY ATM CE/PE 0.9% Breakout', pnl: enginePnl }] : [])
   ];
   const topGainer = allStrategiesWithPnl.filter(s => s.pnl > 0).sort((a, b) => b.pnl - a.pnl)[0];
   const topLoss = allStrategiesWithPnl.filter(s => s.pnl < 0).sort((a, b) => a.pnl - b.pnl)[0];
 
   const realDeployments: DeployedStrategy[] = [
     ...activeDeployments,
-    ...(isEngineRunning && !activeDeployments.some(d => d.strategyId === 'nifty009' || d.strategyId === 'nifty-009-atm-breakout')
+    ...(isEngineRunning && !activeDeployments.some(d => d.strategyId === 'nifty-atm-independent-breakout')
       ? [{
-          deploymentId: 'nifty009-live-engine',
-          strategyId: 'nifty-009-atm-breakout',
-          name: niftyStatus?.strategyName || 'NIFTY 0.09% ATM Breakout',
+          deploymentId: 'nifty-atm-live-engine',
+          strategyId: 'nifty-atm-independent-breakout',
+          name: niftyStatus?.strategyName || 'NIFTY ATM CE/PE 0.9% Breakout',
           symbol: 'NIFTY 50',
           mode: (niftyStatus?.mode || (isLive ? 'live' : 'paper')) as 'paper' | 'live',
           status: (niftyStatus?.isPaused ? 'PAUSED' : 'RUNNING') as 'RUNNING' | 'PAUSED' | 'STOPPED',
@@ -702,7 +702,7 @@ const Dashboard: React.FC = () => {
           {/* 5: Upper Breakout Level */}
           <Box sx={{ borderRight: { md: '1px solid #f1f5f9' }, pr: 1.5 }}>
             <Typography sx={{ fontSize: '0.66rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>
-              Spot Buy Call (+0.09%)
+              ATM CE Upper (+0.9%)
             </Typography>
             <Typography sx={{ fontSize: '1.05rem', fontWeight: 800, color: '#16a34a', fontFamily: 'monospace', mt: 0.2 }}>
               ₹{formatPrice(strategyLevels.upperLevel)}
@@ -715,7 +715,7 @@ const Dashboard: React.FC = () => {
           {/* 6: Lower Breakout Level */}
           <Box>
             <Typography sx={{ fontSize: '0.66rem', fontWeight: 700, color: '#dc2626', textTransform: 'uppercase' }}>
-              Spot Buy Put (-0.09%)
+              ATM PE Lower (-0.9%)
             </Typography>
             <Typography sx={{ fontSize: '1.05rem', fontWeight: 800, color: '#dc2626', fontFamily: 'monospace', mt: 0.2 }}>
               ₹{formatPrice(strategyLevels.lowerLevel)}
@@ -793,7 +793,7 @@ const Dashboard: React.FC = () => {
           {/* Right column: Strategy Status + Positions */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
 
-            {/* NIFTY 0.09% Strategy Status — compact card */}
+            {/* NIFTY ATM CE/PE 0.9% Strategy Status — compact card */}
             <SectionCard
               title="NIFTY Breakout Strategy"
               badge={

@@ -108,7 +108,7 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
               letterSpacing: '-0.01em'
             }}
           >
-            {strategyName || 'NIFTY 0.09% ATM Full-Day Breakout'}
+            {strategyName || 'NIFTY ATM CE/PE Independent 0.9% Breakout'}
           </Typography>
           <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.8rem' }}>
             Select a time range below and run the backtest.

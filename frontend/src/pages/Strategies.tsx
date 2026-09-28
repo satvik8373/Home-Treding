@@ -208,7 +208,7 @@ export const Strategies: React.FC = () => {
   const handleConfirmDeploy = async () => {
     if (!acceptTerms) return;
     const name = deployTargetStrategy?.name || 'Automated Strategy';
-    const stratId = deployTargetStrategy?.id || 'nifty-009-atm-breakout';
+    const stratId = deployTargetStrategy?.id || 'nifty-atm-independent-breakout';
     const symbol = deployTargetStrategy?.symbol || 'NIFTY 50';
 
     try {
