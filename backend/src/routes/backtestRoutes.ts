@@ -13,7 +13,7 @@ router.post('/run', optionalAuth, async (req: Request, res: Response) => {
     const capital = Number(req.body?.capital || 100000);
     const startDate = req.body?.startDate as string | undefined;
     const endDate = req.body?.endDate as string | undefined;
-    const userId = (req as any).user?.userId || (req as any).user?.uid;
+    const userId = (req as any).user?.uid || 'user_admin';
 
     const data = await backtestEngine.runBacktest(
       strategyId,
@@ -41,24 +41,11 @@ router.post('/export', optionalAuth, exportBacktest);
 async function exportBacktest(req: Request, res: Response) {
   try {
     const source = req.method === 'GET' ? req.query : req.body;
-    const strategyId = String(source.strategyId || 'nifty-atm-independent-breakout');
-    const symbol = String(source.symbol || 'NIFTY 50');
-    const days = Number(source.days || 22);
-    const capital = Number(source.capital || 100000);
     const format = String(source.format || 'csv').toLowerCase();
-    const startDate = source.startDate ? String(source.startDate) : undefined;
-    const endDate = source.endDate ? String(source.endDate) : undefined;
-    const userId = (req as any).user?.userId || (req as any).user?.uid;
-
-    const result = await backtestEngine.runBacktest(
-      strategyId,
-      symbol,
-      days,
-      capital,
-      userId,
-      startDate,
-      endDate
-    );
+    const userId = (req as any).user?.uid || 'user_admin';
+    const result = backtestEngine.getResult(String(source.runId || ''), userId);
+    if (!result) return res.status(404).json({ success: false, error: 'BACKTEST_RESULT_NOT_FOUND: Run the backtest again before exporting.' });
+    if (format !== 'csv' && format !== 'json') return res.status(400).json({ success: false, error: 'INVALID_EXPORT_FORMAT' });
 
     if (format === 'json') {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -67,7 +54,7 @@ async function exportBacktest(req: Request, res: Response) {
     }
 
     const headers = [
-      'Trade ID','Date','Strategy','Instrument','Strike','Option Type','Quantity',
+      'Trade ID','Date','Strategy','Instrument','Strike','Spot Market Val','Option Type','Quantity',
       'Reference','Upper Level','Lower Level','Entry Time','Entry Price',
       'T1 Price','T1 Qty','T1 Time','T1 PnL','T2 Price','T2 Qty','T2 Time','T2 PnL',
       'Lower Exit Price','Lower Exit Qty','Lower Exit Time','Lower Exit PnL',
@@ -82,7 +69,7 @@ async function exportBacktest(req: Request, res: Response) {
     };
 
     const rows = result.trades.map((t: any) => [
-      t.id,t.date,t.strategyName,t.instrument,t.strike,t.optionType,t.quantity,
+      t.id,t.date,t.strategyName,t.instrument,t.strike,t.spotRefPrice || t.strike,t.optionType,t.quantity,
       t.signalRefPrice,t.upperBreakoutLevel,t.lowerExitLevel,t.entryTime,t.entryPrice,
       t.target1Price,t.target1Qty,t.target1Time,t.target1Pnl,
       t.target2Price,t.target2Qty,t.target2Time,t.target2Pnl,
@@ -99,6 +86,8 @@ async function exportBacktest(req: Request, res: Response) {
       `Signal Resolution,${escape(result.dataQuality.signalResolution)}`,
       `Execution Resolution,${escape(result.dataQuality.executionResolution)}`,
       `Synthetic Prices,${result.dataQuality.syntheticPrices ? 'YES' : 'NO'}`,
+      `Contract Mapping,${escape(result.provenance.contractVerification)}`,
+      `Expiry Selection,${escape(result.provenance.historicalExpirySelection)}`,
       `Period,${escape(result.period.startDate + ' to ' + result.period.endDate)}`,
       ''
     ].join('\n');

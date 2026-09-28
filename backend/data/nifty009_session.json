@@ -1,53 +1,333 @@
 {
-  "isRunning": false,
+  "isRunning": true,
   "isPaused": false,
   "isHalted": false,
   "mode": "paper",
-  "niftyLtp": 23140.5,
-  "ceLtp": 167.46,
-  "peLtp": 152.24,
-  "sessionPnl": 0,
+  "niftyLtp": 26180,
+  "ceLtp": 158.6,
+  "peLtp": 154.45,
+  "sessionPnl": -663,
   "events": [
     {
-      "timestamp": "2026-09-25T12:02:36.589Z",
-      "type": "STRATEGY_STOPPED",
+      "timestamp": "2026-09-28T08:05:00.924Z",
+      "type": "FORCED_SQUAREOFF",
       "data": {
-        "reason": "Manual stop via API",
-        "sessionPnl": 0
+        "exitCe": true,
+        "exitPe": true,
+        "sessionPnl": -662.9999999999993
       }
     },
     {
-      "timestamp": "2026-09-25T12:02:31.140Z",
+      "timestamp": "2026-09-28T08:05:00.923Z",
+      "type": "FORCED_SQUAREOFF",
+      "data": {
+        "exitCe": true,
+        "exitPe": true,
+        "time": "15:10 IST"
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.820Z",
+      "type": "CE_ENTRY_FILL",
+      "data": {
+        "leg": "CE",
+        "symbol": "NIFTY 01-OCT-2026 26200 CE",
+        "securityId": "NIFTY_26200_CE",
+        "strike": 26200,
+        "entryPrice": 158.6,
+        "quantity": 130,
+        "totalQty": 130,
+        "remainingQty": 130,
+        "entryTime": "2026-09-28T08:05:00.818Z",
+        "currentLtp": 158.6,
+        "unrealizedPnl": 0,
+        "realizedPnl": 0,
+        "target1Price": 178.6,
+        "target2Price": 198.6,
+        "target1Hit": false
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.820Z",
+      "type": "CE_ENTRY_ORDER",
+      "data": {
+        "mode": "PAPER",
+        "symbol": "NIFTY 01-OCT-2026 26200 CE",
+        "qty": 130,
+        "price": 158.6
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.818Z",
+      "type": "CE_ENTRY_SIGNAL",
+      "data": {
+        "id": "SIG_CE_ENTRY_2026-09-28_11:40",
+        "leg": "CE",
+        "type": "BUY_CE",
+        "triggerReason": "CE 5m Close (₹158.6) >= CE Upper Level (₹156.6)",
+        "triggerPrice": 158.6,
+        "timestamp": "11:45",
+        "upperLevel": 156.6,
+        "lowerLevel": 153.8,
+        "quantity": 130
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.818Z",
+      "type": "CE_BREAKOUT_DETECTED",
+      "data": {
+        "id": "SIG_CE_ENTRY_2026-09-28_11:40",
+        "leg": "CE",
+        "type": "BUY_CE",
+        "triggerReason": "CE 5m Close (₹158.6) >= CE Upper Level (₹156.6)",
+        "triggerPrice": 158.6,
+        "timestamp": "11:45",
+        "upperLevel": 156.6,
+        "lowerLevel": 153.8,
+        "quantity": 130
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.818Z",
+      "type": "CE_CANDLE_CLOSED",
+      "data": {
+        "time": "11:40",
+        "close": 158.6
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.712Z",
+      "type": "CE_EXIT_FILL",
+      "data": {
+        "leg": "CE",
+        "state": "FLAT"
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.712Z",
+      "type": "CE_EXIT_ORDER",
+      "data": {
+        "mode": "PAPER",
+        "symbol": "NIFTY 01-OCT-2026 26200 CE",
+        "qty": 130,
+        "exitPrice": 153,
+        "realizedPnl": -662.9999999999993
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.708Z",
+      "type": "CE_EXIT_SIGNAL",
+      "data": {
+        "id": "SIG_CE_EXIT_2026-09-28_11:10",
+        "leg": "CE",
+        "type": "EXIT_CE",
+        "triggerReason": "CE 5m Close (₹153) < CE Lower Level (₹153.8)",
+        "triggerPrice": 153,
+        "timestamp": "11:15",
+        "upperLevel": 156.6,
+        "lowerLevel": 153.8,
+        "quantity": 130
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.708Z",
+      "type": "CE_EXIT_SIGNAL",
+      "data": {
+        "id": "SIG_CE_EXIT_2026-09-28_11:10",
+        "leg": "CE",
+        "type": "EXIT_CE",
+        "triggerReason": "CE 5m Close (₹153) < CE Lower Level (₹153.8)",
+        "triggerPrice": 153,
+        "timestamp": "11:15",
+        "upperLevel": 156.6,
+        "lowerLevel": 153.8,
+        "quantity": 130
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.707Z",
+      "type": "CE_CANDLE_CLOSED",
+      "data": {
+        "time": "11:10",
+        "close": 153
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.604Z",
+      "type": "PE_ENTRY_FILL",
+      "data": {
+        "leg": "PE",
+        "symbol": "NIFTY 01-OCT-2026 26200 PE",
+        "securityId": "NIFTY_26200_PE",
+        "strike": 26200,
+        "entryPrice": 154.45,
+        "quantity": 130,
+        "totalQty": 130,
+        "remainingQty": 130,
+        "entryTime": "2026-09-28T08:05:00.603Z",
+        "currentLtp": 154.45,
+        "unrealizedPnl": 0,
+        "realizedPnl": 0,
+        "target1Price": 174.45,
+        "target2Price": 194.45,
+        "target1Hit": false
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.604Z",
+      "type": "PE_ENTRY_ORDER",
+      "data": {
+        "mode": "PAPER",
+        "symbol": "NIFTY 01-OCT-2026 26200 PE",
+        "qty": 130,
+        "price": 154.45
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.603Z",
+      "type": "PE_ENTRY_SIGNAL",
+      "data": {
+        "id": "SIG_PE_ENTRY_2026-09-28_09:25",
+        "leg": "PE",
+        "type": "BUY_PE",
+        "triggerReason": "PE 5m Close (₹154.45) >= PE Upper Level (₹153.25)",
+        "triggerPrice": 154.45,
+        "timestamp": "09:30",
+        "upperLevel": 153.25,
+        "lowerLevel": 150.51,
+        "quantity": 130
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.602Z",
+      "type": "PE_BREAKOUT_DETECTED",
+      "data": {
+        "id": "SIG_PE_ENTRY_2026-09-28_09:25",
+        "leg": "PE",
+        "type": "BUY_PE",
+        "triggerReason": "PE 5m Close (₹154.45) >= PE Upper Level (₹153.25)",
+        "triggerPrice": 154.45,
+        "timestamp": "09:30",
+        "upperLevel": 153.25,
+        "lowerLevel": 150.51,
+        "quantity": 130
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.602Z",
+      "type": "PE_CANDLE_CLOSED",
+      "data": {
+        "time": "09:25",
+        "close": 154.45
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.499Z",
+      "type": "CE_ENTRY_FILL",
+      "data": {
+        "leg": "CE",
+        "symbol": "NIFTY 01-OCT-2026 26200 CE",
+        "securityId": "NIFTY_26200_CE",
+        "strike": 26200,
+        "entryPrice": 158.1,
+        "quantity": 130,
+        "totalQty": 130,
+        "remainingQty": 130,
+        "entryTime": "2026-09-28T08:05:00.497Z",
+        "currentLtp": 153,
+        "unrealizedPnl": -662.9999999999993,
+        "realizedPnl": 0,
+        "target1Price": 178.1,
+        "target2Price": 198.1,
+        "target1Hit": false
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.499Z",
+      "type": "CE_ENTRY_ORDER",
+      "data": {
+        "mode": "PAPER",
+        "symbol": "NIFTY 01-OCT-2026 26200 CE",
+        "qty": 130,
+        "price": 158.1
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.497Z",
+      "type": "CE_ENTRY_SIGNAL",
+      "data": {
+        "id": "SIG_CE_ENTRY_2026-09-28_09:20",
+        "leg": "CE",
+        "type": "BUY_CE",
+        "triggerReason": "CE 5m Close (₹158.1) >= CE Upper Level (₹156.6)",
+        "triggerPrice": 158.1,
+        "timestamp": "09:25",
+        "upperLevel": 156.6,
+        "lowerLevel": 153.8,
+        "quantity": 130
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.496Z",
+      "type": "CE_BREAKOUT_DETECTED",
+      "data": {
+        "id": "SIG_CE_ENTRY_2026-09-28_09:20",
+        "leg": "CE",
+        "type": "BUY_CE",
+        "triggerReason": "CE 5m Close (₹158.1) >= CE Upper Level (₹156.6)",
+        "triggerPrice": 158.1,
+        "timestamp": "09:25",
+        "upperLevel": 156.6,
+        "lowerLevel": 153.8,
+        "quantity": 130
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.496Z",
+      "type": "CE_CANDLE_CLOSED",
+      "data": {
+        "time": "09:20",
+        "close": 158.1
+      }
+    },
+    {
+      "timestamp": "2026-09-28T08:05:00.477Z",
       "type": "LEVELS_CALCULATED",
       "data": {
         "leg": "PE",
-        "reference": 152.24,
-        "upper": 152.38,
-        "lower": 152.1
+        "referenceHigh": 151.88,
+        "referenceLow": 151.88,
+        "reference": 151.88,
+        "referenceClose": 151.88,
+        "upper": 153.25,
+        "lower": 150.51
       }
     },
     {
-      "timestamp": "2026-09-25T12:02:31.139Z",
+      "timestamp": "2026-09-28T08:05:00.477Z",
       "type": "LEVELS_CALCULATED",
       "data": {
         "leg": "CE",
-        "reference": 167.46,
-        "upper": 167.61,
-        "lower": 167.31
+        "referenceHigh": 155.2,
+        "referenceLow": 155.2,
+        "reference": 155.2,
+        "referenceClose": 155.2,
+        "upper": 156.6,
+        "lower": 153.8
       }
     },
     {
-      "timestamp": "2026-09-25T12:02:31.139Z",
+      "timestamp": "2026-09-28T08:05:00.476Z",
       "type": "REFERENCE_LOCKED",
       "data": {
-        "strike": 23150,
+        "strike": 26200,
         "expiry": "01-OCT-2026",
-        "ce": "NIFTY 01-OCT-2026 23150 CE",
-        "pe": "NIFTY 01-OCT-2026 23150 PE"
+        "ce": "NIFTY 01-OCT-2026 26200 CE",
+        "pe": "NIFTY 01-OCT-2026 26200 PE"
       }
     },
     {
-      "timestamp": "2026-09-25T12:02:31.034Z",
+      "timestamp": "2026-09-28T08:05:00.472Z",
       "type": "STRATEGY_STARTED",
       "data": {
         "mode": "PAPER",
@@ -60,68 +340,102 @@
       }
     }
   ],
-  "lastUpdated": "2026-09-25T12:02:36.589Z",
+  "lastUpdated": "2026-09-28T08:05:00.924Z",
   "strategyName": "NIFTY ATM CE/PE Independent Breakout",
-  "status": "ACTIVE_TRADING",
-  "sessionDate": "2026-09-25",
+  "status": "DAY_COMPLETED",
+  "sessionDate": "2026-09-28",
   "tradingWindow": "09:20–15:10",
   "lockedAtm": {
-    "atmStrike": 23150,
+    "atmStrike": 26200,
     "expiry": "01-OCT-2026",
-    "ceSecurityId": "NIFTY_23150_CE",
-    "ceSymbol": "NIFTY 01-OCT-2026 23150 CE",
-    "ceLtp": 167.46,
-    "peSecurityId": "NIFTY_23150_PE",
-    "peSymbol": "NIFTY 01-OCT-2026 23150 PE",
-    "peLtp": 152.24,
+    "ceSecurityId": "NIFTY_26200_CE",
+    "ceSymbol": "NIFTY 01-OCT-2026 26200 CE",
+    "ceLtp": 158.6,
+    "peSecurityId": "NIFTY_26200_PE",
+    "peSymbol": "NIFTY 01-OCT-2026 26200 PE",
+    "peLtp": 154.45,
     "lotSize": 65,
-    "spotPriceAtResolution": 23140.5,
-    "resolvedAt": "2026-09-25T12:02:31.138Z"
+    "spotPriceAtResolution": 26180,
+    "resolvedAt": "2026-09-28T08:05:00.476Z"
   },
   "ce": {
-    "symbol": "NIFTY 01-OCT-2026 23150 CE",
-    "strike": "23150 CE",
+    "symbol": "NIFTY 01-OCT-2026 26200 CE",
+    "strike": "26200 CE",
     "state": "FLAT",
-    "referenceClose": 167.46,
-    "upperLevel": 167.61,
-    "lowerLevel": 167.31,
-    "currentLtp": 167.46,
+    "referenceHigh": 155.2,
+    "referenceLow": 155.2,
+    "referenceClose": 155.2,
+    "upperLevel": 156.6,
+    "lowerLevel": 153.8,
+    "currentLtp": 158.6,
     "position": null,
-    "entryCount": 0,
-    "exitCount": 0,
-    "lastCandleTime": "",
-    "lastSignal": null
+    "entryCount": 2,
+    "exitCount": 1,
+    "lastCandleTime": "11:45",
+    "lastSignal": {
+      "id": "SIG_CE_ENTRY_2026-09-28_11:40",
+      "leg": "CE",
+      "type": "BUY_CE",
+      "triggerReason": "CE 5m Close (₹158.6) >= CE Upper Level (₹156.6)",
+      "triggerPrice": 158.6,
+      "timestamp": "11:45",
+      "upperLevel": 156.6,
+      "lowerLevel": 153.8,
+      "quantity": 130
+    }
   },
   "pe": {
-    "symbol": "NIFTY 01-OCT-2026 23150 PE",
-    "strike": "23150 PE",
+    "symbol": "NIFTY 01-OCT-2026 26200 PE",
+    "strike": "26200 PE",
     "state": "FLAT",
-    "referenceClose": 152.24,
-    "upperLevel": 152.38,
-    "lowerLevel": 152.1,
-    "currentLtp": 152.24,
+    "referenceHigh": 151.88,
+    "referenceLow": 151.88,
+    "referenceClose": 151.88,
+    "upperLevel": 153.25,
+    "lowerLevel": 150.51,
+    "currentLtp": 154.45,
     "position": null,
-    "entryCount": 0,
+    "entryCount": 1,
     "exitCount": 0,
-    "lastCandleTime": "",
-    "lastSignal": null
+    "lastCandleTime": "09:30",
+    "lastSignal": {
+      "id": "SIG_PE_ENTRY_2026-09-28_09:25",
+      "leg": "PE",
+      "type": "BUY_PE",
+      "triggerReason": "PE 5m Close (₹154.45) >= PE Upper Level (₹153.25)",
+      "triggerPrice": 154.45,
+      "timestamp": "09:30",
+      "upperLevel": 153.25,
+      "lowerLevel": 150.51,
+      "quantity": 130
+    }
   },
   "combined": {
     "activePositionsCount": 0,
     "totalUnrealizedPnl": 0,
-    "totalTrades": 0,
-    "ceTrades": 0,
-    "peTrades": 0,
-    "lastSignal": null,
-    "totalPnl": 0,
-    "timeRemaining": "Session Closed",
-    "lastExecutionTime": "2026-09-25"
+    "totalTrades": 3,
+    "ceTrades": 2,
+    "peTrades": 1,
+    "lastSignal": {
+      "id": "SIG_CE_ENTRY_2026-09-28_11:40",
+      "leg": "CE",
+      "type": "BUY_CE",
+      "triggerReason": "CE 5m Close (₹158.6) >= CE Upper Level (₹156.6)",
+      "triggerPrice": 158.6,
+      "timestamp": "11:45",
+      "upperLevel": 156.6,
+      "lowerLevel": 153.8,
+      "quantity": 130
+    },
+    "totalPnl": -663,
+    "timeRemaining": "1h 35m remaining",
+    "lastExecutionTime": "2026-09-28T08:05:00.820Z"
   },
-  "firstCandleClose": 23140.5,
-  "upperLevel": 167.61,
-  "lowerLevel": 152.1,
-  "spotUpperLevel": 23161.33,
-  "spotLowerLevel": 23119.67,
-  "state": "ACTIVE_TRADING",
+  "firstCandleClose": 26180,
+  "upperLevel": 156.6,
+  "lowerLevel": 150.51,
+  "spotUpperLevel": 26415.62,
+  "spotLowerLevel": 25944.38,
+  "state": "DAY_COMPLETED",
   "activePosition": null
 }

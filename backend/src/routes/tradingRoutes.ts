@@ -9,6 +9,9 @@ import { nifty009Engine } from '../strategies/nifty009/Nifty009Engine';
 import { logger } from '../utils/logger';
 
 const router = Router();
+router.use((_req, _res, next) => {
+  brokerRegistry.whenReady().then(() => next()).catch(next);
+});
 
 let isEngineRunning = true;
 let currentTradingMode: 'paper' | 'live' = (process.env.TRADING_MODE === 'live' ? 'live' : 'paper');

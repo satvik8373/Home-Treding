@@ -8,6 +8,8 @@ export interface DhanAuthResult {
   clientId: string;
   accountName: string;
   terminalActivated: boolean;
+  dataPlan?: string;
+  tokenValidity?: string;
   error?: string;
 }
 
@@ -21,7 +23,7 @@ export interface DhanTokenExchangeResult {
 
 export class DhanAuthService {
   /**
-   * Validate Dhan credentials by pinging fundlimit endpoint
+   * Validate Dhan credentials with the official profile endpoint.
    */
   public static async validateCredentials(credentials: DhanCredentials): Promise<DhanAuthResult> {
     const { clientId, accessToken } = credentials;
@@ -37,7 +39,7 @@ export class DhanAuthService {
     }
 
     try {
-      const response = await axios.get(`${DHAN_CONFIG.BASE_URL}${DHAN_CONFIG.ENDPOINTS.FUND_LIMIT}`, {
+      const response = await axios.get(`${DHAN_CONFIG.BASE_URL}${DHAN_CONFIG.ENDPOINTS.PROFILE}`, {
         headers: {
           ...DHAN_CONFIG.DEFAULT_HEADERS,
           'access-token': accessToken,
@@ -46,12 +48,14 @@ export class DhanAuthService {
         timeout: DHAN_CONFIG.TIMEOUT_MS
       });
 
-      if (response.status === 200) {
+      if (response.status === 200 && String(response.data?.dhanClientId) === clientId) {
         return {
           success: true,
           clientId,
           accountName: `Dhan Account (${clientId})`,
-          terminalActivated: true
+          terminalActivated: true,
+          dataPlan: String(response.data?.dataPlan || 'Unknown'),
+          tokenValidity: response.data?.tokenValidity
         };
       }
 
@@ -60,7 +64,7 @@ export class DhanAuthService {
         clientId,
         accountName: '',
         terminalActivated: false,
-        error: 'Unexpected response from Dhan server'
+        error: 'Dhan Client ID does not match this access token.'
       };
     } catch (error: any) {
       logger.error('[Dhan Auth Validation Failed]', error.response?.data || error.message);
@@ -229,9 +233,16 @@ export class DhanAuthService {
       };
     } catch (error: any) {
       logger.error('[Dhan Generate Consent Error]', error.response?.data || error.message);
+      const status = error.response?.status;
+      let errorMsg = error.response?.data?.remarks || error.response?.data?.message || error.message || 'Dhan consent generation failed';
+      if (status === 404) {
+        errorMsg = 'DhanHQ returned 404 (App / Client Not Found): Your Developer API Key (App ID) or Client ID was not found in DhanHQ. If you are using a standard 24-hour Access Token, please switch to the "Direct Access Token (24-Hr)" tab above.';
+      } else if (status === 401) {
+        errorMsg = 'DhanHQ returned 401 (Unauthorized): Invalid App ID or App Secret. Please check your credentials in the DhanHQ Developer Portal (dhanhq.co).';
+      }
       return {
         success: false,
-        error: error.response?.data?.remarks || error.response?.data?.message || error.message || 'Dhan consent generation failed'
+        error: errorMsg
       };
     }
   }
@@ -320,7 +331,9 @@ export class DhanAuthService {
       const status = error.response?.status;
       let errorMsg = error.response?.data?.remarks || error.response?.data?.message || error.message || 'Failed to exchange token with Dhan';
       
-      if (status === 401) {
+      if (status === 404) {
+        errorMsg = 'DhanHQ returned 404: Authorization session not found or expired. Please try connecting again.';
+      } else if (status === 401) {
         errorMsg = 'Dhan authorization rejected (401). This Token ID has either expired (single-use token expires in 60 seconds), or your API Key / Secret Key does not match the Dhan app. Please click "Back to Brokers" to start a fresh login or use your 24-hr Direct Access Token.';
       }
 

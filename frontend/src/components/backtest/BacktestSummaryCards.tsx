@@ -7,23 +7,32 @@ import {
 
 interface BacktestSummaryProps {
   summary: {
-    tradingDays: number;
-    winDays: number;
-    winDaysPercent: number;
-    lossDays: number;
-    lossDaysPercent: number;
-    totalTrades: number;
-    winTrades: number;
-    winTradesPercent: number;
-    lossTrades: number;
-    lossTradesPercent: number;
-    winStreak: number;
-    lossStreak: number;
-    maxProfit: number;
-    maxLoss: number;
-    avgProfitPerDay: number;
-    avgLossPerDay: number;
-    maxDrawdownFromPeak: number;
+    tradingDays?: number;
+    winDays?: number;
+    winDaysPercent?: number;
+    winDaysPct?: number;
+    lossDays?: number;
+    lossDaysPercent?: number;
+    lossDaysPct?: number;
+    totalTrades?: number;
+    winTrades?: number;
+    winningTrades?: number;
+    winTradesPercent?: number;
+    winRatePct?: number;
+    lossTrades?: number;
+    losingTrades?: number;
+    lossTradesPercent?: number;
+    winStreak?: number;
+    lossStreak?: number;
+    maxProfit?: number;
+    maxProfitDay?: number;
+    maxLoss?: number;
+    maxLossDay?: number;
+    avgProfitPerDay?: number;
+    avgLossPerDay?: number;
+    maxDrawdownFromPeak?: number;
+    maxDrawdown?: number;
+    maxDrawdownPct?: number;
     ceTrades?: number;
     peTrades?: number;
     target1Hits?: number;
@@ -37,6 +46,11 @@ interface BacktestSummaryProps {
 }
 
 export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }) => {
+  const safeNumber = (val: unknown, fallback = 0): number => {
+    const num = Number(val);
+    return isNaN(num) ? fallback : num;
+  };
+
   const formatK = (num: number) => {
     const abs = Math.abs(num);
     if (abs >= 1000) {
@@ -45,7 +59,39 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
     return abs.toFixed(0);
   };
 
-  const hasStrategyBreakdown = summary.ceTrades !== undefined || summary.target1Hits !== undefined;
+  const formatInr = (val: unknown) => {
+    return safeNumber(val).toLocaleString('en-IN');
+  };
+
+  const formatDec = (val: unknown, dec = 2) => {
+    return safeNumber(val).toFixed(dec);
+  };
+
+  const tradingDays = safeNumber(summary?.tradingDays);
+  const winDays = safeNumber(summary?.winDays);
+  const winDaysPct = safeNumber(summary?.winDaysPercent ?? summary?.winDaysPct);
+  const lossDays = safeNumber(summary?.lossDays);
+  const lossDaysPct = safeNumber(summary?.lossDaysPercent ?? summary?.lossDaysPct);
+
+  const totalTrades = safeNumber(summary?.totalTrades);
+  const winTrades = safeNumber(summary?.winTrades ?? summary?.winningTrades);
+  const winTradesPct = safeNumber(summary?.winTradesPercent ?? summary?.winRatePct);
+  const lossTrades = safeNumber(summary?.lossTrades ?? summary?.losingTrades);
+  const lossTradesPct = safeNumber(
+    summary?.lossTradesPercent ??
+    (summary?.winRatePct !== undefined ? 100 - summary.winRatePct : 0)
+  );
+
+  const winStreak = safeNumber(summary?.winStreak);
+  const lossStreak = safeNumber(summary?.lossStreak);
+  const maxProfit = safeNumber(summary?.maxProfit ?? summary?.maxProfitDay);
+  const maxLoss = safeNumber(summary?.maxLoss ?? summary?.maxLossDay);
+
+  const avgProfitPerDay = safeNumber(summary?.avgProfitPerDay);
+  const avgLossPerDay = safeNumber(summary?.avgLossPerDay);
+  const maxDrawdown = safeNumber(summary?.maxDrawdownFromPeak ?? summary?.maxDrawdown);
+
+  const hasStrategyBreakdown = summary?.ceTrades !== undefined || summary?.target1Hits !== undefined;
 
   return (
     <Box sx={{ mb: 4 }}>
@@ -88,7 +134,7 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
               Trading Days
             </Typography>
             <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a' }}>
-              {summary.tradingDays}
+              {tradingDays}
             </Typography>
           </Box>
 
@@ -98,10 +144,10 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
                 Win Days
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 700, color: '#16a34a', fontSize: '0.875rem' }}>
-                {summary.winDaysPercent}%
+                {winDaysPct}%
               </Typography>
               <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.7rem' }}>
-                {summary.winDays} vs {summary.tradingDays}
+                {winDays} vs {tradingDays}
               </Typography>
             </Box>
 
@@ -110,10 +156,10 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
                 Loss Days
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 700, color: '#dc2626', fontSize: '0.875rem' }}>
-                {summary.lossDaysPercent}%
+                {lossDaysPct}%
               </Typography>
               <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.7rem' }}>
-                {summary.lossDays} vs {summary.tradingDays}
+                {lossDays} vs {tradingDays}
               </Typography>
             </Box>
           </Box>
@@ -137,7 +183,7 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
               Total Trades
             </Typography>
             <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a' }}>
-              {summary.totalTrades}
+              {totalTrades}
             </Typography>
           </Box>
 
@@ -147,10 +193,10 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
                 Win Trades
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 700, color: '#16a34a', fontSize: '0.875rem' }}>
-                {summary.winTradesPercent}%
+                {winTradesPct}%
               </Typography>
               <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.7rem' }}>
-                {summary.winTrades} vs {summary.totalTrades}
+                {winTrades} vs {totalTrades}
               </Typography>
             </Box>
 
@@ -159,10 +205,10 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
                 Loss Trades
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 700, color: '#dc2626', fontSize: '0.875rem' }}>
-                {summary.lossTradesPercent}%
+                {lossTradesPct}%
               </Typography>
               <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.7rem' }}>
-                {summary.lossTrades} vs {summary.totalTrades}
+                {lossTrades} vs {totalTrades}
               </Typography>
             </Box>
           </Box>
@@ -187,10 +233,10 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
             </Typography>
             <Box sx={{ textAlign: 'right' }}>
               <Typography variant="body2" sx={{ fontWeight: 700, color: '#16a34a', fontSize: '0.85rem' }}>
-                Win {summary.winStreak}
+                Win {winStreak}
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 700, color: '#dc2626', fontSize: '0.85rem' }}>
-                Loss {summary.lossStreak}
+                Loss {lossStreak}
               </Typography>
             </Box>
           </Box>
@@ -201,7 +247,7 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
                 Max Profit
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 700, color: '#16a34a', fontSize: '0.85rem' }}>
-                ₹ {summary.maxProfit.toLocaleString('en-IN')}
+                ₹ {formatInr(maxProfit)}
               </Typography>
             </Box>
 
@@ -210,7 +256,7 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
                 Max Loss
               </Typography>
               <Typography variant="body2" sx={{ fontWeight: 700, color: '#dc2626', fontSize: '0.85rem' }}>
-                ₹ {summary.maxLoss.toLocaleString('en-IN')}
+                ₹ {formatInr(maxLoss)}
               </Typography>
             </Box>
           </Box>
@@ -234,10 +280,10 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
               Average Per Day
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 700, color: '#16a34a', fontSize: '0.85rem', mb: 0.5 }}>
-              Profit {summary.avgProfitPerDay.toFixed(2)}
+              Profit {formatDec(avgProfitPerDay)}
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 700, color: '#dc2626', fontSize: '0.85rem', mb: 1 }}>
-              Loss {summary.avgLossPerDay.toFixed(2)}
+              Loss {formatDec(avgLossPerDay)}
             </Typography>
             <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '0.75rem', fontWeight: 600 }}>
               Max Drawdown
@@ -269,7 +315,7 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
                 letterSpacing: '-0.02em'
               }}
             >
-              {formatK(summary.maxDrawdownFromPeak ?? (summary as any).maxDrawdown ?? 0)}
+              {formatK(maxDrawdown)}
             </Typography>
           </Box>
         </Paper>
@@ -376,13 +422,13 @@ export const BacktestSummaryCards: React.FC<BacktestSummaryProps> = ({ summary }
               <Box>
                 <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>Avg Win</Typography>
                 <Typography variant="body1" sx={{ fontWeight: 700, color: '#16a34a' }}>
-                  {summary.avgWin !== undefined ? `₹${summary.avgWin.toLocaleString('en-IN')}` : '—'}
+                  {summary.avgWin !== undefined ? `₹${formatInr(summary.avgWin)}` : '—'}
                 </Typography>
               </Box>
               <Box sx={{ textAlign: 'right' }}>
                 <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>Avg Loss</Typography>
                 <Typography variant="body1" sx={{ fontWeight: 700, color: '#dc2626' }}>
-                  {summary.avgLoss !== undefined ? `₹${summary.avgLoss.toLocaleString('en-IN')}` : '—'}
+                  {summary.avgLoss !== undefined ? `₹${formatInr(summary.avgLoss)}` : '—'}
                 </Typography>
               </Box>
             </Box>

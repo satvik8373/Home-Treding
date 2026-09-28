@@ -43,6 +43,11 @@ export interface BacktestTradeItem {
   exitReason: string;
   status: 'WIN' | 'LOSS';
   spotRefPrice?: string;
+  spotMarketVal?: number;
+  optionRefText?: string;
+  signalRefPrice?: number;
+  upperBreakoutLevel?: number;
+  lowerExitLevel?: number;
   fillModel?: string;
 }
 
@@ -171,7 +176,6 @@ export const TransactionDetailsAccordion: React.FC<TransactionDetailsAccordionPr
                         <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.75rem' }}>Qty</TableCell>
                         <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.75rem' }}>Entry Price</TableCell>
                         <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.75rem' }}>Exit Price</TableCell>
-                        <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.75rem' }}>Gross P&L</TableCell>
                         <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.75rem' }}>Charges</TableCell>
                         <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.75rem' }}>Net P&L</TableCell>
                         <TableCell sx={{ fontWeight: 700, color: '#475569', fontSize: '0.75rem' }}>Status</TableCell>
@@ -183,7 +187,6 @@ export const TransactionDetailsAccordion: React.FC<TransactionDetailsAccordionPr
                         const grossVal = trade.grossPnl !== undefined
                           ? trade.grossPnl
                           : Number(((trade.side === 'BUY' ? trade.exitPrice - trade.entryPrice : trade.entryPrice - trade.exitPrice) * trade.quantity).toFixed(2));
-                        const isGrossWin = grossVal >= 0;
                         const totalChargesVal = trade.totalCharges ?? trade.charges ?? (trade.grossPnl !== undefined ? Math.max(0, Number((grossVal - trade.netPnl).toFixed(2))) : trade.brokerage ?? 0);
                         const chargesTooltip = trade.brokerage !== undefined
                           ? `Brokerage: ₹${trade.brokerage.toFixed(2)} | STT: ₹${(trade.stt || 0).toFixed(2)} | Exch: ₹${(trade.exchangeCharges || 0).toFixed(2)} | GST: ₹${(trade.gst || 0).toFixed(2)} | Stamp: ₹${(trade.stampDuty || 0).toFixed(2)} | SEBI: ₹${(trade.sebiCharges || 0).toFixed(2)}`
@@ -197,8 +200,18 @@ export const TransactionDetailsAccordion: React.FC<TransactionDetailsAccordionPr
                             <TableCell sx={{ fontSize: '0.8rem', fontWeight: 600, color: '#0f172a' }}>
                               {trade.instrument}
                             </TableCell>
-                            <TableCell sx={{ fontSize: '0.75rem', color: '#0369a1', fontWeight: 600 }}>
-                              {trade.spotRefPrice || '—'}
+                            <TableCell sx={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                              {trade.optionRefText
+                                ? trade.optionRefText
+                                : (trade.signalRefPrice && trade.upperBreakoutLevel && trade.lowerExitLevel)
+                                ? `Option Ref: ₹${trade.signalRefPrice.toFixed(2)} (Upper: ₹${trade.upperBreakoutLevel.toFixed(2)}, Lower: ₹${trade.lowerExitLevel.toFixed(2)})`
+                                : trade.spotRefPrice
+                                ? trade.spotRefPrice
+                                : (trade as any).spotMarketVal
+                                ? `₹${Number((trade as any).spotMarketVal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                : trade.strike
+                                ? `₹${Number(trade.strike).toLocaleString('en-IN')}`
+                                : '—'}
                             </TableCell>
                             <TableCell>
                               <Chip
@@ -216,9 +229,6 @@ export const TransactionDetailsAccordion: React.FC<TransactionDetailsAccordionPr
                             <TableCell sx={{ fontSize: '0.8rem', color: '#334155' }}>{trade.quantity}</TableCell>
                             <TableCell sx={{ fontSize: '0.8rem', color: '#334155' }}>₹{trade.entryPrice.toFixed(2)}</TableCell>
                             <TableCell sx={{ fontSize: '0.8rem', color: '#334155' }}>₹{trade.exitPrice.toFixed(2)}</TableCell>
-                            <TableCell sx={{ fontSize: '0.8rem', fontWeight: 600, color: isGrossWin ? '#16a34a' : '#dc2626' }}>
-                              {isGrossWin ? `+₹${grossVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `-₹${Math.abs(grossVal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                            </TableCell>
                             <TableCell sx={{ fontSize: '0.8rem', color: '#64748b' }}>
                               <Tooltip title={chargesTooltip} arrow>
                                 <span style={{ cursor: 'help', textDecoration: 'underline dotted #94a3b8' }}>

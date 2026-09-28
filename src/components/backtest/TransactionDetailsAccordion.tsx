@@ -35,6 +35,11 @@ export interface BacktestTradeItem {
   exitReason: string;
   status: 'WIN' | 'LOSS';
   spotRefPrice?: string;
+  spotMarketVal?: number;
+  optionRefText?: string;
+  signalRefPrice?: number;
+  upperBreakoutLevel?: number;
+  lowerExitLevel?: number;
   fillModel?: string;
 }
 
@@ -179,8 +184,18 @@ export const TransactionDetailsAccordion: React.FC<TransactionDetailsAccordionPr
                             <TableCell sx={{ fontSize: '0.8rem', fontWeight: 600, color: '#0f172a' }}>
                               {trade.instrument}
                             </TableCell>
-                            <TableCell sx={{ fontSize: '0.75rem', color: '#0369a1', fontWeight: 600 }}>
-                              {trade.spotRefPrice || '—'}
+                            <TableCell sx={{ fontSize: '0.75rem', color: '#0284c7', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                              {trade.optionRefText
+                                ? trade.optionRefText
+                                : (trade.signalRefPrice && trade.upperBreakoutLevel && trade.lowerExitLevel)
+                                ? `Option Ref: ₹${trade.signalRefPrice.toFixed(2)} (Upper: ₹${trade.upperBreakoutLevel.toFixed(2)}, Lower: ₹${trade.lowerExitLevel.toFixed(2)})`
+                                : trade.spotRefPrice
+                                ? trade.spotRefPrice
+                                : (trade as any).spotMarketVal
+                                ? `₹${Number((trade as any).spotMarketVal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                : trade.strike
+                                ? `₹${Number(trade.strike).toLocaleString('en-IN')}`
+                                : '—'}
                             </TableCell>
                             <TableCell>
                               <Chip

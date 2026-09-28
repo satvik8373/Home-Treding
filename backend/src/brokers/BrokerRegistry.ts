@@ -5,6 +5,8 @@ import { DhanAdapter } from './dhan/DhanAdapter';
 import { BrokerName, BrokerCredentials, BrokerAccountProfile, BrokerStatus } from './types';
 import { encryptToken, decryptToken, maskIdentifier } from '../security/encryption';
 import { logger } from '../utils/logger';
+import { brokerStorageFile } from './brokerStorage';
+import { DhanAuthService } from './dhan/auth';
 
 export interface StoredBrokerConnection {
   id: string;
@@ -20,32 +22,23 @@ export interface StoredBrokerConnection {
   encryptedAccessToken: string;
   connectedAt: string;
   lastHeartbeat: string;
+  dataPlan?: string;
+  tokenValidity?: string;
 }
 
 export class BrokerRegistry {
   private static instance: BrokerRegistry;
   private adapters: Map<string, BrokerAdapter> = new Map();
   private storageFile: string;
+  private readonly ready: Promise<void>;
 
   private constructor() {
-    const candidates = [
-      path.join(__dirname, '../../data/broker-connections.json'),
-      path.join(process.cwd(), 'backend', 'data', 'broker-connections.json'),
-      path.join(process.cwd(), 'data', 'broker-connections.json')
-    ];
-    let resolved = candidates.find(p => fs.existsSync(p));
-    if (!resolved) {
-      const preferredDir = fs.existsSync(path.join(process.cwd(), 'backend', 'data'))
-        ? path.join(process.cwd(), 'backend', 'data')
-        : path.join(__dirname, '../../data');
-      if (!fs.existsSync(preferredDir)) {
-        fs.mkdirSync(preferredDir, { recursive: true });
-      }
-      resolved = path.join(preferredDir, 'broker-connections.json');
-    }
-    this.storageFile = resolved;
-    this.loadPersistedConnections();
+    this.storageFile = brokerStorageFile();
+    fs.mkdirSync(path.dirname(this.storageFile), { recursive: true });
+    this.ready = this.loadPersistedConnections();
   }
+
+  public whenReady(): Promise<void> { return this.ready; }
 
   public static getInstance(): BrokerRegistry {
     if (!BrokerRegistry.instance) {
@@ -89,6 +82,8 @@ export class BrokerRegistry {
       accountName: profile.accountName,
       status: 'Connected',
       terminalActivated: profile.terminalActivated,
+      dataPlan: profile.dataPlan,
+      tokenValidity: profile.tokenValidity,
       encryptedAccessToken: encryptToken(accessToken),
       connectedAt: profile.connectedAt.toISOString(),
       lastHeartbeat: new Date().toISOString()
@@ -121,13 +116,7 @@ export class BrokerRegistry {
   public async disconnectBroker(userId: string, brokerId: string): Promise<boolean> {
     const list = this.readStorage();
     
-    // Match any connection by full ID, client ID, or user
-    const toRemove = list.filter(c => 
-      c.id === brokerId || 
-      c.clientId === brokerId || 
-      c.id.endsWith(`_${brokerId}`) ||
-      (userId && c.userId === userId && (c.id === brokerId || c.clientId === brokerId))
-    );
+    const toRemove = list.filter(c => c.userId === userId && (c.id === brokerId || c.clientId === brokerId));
 
     for (const conn of toRemove) {
       const adapter = this.adapters.get(conn.id);
@@ -137,20 +126,8 @@ export class BrokerRegistry {
       }
     }
 
-    // Purge from active memory adapters
-    for (const [key, adapter] of this.adapters.entries()) {
-      if (key === brokerId || key.includes(brokerId)) {
-        await adapter.disconnect().catch(() => {});
-        this.adapters.delete(key);
-      }
-    }
-
-    // Filter out completely from persistent storage
-    const remaining = list.filter(c => 
-      c.id !== brokerId && 
-      c.clientId !== brokerId && 
-      !c.id.endsWith(`_${brokerId}`)
-    );
+    const ids = new Set(toRemove.map(c => c.id));
+    const remaining = list.filter(c => !ids.has(c.id));
     this.writeStorage(remaining);
 
     logger.info(`[BrokerRegistry] Broker ${brokerId} disconnected and purged completely from registry`);
@@ -161,40 +138,14 @@ export class BrokerRegistry {
    * Get active adapter instance strictly scoped to a specific user
    */
   public getAdapter(userId: string, broker: BrokerName = 'dhan'): BrokerAdapter | null {
-    if (!userId) {
-      userId = 'user_admin';
-    }
+    if (!userId) return null;
 
     // 1. Check in-memory adapters
     for (const [key, adapter] of this.adapters.entries()) {
-      if (key.startsWith(`${userId}_${broker}`)) {
+      if (key.startsWith(`${userId}_${broker}_`) && adapter.getStatus()) {
         return adapter;
       }
     }
-    // Check if any active adapter exists
-    if (this.adapters.size > 0) {
-      const anyAdapter = Array.from(this.adapters.values())[0];
-      if (anyAdapter) return anyAdapter;
-    }
-
-    // 2. Check persistent storage and rehydrate on the fly
-    const conns = this.readStorage();
-    let match = conns.find(c => c.userId === userId && c.broker === broker);
-    if (!match && conns.length > 0) {
-      match = conns.find(c => c.broker === broker);
-    }
-    if (match && match.encryptedAccessToken) {
-      try {
-        const rawToken = decryptToken(match.encryptedAccessToken);
-        if (rawToken) {
-          const newAdapter = new DhanAdapter();
-          newAdapter.connect({ clientId: match.clientId, accessToken: rawToken }).catch(() => {});
-          this.adapters.set(match.id, newAdapter);
-          return newAdapter;
-        }
-      } catch (_) {}
-    }
-
     return null;
   }
 
@@ -202,11 +153,14 @@ export class BrokerRegistry {
    * Get active adapter by connection id with strict ownership check
    */
   public getAdapterById(connectionId: string, userId?: string): BrokerAdapter | null {
-    if (connectionId) {
-      const adapter = this.adapters.get(connectionId);
-      if (adapter) return adapter;
+    const owned = connectionId && userId
+      ? this.readStorage().find(c => c.userId === userId && (c.id === connectionId || c.clientId === connectionId))
+      : undefined;
+    if (owned) {
+      const adapter = this.adapters.get(owned.id);
+      if (adapter?.getStatus()) return adapter;
     }
-    return this.getAdapter(userId || 'user_admin', 'dhan');
+    return null;
   }
 
   /**
@@ -222,50 +176,50 @@ export class BrokerRegistry {
    */
   public listConnections(userId?: string): Omit<StoredBrokerConnection, 'encryptedAccessToken'>[] {
     const connections = this.readStorage();
-    if (connections.length === 0) return [];
-
-    // Filter by userId with smart fallback for single-user trading
-    const targetUserId = userId || 'user_admin';
-    let filtered = connections.filter(c => c.userId === targetUserId);
-    if (filtered.length === 0 && connections.length > 0) {
-      filtered = connections;
-    }
-    if (filtered.length === 0) return [];
-
-    return filtered.map(c => {
-      let adapter = this.adapters.get(c.id);
-
-      // Lazy rehydrate if missing from memory
-      if (!adapter && c.encryptedAccessToken) {
-        try {
-          const rawToken = decryptToken(c.encryptedAccessToken);
-          if (rawToken) {
-            const newAdapter = new DhanAdapter();
-            newAdapter.connect({ clientId: c.clientId, accessToken: rawToken }).catch(() => {});
-            this.adapters.set(c.id, newAdapter);
-            adapter = newAdapter;
-          }
-        } catch (_) {}
-      }
-
-      const isLive = adapter ? adapter.getStatus() : (c.status === 'Connected');
-      const isConnected = isLive || c.status === 'Connected';
-
-      return {
+    return connections.filter(c => c.userId === (userId || 'user_admin')).map(c => ({
         id: c.id,
         userId: c.userId,
         broker: c.broker,
         clientId: c.clientId,
         maskedClientId: c.maskedClientId || maskIdentifier(c.clientId),
         accountName: c.accountName,
-        status: isConnected ? 'Connected' : 'Disconnected',
+        status: c.status,
         staticIp: c.staticIp,
         secondaryIp: c.secondaryIp,
-        terminalActivated: isConnected ? (c.terminalActivated ?? true) : false,
+        terminalActivated: c.status === 'Connected' && c.terminalActivated,
+        dataPlan: c.dataPlan,
+        tokenValidity: c.tokenValidity,
         connectedAt: c.connectedAt,
         lastHeartbeat: c.lastHeartbeat
-      };
-    });
+    }));
+  }
+
+  public async listVerifiedConnections(userId: string): Promise<Omit<StoredBrokerConnection, 'encryptedAccessToken'>[]> {
+    await this.whenReady();
+    const rows = this.readStorage();
+    for (const connection of rows.filter(c => c.userId === userId && c.broker === 'dhan')) {
+      try {
+        const accessToken = decryptToken(connection.encryptedAccessToken);
+        const verified = await DhanAuthService.validateCredentials({
+          clientId: connection.clientId, accessToken
+        });
+        connection.status = verified.success ? 'Connected' :
+          verified.error?.includes('unreachable') ? 'Error' : 'Expired';
+        connection.terminalActivated = verified.success;
+        connection.dataPlan = verified.success ? verified.dataPlan : undefined;
+        connection.tokenValidity = verified.success ? verified.tokenValidity : undefined;
+        if (!verified.success && connection.status === 'Expired') {
+          const adapter = this.adapters.get(connection.id);
+          if (adapter) await adapter.disconnect().catch(() => {});
+          this.adapters.delete(connection.id);
+        }
+      } catch {
+        connection.status = 'Expired';
+        connection.terminalActivated = false;
+      }
+    }
+    this.writeStorage(rows);
+    return this.listConnections(userId);
   }
 
   private makeKey(userId: string, broker: string, clientId: string): string {
@@ -306,6 +260,7 @@ export class BrokerRegistry {
       fs.writeFileSync(this.storageFile, JSON.stringify(list, null, 2), 'utf8');
     } catch (e) {
       logger.error('Failed to write broker connections storage', e);
+      throw new Error('Broker connection could not be saved. Check persistent server storage.');
     }
   }
 
@@ -320,11 +275,15 @@ export class BrokerRegistry {
           const rawToken = decryptToken(conn.encryptedAccessToken);
           if (rawToken) {
             const adapter = new DhanAdapter();
-            await adapter.connect({
+            const profile = await adapter.connect({
               clientId: conn.clientId,
               accessToken: rawToken
             });
             this.adapters.set(conn.id, adapter);
+            conn.status = 'Connected';
+            conn.dataPlan = profile.dataPlan;
+            conn.tokenValidity = profile.tokenValidity;
+            this.persistConnection(conn);
             logger.info(`🔄 [BrokerRegistry] Rehydrated connection for Dhan: ${conn.maskedClientId}`);
           }
         } catch (err: any) {

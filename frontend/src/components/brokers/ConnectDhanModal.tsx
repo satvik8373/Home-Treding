@@ -37,7 +37,7 @@ interface ConnectDhanModalProps {
 }
 
 export const ConnectDhanModal: React.FC<ConnectDhanModalProps> = ({ open, onClose, onSuccess }) => {
-  const [tab, setTab] = useState<number>(0); // 0: Official API Key & Secret, 1: Direct Access Token
+  const [tab, setTab] = useState<number>(1); // Direct token is the simplest official Dhan connection method.
 
   // Form inputs matching user image
   const [clientId, setClientId] = useState('');

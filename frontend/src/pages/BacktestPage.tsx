@@ -16,11 +16,24 @@ interface StrategyOption {
   name: string;
 }
 
+const backtestErrorMessage = (detail: string): string => {
+  if (detail.includes('DHAN_AUTH_REQUIRED') || detail.includes('DHAN_TOKEN_EXPIRED'))
+    return 'Connect or reconnect your Dhan account to run this backtest.';
+  if (detail.includes('DHAN_DATA_API_NOT_SUBSCRIBED'))
+    return 'Historical Data API access is required on your Dhan account.';
+  if (/INCOMPLETE_OPTION_DATA|UNEXECUTABLE_OPTION_CANDLE|UNVERIFIED_ATM_CONTRACT|MISSING_REFERENCE_CANDLE/.test(detail))
+    return 'Historical option candles are incomplete for this range. Try a shorter completed date range.';
+  if (detail.includes('INVALID_DATE_RANGE'))
+    return 'Choose completed trading sessions from 2026 onward, ending before today.';
+  if (detail.includes('UNSUPPORTED_BACKTEST_STRATEGY'))
+    return 'This backtest currently supports the NIFTY ATM CE/PE breakout only.';
+  return 'Backtest could not be completed. Check your Dhan data access and date range.';
+};
+
 export const BacktestPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-
   const initialStrategy = searchParams.get('strategyId') || location.state?.strategyId || 'nifty-atm-independent-breakout';
   const [selectedStrategyId, setSelectedStrategyId] = useState(initialStrategy);
   const [strategies, setStrategies] = useState<StrategyOption[]>([]);
@@ -35,7 +48,7 @@ export const BacktestPage: React.FC = () => {
   useEffect(() => {
     axios.get(`${API_CONFIG.BASE_URL}/api/strategies/templates`)
       .then(({ data }) => {
-        const options = (data?.templates || []).map((s: any) => ({ id: s.id, name: s.name }));
+        const options = (data?.templates || []).filter((s: any) => s.id === 'nifty-atm-independent-breakout').map((s: any) => ({ id: s.id, name: s.name }));
         setStrategies(options.length ? options : [{ id: 'nifty-atm-independent-breakout', name: 'NIFTY ATM CE/PE Independent 0.9% Breakout' }]);
       })
       .catch(() => setStrategies([{ id: 'nifty-atm-independent-breakout', name: 'NIFTY ATM CE/PE Independent 0.9% Breakout' }]));
@@ -43,6 +56,14 @@ export const BacktestPage: React.FC = () => {
 
   const runBacktest = async () => {
     if (!selectedStrategyId) return;
+    if (selectedStrategyId !== 'nifty-atm-independent-breakout') {
+      setError('Only the NIFTY ATM CE/PE breakout has a verified historical options backtest.');
+      return;
+    }
+    if (selectedRange === 'Custom Range' && (!startDate || !endDate)) {
+      setError('Select both start and end dates for a custom range.');
+      return;
+    }
     setLoading(true);
     setError(null);
     setResult(null);
@@ -60,45 +81,46 @@ export const BacktestPage: React.FC = () => {
       if (!response.data?.success) throw new Error(response.data?.error || 'BACKTEST_FAILED');
       setResult(response.data.data);
     } catch (e: any) {
-      setError(e.response?.data?.error || e.message || 'BACKTEST_FAILED');
+      setError(backtestErrorMessage(String(e.response?.data?.error || e.message || 'BACKTEST_FAILED')));
     } finally {
       setLoading(false);
     }
   };
 
   const exportBacktest = async (format: 'csv' | 'json') => {
+    if (!result?.runId) return;
     try {
-      const params = new URLSearchParams({
-        strategyId: selectedStrategyId,
-        symbol: 'NIFTY 50',
-        days: String(selectedDays),
-        capital: '100000',
-        format
-      });
-      if (startDate) params.set('startDate', startDate);
-      if (endDate) params.set('endDate', endDate);
-
-      const response = await axios.get(
-        `${API_CONFIG.BASE_URL}/api/backtest/export?${params.toString()}`,
-        { responseType: 'blob' }
-      );
-
-      const url = URL.createObjectURL(response.data);
+      const fields = ['id', 'date', 'instrument', 'optionType', 'strike', 'quantity',
+        'signalTime', 'triggerClosePrice', 'entryTime', 'entryPrice', 'exitTime',
+        'exitPrice', 'exitReason', 'grossPnl', 'totalCharges', 'netPnl',
+        'cumulativeEquity', 'drawdown'];
+      const quote = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+      const csv = [
+        `Data source,${quote(result.dataSource?.provider)}`,
+        `Period,${quote(`${result.period?.startDate} to ${result.period?.endDate}`)}`,
+        fields.join(','),
+        ...(result.trades || []).map((trade: any) => fields.map(field => quote(trade[field])).join(','))
+      ].join('\n');
+      const blob = new Blob([format === 'json' ? JSON.stringify(result, null, 2) : '\uFEFF' + csv],
+        { type: format === 'json' ? 'application/json' : 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `Mavrix_Backtest_${selectedStrategyId}_${format}`;
+      anchor.download = `Mavrix_Backtest_${result.runId}.${format}`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      setError(e.response?.data?.error || e.message || 'BACKTEST_EXPORT_FAILED');
+      setError(e.message || 'BACKTEST_EXPORT_FAILED');
     }
   };
 
   const strategyName =
     strategies.find((s) => s.id === selectedStrategyId)?.name ||
-    'NIFTY ATM CE/PE Independent 0.9% Breakout';
+    (selectedStrategyId === 'nifty-atm-independent-breakout'
+      ? 'NIFTY ATM CE/PE Independent 0.9% Breakout'
+      : 'Unsupported strategy');
 
   return (
     <Layout>
@@ -115,6 +137,10 @@ export const BacktestPage: React.FC = () => {
           onSelectRange={(range, days) => {
             setSelectedRange(range);
             setSelectedDays(days);
+            if (range !== 'Custom Range') {
+              setStartDate('');
+              setEndDate('');
+            }
             setResult(null);
           }}
           totalPnl={result?.summary?.netProfit ?? null}
@@ -134,11 +160,8 @@ export const BacktestPage: React.FC = () => {
         />
 
         {error && (
-          <Alert severity="error" sx={{ mt: 3 }} action={
-            <Button color="inherit" size="small" onClick={() => navigate('/brokers')}>
-              Brokers
-            </Button>
-          }>
+          <Alert severity="error" sx={{ mt: 3 }} action={error.includes('Dhan') ?
+            <Button color="inherit" size="small" onClick={() => navigate('/brokers')}>Brokers</Button> : undefined}>
             {error}
           </Alert>
         )}
@@ -146,8 +169,8 @@ export const BacktestPage: React.FC = () => {
         {loading && (
           <Box sx={{ py: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
             <CircularProgress size={36} />
-            <Typography variant="caption">
-              Fetching official Dhan historical option data and running the backtest…
+            <Typography variant="caption" sx={{ color: '#64748b' }}>
+              Fetching market data and running backtest simulation…
             </Typography>
           </Box>
         )}
@@ -156,7 +179,7 @@ export const BacktestPage: React.FC = () => {
           <Box sx={{ mt: 3 }}>
             <EmptyState
               title="No Backtest Results"
-              description="Run the strategy to load official Dhan historical option data."
+              description="Select your date range and click Run Backtest to simulate strategy performance."
               actionLabel="Run Backtest"
               onAction={runBacktest}
             />
@@ -165,6 +188,35 @@ export const BacktestPage: React.FC = () => {
 
         {result?.summary && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 3 }}>
+            <Box
+              sx={{
+                p: 2,
+                bgcolor: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 1
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a' }}>
+                  Data Feed:
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#475569' }}>
+                  {result.dataSource?.provider}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#64748b' }}>
+                  {result.period?.startDate} to {result.period?.endDate}
+                </Typography>
+              </Box>
+              <Typography variant="caption" sx={{ color: '#64748b' }}>
+                Completed 5m signals · modeled 1m OHLC fills · estimated charges · closed-trade drawdown · spread and market impact excluded
+              </Typography>
+            </Box>
+
             <BacktestSummaryCards summary={result.summary} />
             <MaxProfitLossChart
               dailyBars={result.dailyPnlBars || []}

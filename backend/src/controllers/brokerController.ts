@@ -12,7 +12,7 @@ import { logger } from '../utils/logger';
  * Strictly bound to req.userId
  */
 export const connectBroker = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || req.body.userId || 'user_admin';
+  const userId = req.userId || 'user_admin';
 
   const { broker = 'dhan', clientId, accessToken } = req.body;
 
@@ -44,6 +44,8 @@ export const connectBroker = asyncHandler(async (req: AuthRequest, res: Response
         status: profile.status,
         terminalEnabled: profile.terminalActivated,
         tradingEngineEnabled: true,
+        dataPlan: profile.dataPlan,
+        tokenValidity: profile.tokenValidity,
         connectedAt: profile.connectedAt
       }
     });
@@ -60,8 +62,8 @@ export const connectBroker = asyncHandler(async (req: AuthRequest, res: Response
  * List connected brokers strictly scoped to authenticated user
  */
 export const listBrokers = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || (req.query.userId as string) || 'user_admin';
-  const list = brokerRegistry.listConnections(userId);
+  const userId = req.userId || 'user_admin';
+  const list = await brokerRegistry.listVerifiedConnections(userId);
 
   const formattedBrokers = list.map(b => ({
     id: b.id,
@@ -74,6 +76,8 @@ export const listBrokers = asyncHandler(async (req: AuthRequest, res: Response) 
     secondaryIp: (b as any).secondaryIp || undefined,
     terminalEnabled: b.terminalActivated,
     tradingEngineEnabled: true,
+    dataPlan: b.dataPlan,
+    tokenValidity: b.tokenValidity,
     connectedAt: b.connectedAt,
     lastActivity: b.lastHeartbeat
   }));
@@ -163,7 +167,7 @@ export const handleDhanCallback = asyncHandler(async (req: AuthRequest, res: Res
  * Get broker funds (Strictly scoped to caller's broker)
  */
 export const getFunds = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || (req.query.userId as string) || 'user_admin';
+  const userId = req.userId || 'user_admin';
 
   const brokerId = (req.params.brokerId || req.query.brokerId) as string;
   const adapter = brokerId
@@ -188,7 +192,7 @@ export const getFunds = asyncHandler(async (req: AuthRequest, res: Response) => 
  * Get broker positions (Strictly scoped to caller's broker)
  */
 export const getPositions = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || (req.query.userId as string) || 'user_admin';
+  const userId = req.userId || 'user_admin';
 
   const brokerId = (req.params.brokerId || req.query.brokerId) as string;
   const adapter = brokerId
@@ -213,7 +217,7 @@ export const getPositions = asyncHandler(async (req: AuthRequest, res: Response)
  * Get broker orders (Strictly scoped to caller's broker)
  */
 export const getOrders = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || (req.query.userId as string) || 'user_admin';
+  const userId = req.userId || 'user_admin';
 
   const brokerId = (req.params.brokerId || req.query.brokerId) as string;
   const adapter = brokerId
@@ -238,7 +242,7 @@ export const getOrders = asyncHandler(async (req: AuthRequest, res: Response) =>
  * Disconnect and remove broker completely
  */
 export const deleteBroker = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || (req.query.userId as string) || (req.body && req.body.userId) || 'user_admin';
+  const userId = req.userId || 'user_admin';
   const brokerId = String(req.params.brokerId);
   
   await brokerRegistry.disconnectBroker(userId, brokerId);
@@ -307,7 +311,7 @@ export const checkTerminalStatus = asyncHandler(async (req: AuthRequest, res: Re
  * POST /api/brokers/option-chain
  */
 export const getOptionChain = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || (req.query.userId as string) || (req.body && req.body.userId) || 'user_admin';
+  const userId = req.userId || 'user_admin';
   const { underlyingSecurityId = '13', expiry, brokerId } = req.body || {};
   const adapter = (brokerId && userId
     ? brokerRegistry.getAdapterById(brokerId, userId)
@@ -325,7 +329,7 @@ export const getOptionChain = asyncHandler(async (req: AuthRequest, res: Respons
  * POST /api/brokers/option-chain/expiries
  */
 export const getOptionExpiries = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || (req.query.userId as string) || (req.body && req.body.userId) || 'user_admin';
+  const userId = req.userId || 'user_admin';
   const { underlyingSecurityId = '13', brokerId } = req.body || {};
   const adapter = (brokerId && userId
     ? brokerRegistry.getAdapterById(brokerId, userId)
@@ -560,7 +564,7 @@ export const placeSliceOrder = asyncHandler(async (req: AuthRequest, res: Respon
  * GET /api/brokers/trades
  */
 export const getTrades = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || (req.query.userId as string) || 'user_admin';
+  const userId = req.userId || 'user_admin';
   const brokerId = (req.query.brokerId as string) || undefined;
   const adapter = (brokerId && userId
     ? brokerRegistry.getAdapterById(brokerId, userId)
@@ -580,7 +584,7 @@ export const getTrades = asyncHandler(async (req: AuthRequest, res: Response) =>
  * GET /api/brokers/trades/:orderId
  */
 export const getTradeByOrderId = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || (req.query.userId as string) || 'user_admin';
+  const userId = req.userId || 'user_admin';
   const orderId = String(req.params.orderId);
   const brokerId = (req.query.brokerId as string) || undefined;
   const adapter = (brokerId && userId
@@ -601,7 +605,7 @@ export const getTradeByOrderId = asyncHandler(async (req: AuthRequest, res: Resp
  * GET /api/brokers/trades/history
  */
 export const getTradeHistory = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || (req.query.userId as string) || 'user_admin';
+  const userId = req.userId || 'user_admin';
   const { fromDate, toDate, pageNumber, brokerId } = req.query as {
     fromDate: string;
     toDate: string;
@@ -690,7 +694,7 @@ export const stopPnlExit = asyncHandler(async (req: AuthRequest, res: Response) 
  * GET /api/brokers/ip
  */
 export const getIP = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || (req.query.userId as string) || 'user_admin';
+  const userId = req.userId || 'user_admin';
   const brokerId = (req.query.brokerId as string) || undefined;
   const adapter = (brokerId
     ? brokerRegistry.getAdapterById(brokerId, userId)
@@ -708,7 +712,7 @@ export const getIP = asyncHandler(async (req: AuthRequest, res: Response) => {
  * POST /api/brokers/ip
  */
 export const setIP = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || req.body.userId || 'user_admin';
+  const userId = req.userId || 'user_admin';
   const { brokerId, ip = '171.61.160.213', ipFlag = 'PRIMARY' } = req.body;
   const adapter = (brokerId
     ? brokerRegistry.getAdapterById(brokerId, userId)
@@ -738,7 +742,7 @@ export const setIP = asyncHandler(async (req: AuthRequest, res: Response) => {
  * PUT /api/brokers/ip
  */
 export const modifyIP = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || req.body.userId || 'user_admin';
+  const userId = req.userId || 'user_admin';
   const { brokerId, ip = '171.61.160.213', ipFlag = 'PRIMARY' } = req.body;
   const adapter = (brokerId
     ? brokerRegistry.getAdapterById(brokerId, userId)
@@ -911,7 +915,7 @@ export const getCompanyInfo = asyncHandler(async (req: AuthRequest, res: Respons
  * Generates consentAppId and returns official Dhan login URL
  */
 export const generateDhanConsent = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || req.body.userId || 'user_admin';
+  const userId = req.userId || 'user_admin';
   const { clientId, apiKey, apiSecret } = req.body;
 
   if (!clientId || !apiKey || !apiSecret) {
@@ -952,7 +956,7 @@ export const generateDhanConsent = asyncHandler(async (req: AuthRequest, res: Re
  * and automatically connects and registers the broker into user's account!
  */
 export const consumeDhanConsent = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const userId = req.userId || req.body.userId || 'user_admin';
+  const userId = req.userId || 'user_admin';
   const { tokenId, consentAppId, clientId, apiKey, apiSecret } = req.body;
 
   if (!tokenId) {
@@ -1002,7 +1006,9 @@ export const consumeDhanConsent = asyncHandler(async (req: AuthRequest, res: Res
       terminalEnabled: profile.terminalActivated,
       tradingEngineEnabled: true,
       connectedAt: profile.connectedAt,
-      expiryTime: tokenResult.expiryTime
+      expiryTime: tokenResult.expiryTime,
+      dataPlan: profile.dataPlan,
+      tokenValidity: profile.tokenValidity
     }
   });
 });

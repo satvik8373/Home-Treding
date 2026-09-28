@@ -70,7 +70,7 @@ export const Brokers: React.FC = () => {
   const [viewMode, setViewMode] = useState<'list' | 'add' | 'profile'>('list');
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const initialMethod = searchParams.get('method') === 'token' ? 'token' : 'developer';
+  const initialMethod = searchParams.get('method') === 'developer' ? 'developer' : 'token';
 
   // Form Fields (Matching Screenshot 2) - retain previous input for easy re-auth
   const [clientId, setClientId] = useState(() => localStorage.getItem('dhan_pending_client_id') || localStorage.getItem('dhan_saved_client_id') || '');
@@ -126,21 +126,12 @@ export const Brokers: React.FC = () => {
         setViewMode('list');
         setFormSuccess('');
       } else {
-        const cached = brokerApi.getActiveBroker();
-        if (cached) {
-          setBrokers([cached]);
-          setViewMode('list');
-        } else {
-          setViewMode('add');
-        }
+        setViewMode('add');
       }
     } catch (error) {
       console.error('Failed to fetch brokers:', error);
-      const cached = brokerApi.getActiveBroker();
-      if (cached) {
-        setBrokers([cached]);
-        setViewMode('list');
-      }
+      setBrokers([]);
+      setFormError('Could not verify your Dhan connection. Please retry.');
     } finally {
       setLoading(false);
     }
@@ -244,7 +235,14 @@ export const Brokers: React.FC = () => {
         setSubmitting(false);
       }
     } catch (err: any) {
-      setFormError(err.response?.data?.message || err.message || 'Connection failed.');
+      const apiMsg = err.response?.data?.message;
+      let msg = apiMsg || err.message || 'Connection failed.';
+      if (msg.includes('404')) {
+        msg = 'DhanHQ returned 404 (App / Client Not Found): Your Developer API Key (App ID) or Client ID was not found in DhanHQ. If you are using a standard 24-hour Access Token from web.dhan.co, please switch to the "Direct Access Token (24-Hr)" tab above.';
+      } else if (msg.includes('401')) {
+        msg = 'DhanHQ returned 401 (Unauthorized): Invalid API Key or Secret Key. Please check your credentials in the DhanHQ Developer Portal (dhanhq.co).';
+      }
+      setFormError(msg);
       setSubmitting(false);
     }
   };
@@ -277,7 +275,12 @@ export const Brokers: React.FC = () => {
         setSubmitting(false);
       }
     } catch (err: any) {
-      setFormError(err.response?.data?.message || err.message || 'Failed to connect Dhan broker.');
+      const apiMsg = err.response?.data?.message;
+      let msg = apiMsg || err.message || 'Failed to connect Dhan broker.';
+      if (msg.includes('404')) {
+        msg = 'Connection endpoint not found (404). Please ensure the backend server is running.';
+      }
+      setFormError(msg);
       setSubmitting(false);
     }
   };
@@ -290,32 +293,16 @@ export const Brokers: React.FC = () => {
       const elapsed = Date.now() - start;
       setPingLatency(elapsed);
 
-      // Immediately promote broker status to 'Connected' in state & localStorage
-      setBrokers((prev) =>
-        prev.map((b) => {
-          if (b.id === brokerId || !brokerId || prev.length === 1) {
-            return { ...b, status: 'Connected' as const, funds: f || b.funds };
-          }
-          return b;
-        })
-      );
-
-      const cached = brokerApi.getActiveBroker();
-      if (cached) {
-        cached.status = 'Connected';
-        if (f) cached.funds = f;
-        localStorage.setItem('mavrix_saved_brokers', JSON.stringify([cached]));
-      }
-
       if (f) {
+        await fetchBrokers();
         setActionFeedback({
           message: `Verified DhanHQ Live Connection (${elapsed}ms). Total Balance: ₹${(f.totalAccountBalance || f.availableMargin || 0).toLocaleString()}`,
           severity: 'success'
         });
       } else {
         setActionFeedback({
-          message: `Connection responsive & verified (${elapsed}ms)`,
-          severity: 'success'
+          message: 'Dhan did not return verified funds. Reconnect with a fresh access token.',
+          severity: 'warning'
         });
       }
     } catch (e: any) {
@@ -526,23 +513,38 @@ export const Brokers: React.FC = () => {
                           {broker.broker || 'DHAN'}
                         </Typography>
                         <Typography sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.82rem', mt: 0.3 }}>
-                          {broker.clientId || '1108893841'}
+                          {broker.maskedClientId || broker.clientId}
                         </Typography>
-                        <Typography sx={{ color: '#16a34a', fontWeight: 700, fontSize: '0.78rem', mt: 0.2 }}>
-                          {isConnected ? 'Connected' : 'Disconnected'}
+                        <Typography sx={{ color: isConnected ? '#16a34a' : '#dc2626', fontWeight: 700, fontSize: '0.78rem', mt: 0.2 }}>
+                          {broker.status}
                         </Typography>
+                        {isConnected && broker.dataPlan && broker.dataPlan !== 'Active' && (
+                          <Tooltip
+                            title="Your Dhan account has not subscribed to DhanHQ's paid 'Data APIs' (dataPlan: Deactive). Live trading and automated order execution are 100% active. Backtesting automatically runs using our Free Real NSE Market Data feed at zero cost. To use official Dhan historical candles, activate 'Data APIs' in your web.dhan.co profile."
+                            arrow
+                          >
+                            <Typography
+                              sx={{
+                                color: '#64748b',
+                                fontSize: '0.75rem',
+                                cursor: 'help',
+                                textDecoration: 'underline dotted #94a3b8',
+                                display: 'inline-block',
+                                mt: 0.2
+                              }}
+                            >
+                              Historical data access inactive (Using Free NSE Mode)
+                            </Typography>
+                          </Tooltip>
+                        )}
                       </Box>
                     </Box>
 
-                    {/* Center: Strategy Performance */}
-                    <Box sx={{ textAlign: { xs: 'left', sm: 'center' }, minWidth: 120 }}>
-                      <Typography sx={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 600 }}>
-                        Strategy Performance
-                      </Typography>
-                      <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem', mt: 0.2 }}>
-                        0.00
-                      </Typography>
-                    </Box>
+                    {!isConnected && (
+                      <Button size="small" onClick={() => { setClientId(broker.clientId); setAuthMethod('token'); setViewMode('add'); }}>
+                        Reconnect
+                      </Button>
+                    )}
 
                     {/* Right: Terminal toggle, Trading Engine toggle, 3 dots menu */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 2.5, sm: 3 } }}>
@@ -736,6 +738,21 @@ export const Brokers: React.FC = () => {
             </Button>
           </Box>
 
+          {/* Method Guidance Note */}
+          <Box sx={{ mb: 2, p: 1.2, bgcolor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <Typography sx={{ color: '#475569', fontSize: '0.75rem', lineHeight: 1.4 }}>
+              {authMethod === 'developer' ? (
+                <>
+                  <strong>Developer API Key:</strong> For accounts with a registered App on <code>dhanhq.co</code>. If you only generated a token on web.dhan.co, click <strong>Direct Access Token (24-Hr)</strong> above.
+                </>
+              ) : (
+                <>
+                  <strong>Direct Access Token:</strong> Paste your Dhan Client ID and 24-hr Access Token generated from <code>web.dhan.co → Profile → Access DhanHQ APIs</code>.
+                </>
+              )}
+            </Typography>
+          </Box>
+
           {formError && (
             <Alert severity="error" sx={{ mb: 2, borderRadius: '10px', fontSize: '0.8rem' }}>
               {formError}
@@ -760,7 +777,7 @@ export const Brokers: React.FC = () => {
                   Broker ID (Dhan Client ID)
                 </Typography>
                 <TextField
-                  placeholder="e.g. 1108893841"
+                  placeholder="Dhan Client ID"
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
                   required

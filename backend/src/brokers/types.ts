@@ -29,6 +29,8 @@ export interface BrokerAccountProfile {
   terminalActivated: boolean;
   connectedAt: Date;
   tokenExpiresAt?: Date;
+  dataPlan?: string;
+  tokenValidity?: string;
   lastHeartbeat: Date;
 }
 

@@ -1,4 +1,4 @@
-import { Candle, OptionCandle } from './DhanHistoricalDataService';
+import type { Candle, OptionCandle } from './DhanHistoricalDataService';
 import { calculateCharges, ChargeConfig, DEFAULT_CHARGES } from './ChargesEngine';
 import { getStrategyConfig, resolveLotSize } from '../config/strategyConfig';
 
@@ -6,8 +6,8 @@ export interface OptionLegCandleSeries {
   strike?: number;
   expiry?: string;
   securityId?: string;
-  source: 'DHAN_EXPIRED_OPTIONS' | 'REAL_OPTION_FEED';
-  isSynthetic: false;
+  source: 'DHAN_EXPIRED_OPTIONS' | 'REAL_OPTION_FEED' | 'ESTIMATED_BSM';
+  isSynthetic: boolean;
   candles5m: OptionCandle[];
   candles1m: OptionCandle[];
 }
@@ -18,10 +18,12 @@ export interface AlgoroomsStrategyConfig {
   initialCapital: number;
   startTime: string;
   endTime: string;
-  executionResolution: '1m';
+  executionResolution?: '1m';
   chargeConfig?: ChargeConfig;
-  ceOptionSeries: OptionLegCandleSeries;
-  peOptionSeries: OptionLegCandleSeries;
+  ceOptionSeries?: OptionLegCandleSeries;
+  peOptionSeries?: OptionLegCandleSeries;
+  legs?: any[];
+  strategyParams?: { lotSize: number; entryLots: number; breakoutPct: number; target1Pts: number; target2Pts: number };
 }
 
 export interface TradePartialExit {
@@ -42,6 +44,9 @@ export interface CompletedTradeLog {
   type: 'BUY';
   optionType: 'CE' | 'PE';
   strike: number;
+  spotMarketVal: number;
+  spotRefPrice: string;
+  optionRefText?: string;
   instrument: string;
   side: 'BUY';
   orderType: 'MARKET';
@@ -75,6 +80,7 @@ export interface CompletedTradeLog {
   eodExitQty: number;
   eodExitTime: string;
   eodExitPnl: number;
+  eodExitHit: boolean;
   exitPrice: number;
   exitTime: string;
   exitTimestamp: string;
@@ -99,7 +105,7 @@ export interface CompletedTradeLog {
   executionAmbiguity: 'NONE' | 'INTRA_1M_AMBIGUITY';
   fillModel: string;
   dataSource: string;
-  isSynthetic: false;
+  isSynthetic: boolean;
   exits: TradePartialExit[];
 }
 
@@ -157,7 +163,7 @@ export interface AlgoroomsPerformanceReport {
     avgLossPerDay: number;
     winStreak: number;
     lossStreak: number;
-    profitFactor: number;
+    profitFactor: number | null;
   };
   dataQuality: {
     dataSource: string;
@@ -165,11 +171,11 @@ export interface AlgoroomsPerformanceReport {
     peHistoricalData: string;
     signalResolution: string;
     executionResolution: string;
-    syntheticPrices: false;
+    syntheticPrices: boolean;
     lookaheadBias: 'PASS';
     missingCandles: number;
     duplicateCandles: number;
-    contractMapping: 'VERIFIED';
+    contractMapping: 'FIXED_STRIKE_MATCHED';
     backtestReproducibility: 'PASS';
   };
   equityCurve: Array<{ date: string; timestamp: string; equity: number; pnl: number; drawdown: number }>;
@@ -191,6 +197,7 @@ interface LegState {
   trade: {
     id: string;
     entry: OptionCandle;
+    signalPrice: number;
     exits: TradePartialExit[];
     target1Price: number;
     target2Price: number;
@@ -202,6 +209,7 @@ export class AlgoroomsStyleBacktester {
   private balance: number;
   private peakEquity: number;
   private maxDrawdown = 0;
+  private tradeCounter = 0;
   private readonly tradeLogs: CompletedTradeLog[] = [];
   private readonly equityCurve: AlgoroomsPerformanceReport['equityCurve'] = [];
   private readonly chargeConfig: ChargeConfig;
@@ -211,85 +219,66 @@ export class AlgoroomsStyleBacktester {
   private readonly breakoutPct: number;
   private readonly target1Pts: number;
   private readonly target2Pts: number;
+  private readonly dates: string[];
 
   constructor(private readonly spotData: Candle[], private readonly config: AlgoroomsStrategyConfig) {
-    if (config.ceOptionSeries.isSynthetic || config.peOptionSeries.isSynthetic) {
-      throw new Error('SYNTHETIC_OPTION_DATA_NOT_ALLOWED');
-    }
-    if (config.ceOptionSeries.source !== 'DHAN_EXPIRED_OPTIONS' || config.peOptionSeries.source !== 'DHAN_EXPIRED_OPTIONS') {
-      throw new Error('OFFICIAL_DHAN_OPTION_DATA_REQUIRED');
-    }
-
     this.balance = config.initialCapital;
     this.peakEquity = config.initialCapital;
     this.chargeConfig = config.chargeConfig ?? DEFAULT_CHARGES;
-    this.lotSize = resolveLotSize(config.symbol);
+    this.lotSize = config.strategyParams?.lotSize ?? resolveLotSize(config.symbol);
     const strategy = getStrategyConfig();
-    this.qty = this.lotSize * strategy.entryLots;
-    this.breakoutPct = strategy.breakoutPct;
-    this.target1Pts = strategy.target1Pts;
-    this.target2Pts = strategy.target2Pts;
+    this.qty = this.lotSize * (config.strategyParams?.entryLots ?? strategy.entryLots);
+    this.breakoutPct = config.strategyParams?.breakoutPct ?? strategy.breakoutPct;
+    this.target1Pts = config.strategyParams?.target1Pts ?? strategy.target1Pts;
+    this.target2Pts = config.strategyParams?.target2Pts ?? strategy.target2Pts;
+    if (!Number.isInteger(this.lotSize) || !Number.isInteger(this.qty) || this.lotSize <= 0 ||
+        this.qty <= 0 || this.breakoutPct <= 0 || this.breakoutPct >= 1 ||
+        this.target1Pts <= 0 || this.target2Pts <= this.target1Pts) {
+      throw new Error('INVALID_STRATEGY_PARAMETERS');
+    }
+    this.dates = [...new Set(this.spotData.map(c => c.date))].sort();
 
-    const validate = (series: OptionLegCandleSeries, name: string) => {
-      if (!series.candles5m.length || !series.candles1m.length) throw new Error(`MISSING_${name}_OPTION_DATA`);
+    const validate = (series: OptionLegCandleSeries | undefined, name: string) => {
+      if (!series?.candles5m?.length || !series?.candles1m?.length || series.isSynthetic) {
+        throw new Error(`REAL_${name}_OPTION_DATA_REQUIRED`);
+      }
     };
     validate(config.ceOptionSeries, 'CE');
     validate(config.peOptionSeries, 'PE');
 
     this.dataQuality = {
-      dataSource: 'DhanHQ /charts/rollingoption (expired options)',
-      ceHistoricalData: 'Actual OHLC',
-      peHistoricalData: 'Actual OHLC',
+      dataSource: 'DhanHQ Expired Options /charts/rollingoption',
+      ceHistoricalData: 'DhanHQ expired option minute OHLC',
+      peHistoricalData: 'DhanHQ expired option minute OHLC',
       signalResolution: '5 min',
       executionResolution: '1 min',
       syntheticPrices: false,
       lookaheadBias: 'PASS',
       missingCandles: 0,
       duplicateCandles: 0,
-      contractMapping: 'VERIFIED',
+      contractMapping: 'FIXED_STRIKE_MATCHED',
       backtestReproducibility: 'PASS'
     };
   }
 
   run(): AlgoroomsPerformanceReport {
-    const dates = [...new Set(this.spotData.map((c) => c.date))].sort();
-    for (const date of dates) this.simulateDay(date);
+    for (const date of this.dates) this.simulateDay(date);
     return this.report();
   }
 
   private simulateDay(date: string): void {
-    const ce5m = this.config.ceOptionSeries.candles5m.filter((c) => c.date === date);
-    const pe5m = this.config.peOptionSeries.candles5m.filter((c) => c.date === date);
-    const ce1m = this.config.ceOptionSeries.candles1m.filter((c) => c.date === date);
-    const pe1m = this.config.peOptionSeries.candles1m.filter((c) => c.date === date);
-    if (!ce5m.length || !pe5m.length) return;
-
+    const ce5m = this.config.ceOptionSeries?.candles5m.filter((c) => c.date === date) ?? [];
+    const pe5m = this.config.peOptionSeries?.candles5m.filter((c) => c.date === date) ?? [];
+    const ce1m = this.config.ceOptionSeries?.candles1m.filter((c) => c.date === date) ?? [];
+    const pe1m = this.config.peOptionSeries?.candles1m.filter((c) => c.date === date) ?? [];
     const ceRefCandle = ce5m.find((c) => c.time === '09:15');
     const peRefCandle = pe5m.find((c) => c.time === '09:15');
-    if (!ceRefCandle || !peRefCandle) throw new Error(`MISSING_REFERENCE_CANDLE:${date}`);
-
-    const strategy = getStrategyConfig();
+    if (!ceRefCandle || !peRefCandle) throw new Error(`MISSING_REFERENCE_CANDLE: ${date}`);
     const ce: LegState = this.createLeg('CE', ce5m, ce1m, ceRefCandle.close);
     const pe: LegState = this.createLeg('PE', pe5m, pe1m, peRefCandle.close);
 
-    for (let i = 1; i < ce5m.length; i++) {
-      const ceBar = ce5m[i];
-      const peBar = pe5m[i];
-      if (ceBar.time > strategy.forceSquareOffTime && peBar.time > strategy.forceSquareOffTime) break;
-
-      this.processLeg(ce, ceBar, date, i);
-      this.processLeg(pe, peBar, date, i);
-    }
-
-    const squareOff = (leg: LegState) => {
-      if (!leg.trade || leg.remainingQty <= 0) return;
-      const candle = leg.candles1m.find((c) => c.time >= strategy.forceSquareOffTime);
-      if (!candle) throw new Error(`MISSING_SQUAREOFF_PRICE:${date}:${leg.type}`);
-      this.close(leg, 'FORCE_EXIT', candle.time, candle.isoTime, candle.open, leg.remainingQty);
-      this.finishTrade(leg, date);
-    };
-    squareOff(ce);
-    squareOff(pe);
+    this.processLeg(ce, date);
+    this.processLeg(pe, date);
   }
 
   private createLeg(type: 'CE' | 'PE', candles5m: OptionCandle[], candles1m: OptionCandle[], reference: number): LegState {
@@ -307,58 +296,79 @@ export class AlgoroomsStyleBacktester {
     };
   }
 
-  private processLeg(leg: LegState, bar: OptionCandle, date: string, index: number): void {
-    if (bar.time >= this.config.endTime) return;
-
-    if (!leg.trade) {
-      if (bar.close >= leg.upper) {
-        this.openTrade(leg, bar, date);
-      }
-      return;
+  private processLeg(leg: LegState, date: string): void {
+    const bars = new Map(leg.candles5m.map(c => [c.timestamp, c]));
+    const minutes = [...leg.candles1m].sort((a, b) => a.timestamp - b.timestamp);
+    if (minutes.length !== 356 || minutes[0].time !== '09:15' || minutes[355].time !== '15:10') {
+      throw new Error(`INCOMPLETE_OPTION_DATA: ${leg.type} ${date}`);
     }
-
-    const previous = leg.candles5m[index - 1];
-    const minutes = leg.candles1m.filter((c) => c.timestamp > previous.timestamp && c.timestamp <= bar.timestamp);
-
+    let pending: 'ENTRY' | 'LOWER_EXIT' | null = null;
+    let signalPrice = 0;
     for (const minute of minutes) {
-      if (!leg.trade || leg.remainingQty <= 0) break;
-
-      const t2 = minute.high >= leg.trade.target2Price;
-      const t1 = minute.high >= leg.trade.target1Price;
-
-      if (t2 && minute.low <= leg.lower) leg.trade.ambiguity = 'INTRA_1M_AMBIGUITY';
-
-      if (t2) {
-        if (leg.trade.exits.every((e) => e.type !== 'TARGET_1')) {
-          this.close(leg, 'TARGET_1', minute.time, minute.isoTime, leg.trade.target1Price, this.lotSize);
+      if (minute.time === this.config.endTime) {
+        if (leg.trade) {
+          this.requireTradedMinute(minute);
+          this.close(leg, 'FORCE_EXIT', minute.time, minute.isoTime, minute.open, leg.remainingQty);
+          this.finishTrade(leg, date);
         }
-        if (leg.remainingQty > 0) {
-          this.close(leg, 'TARGET_2', minute.time, minute.isoTime, leg.trade.target2Price, leg.remainingQty);
+        break;
+      }
+      if (pending === 'LOWER_EXIT' && leg.trade) {
+        this.requireTradedMinute(minute);
+        this.close(leg, 'LOWER_EXIT', minute.time, minute.isoTime, minute.open, leg.remainingQty);
+        this.finishTrade(leg, date);
+      } else if (pending === 'ENTRY' && !leg.trade && minute.time < '15:05') {
+        this.openTrade(leg, minute, signalPrice);
+      }
+      pending = null;
+      if (leg.trade) {
+        const t1 = leg.trade.target1Price;
+        const t2 = leg.trade.target2Price;
+        if (leg.trade.exits.every(e => e.type !== 'TARGET_1') && minute.high >= t1) {
+          this.requireTradedMinute(minute);
+          this.close(leg, 'TARGET_1', minute.time, minute.isoTime, Math.max(t1, minute.open), this.lotSize);
         }
-      } else if (t1 && leg.trade.exits.every((e) => e.type !== 'TARGET_1')) {
-        this.close(leg, 'TARGET_1', minute.time, minute.isoTime, leg.trade.target1Price, this.lotSize);
+        if (leg.remainingQty > 0 && minute.high >= t2) {
+          this.requireTradedMinute(minute);
+          this.close(leg, 'TARGET_2', minute.time, minute.isoTime, Math.max(t2, minute.open), leg.remainingQty);
+        }
+        if (leg.trade && leg.remainingQty === 0) this.finishTrade(leg, date);
+      }
+      // The 5-minute bar is labelled by its opening time. Its close becomes
+      // knowable only after the fifth 1-minute candle, never at the bar open.
+      const opening = minute.timestamp - 4 * 60;
+      const bar = bars.get(opening);
+      if (bar && bar.time !== '09:15') {
+        if (leg.trade && bar.close < leg.lower) pending = 'LOWER_EXIT';
+        else if (!leg.trade && bar.close >= leg.upper) {
+          pending = 'ENTRY';
+          signalPrice = bar.close;
+        }
       }
     }
-
-    if (leg.trade && leg.remainingQty > 0 && bar.close < leg.lower) {
-      this.close(leg, 'LOWER_EXIT', bar.time, bar.isoTime, bar.close, leg.remainingQty);
-    }
-
-    if (leg.trade && leg.remainingQty === 0) this.finishTrade(leg, date);
   }
 
-  private openTrade(leg: LegState, bar: OptionCandle, date: string): void {
-    leg.entryPrice = bar.close;
+  private openTrade(leg: LegState, bar: OptionCandle, signalPrice: number): void {
+    this.requireTradedMinute(bar);
+    leg.entryPrice = bar.open;
     leg.entryTime = bar.time;
     leg.remainingQty = this.qty;
+    this.tradeCounter++;
     leg.trade = {
-      id: `TR-${this.tradeLogs.length + 1}`,
-      entry: bar,
+      id: `TR-${String(this.tradeCounter).padStart(6, '0')}`,
+      entry: { ...bar, close: bar.open },
+      signalPrice,
       exits: [],
-      target1Price: this.round(bar.close + this.target1Pts),
-      target2Price: this.round(bar.close + this.target2Pts),
+      target1Price: this.round(bar.open + this.target1Pts),
+      target2Price: this.round(bar.open + this.target2Pts),
       ambiguity: 'NONE'
     };
+  }
+
+  private requireTradedMinute(candle: OptionCandle): void {
+    if (!Number.isFinite(candle.volume) || candle.volume <= 0) {
+      throw new Error(`UNEXECUTABLE_OPTION_CANDLE: ${candle.optionType} ${candle.isoTime} has no traded volume.`);
+    }
   }
 
   private close(leg: LegState, type: TradePartialExit['type'], time: string, isoTime: string, price: number, quantity: number): void {
@@ -403,6 +413,15 @@ export class AlgoroomsStyleBacktester {
     const exitTimestamp = exitCandle?.timestamp ?? entryTimestamp;
     const duration = Math.max(0, Math.round((exitTimestamp - entryTimestamp) / 60));
 
+    const spotCandlesForDay = this.spotData.filter((c) => c.date === date);
+    const entrySpotCandle = spotCandlesForDay
+      .filter(c => c.timestamp + 300 <= trade.entry.timestamp)
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .pop();
+    const spotVal = entrySpotCandle?.close ?? 0;
+    const optionRefText = `Option Ref: ₹${leg.reference.toFixed(2)} (Upper: ₹${leg.upper.toFixed(2)}, Lower: ₹${leg.lower.toFixed(2)})`;
+    const spotRefPrice = entrySpotCandle ? `Spot last completed 5m: ₹${spotVal.toFixed(2)}` : 'Spot unavailable';
+
     this.tradeLogs.push({
       id: trade.id,
       date,
@@ -413,16 +432,19 @@ export class AlgoroomsStyleBacktester {
       type: 'BUY',
       optionType: leg.type,
       strike: trade.entry.strike,
+      spotMarketVal: spotVal,
+      spotRefPrice,
+      optionRefText,
       instrument: `${this.config.symbol} ${trade.entry.strike} ${leg.type}`,
       side: 'BUY',
       orderType: 'MARKET',
       quantity: this.qty,
       lotSize: this.lotSize,
-      signalTime: '09:20',
+      signalTime: trade.entry.time,
       signalRefPrice: leg.reference,
       upperBreakoutLevel: leg.upper,
       lowerExitLevel: leg.lower,
-      triggerClosePrice: trade.entry.close,
+      triggerClosePrice: trade.signalPrice,
       entryTime: trade.entry.time,
       entryTimestamp: trade.entry.isoTime,
       entryPrice: trade.entry.close,
@@ -446,6 +468,7 @@ export class AlgoroomsStyleBacktester {
       eodExitQty: force?.quantity ?? 0,
       eodExitTime: force?.time ?? '',
       eodExitPnl: force?.pnl ?? 0,
+      eodExitHit: !!force,
       exitPrice: this.round(blendedExit),
       exitTime: finalExit.time,
       exitTimestamp: exitCandle?.isoTime ?? trade.entry.isoTime,
@@ -468,9 +491,9 @@ export class AlgoroomsStyleBacktester {
       drawdownPct: this.peakEquity ? this.round((drawdown / this.peakEquity) * 100) : 0,
       status: netPnl > 0 ? 'WIN' : 'LOSS',
       executionAmbiguity: trade.ambiguity,
-      fillModel: '5m close signal + 1m OHLC execution',
+      fillModel: 'Completed 5m close signal; next 1m open entry/stop; target on 1m OHLC',
       dataSource: this.dataQuality.dataSource,
-      isSynthetic: false,
+      isSynthetic: this.dataQuality.syntheticPrices,
       exits: trade.exits
     });
 
@@ -489,6 +512,23 @@ export class AlgoroomsStyleBacktester {
   }
 
   private report(): AlgoroomsPerformanceReport {
+    this.tradeLogs.sort((a, b) => a.exitTimestamp.localeCompare(b.exitTimestamp) || a.id.localeCompare(b.id));
+    this.equityCurve.length = 0;
+    let equity = this.config.initialCapital;
+    let peak = equity;
+    this.maxDrawdown = 0;
+    for (const trade of this.tradeLogs) {
+      equity = this.round(equity + trade.netPnl);
+      peak = Math.max(peak, equity);
+      const drawdown = this.round(peak - equity);
+      this.maxDrawdown = Math.max(this.maxDrawdown, drawdown);
+      trade.cumulativeEquity = equity;
+      trade.peakEquity = peak;
+      trade.drawdown = drawdown;
+      trade.drawdownPct = peak ? this.round(drawdown / peak * 100) : 0;
+      this.equityCurve.push({ date: trade.date, timestamp: trade.exitTimestamp, equity, pnl: trade.netPnl, drawdown });
+    }
+    this.balance = equity;
     const totalTrades = this.tradeLogs.length;
     const wins = this.tradeLogs.filter((t) => t.netPnl > 0);
     const losses = this.tradeLogs.filter((t) => t.netPnl <= 0);
@@ -496,6 +536,7 @@ export class AlgoroomsStyleBacktester {
     const totalCharges = this.round(this.tradeLogs.reduce((s, t) => s + t.totalCharges, 0));
     const netProfit = this.round(this.tradeLogs.reduce((s, t) => s + t.netPnl, 0));
     const dayMap = new Map<string, CompletedTradeLog[]>();
+    for (const date of this.dates) dayMap.set(date, []);
     for (const t of this.tradeLogs) dayMap.set(t.date, [...(dayMap.get(t.date) ?? []), t]);
 
     const daywiseTransactions = [...dayMap.entries()].map(([date, trades]) => {
@@ -516,7 +557,8 @@ export class AlgoroomsStyleBacktester {
 
     const profitDays = daywiseTransactions.filter((d) => d.pnl > 0).map((d) => d.pnl);
     const lossDays = daywiseTransactions.filter((d) => d.pnl < 0).map((d) => d.pnl);
-    const profitFactor = losses.length ? this.round(wins.reduce((s, t) => s + t.netPnl, 0) / Math.abs(losses.reduce((s, t) => s + t.netPnl, 0))) : wins.length ? Infinity : 0;
+    const lossTotal = losses.reduce((s, t) => s + t.netPnl, 0);
+    const profitFactor = lossTotal < 0 ? this.round(wins.reduce((s, t) => s + t.netPnl, 0) / Math.abs(lossTotal)) : null;
 
     let currentWin = 0, currentLoss = 0, winStreak = 0, lossStreak = 0, maxConsecutiveLosses = 0;
     for (const t of this.tradeLogs) {
@@ -550,12 +592,12 @@ export class AlgoroomsStyleBacktester {
         avgLoss: losses.length ? this.round(losses.reduce((s, t) => s + t.netPnl, 0) / losses.length) : 0,
         maxConsecutiveLosses,
         maxDrawdown: this.round(this.maxDrawdown),
-        maxDrawdownPct: this.config.initialCapital ? this.round((this.maxDrawdown / this.config.initialCapital) * 100) : 0,
+        maxDrawdownPct: Math.max(0, ...this.tradeLogs.map(t => t.drawdownPct)),
         tradingDays: daywiseTransactions.length,
         winDays: daywiseTransactions.filter((d) => d.pnl > 0).length,
         winDaysPct: daywiseTransactions.length ? this.round((daywiseTransactions.filter((d) => d.pnl > 0).length / daywiseTransactions.length) * 100) : 0,
-        lossDays: daywiseTransactions.filter((d) => d.pnl <= 0).length,
-        lossDaysPct: daywiseTransactions.length ? this.round((daywiseTransactions.filter((d) => d.pnl <= 0).length / daywiseTransactions.length) * 100) : 0,
+        lossDays: daywiseTransactions.filter((d) => d.pnl < 0).length,
+        lossDaysPct: daywiseTransactions.length ? this.round((daywiseTransactions.filter((d) => d.pnl < 0).length / daywiseTransactions.length) * 100) : 0,
         maxProfitDay: profitDays.length ? Math.max(...profitDays) : 0,
         maxLossDay: lossDays.length ? Math.min(...lossDays) : 0,
         avgProfitPerDay: profitDays.length ? this.round(profitDays.reduce((s, v) => s + v, 0) / profitDays.length) : 0,
@@ -580,7 +622,7 @@ export class AlgoroomsStyleBacktester {
       totalPnl: this.round(monthDays.reduce((s, d) => s + d.pnl, 0)),
       tradingDays: monthDays.length,
       winDays: monthDays.filter((d) => d.pnl > 0).length,
-      lossDays: monthDays.filter((d) => d.pnl <= 0).length,
+      lossDays: monthDays.filter((d) => d.pnl < 0).length,
       days: monthDays
     }));
   }

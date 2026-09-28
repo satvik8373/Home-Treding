@@ -66,9 +66,6 @@ const DhanCallback: React.FC = () => {
           // Retain verified client ID in localStorage
           if (storedClientId) localStorage.setItem('dhan_saved_client_id', storedClientId);
 
-          if (broker) {
-            localStorage.setItem('mavrix_saved_brokers', JSON.stringify([broker]));
-          }
           localStorage.setItem('dhan_oauth_completed', String(Date.now()));
 
           if (isMounted) {

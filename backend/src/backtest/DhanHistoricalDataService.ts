@@ -1,8 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import path from 'path';
-import fs from 'fs';
-import { BrokerRegistry } from '../brokers/BrokerRegistry';
-import { decryptToken } from '../security/encryption';
+import { storedDhanAuth } from '../brokers/brokerStorage';
 import { logger } from '../utils/logger';
 import { DHAN_CONFIG } from '../brokers/dhan/config';
 
@@ -79,9 +76,8 @@ export class DhanHistoricalDataService {
    * Resolves Dhan credentials for a specific authenticated user.
    * Priority:
    * 1. Direct custom credentials if supplied in request
-   * 2. User's active connected Dhan adapter from BrokerRegistry
-   * 3. User's encrypted connected broker in data/broker-connections.json
-   * 4. System fallback: process.env.DHAN_ACCESS_TOKEN and process.env.DHAN_CLIENT_ID
+   * 2. User's encrypted connected broker in data/broker-connections.json
+   * 3. System fallback: process.env.DHAN_ACCESS_TOKEN and process.env.DHAN_CLIENT_ID
    */
   static resolveAuth(
     userId?: string,
@@ -91,32 +87,8 @@ export class DhanHistoricalDataService {
       return { accessToken: customCreds.accessToken, clientId: customCreds.clientId };
     }
 
-    const registry = BrokerRegistry.getInstance();
-
     if (userId) {
-      const adapter = registry.getAdapter(userId, 'dhan');
-      if (adapter && adapter.getStatus()) {
-        const creds = adapter.getCredentials();
-        if (creds?.accessToken && creds?.clientId) {
-          return { accessToken: creds.accessToken, clientId: creds.clientId };
-        }
-      }
-
-      const storageFile = path.join(__dirname, '../../data/broker-connections.json');
-      if (fs.existsSync(storageFile)) {
-        try {
-          const rawList: any[] = JSON.parse(fs.readFileSync(storageFile, 'utf8'));
-          const userDhan = rawList.find(
-            (c) => c.userId === userId && c.broker === 'dhan' && c.status === 'Connected'
-          );
-          if (userDhan && userDhan.clientId && userDhan.encryptedAccessToken) {
-            const accessToken = decryptToken(userDhan.encryptedAccessToken);
-            if (accessToken) {
-              return { accessToken, clientId: userDhan.clientId };
-            }
-          }
-        } catch (_) {}
-      }
+      return storedDhanAuth(userId);
     }
 
     const envToken = process.env.DHAN_ACCESS_TOKEN;
@@ -146,11 +118,7 @@ export class DhanHistoricalDataService {
     if (clean.includes('NIFTY')) {
       return DHAN_SYMBOL_SECURITY_MAP['NIFTY 50'];
     }
-    return {
-      securityId: '13',
-      exchangeSegment: 'IDX_I',
-      instrument: 'INDEX'
-    };
+    throw new Error(`UNSUPPORTED_SYMBOL: ${symbol}`);
   }
 
   /**
@@ -248,6 +216,9 @@ export class DhanHistoricalDataService {
     toDate: string;
     interval?: 1 | 5 | 15 | 25 | 60;
   }): Promise<OptionCandle[]> {
+    const all: OptionCandle[] = [];
+    const chunks = chunkDateRange(new Date(`${params.fromDate}T00:00:00Z`), new Date(`${params.toDate}T00:00:00Z`), 30);
+    for (const chunk of chunks) {
     try {
       const response = await this.http.post('/charts/rollingoption', {
         exchangeSegment: params.exchangeSegment,
@@ -259,14 +230,15 @@ export class DhanHistoricalDataService {
         strike: params.strike,
         drvOptionType: params.optionType,
         requiredData: ['open', 'high', 'low', 'close', 'volume', 'oi', 'iv', 'strike', 'spot'],
-        fromDate: params.fromDate,
-        toDate: params.toDate
+        fromDate: chunk.fromDate.toISOString().slice(0, 10),
+        toDate: chunk.toDate.toISOString().slice(0, 10)
       });
-      return this.parseRollingOptionResponse(response.data, params.optionType);
+      all.push(...this.parseRollingOptionResponse(response.data, params.optionType));
     } catch (err: any) {
       this.handleDhanError(err, 'charts/rollingoption');
-      return [];
     }
+    }
+    return all.sort((a, b) => a.timestamp - b.timestamp);
   }
 
   /**
@@ -330,20 +302,16 @@ export class DhanHistoricalDataService {
     const optionType = params.optionType === 'CE' ? 'CALL' : 'PUT';
     const expiryFlag = params.expiryFlag ?? 'WEEK';
 
+    if (!Object.keys(strikesByDate).length) throw new Error('MISSING_SPOT_REFERENCE_CANDLES');
     const series: OptionCandle[][] = [];
-    for (const offset of offsets) {
-      series.push(await this.getExpiredOptionCandles({
-        securityId: meta.securityId,
-        exchangeSegment: 'NSE_FNO',
-        instrument: 'OPTIDX',
-        expiryFlag,
-        expiryCode: 0,
+    for (let i = 0; i < offsets.length; i += 5) {
+      const batch = offsets.slice(i, i + 5);
+      series.push(...await Promise.all(batch.map(offset => this.getExpiredOptionCandles({
+        securityId: meta.securityId, exchangeSegment: 'NSE_FNO', instrument: 'OPTIDX',
+        expiryFlag, expiryCode: 0,
         strike: offset === 0 ? 'ATM' : offset > 0 ? `ATM+${offset}` : `ATM${offset}`,
-        optionType,
-        fromDate: params.fromDate,
-        toDate: params.toDate,
-        interval: 1
-      }));
+        optionType, fromDate: params.fromDate, toDate: params.toDate, interval: 1
+      }))));
     }
 
     const selected = new Map<string, OptionCandle>();
@@ -363,17 +331,18 @@ export class DhanHistoricalDataService {
 
     for (const date of dates) {
       const day = candles1m.filter((c) => c.date === date && c.time >= '09:15' && c.time <= '15:10');
-      const fiveMinuteCount = candles1m.filter((c) => c.date === date && c.time >= '09:15' && c.time <= '15:05').length;
-      if (day.length < expectedMinutes || fiveMinuteCount < 71) {
+      const uniqueTimes = new Set(day.map((c) => c.time));
+      if (day.length !== expectedMinutes || uniqueTimes.size !== expectedMinutes ||
+          day[0]?.time !== '09:15' || day[day.length - 1]?.time !== '15:10') {
         throw new Error(
-          `INCOMPLETE_OPTION_DATA: ${params.optionType} ${date} fixed strike ${strikesByDate[date]} has ${day.length}/${expectedMinutes} one-minute candles and ${fiveMinuteCount}/351 signal minutes before the 15:10 square-off. Backtest stopped to avoid estimated or fabricated values.`
+          `INCOMPLETE_OPTION_DATA: ${params.optionType} ${date} fixed strike ${strikesByDate[date]} has ${day.length}/${expectedMinutes} one-minute candles. Backtest stopped.`
         );
       }
     }
 
     const fiveMinute = new Map<string, OptionCandle[]>();
     for (const candle of candles1m) {
-      if (candle.time < '09:15' || candle.time > '15:10') continue;
+      if (candle.time < '09:15' || candle.time >= '15:10') continue;
       const minute = Number(candle.time.slice(3, 5));
       const bucketMinute = Math.floor(minute / 5) * 5;
       const bucketTime = `${candle.time.slice(0, 3)}${String(bucketMinute).padStart(2, '0')}`;
@@ -485,12 +454,12 @@ export class DhanHistoricalDataService {
       : data?.data?.pe ?? data?.pe;
 
     if (!root) {
-      throw new Error('FRESH_DHAN_DATA_UNAVAILABLE: /charts/rollingoption returned no option data');
+      return [];
     }
 
     const timestamps: any[] = root.timestamp ?? root.start_Time ?? [];
     if (!Array.isArray(timestamps) || timestamps.length === 0) {
-      throw new Error('FRESH_DHAN_DATA_UNAVAILABLE: /charts/rollingoption returned no candles');
+      return [];
     }
 
     const open = root.open ?? [];
@@ -523,6 +492,9 @@ export class DhanHistoricalDataService {
         oi: oi[i] !== undefined ? Number(oi[i]) : undefined
       };
       this.validateCandle(candle);
+      if (!Number.isFinite(candle.strike) || candle.strike <= 0) {
+        throw new Error(`INVALID_OPTION_STRIKE: ${candle.isoTime}`);
+      }
       result.push(candle);
     }
     return result.sort((a, b) => a.timestamp - b.timestamp);
@@ -533,8 +505,9 @@ export class DhanHistoricalDataService {
         !Number.isFinite(candle.low) || !Number.isFinite(candle.close)) {
       throw new Error(`INVALID_DHAN_CANDLE: Non-finite OHLC at timestamp ${candle.timestamp}`);
     }
-    if (candle.high < candle.low) {
-      throw new Error(`INVALID_OHLC_RANGE: high < low at timestamp ${candle.timestamp}`);
+    if (candle.high < Math.max(candle.open, candle.close) ||
+        candle.low > Math.min(candle.open, candle.close) || candle.low < 0) {
+      throw new Error(`INVALID_OHLC_RANGE: ${candle.isoTime}`);
     }
   }
 
@@ -575,7 +548,6 @@ export function chunkDateRange(
     const chunkEnd = next > endDate ? new Date(endDate) : next;
     chunks.push({ fromDate: new Date(cur), toDate: new Date(chunkEnd) });
     cur = new Date(chunkEnd);
-    cur.setDate(cur.getDate() + 1);
   }
   return chunks;
 }

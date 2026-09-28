@@ -42,8 +42,12 @@ import {
   consumeDhanConsent
 } from '../controllers/brokerController';
 import { authenticate, optionalAuth } from '../middleware/auth';
+import { brokerRegistry } from '../brokers/BrokerRegistry';
 
 const router = Router();
+router.use((_req, _res, next) => {
+  brokerRegistry.whenReady().then(() => next()).catch(next);
+});
 
 // 1. Broker Connection Management
 router.post('/connect', optionalAuth, connectBroker);

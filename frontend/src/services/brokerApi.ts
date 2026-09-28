@@ -17,6 +17,8 @@ export interface BrokerSummary {
   connectedAt?: string;
   lastActivity?: string;
   funds?: BrokerFunds;
+  dataPlan?: string;
+  tokenValidity?: string;
 }
 
 export interface BrokerFunds {
@@ -105,21 +107,8 @@ const createFreshPortfolio = (capital: number = 100000): PaperPortfolio => ({
   winRate: 0
 });
 
-// Load cached brokers from localStorage
-const loadCachedBrokers = (): BrokerSummary[] => {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem('mavrix_saved_brokers');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (_) {}
-  return [];
-};
-
-// User-scoped in-memory state initialized with cached data
-let localBrokers: BrokerSummary[] = loadCachedBrokers();
+// Status is supplied by the server after Dhan profile verification.
+let localBrokers: BrokerSummary[] = [];
 let localPaperPortfolio: PaperPortfolio = createFreshPortfolio(100000);
 let localPositions: BrokerPosition[] = [];
 let localOrders: BrokerOrder[] = [];
@@ -137,9 +126,7 @@ export const brokerApi = {
   },
 
   hasActiveBroker(): boolean {
-    if (localBrokers.length > 0 && localBrokers.some(b => b.status === 'Connected')) return true;
-    const cached = loadCachedBrokers();
-    return cached.some(b => b.status === 'Connected');
+    return localBrokers.some(b => b.status === 'Connected');
   },
 
   getActiveBroker(): BrokerSummary | null {
@@ -148,114 +135,37 @@ export const brokerApi = {
       if (active) return active;
       return localBrokers[0];
     }
-    const cached = loadCachedBrokers();
-    if (cached.length > 0) {
-      const active = cached.find(b => b.status === 'Connected');
-      if (active) return active;
-      return cached[0];
-    }
     return null;
   },
 
   // --- Broker Connections ---
   async getBrokers(userId?: string): Promise<BrokerSummary[]> {
-    let effectiveUserId = userId;
-    if (!effectiveUserId && typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem('mavrix_local_user');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed?.uid) effectiveUserId = parsed.uid;
-        }
-      } catch (_) {}
-    }
-    if (!effectiveUserId) effectiveUserId = 'user_admin';
-
-    const urls = [
-      `${getBaseUrl()}/api/brokers/list?userId=${encodeURIComponent(effectiveUserId)}`,
-      `/api/brokers/list?userId=${encodeURIComponent(effectiveUserId)}`,
-      `${getBaseUrl()}/api/brokers/list`,
-      `/api/brokers/list`
-    ];
-
-    for (const url of Array.from(new Set(urls))) {
-      try {
-        const res = await axios.get(url, { timeout: 6000 });
-        if (res.data?.brokers && Array.isArray(res.data.brokers)) {
-          if (res.data.brokers.length > 0) {
-            localBrokers = res.data.brokers;
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('mavrix_saved_brokers', JSON.stringify(res.data.brokers));
-            }
-            return res.data.brokers;
-          } else {
-            // Server returned empty list. If we have a cached connected broker, don't wipe it!
-            if (localBrokers.length > 0) {
-              return localBrokers;
-            }
-          }
-        }
-      } catch (err: any) {
-        if (err.response?.status !== 404) break;
-      }
-    }
-
-    if (localBrokers.length === 0) {
-      localBrokers = loadCachedBrokers();
-    }
+    const res = await axios.get(`${getBaseUrl()}/api/brokers/list`, { timeout: 15000 });
+    localBrokers = Array.isArray(res.data?.brokers) ? res.data.brokers : [];
+    if (typeof window !== 'undefined') localStorage.removeItem('mavrix_saved_brokers');
     return localBrokers;
   },
 
   async connectDhan(params: { clientId: string; accessToken: string; userId?: string }): Promise<any> {
-    const urlsToTry = Array.from(new Set([
-      `${getBaseUrl()}/api/brokers/connect`,
-      '/api/brokers/connect',
-      `${getBaseUrl()}/api/broker/connect`,
-      '/api/broker/connect'
-    ]));
-
-    let lastError: any = null;
-    for (const url of urlsToTry) {
-      try {
-        const res = await axios.post(url, {
+    try {
+        const res = await axios.post(`${getBaseUrl()}/api/brokers/connect`, {
           broker: 'dhan',
           clientId: params.clientId.trim(),
           accessToken: params.accessToken.trim(),
-          userId: params.userId
         }, { timeout: 15000 });
 
         if (res.data?.success && res.data?.broker) {
           localBrokers = [res.data.broker, ...localBrokers.filter(b => b.clientId !== params.clientId.trim())];
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('mavrix_saved_brokers', JSON.stringify(localBrokers));
-          }
           return res.data;
         }
 
         if (res.data && res.data.success === false) {
           return res.data;
         }
-      } catch (err: any) {
-        lastError = err;
-        if (err.response?.status === 401 || err.response?.status === 403) {
-          return {
-            success: false,
-            message: err.response?.data?.message || 'Invalid Dhan Client ID or Access Token. Please verify your credentials in Dhan Developer Portal.',
-            error: err.response?.data
-          };
-        }
-        if (err.response?.status !== 404) {
-          break;
-        }
-      }
+    } catch (err: any) {
+      return { success: false, message: err.response?.data?.message || err.message || 'Dhan connection failed.' };
     }
-
-    const errorMsg = lastError?.response?.data?.message || lastError?.message || 'Failed to authenticate with Dhan API';
-    return {
-      success: false,
-      message: errorMsg,
-      error: lastError?.response?.data
-    };
+    return { success: false, message: 'Dhan connection failed.' };
   },
 
   /**
@@ -285,9 +195,6 @@ export const brokerApi = {
     const res = await axios.post(`${getBaseUrl()}/api/brokers/dhan/consume-consent`, params, { timeout: 15000 });
     if (res.data?.success && res.data?.broker) {
       localBrokers = [res.data.broker, ...localBrokers.filter(b => b.clientId !== res.data.broker.clientId)];
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('mavrix_saved_brokers', JSON.stringify(localBrokers));
-      }
     }
     return res.data;
   },
@@ -351,24 +258,7 @@ export const brokerApi = {
   },
 
   async disconnectBroker(brokerId: string): Promise<boolean> {
-    let effectiveUserId = '';
-    try {
-      const raw = localStorage.getItem('mavrix_local_user');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.uid) effectiveUserId = parsed.uid;
-      }
-    } catch (_) {}
-    if (!effectiveUserId) effectiveUserId = 'user_admin';
-
-    try {
-      await axios.delete(
-        `${getBaseUrl()}/api/brokers/${encodeURIComponent(brokerId)}?userId=${encodeURIComponent(effectiveUserId)}`,
-        { timeout: 8000 }
-      );
-    } catch (e) {
-      console.warn('Backend broker disconnect warning:', e);
-    }
+    await axios.delete(`${getBaseUrl()}/api/brokers/${encodeURIComponent(brokerId)}`, { timeout: 8000 });
 
     // Clear any pending credentials from localStorage
     localStorage.removeItem('dhan_pending_client_id');
@@ -385,28 +275,9 @@ export const brokerApi = {
   },
 
   async getFunds(brokerId?: string): Promise<BrokerFunds | null> {
-    const urls = [
-      brokerId ? `${getBaseUrl()}/api/brokers/funds/${brokerId}` : `${getBaseUrl()}/api/brokers/funds`,
-      brokerId ? `/api/brokers/funds/${brokerId}` : `/api/brokers/funds`,
-      brokerId ? `${getBaseUrl()}/api/broker/funds/${brokerId}` : `${getBaseUrl()}/api/broker/funds`
-    ];
-
-    for (const url of Array.from(new Set(urls))) {
-      try {
-        const res = await axios.get(url, { timeout: 8000 });
-        if (res.data?.success && res.data?.funds) return res.data.funds;
-        if (res.data?.status === 'Expired') {
-          throw new Error('Token expired');
-        }
-      } catch (e: any) {
-        if (e.response?.status === 401 || e.message?.includes('expired')) {
-          throw e;
-        }
-        if (e.response?.status !== 404) break;
-      }
-    }
-
-    return null;
+    const url = brokerId ? `${getBaseUrl()}/api/brokers/funds/${encodeURIComponent(brokerId)}` : `${getBaseUrl()}/api/brokers/funds`;
+    const res = await axios.get(url, { timeout: 12000 });
+    return res.data?.success ? res.data.funds : null;
   },
 
   async getPositions(brokerId?: string): Promise<BrokerPosition[]> {

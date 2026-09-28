@@ -13,8 +13,10 @@ export class DhanProfileService {
   public async getProfile(): Promise<BrokerAccountProfile> {
     const clientId = this.client.getClientId();
     
-    // Validate connectivity by fetching fund limits or profile
-    await this.client.get(DHAN_CONFIG.ENDPOINTS.FUND_LIMIT);
+    const result = await this.client.get<any>(DHAN_CONFIG.ENDPOINTS.PROFILE);
+    if (String(result?.dhanClientId) !== clientId) {
+      throw new Error('Dhan Client ID does not match this access token.');
+    }
 
     return {
       broker: 'dhan',
@@ -23,6 +25,8 @@ export class DhanProfileService {
       accountName: `Dhan Trader (${maskIdentifier(clientId)})`,
       status: 'Connected',
       terminalActivated: true,
+      dataPlan: String(result.dataPlan || 'Unknown'),
+      tokenValidity: result.tokenValidity,
       connectedAt: new Date(),
       lastHeartbeat: new Date()
     };

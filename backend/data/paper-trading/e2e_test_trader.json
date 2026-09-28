@@ -1,13 +1,13 @@
 {
   "initialCapital": 100000,
-  "availableCash": 10030.029999999977,
-  "realizedPnl": -904.1999999999987,
-  "totalBrokerage": 245.27,
-  "totalSlippageCost": 99.40000000000282,
+  "availableCash": 9236.169999999973,
+  "realizedPnl": -5122.699999999997,
+  "totalBrokerage": 290.33,
+  "totalSlippageCost": 120.20000000000607,
   "winCount": 0,
-  "lossCount": 3,
+  "lossCount": 4,
   "peakCapital": 100000,
-  "maxDrawdown": 1271.9700000000303,
+  "maxDrawdown": 5663.750000000015,
   "orders": [
     [
       "paper_ord_1790323945009_grf6q2",
@@ -272,6 +272,94 @@
         "executionTimestamp": "2026-09-25T10:34:18.706Z",
         "strategyId": "nifty-009-atm-breakout"
       }
+    ],
+    [
+      "paper_ord_1790582700497_ho9c6d",
+      {
+        "orderId": "paper_ord_1790582700497_ho9c6d",
+        "brokerOrderId": "virt_paper_ord_1790582700497_ho9c6d",
+        "symbol": "NIFTY 01-OCT-2026 26200 CE",
+        "exchange": "NFO",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 130,
+        "filledQuantity": 0,
+        "pendingQuantity": 130,
+        "price": 158.18,
+        "averagePrice": 0,
+        "status": "REJECTED",
+        "statusMessage": "Insufficient virtual cash. Required: ₹20585.97, Available: ₹10030.03",
+        "orderTimestamp": "2026-09-28T08:05:00.497Z",
+        "strategyId": "nifty-009-atm-breakout"
+      }
+    ],
+    [
+      "paper_ord_1790582700603_a6kh5h",
+      {
+        "orderId": "paper_ord_1790582700603_a6kh5h",
+        "brokerOrderId": "virt_paper_ord_1790582700603_a6kh5h",
+        "symbol": "NIFTY 01-OCT-2026 26200 PE",
+        "exchange": "NFO",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 130,
+        "filledQuantity": 0,
+        "pendingQuantity": 130,
+        "price": 154.53,
+        "averagePrice": 0,
+        "status": "REJECTED",
+        "statusMessage": "Insufficient virtual cash. Required: ₹20111.41, Available: ₹10030.03",
+        "orderTimestamp": "2026-09-28T08:05:00.603Z",
+        "strategyId": "nifty-009-atm-breakout"
+      }
+    ],
+    [
+      "paper_ord_1790582700708_tspqjh",
+      {
+        "orderId": "paper_ord_1790582700708_tspqjh",
+        "brokerOrderId": "virt_paper_ord_1790582700708_tspqjh",
+        "symbol": "NIFTY 01-OCT-2026 26200 CE",
+        "exchange": "NFO",
+        "side": "SELL",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 130,
+        "filledQuantity": 130,
+        "pendingQuantity": 0,
+        "price": 152.92,
+        "averagePrice": 152.92,
+        "status": "FILLED",
+        "orderTimestamp": "2026-09-28T08:05:00.708Z",
+        "executionTimestamp": "2026-09-28T08:05:00.708Z",
+        "strategyId": "nifty-009-atm-breakout"
+      }
+    ],
+    [
+      "paper_ord_1790582700818_fl6p5y",
+      {
+        "orderId": "paper_ord_1790582700818_fl6p5y",
+        "brokerOrderId": "virt_paper_ord_1790582700818_fl6p5y",
+        "symbol": "NIFTY 01-OCT-2026 26200 CE",
+        "exchange": "NFO",
+        "side": "BUY",
+        "orderType": "MARKET",
+        "productType": "INTRADAY",
+        "validity": "DAY",
+        "quantity": 130,
+        "filledQuantity": 130,
+        "pendingQuantity": 0,
+        "price": 158.68,
+        "averagePrice": 158.68,
+        "status": "FILLED",
+        "orderTimestamp": "2026-09-28T08:05:00.818Z",
+        "executionTimestamp": "2026-09-28T08:05:00.818Z",
+        "strategyId": "nifty-009-atm-breakout"
+      }
     ]
   ],
   "positions": [
@@ -324,15 +412,15 @@
         "segment": "EQ",
         "productType": "INTRADAY",
         "quantity": 260,
-        "buyQuantity": 520,
-        "sellQuantity": 260,
+        "buyQuantity": 650,
+        "sellQuantity": 390,
         "buyAvgPrice": 0,
         "sellAvgPrice": 0,
-        "netAvgPrice": 185.36999999999998,
+        "netAvgPrice": 155.8,
         "ltp": 186.53,
-        "realizedPnl": -765.6999999999982,
-        "unrealizedPnl": 301.6000000000065,
-        "totalPnl": -464.0999999999917
+        "realizedPnl": -4984.199999999996,
+        "unrealizedPnl": 7989.799999999997,
+        "totalPnl": 3005.6000000000013
       }
     ],
     [
@@ -465,6 +553,26 @@
       "quantity": 130,
       "price": 187.03,
       "timestamp": "2026-09-25T10:34:18.708Z",
+      "strategyId": "nifty-009-atm-breakout"
+    },
+    {
+      "tradeId": "trade_1790582700710",
+      "orderId": "paper_ord_1790582700708_tspqjh",
+      "symbol": "NIFTY 01-OCT-2026 26200 CE",
+      "side": "SELL",
+      "quantity": 130,
+      "price": 152.92,
+      "timestamp": "2026-09-28T08:05:00.710Z",
+      "strategyId": "nifty-009-atm-breakout"
+    },
+    {
+      "tradeId": "trade_1790582700819",
+      "orderId": "paper_ord_1790582700818_fl6p5y",
+      "symbol": "NIFTY 01-OCT-2026 26200 CE",
+      "side": "BUY",
+      "quantity": 130,
+      "price": 158.68,
+      "timestamp": "2026-09-28T08:05:00.819Z",
       "strategyId": "nifty-009-atm-breakout"
     }
   ],
@@ -638,6 +746,88 @@
         "price": 187.03,
         "brokerage": 23.04,
         "slippageCost": 11.700000000000443
+      }
+    },
+    {
+      "id": "audit_1790582700497_kfcsql",
+      "timestamp": "2026-09-28T08:05:00.497Z",
+      "eventType": "ORDER_REJECTED",
+      "symbol": "NIFTY 01-OCT-2026 26200 CE",
+      "details": {
+        "reason": "Insufficient virtual cash. Required: ₹20585.97, Available: ₹10030.03",
+        "order": {
+          "orderId": "paper_ord_1790582700497_ho9c6d",
+          "brokerOrderId": "virt_paper_ord_1790582700497_ho9c6d",
+          "symbol": "NIFTY 01-OCT-2026 26200 CE",
+          "exchange": "NFO",
+          "side": "BUY",
+          "orderType": "MARKET",
+          "productType": "INTRADAY",
+          "validity": "DAY",
+          "quantity": 130,
+          "filledQuantity": 0,
+          "pendingQuantity": 130,
+          "price": 158.18,
+          "averagePrice": 0,
+          "status": "REJECTED",
+          "statusMessage": "Insufficient virtual cash. Required: ₹20585.97, Available: ₹10030.03",
+          "orderTimestamp": "2026-09-28T08:05:00.497Z",
+          "strategyId": "nifty-009-atm-breakout"
+        }
+      }
+    },
+    {
+      "id": "audit_1790582700603_0st4vt",
+      "timestamp": "2026-09-28T08:05:00.603Z",
+      "eventType": "ORDER_REJECTED",
+      "symbol": "NIFTY 01-OCT-2026 26200 PE",
+      "details": {
+        "reason": "Insufficient virtual cash. Required: ₹20111.41, Available: ₹10030.03",
+        "order": {
+          "orderId": "paper_ord_1790582700603_a6kh5h",
+          "brokerOrderId": "virt_paper_ord_1790582700603_a6kh5h",
+          "symbol": "NIFTY 01-OCT-2026 26200 PE",
+          "exchange": "NFO",
+          "side": "BUY",
+          "orderType": "MARKET",
+          "productType": "INTRADAY",
+          "validity": "DAY",
+          "quantity": 130,
+          "filledQuantity": 0,
+          "pendingQuantity": 130,
+          "price": 154.53,
+          "averagePrice": 0,
+          "status": "REJECTED",
+          "statusMessage": "Insufficient virtual cash. Required: ₹20111.41, Available: ₹10030.03",
+          "orderTimestamp": "2026-09-28T08:05:00.603Z",
+          "strategyId": "nifty-009-atm-breakout"
+        }
+      }
+    },
+    {
+      "id": "audit_1790582700710_xmj1ic",
+      "timestamp": "2026-09-28T08:05:00.710Z",
+      "eventType": "ORDER_FILLED",
+      "symbol": "NIFTY 01-OCT-2026 26200 CE",
+      "details": {
+        "side": "SELL",
+        "qty": 130,
+        "price": 152.92,
+        "brokerage": 22.48,
+        "slippageCost": 10.400000000001626
+      }
+    },
+    {
+      "id": "audit_1790582700819_eo6vur",
+      "timestamp": "2026-09-28T08:05:00.819Z",
+      "eventType": "ORDER_FILLED",
+      "symbol": "NIFTY 01-OCT-2026 26200 CE",
+      "details": {
+        "side": "BUY",
+        "qty": 130,
+        "price": 158.68,
+        "brokerage": 22.58,
+        "slippageCost": 10.400000000001626
       }
     }
   ]

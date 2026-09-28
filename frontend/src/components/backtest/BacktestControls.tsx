@@ -4,7 +4,6 @@ import {
   Typography,
   Paper,
   Button,
-  Chip,
   Menu,
   MenuItem,
   CircularProgress,
@@ -69,8 +68,6 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
     { label: '1 Month', days: 23 },
     { label: '3 Months', days: 65 },
     { label: '6 Months', days: 130 },
-    { label: '1 Year', days: 250 },
-    { label: '2 Years', days: 500 },
     { label: 'Custom Range', days: 45 }
   ];
 
@@ -274,27 +271,10 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
           </Box>
 
           <Typography sx={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-            Official Dhan historical 1-minute execution data will be used for this period.
+            Completed 2026 sessions only. Dhan historical option access is required.
           </Typography>
         </Box>
       )}
-
-      {/* Selected Tag Chip */}
-      <Box sx={{ mb: 2 }}>
-        <Chip
-          label={`${strategyName} ×`}
-          size="small"
-          sx={{
-            bgcolor: '#eff6ff',
-            color: '#2563eb',
-            fontWeight: 700,
-            fontSize: '0.75rem',
-            border: '1px solid #bfdbfe',
-            borderRadius: 1.5,
-            cursor: 'pointer'
-          }}
-        />
-      </Box>
 
       {/* Actions & Credits Row (Matching Screenshot 3) */}
       <Box
@@ -315,6 +295,7 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
           <Button
             variant="outlined"
             size="small"
+            disabled={loading || totalPnl === null}
             endIcon={<KeyboardArrowDown />}
             onClick={(e) => setDownloadAnchor(e.currentTarget)}
             sx={{
@@ -383,7 +364,7 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
       <Box sx={{ mb: 2 }}>
         <Typography variant="body1" sx={{ fontWeight: 800, color: '#334155', fontSize: '1rem', mb: 0.3 }}>
           P&L:{' '}
-          {totalPnl !== null ? (
+          {typeof totalPnl === 'number' && !isNaN(totalPnl) ? (
             <span style={{ color: totalPnl >= 0 ? '#16a34a' : '#dc2626' }}>
               ₹ {totalPnl.toLocaleString('en-IN')}
             </span>
@@ -393,7 +374,7 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
         </Typography>
         <Typography variant="body2" sx={{ fontWeight: 800, color: '#334155', fontSize: '0.9rem' }}>
           Max. Draw down:{' '}
-          {maxDrawdown !== null ? (
+          {typeof maxDrawdown === 'number' && !isNaN(maxDrawdown) ? (
             <span style={{ color: '#dc2626' }}>
               ₹ -{Math.abs(maxDrawdown).toLocaleString('en-IN')}
             </span>
