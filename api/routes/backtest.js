@@ -137,14 +137,15 @@ async function fetchNseExchangeCandles(symbol, fromDate, toDate) {
  * Executes authentic historical backtest on real NSE candles
  */
 async function executeAuthenticBacktest({ strategyId, symbol = 'NIFTY 50', days = 22, capital = 100000, startDate, endDate }) {
+  // ── Strategy parameters — must exactly match backend/data/strategies.json ──
   const isBankNifty = symbol.toUpperCase().includes('BANK');
-  const lotSize = isBankNifty ? 15 : 25;
-  const entryLots = 2;
-  const quantity = lotSize * entryLots;
+  const lotSize = isBankNifty ? 35 : 65;   // NSE 2025 revised: NIFTY=65, BANKNIFTY=35
+  const entryLots = 3;                       // 3 lots per leg
+  const quantity = lotSize * entryLots;      // 195 for NIFTY, 105 for BANKNIFTY
   const strikeStep = isBankNifty ? 100 : 50;
-  const breakoutPct = 0.009;
-  const target1Pts = 10;
-  const target2Pts = 25;
+  const breakoutPct = 0.009;                 // 0.9%
+  const target1Pts = 20;                     // +₹20 → exit 1 lot (65 qty)
+  const target2Pts = 40;                     // +₹40 → exit remaining 2 lots (130 qty)
 
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   const prevDate = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -279,11 +280,15 @@ async function executeAuthenticBacktest({ strategyId, symbol = 'NIFTY 50', days 
 
     // Simulate legs
     const simulateLeg = (optionType, candles1m, bars5m) => {
+      // Per strategy spec: Upper = refHigh × 1.009, Lower = refLow × 0.991
+      // The reference is the 09:15 option premium candle's High and Low (not spot close).
       const refBar = bars5m.get(baseEpoch);
       if (!refBar) return;
-      const reference = refBar.close;
-      const upper = Number((reference * (1 + breakoutPct)).toFixed(2));
-      const lower = Number((reference * (1 - breakoutPct)).toFixed(2));
+      const refHigh = refBar.high;
+      const refLow  = refBar.low;
+      const upper = Number((refHigh * (1 + breakoutPct)).toFixed(2));
+      const lower = Number((refLow  * (1 - breakoutPct)).toFixed(2));
+      const reference = refBar.close; // kept for logging only
 
       let pending = null;
       let signalPrice = 0;
@@ -324,7 +329,7 @@ async function executeAuthenticBacktest({ strategyId, symbol = 'NIFTY 50', days 
             lotSize,
             side: 'BUY',
             signalTime: minute.time,
-            signalRefPrice: reference,
+            signalRefPrice: refHigh,
             upperBreakoutLevel: upper,
             lowerExitLevel: lower,
             entryTime: minute.time,
