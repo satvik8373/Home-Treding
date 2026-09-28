@@ -188,7 +188,10 @@ interface LegState {
   type: 'CE' | 'PE';
   candles5m: OptionCandle[];
   candles1m: OptionCandle[];
-  reference: number;
+  /** 09:15 reference candle high — used to compute upper breakout level */
+  refHigh: number;
+  /** 09:15 reference candle low — used to compute lower exit level */
+  refLow: number;
   upper: number;
   lower: number;
   entryPrice: number | null;
@@ -278,24 +281,35 @@ export class AlgoroomsStyleBacktester {
     const pe5m = this.config.peOptionSeries?.candles5m.filter((c) => c.date === date) ?? [];
     const ce1m = this.config.ceOptionSeries?.candles1m.filter((c) => c.date === date) ?? [];
     const pe1m = this.config.peOptionSeries?.candles1m.filter((c) => c.date === date) ?? [];
+    // Per strategy spec: reference candle is the 09:15–09:20 bar.
+    // Upper = High × (1 + breakoutPct); Lower = Low × (1 − breakoutPct).
     const ceRefCandle = ce5m.find((c) => c.time === '09:15');
     const peRefCandle = pe5m.find((c) => c.time === '09:15');
     if (!ceRefCandle || !peRefCandle) throw new Error(`MISSING_REFERENCE_CANDLE: ${date}`);
-    const ce: LegState = this.createLeg('CE', ce5m, ce1m, ceRefCandle.close);
-    const pe: LegState = this.createLeg('PE', pe5m, pe1m, peRefCandle.close);
+    const ce: LegState = this.createLeg('CE', ce5m, ce1m, ceRefCandle.high, ceRefCandle.low);
+    const pe: LegState = this.createLeg('PE', pe5m, pe1m, peRefCandle.high, peRefCandle.low);
 
     this.processLeg(ce, date);
     this.processLeg(pe, date);
   }
 
-  private createLeg(type: 'CE' | 'PE', candles5m: OptionCandle[], candles1m: OptionCandle[], reference: number): LegState {
+  private createLeg(
+    type: 'CE' | 'PE',
+    candles5m: OptionCandle[],
+    candles1m: OptionCandle[],
+    refHigh: number,
+    refLow: number
+  ): LegState {
+    // Upper breakout level uses the reference candle High.
+    // Lower exit level uses the reference candle Low.
     return {
       type,
       candles5m,
       candles1m,
-      reference,
-      upper: this.round(reference * (1 + this.breakoutPct)),
-      lower: this.round(reference * (1 - this.breakoutPct)),
+      refHigh,
+      refLow,
+      upper: this.round(refHigh * (1 + this.breakoutPct)),
+      lower: this.round(refLow * (1 - this.breakoutPct)),
       entryPrice: null,
       entryTime: null,
       remainingQty: 0,
@@ -306,8 +320,11 @@ export class AlgoroomsStyleBacktester {
   private processLeg(leg: LegState, date: string): void {
     const bars = new Map(leg.candles5m.map(c => [c.timestamp, c]));
     const minutes = [...leg.candles1m].sort((a, b) => a.timestamp - b.timestamp);
-    if (minutes.length !== 356 || minutes[0].time !== '09:15' || minutes[355].time !== '15:10') {
-      throw new Error(`INCOMPLETE_OPTION_DATA: ${leg.type} ${date}`);
+    // A complete NSE session is 09:15–15:30, but we only need through 15:10 (EOD square-off).
+    // Allow minor gaps (e.g. auction minute, thin liquidity days) rather than hard-rejecting.
+    const MIN_EXPECTED = 355; // 09:15 through 15:09 inclusive
+    if (minutes.length < MIN_EXPECTED || minutes[0].time > '09:15' || minutes[minutes.length - 1].time < '15:10') {
+      throw new Error(`INCOMPLETE_OPTION_DATA: ${leg.type} ${date} (${minutes.length} candles, first=${minutes[0]?.time}, last=${minutes[minutes.length - 1]?.time})`);
     }
     let pending: 'ENTRY' | 'LOWER_EXIT' | null = null;
     let signalPrice = 0;
@@ -426,7 +443,7 @@ export class AlgoroomsStyleBacktester {
       .sort((a, b) => a.timestamp - b.timestamp)
       .pop();
     const spotVal = entrySpotCandle?.close ?? 0;
-    const optionRefText = `Option Ref: ₹${leg.reference.toFixed(2)} (Upper: ₹${leg.upper.toFixed(2)}, Lower: ₹${leg.lower.toFixed(2)})`;
+    const optionRefText = `Ref H: ₹${leg.refHigh.toFixed(2)} | Ref L: ₹${leg.refLow.toFixed(2)} | Upper: ₹${leg.upper.toFixed(2)} | Lower: ₹${leg.lower.toFixed(2)}`;
     const spotRefPrice = entrySpotCandle ? `Spot last completed 5m: ₹${spotVal.toFixed(2)}` : 'Spot unavailable';
 
     this.tradeLogs.push({
@@ -448,7 +465,7 @@ export class AlgoroomsStyleBacktester {
       quantity: this.qty,
       lotSize: this.lotSize,
       signalTime: trade.entry.time,
-      signalRefPrice: leg.reference,
+      signalRefPrice: leg.refHigh,
       upperBreakoutLevel: leg.upper,
       lowerExitLevel: leg.lower,
       triggerClosePrice: trade.signalPrice,
