@@ -74,8 +74,8 @@ export const Brokers: React.FC = () => {
 
   // Form Fields (Matching Screenshot 2) - retain previous input for easy re-auth
   const [clientId, setClientId] = useState(() => localStorage.getItem('dhan_pending_client_id') || localStorage.getItem('dhan_saved_client_id') || '');
-  const [apiKey, setApiKey] = useState('');
-  const [apiSecret, setApiSecret] = useState('');
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('dhan_pending_api_key') || '');
+  const [apiSecret, setApiSecret] = useState(() => localStorage.getItem('dhan_pending_api_secret') || '');
   const [accessToken, setAccessToken] = useState('');
   const [authMethod, setAuthMethod] = useState<'developer' | 'token'>(initialMethod);
   const [showSecret, setShowSecret] = useState(false);
@@ -215,6 +215,8 @@ export const Brokers: React.FC = () => {
     try {
       localStorage.setItem('dhan_pending_client_id', clientId.trim());
       localStorage.setItem('dhan_saved_client_id', clientId.trim());
+      localStorage.setItem('dhan_pending_api_key', apiKey.trim());
+      localStorage.setItem('dhan_pending_api_secret', apiSecret.trim());
 
       const res = await brokerApi.generateDhanConsent({
         clientId: clientId.trim(),

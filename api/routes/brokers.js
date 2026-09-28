@@ -1,12 +1,39 @@
 const express = require('express');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 const router = express.Router();
 
-// In-memory broker storage
+// In-memory broker storage with /tmp persistence for serverless containers
 const brokers = new Map();
+const TMP_BROKERS_PATH = path.join('/tmp', 'mavrix_brokers.json');
+
+const loadBrokersFromDisk = () => {
+  try {
+    if (fs.existsSync(TMP_BROKERS_PATH)) {
+      const data = JSON.parse(fs.readFileSync(TMP_BROKERS_PATH, 'utf8'));
+      if (Array.isArray(data)) {
+        for (const item of data) {
+          if (item && item.id) brokers.set(item.id, item);
+        }
+      }
+    }
+  } catch (_) {}
+};
+
+const saveBrokersToDisk = () => {
+  try {
+    const list = Array.from(brokers.values());
+    fs.writeFileSync(TMP_BROKERS_PATH, JSON.stringify(list), 'utf8');
+  } catch (_) {}
+};
+
+// Initial load on container initialization
+loadBrokersFromDisk();
 
 // Helper to safely find user broker without cross-user leakage
 const findUserBroker = (userId, brokerId) => {
+  loadBrokersFromDisk();
   if (brokerId) {
     const b = brokers.get(brokerId);
     if (b && (!userId || b.userId === userId)) return b;
@@ -28,11 +55,12 @@ const findUserBroker = (userId, brokerId) => {
 // Get broker list (support both / and /list)
 const handleGetBrokers = (req, res) => {
   try {
+    loadBrokersFromDisk();
     const { userId } = req.query;
     const all = Array.from(brokers.values());
     const userBrokers = userId 
-      ? all.filter(b => b.userId === userId)
-      : [];
+      ? all.filter(b => b.userId === userId || !b.userId)
+      : all;
 
     // Sanitize: do not send plaintext accessToken to client list
     const sanitized = userBrokers.map(b => ({
@@ -192,6 +220,7 @@ router.post('/connect', async (req, res) => {
       };
 
       brokers.set(id, brokerObj);
+      saveBrokersToDisk();
 
       return res.json({
         success: true,
@@ -399,6 +428,7 @@ const handleConsumeConsent = async (req, res) => {
     };
 
     brokers.set(id, brokerObj);
+    saveBrokersToDisk();
 
     return res.json({
       success: true,
@@ -419,9 +449,18 @@ const handleConsumeConsent = async (req, res) => {
   } catch (error) {
     console.error('[Dhan Consume Consent Error]:', error.response?.data || error.message);
     const respData = error.response?.data;
-    return res.status(error.response?.status && error.response.status >= 400 && error.response.status < 500 ? error.response.status : 400).json({
+    const status = error.response?.status;
+    let message = respData?.remarks || respData?.message || respData?.errorMessage || error.message || 'Failed to exchange token with Dhan server';
+
+    if (status === 401) {
+      message = 'Dhan authorization rejected (401): This single-use Token ID has expired or the API Key / Secret does not match. Please click "Back to Brokers" to start a fresh login or verify your API credentials.';
+    } else if (status === 404) {
+      message = 'DhanHQ returned 404: Authorization session not found or expired. Please start a fresh login from Brokers.';
+    }
+
+    return res.status(status && status >= 400 && status < 500 ? status : 400).json({
       success: false,
-      message: respData?.remarks || respData?.message || error.message || 'Failed to exchange token with Dhan server',
+      message,
       error: respData || error.message
     });
   }
@@ -650,6 +689,7 @@ router.delete('/:brokerId', (req, res) => {
     const { brokerId } = req.params;
     if (brokers.has(brokerId)) {
       brokers.delete(brokerId);
+      saveBrokersToDisk();
       res.json({ success: true, message: 'Dhan broker disconnected successfully' });
     } else {
       // If client sent clientId or partial ID
@@ -662,6 +702,7 @@ router.delete('/:brokerId', (req, res) => {
         }
       }
       if (deleted) {
+        saveBrokersToDisk();
         res.json({ success: true, message: 'Dhan broker disconnected successfully' });
       } else {
         res.json({ success: true, message: 'Broker already removed' });
