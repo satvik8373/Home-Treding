@@ -70,7 +70,7 @@ export const Brokers: React.FC = () => {
   const [viewMode, setViewMode] = useState<'list' | 'add' | 'profile'>('list');
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const initialMethod = searchParams.get('method') === 'developer' ? 'developer' : 'token';
+  const initialMethod = searchParams.get('method') === 'token' ? 'token' : 'developer';
 
   // Form Fields (Matching Screenshot 2) - retain previous input for easy re-auth
   const [clientId, setClientId] = useState(() => localStorage.getItem('dhan_pending_client_id') || localStorage.getItem('dhan_saved_client_id') || '');
@@ -237,10 +237,10 @@ export const Brokers: React.FC = () => {
     } catch (err: any) {
       const apiMsg = err.response?.data?.message;
       let msg = apiMsg || err.message || 'Connection failed.';
-      if (msg.includes('404')) {
-        msg = 'DhanHQ returned 404 (App / Client Not Found): Your Developer API Key (App ID) or Client ID was not found in DhanHQ. If you are using a standard 24-hour Access Token from web.dhan.co, please switch to the "Direct Access Token (24-Hr)" tab above.';
-      } else if (msg.includes('401')) {
-        msg = 'DhanHQ returned 401 (Unauthorized): Invalid API Key or Secret Key. Please check your credentials in the DhanHQ Developer Portal (dhanhq.co).';
+      if (!apiMsg && msg.includes('404')) {
+        msg = `DhanHQ returned 404 (App / Client Not Found): Dhan could not find an active 12-Month Developer App with this Client ID (${clientId}) and API Key. Please verify you created an App under web.dhan.co → Profile → Access DhanHQ APIs → "API Key" toggle and generated both API Key and API Secret.`;
+      } else if (!apiMsg && msg.includes('401')) {
+        msg = 'DhanHQ returned 401 (Unauthorized): Invalid API Key or Secret Key. Please check your credentials under web.dhan.co → Profile → Access DhanHQ APIs.';
       }
       setFormError(msg);
       setSubmitting(false);
@@ -412,7 +412,7 @@ export const Brokers: React.FC = () => {
               variant="contained"
               onClick={() => {
                 setViewMode('add');
-                setAuthMethod('token');
+                setAuthMethod('developer');
                 setFormError('');
                 setFormSuccess('');
               }}
@@ -458,7 +458,7 @@ export const Brokers: React.FC = () => {
                 variant="contained"
                 onClick={() => {
                   setViewMode('add');
-                  setAuthMethod('token');
+                  setAuthMethod('developer');
                   setFormError('');
                   setFormSuccess('');
                 }}
@@ -705,26 +705,6 @@ export const Brokers: React.FC = () => {
             <Button
               fullWidth
               size="small"
-              onClick={() => { setAuthMethod('token'); setFormError(''); }}
-              sx={{
-                borderRadius: '8px',
-                textTransform: 'none',
-                fontWeight: 700,
-                fontSize: '0.78rem',
-                py: 0.8,
-                bgcolor: authMethod === 'token' ? '#ffffff' : 'transparent',
-                color: authMethod === 'token' ? '#0f172a' : '#64748b',
-                boxShadow: authMethod === 'token' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                '&:hover': {
-                  bgcolor: authMethod === 'token' ? '#ffffff' : '#e2e8f0'
-                }
-              }}
-            >
-              Direct Access Token (24-Hr)
-            </Button>
-            <Button
-              fullWidth
-              size="small"
               onClick={() => { setAuthMethod('developer'); setFormError(''); }}
               sx={{
                 borderRadius: '8px',
@@ -742,21 +722,65 @@ export const Brokers: React.FC = () => {
             >
               Developer API Key (12-Mo)
             </Button>
+            <Button
+              fullWidth
+              size="small"
+              onClick={() => { setAuthMethod('token'); setFormError(''); }}
+              sx={{
+                borderRadius: '8px',
+                textTransform: 'none',
+                fontWeight: 700,
+                fontSize: '0.78rem',
+                py: 0.8,
+                bgcolor: authMethod === 'token' ? '#ffffff' : 'transparent',
+                color: authMethod === 'token' ? '#0f172a' : '#64748b',
+                boxShadow: authMethod === 'token' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                '&:hover': {
+                  bgcolor: authMethod === 'token' ? '#ffffff' : '#e2e8f0'
+                }
+              }}
+            >
+              Direct Access Token (24-Hr)
+            </Button>
           </Box>
 
           {/* Method Guidance Note */}
-          <Box sx={{ mb: 2, p: 1.2, bgcolor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-            <Typography sx={{ color: '#475569', fontSize: '0.75rem', lineHeight: 1.4 }}>
-              {authMethod === 'token' ? (
-                <>
-                  <strong>Direct Access Token (Recommended):</strong> Paste your Dhan Client ID and 24-hr Access Token generated directly from <code>web.dhan.co → Profile → Access DhanHQ APIs</code>.
-                </>
-              ) : (
-                <>
-                  <strong>Developer API Key:</strong> For registered apps on <code>dhanhq.co</code>. If you generated your token from retail web.dhan.co, switch to <strong>Direct Access Token (24-Hr)</strong>.
-                </>
-              )}
-            </Typography>
+          <Box sx={{ mb: 2, p: 1.5, bgcolor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+            {authMethod === 'token' ? (
+              <Typography sx={{ color: '#475569', fontSize: '0.76rem', lineHeight: 1.45 }}>
+                <strong>Direct Access Token (24-Hr):</strong> Paste your Dhan Client ID and 24-hr Access Token generated directly from <code>web.dhan.co → Profile → Access DhanHQ APIs → Access Token</code>.
+              </Typography>
+            ) : (
+              <Box>
+                <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.8rem', mb: 0.8 }}>
+                  12-Month Developer Key Setup Guide (Valid for 1 Year):
+                </Typography>
+                <Box
+                  component="ol"
+                  sx={{
+                    pl: 2.2,
+                    m: 0,
+                    '& li': { mb: 0.6, fontSize: '0.75rem', color: '#334155', lineHeight: 1.45 }
+                  }}
+                >
+                  <li>
+                    Log in to <strong>web.dhan.co</strong>, click your <strong>Profile avatar</strong> (top right), and select <strong>Access DhanHQ APIs</strong>.
+                  </li>
+                  <li>
+                    At the top of the APIs page, flip the switch from <strong>Access Token</strong> to <strong>API Key</strong>.
+                  </li>
+                  <li>
+                    Under <strong>Redirect URL</strong>, paste our URL: <code>{redirectUrl}</code> (click copy below).
+                  </li>
+                  <li>
+                    Click <strong>Generate API Key</strong>. Dhan will generate your <strong>API Key</strong> and <strong>API Secret Key</strong>.
+                  </li>
+                  <li>
+                    Paste the <strong>Client ID</strong>, <strong>API Key</strong>, and <strong>API Secret Key</strong> into the fields below and click Connect.
+                  </li>
+                </Box>
+              </Box>
+            )}
           </Box>
 
           {formError && (
@@ -889,13 +913,61 @@ export const Brokers: React.FC = () => {
               ) : (
                 /* Developer API Key & Secret Inputs */
                 <>
+                  {/* Redirect URL Box - Prominently positioned for easy copying first */}
+                  <Box sx={{ p: 1.5, bgcolor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                      <Typography sx={{ color: '#0f172a', fontSize: '0.76rem', fontWeight: 700 }}>
+                        Step 1: Copy Redirect URL for Dhan App
+                      </Typography>
+                      <Button
+                        size="small"
+                        startIcon={copied ? <Check sx={{ fontSize: 14 }} /> : <ContentCopy sx={{ fontSize: 14 }} />}
+                        onClick={handleCopyRedirect}
+                        sx={{
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          textTransform: 'none',
+                          color: copied ? '#16a34a' : '#2563eb',
+                          py: 0.3,
+                          px: 1,
+                          bgcolor: copied ? '#f0fdf4' : '#eff6ff',
+                          borderRadius: '6px',
+                          border: '1px solid',
+                          borderColor: copied ? '#bbf7d0' : '#bfdbfe',
+                          '&:hover': { bgcolor: copied ? '#dcfce7' : '#dbeafe' }
+                        }}
+                      >
+                        {copied ? 'Copied!' : 'Copy URL'}
+                      </Button>
+                    </Box>
+                    <Typography
+                      sx={{
+                        color: '#2563eb',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        fontFamily: 'monospace',
+                        wordBreak: 'break-all',
+                        bgcolor: '#ffffff',
+                        p: 0.8,
+                        borderRadius: '6px',
+                        border: '1px solid #e2e8f0',
+                        mt: 0.5
+                      }}
+                    >
+                      {redirectUrl}
+                    </Typography>
+                    <Typography sx={{ color: '#64748b', fontSize: '0.71rem', mt: 0.5 }}>
+                      Paste this URL into the &quot;Redirect URL&quot; field on web.dhan.co when creating your API Key.
+                    </Typography>
+                  </Box>
+
                   {/* Field 2: API Key */}
                   <Box>
                     <Typography sx={{ fontWeight: 700, color: '#1e293b', display: 'block', mb: 0.6, fontSize: '0.82rem' }}>
-                      API Key
+                      Step 2: API Key (Developer App ID)
                     </Typography>
                     <TextField
-                      placeholder="Paste Dhan API Key"
+                      placeholder="Paste Dhan API Key (App ID)"
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
                       required
@@ -962,7 +1034,7 @@ export const Brokers: React.FC = () => {
                   {/* Field 3: API Secret Key */}
                   <Box>
                     <Typography sx={{ fontWeight: 700, color: '#1e293b', display: 'block', mb: 0.6, fontSize: '0.82rem' }}>
-                      API Secret Key
+                      Step 3: API Secret Key
                     </Typography>
                     <TextField
                       placeholder="Paste Dhan API Secret Key"
@@ -998,31 +1070,6 @@ export const Brokers: React.FC = () => {
                       }}
                     />
                   </Box>
-
-                  {/* Redirect URL Box */}
-                  <Box sx={{ mt: 0.5, p: 1.5, bgcolor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-                      <Typography sx={{ color: '#64748b', fontSize: '0.74rem', fontWeight: 600 }}>
-                        Redirect URL for Dhan Developer App
-                      </Typography>
-                      <Tooltip title={copied ? 'Copied!' : 'Copy URL'} arrow>
-                        <IconButton size="small" onClick={handleCopyRedirect} sx={{ color: copied ? '#16a34a' : '#64748b', p: 0.4 }}>
-                          {copied ? <Check sx={{ fontSize: 16 }} /> : <ContentCopy sx={{ fontSize: 16 }} />}
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                    <Typography
-                      sx={{
-                        color: '#2563eb',
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
-                        fontFamily: 'monospace',
-                        wordBreak: 'break-all'
-                      }}
-                    >
-                      {redirectUrl}
-                    </Typography>
-                  </Box>
                 </>
               )}
 
@@ -1056,7 +1103,7 @@ export const Brokers: React.FC = () => {
                 ) : authMethod === 'token' ? (
                   'Connect with Access Token'
                 ) : (
-                  'Connect to Dhan Broker'
+                  'Connect with 12-Month Developer Key'
                 )}
               </Button>
             </Box>

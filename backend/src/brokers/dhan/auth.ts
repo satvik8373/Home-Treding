@@ -236,9 +236,9 @@ export class DhanAuthService {
       const status = error.response?.status;
       let errorMsg = error.response?.data?.remarks || error.response?.data?.message || error.message || 'Dhan consent generation failed';
       if (status === 404) {
-        errorMsg = 'DhanHQ returned 404 (App / Client Not Found): Your Developer API Key (App ID) or Client ID was not found in DhanHQ. If you are using a standard 24-hour Access Token, please switch to the "Direct Access Token (24-Hr)" tab above.';
+        errorMsg = `DhanHQ returned 404 (App / Client Not Found): Dhan could not find an active 12-Month Developer App with this Client ID (${clientId}) and API Key. Please verify you created an App under web.dhan.co → Profile → Access DhanHQ APIs → "API Key" toggle and generated both API Key and API Secret.`;
       } else if (status === 401) {
-        errorMsg = 'DhanHQ returned 401 (Unauthorized): Invalid App ID or App Secret. Please check your credentials in the DhanHQ Developer Portal (dhanhq.co).';
+        errorMsg = 'DhanHQ returned 401 (Unauthorized): Invalid API Key or Secret Key. Please verify that the API Key and API Secret match your Dhan developer credentials.';
       }
       return {
         success: false,
