@@ -474,7 +474,7 @@ const InteractiveEquitySvgChart: React.FC<{
     pathD += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y}`;
   }
 
-  // Area path for gradient fill
+  // Area path for flat fill
   const areaD = `${pathD} L ${coords[coords.length - 1].x} ${height - paddingBottom} L ${coords[0].x} ${height - paddingBottom} Z`;
 
   // Y-axis grid ticks (4 ticks)
@@ -492,14 +492,6 @@ const InteractiveEquitySvgChart: React.FC<{
         style={{ width: '100%', height: 'auto', display: 'block', overflow: 'visible' }}
         onMouseLeave={() => setHoveredPoint(null)}
       >
-        <defs>
-          <linearGradient id="blueCurveGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#38bdf8" stopOpacity={0.35} />
-            <stop offset="60%" stopColor="#38bdf8" stopOpacity={0.12} />
-            <stop offset="100%" stopColor="#38bdf8" stopOpacity={0.01} />
-          </linearGradient>
-        </defs>
-
         {/* Horizontal Gridlines & Y-Axis Labels */}
         {yTicks.map((tick, idx) => (
           <g key={idx}>
@@ -526,8 +518,8 @@ const InteractiveEquitySvgChart: React.FC<{
           </g>
         ))}
 
-        {/* Gradient Filled Area */}
-        <path d={areaD} fill="url(#blueCurveGradient)" />
+        {/* Solid Flat Area */}
+        <path d={areaD} fill="#f1f5f9" opacity={0.5} />
 
         {/* Smooth Blue Stroke Line */}
         <path

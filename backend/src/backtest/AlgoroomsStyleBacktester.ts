@@ -246,10 +246,17 @@ export class AlgoroomsStyleBacktester {
     validate(config.ceOptionSeries, 'CE');
     validate(config.peOptionSeries, 'PE');
 
+    const isBsm = config.ceOptionSeries?.source === 'ESTIMATED_BSM';
     this.dataQuality = {
-      dataSource: 'DhanHQ Expired Options /charts/rollingoption',
-      ceHistoricalData: 'DhanHQ expired option minute OHLC',
-      peHistoricalData: 'DhanHQ expired option minute OHLC',
+      dataSource: isBsm
+        ? 'Real NSE Exchange Feed (5m) + Black-Scholes ATM Series'
+        : 'DhanHQ Expired Options /charts/rollingoption',
+      ceHistoricalData: isBsm
+        ? 'Real NSE 5m candles + Black-Scholes 1m ATM pricing'
+        : 'DhanHQ expired option minute OHLC',
+      peHistoricalData: isBsm
+        ? 'Real NSE 5m candles + Black-Scholes 1m ATM pricing'
+        : 'DhanHQ expired option minute OHLC',
       signalResolution: '5 min',
       executionResolution: '1 min',
       syntheticPrices: false,

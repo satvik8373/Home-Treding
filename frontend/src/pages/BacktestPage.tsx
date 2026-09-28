@@ -17,17 +17,15 @@ interface StrategyOption {
 }
 
 const backtestErrorMessage = (detail: string): string => {
-  if (detail.includes('DHAN_AUTH_REQUIRED') || detail.includes('DHAN_TOKEN_EXPIRED'))
-    return 'Connect or reconnect your Dhan account to run this backtest.';
-  if (detail.includes('DHAN_DATA_API_NOT_SUBSCRIBED'))
-    return 'Historical Data API access is required on your Dhan account.';
+  if (detail.includes('DHAN_TOKEN_EXPIRED'))
+    return 'Dhan session expired. Reconnect your Dhan account.';
   if (/INCOMPLETE_OPTION_DATA|UNEXECUTABLE_OPTION_CANDLE|UNVERIFIED_ATM_CONTRACT|MISSING_REFERENCE_CANDLE/.test(detail))
-    return 'Historical option candles are incomplete for this range. Try a shorter completed date range.';
+    return 'Historical candles are incomplete for this range. Select a standard completed trading period.';
   if (detail.includes('INVALID_DATE_RANGE'))
     return 'Choose completed trading sessions from 2026 onward, ending before today.';
   if (detail.includes('UNSUPPORTED_BACKTEST_STRATEGY'))
     return 'This backtest currently supports the NIFTY ATM CE/PE breakout only.';
-  return 'Backtest could not be completed. Check your Dhan data access and date range.';
+  return detail.length > 0 && detail !== 'BACKTEST_FAILED' ? detail : 'Backtest could not be completed. Check date range and try again.';
 };
 
 export const BacktestPage: React.FC = () => {

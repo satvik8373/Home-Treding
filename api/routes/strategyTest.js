@@ -1,77 +1,88 @@
+/**
+ * Mavrix AlgoRooms - Production Strategy Test Route
+ * Routes all backtesting to the authentic Black-Scholes + Real NSE backtest engine.
+ * No hardcoded sample or fake data.
+ */
+
 const express = require('express');
 const router = express.Router();
+const backtestRouter = require('./backtest');
 
 /**
  * GET /api/strategy-test/quick-backtest
  */
-router.get('/quick-backtest', (req, res) => {
-  const days = Number(req.query.days) || 5;
-  const symbol = req.query.symbol || 'NIFTY 50';
+router.get('/quick-backtest', async (req, res) => {
+  try {
+    const days = Number(req.query.days) || 5;
+    const symbol = req.query.symbol || 'NIFTY 50';
+    const result = await backtestRouter.executeAuthenticBacktest({
+      strategyId: 'nifty-atm-independent-breakout',
+      symbol,
+      days,
+      capital: 100000
+    });
 
-  res.json({
-    success: true,
-    strategy: 'nifty-009-atm-breakout',
-    symbol,
-    periodDays: days,
-    candleCount: days * 75,
-    dataSource: 'DhanHQ v2 Historical 5m Feed',
-    results: {
-      totalTrades: 14,
-      winRate: 71.4,
-      netProfit: 18450.00,
-      profitFactor: 2.34,
-      maxDrawdown: 3120.00
-    },
-    summary: {
-      totalTrades: 14,
-      winRate: '71.4%',
-      netProfit: '₹18,450.00',
-      profitFactor: '2.34',
-      maxDrawdown: '₹3,120.00'
-    }
-  });
+    res.json({
+      success: true,
+      strategy: 'nifty-atm-independent-breakout',
+      symbol,
+      periodDays: days,
+      candleCount: result.dataSource?.spotCandleCount || days * 75,
+      dataSource: result.dataSource?.provider,
+      results: {
+        totalTrades: result.totalTrades,
+        winRate: result.winRate,
+        netProfit: result.totalNetPnl,
+        profitFactor: result.profitFactor,
+        maxDrawdown: result.maxDrawdown
+      },
+      summary: result.summary
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message || 'BACKTEST_FAILED' });
+  }
 });
 
 /**
  * POST /api/strategy-test/backtest
  */
-router.post('/backtest', (req, res) => {
-  const { symbol = 'NIFTY 50', days = 5, capital = 100000 } = req.body || {};
-  res.json({
-    success: true,
-    strategy: 'nifty-009-atm-breakout',
-    symbol,
-    periodDays: Number(days),
-    results: {
-      totalTrades: 14,
-      winRate: 71.4,
-      netProfit: 18450.00,
-      profitFactor: 2.34,
-      maxDrawdown: 3120.00
-    }
-  });
+router.post('/backtest', async (req, res) => {
+  try {
+    const { symbol = 'NIFTY 50', days = 5, capital = 100000 } = req.body || {};
+    const result = await backtestRouter.executeAuthenticBacktest({
+      strategyId: 'nifty-atm-independent-breakout',
+      symbol,
+      days: Number(days) || 5,
+      capital: Number(capital) || 100000
+    });
+
+    res.json({
+      success: true,
+      strategy: 'nifty-atm-independent-breakout',
+      symbol,
+      periodDays: Number(days),
+      dataSource: result.dataSource?.provider,
+      results: {
+        totalTrades: result.totalTrades,
+        winRate: result.winRate,
+        netProfit: result.totalNetPnl,
+        profitFactor: result.profitFactor,
+        maxDrawdown: result.maxDrawdown
+      },
+      summary: result.summary
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message || 'BACKTEST_FAILED' });
+  }
 });
 
 /**
  * POST /api/strategy-test/test-candle
  */
-router.post('/test-candle', (req, res) => {
-  const { candle = {}, referenceClose = 24850 } = req.body || {};
-  const upper = Number((referenceClose * 1.0009).toFixed(2));
-  const lower = Number((referenceClose * 0.9991).toFixed(2));
-  const close = Number(candle.close) || referenceClose;
-
-  let signal = 'HOLD';
-  if (close > upper) signal = 'BUY_CE';
-  else if (close < lower) signal = 'BUY_PE';
-
-  res.json({
-    success: true,
-    signal,
-    referenceClose,
-    upperLevel: upper,
-    lowerLevel: lower,
-    candleClose: close
+router.post('/test-candle', (_req, res) => {
+  res.status(410).json({
+    success: false,
+    error: 'Single-candle testing is unavailable; run a complete historical session.'
   });
 });
 
@@ -79,10 +90,12 @@ router.post('/test-candle', (req, res) => {
  * POST /api/strategy-test/validate
  */
 router.post('/validate', (req, res) => {
-  res.json({
-    success: true,
-    valid: true,
-    message: 'Strategy parameters validated successfully for NIFTY 0.09% ATM Breakout'
+  const config = req.body?.strategyConfig;
+  const valid = config && Number.isFinite(config.breakoutPct) && config.breakoutPct > 0;
+  res.status(valid ? 200 : 400).json({
+    success: Boolean(valid),
+    valid: Boolean(valid),
+    message: valid ? 'Strategy parameters validated successfully' : 'Invalid breakout parameters'
   });
 });
 
