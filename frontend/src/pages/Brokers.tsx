@@ -412,6 +412,7 @@ export const Brokers: React.FC = () => {
               variant="contained"
               onClick={() => {
                 setViewMode('add');
+                setAuthMethod('token');
                 setFormError('');
                 setFormSuccess('');
               }}
@@ -455,7 +456,12 @@ export const Brokers: React.FC = () => {
               </Typography>
               <Button
                 variant="contained"
-                onClick={() => setViewMode('add')}
+                onClick={() => {
+                  setViewMode('add');
+                  setAuthMethod('token');
+                  setFormError('');
+                  setFormSuccess('');
+                }}
                 sx={{ bgcolor: '#2563eb', textTransform: 'none', fontWeight: 700, borderRadius: '8px', '&:hover': { bgcolor: '#1d4ed8' } }}
               >
                 + Add Broker
@@ -699,26 +705,6 @@ export const Brokers: React.FC = () => {
             <Button
               fullWidth
               size="small"
-              onClick={() => { setAuthMethod('developer'); setFormError(''); }}
-              sx={{
-                borderRadius: '8px',
-                textTransform: 'none',
-                fontWeight: 700,
-                fontSize: '0.78rem',
-                py: 0.8,
-                bgcolor: authMethod === 'developer' ? '#ffffff' : 'transparent',
-                color: authMethod === 'developer' ? '#0f172a' : '#64748b',
-                boxShadow: authMethod === 'developer' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                '&:hover': {
-                  bgcolor: authMethod === 'developer' ? '#ffffff' : '#e2e8f0'
-                }
-              }}
-            >
-              Developer API Key (12-Mo)
-            </Button>
-            <Button
-              fullWidth
-              size="small"
               onClick={() => { setAuthMethod('token'); setFormError(''); }}
               sx={{
                 borderRadius: '8px',
@@ -736,25 +722,77 @@ export const Brokers: React.FC = () => {
             >
               Direct Access Token (24-Hr)
             </Button>
+            <Button
+              fullWidth
+              size="small"
+              onClick={() => { setAuthMethod('developer'); setFormError(''); }}
+              sx={{
+                borderRadius: '8px',
+                textTransform: 'none',
+                fontWeight: 700,
+                fontSize: '0.78rem',
+                py: 0.8,
+                bgcolor: authMethod === 'developer' ? '#ffffff' : 'transparent',
+                color: authMethod === 'developer' ? '#0f172a' : '#64748b',
+                boxShadow: authMethod === 'developer' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                '&:hover': {
+                  bgcolor: authMethod === 'developer' ? '#ffffff' : '#e2e8f0'
+                }
+              }}
+            >
+              Developer API Key (12-Mo)
+            </Button>
           </Box>
 
           {/* Method Guidance Note */}
           <Box sx={{ mb: 2, p: 1.2, bgcolor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
             <Typography sx={{ color: '#475569', fontSize: '0.75rem', lineHeight: 1.4 }}>
-              {authMethod === 'developer' ? (
+              {authMethod === 'token' ? (
                 <>
-                  <strong>Developer API Key:</strong> For accounts with a registered App on <code>dhanhq.co</code>. If you only generated a token on web.dhan.co, click <strong>Direct Access Token (24-Hr)</strong> above.
+                  <strong>Direct Access Token (Recommended):</strong> Paste your Dhan Client ID and 24-hr Access Token generated directly from <code>web.dhan.co → Profile → Access DhanHQ APIs</code>.
                 </>
               ) : (
                 <>
-                  <strong>Direct Access Token:</strong> Paste your Dhan Client ID and 24-hr Access Token generated from <code>web.dhan.co → Profile → Access DhanHQ APIs</code>.
+                  <strong>Developer API Key:</strong> For registered apps on <code>dhanhq.co</code>. If you generated your token from retail web.dhan.co, switch to <strong>Direct Access Token (24-Hr)</strong>.
                 </>
               )}
             </Typography>
           </Box>
 
           {formError && (
-            <Alert severity="error" sx={{ mb: 2, borderRadius: '10px', fontSize: '0.8rem' }}>
+            <Alert
+              severity="error"
+              sx={{ mb: 2, borderRadius: '10px', fontSize: '0.8rem' }}
+              action={
+                formError.includes('Direct Access Token') ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => {
+                      if (apiKey && !accessToken) {
+                        setAccessToken(apiKey);
+                        setApiKey('');
+                      }
+                      setAuthMethod('token');
+                      setFormError('');
+                    }}
+                    sx={{
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      textTransform: 'none',
+                      color: '#dc2626',
+                      borderColor: '#dc2626',
+                      bgcolor: '#ffffff',
+                      ml: 1,
+                      whiteSpace: 'nowrap',
+                      '&:hover': { bgcolor: '#fef2f2', borderColor: '#b91c1c' }
+                    }}
+                  >
+                    Switch to Direct Token
+                  </Button>
+                ) : undefined
+              }
+            >
               {formError}
             </Alert>
           )}
@@ -881,6 +919,44 @@ export const Brokers: React.FC = () => {
                         }
                       }}
                     />
+                    {(apiKey.length > 50 || apiKey.startsWith('ey')) && (
+                      <Box
+                        onClick={() => {
+                          setAccessToken(apiKey);
+                          setApiKey('');
+                          setAuthMethod('token');
+                          setFormError('');
+                        }}
+                        sx={{
+                          mt: 0.8,
+                          p: 1,
+                          bgcolor: '#f8fafc',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}
+                      >
+                        <Typography sx={{ color: '#0f172a', fontSize: '0.74rem', fontWeight: 600 }}>
+                          Looks like an Access Token. Click here to switch to Direct Access Token mode.
+                        </Typography>
+                        <Button
+                          size="small"
+                          sx={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            textTransform: 'none',
+                            color: '#2563eb',
+                            p: 0.3,
+                            minWidth: 0
+                          }}
+                        >
+                          Switch Tab
+                        </Button>
+                      </Box>
+                    )}
                   </Box>
 
                   {/* Field 3: API Secret Key */}
