@@ -91,6 +91,38 @@ const handleGetBrokers = (req, res) => {
 router.get('/', handleGetBrokers);
 router.get('/list', handleGetBrokers);
 
+// Sync client broker to warm up serverless container
+const handleSyncBroker = (req, res) => {
+  try {
+    const { broker } = req.body;
+    if (broker && (broker.id || broker.clientId)) {
+      const id = broker.id || `dhan_${broker.clientId}`;
+      brokers.set(id, {
+        id,
+        broker: broker.broker || 'DHAN',
+        clientId: broker.clientId,
+        maskedClientId: broker.maskedClientId || broker.clientId,
+        accountName: broker.accountName || `DhanHQ (${broker.clientId})`,
+        status: broker.status || 'Connected',
+        terminalEnabled: broker.terminalEnabled ?? true,
+        tradingEngineEnabled: broker.tradingEngineEnabled ?? true,
+        accessToken: broker.accessToken || '',
+        userId: broker.userId || 'user_admin',
+        connectedAt: broker.connectedAt || new Date().toISOString(),
+        lastActivity: new Date().toISOString()
+      });
+      saveBrokersToDisk();
+      return res.json({ success: true, message: 'Broker synced' });
+    }
+    return res.json({ success: false, message: 'No broker provided' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+router.post('/sync', handleSyncBroker);
+router.post('/dhan/sync', handleSyncBroker);
+
 // Toggle Terminal Status
 router.post('/terminal', (req, res) => {
   try {

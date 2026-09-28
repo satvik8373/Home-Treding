@@ -65,9 +65,36 @@ const CustomSwitch = styled((props: any) => (
 }));
 
 export const Brokers: React.FC = () => {
-  const [brokers, setBrokers] = useState<BrokerSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'list' | 'add' | 'profile'>('list');
+  const [brokers, setBrokers] = useState<BrokerSummary[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('dhan_connected_broker');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && (parsed.status === 'Connected' || parsed.clientId)) return [parsed];
+        }
+      } catch (_) {}
+    }
+    return [];
+  });
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('dhan_connected_broker')) {
+      return false;
+    }
+    return true;
+  });
+  const [viewMode, setViewMode] = useState<'list' | 'add' | 'profile'>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('dhan_connected_broker');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && (parsed.status === 'Connected' || parsed.clientId)) return 'list';
+        }
+      } catch (_) {}
+    }
+    return 'add';
+  });
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const initialMethod = searchParams.get('method') === 'token' ? 'token' : 'developer';
@@ -103,35 +130,19 @@ export const Brokers: React.FC = () => {
 
   const fetchBrokers = useCallback(async () => {
     try {
-      const [list, engineRes] = await Promise.all([
-        brokerApi.getBrokers(),
-        axios.get(`${API_CONFIG.BASE_URL}/api/trading/engine/status`).catch(() => ({ data: { success: false, isRunning: false } }))
-      ]);
-
-      setBrokers(list);
-
-      const isRunning = engineRes.data?.isRunning ?? false;
-      const engines: Record<string, boolean> = {};
-      const terminals: Record<string, boolean> = {};
-
-      list.forEach((b) => {
-        engines[b.id] = isRunning;
-        terminals[b.id] = b.terminalEnabled ?? true;
-      });
-
-      setTradingEngineStates(engines);
-      setTerminalStates(terminals);
-
-      if (list.length > 0) {
+      const list = await brokerApi.getBrokers();
+      if (list && list.length > 0) {
+        setBrokers(list);
         setViewMode('list');
-        setFormSuccess('');
       } else {
-        setViewMode('add');
+        const saved = typeof window !== 'undefined' ? localStorage.getItem('dhan_connected_broker') : null;
+        if (!saved) {
+          setBrokers([]);
+          setViewMode('add');
+        }
       }
     } catch (error) {
       console.error('Failed to fetch brokers:', error);
-      setBrokers([]);
-      setFormError('Could not verify your Dhan connection. Please retry.');
     } finally {
       setLoading(false);
     }
@@ -270,8 +281,11 @@ export const Brokers: React.FC = () => {
       if (res.success && res.broker) {
         setFormSuccess('Dhan account verified with live API and connected successfully!');
         setSubmitting(false);
-        await fetchBrokers();
+        setBrokers([res.broker]);
         setViewMode('list');
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('dhan_connected_broker', JSON.stringify(res.broker));
+        }
       } else {
         setFormError(res.message || 'Verification failed. Please check your credentials.');
         setSubmitting(false);

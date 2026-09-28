@@ -82,6 +82,9 @@ const DhanCallback: React.FC = () => {
         const broker = response.data.broker;
         setBrokerInfo(broker);
 
+        if (broker) {
+          localStorage.setItem('dhan_connected_broker', JSON.stringify(broker));
+        }
         if (clientId) localStorage.setItem('dhan_saved_client_id', clientId.trim());
         localStorage.removeItem('dhan_pending_api_key');
         localStorage.removeItem('dhan_pending_api_secret');
