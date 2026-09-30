@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Alert, Box, Button, CircularProgress, Typography } from '@mui/material';
+import { Alert, Box, CircularProgress, Typography } from '@mui/material';
 import axios from 'axios';
 import Layout from '../components/Layout';
 import { API_CONFIG } from '../config/api';
@@ -17,9 +17,15 @@ interface StrategyOption {
 }
 
 const backtestErrorMessage = (detail: string): string => {
+  if (detail.includes('DHAN_AUTH_REQUIRED'))
+    return 'Connect your Dhan account on the Brokers page before running a historical backtest.';
+  if (detail.includes('DHAN_DATA_API_NOT_SUBSCRIBED') || detail.includes('DH-902'))
+    return 'Dhan trading connection is active, but your Dhan account does not have Data API access enabled (DH-902). Activate Data APIs on web.dhan.co (My Profile → Access DhanHQ APIs), generate a fresh token, and reconnect on the Brokers page.';
+  if (detail.includes('REAL_OPTIONS_BACKTEST_UNAVAILABLE'))
+    return 'Historical backtesting service is unavailable. Please try again after the backend is configured.';
   if (detail.includes('DHAN_TOKEN_EXPIRED'))
     return 'Dhan session expired. Reconnect your Dhan account.';
-  if (/INCOMPLETE_OPTION_DATA|UNEXECUTABLE_OPTION_CANDLE|UNVERIFIED_ATM_CONTRACT|MISSING_REFERENCE_CANDLE/.test(detail))
+  if (/INCOMPLETE_|UNEXECUTABLE_OPTION_CANDLE|UNVERIFIED_ATM_CONTRACT|MISSING_REFERENCE_CANDLE|NO_HISTORICAL_SPOT_DATA/.test(detail))
     return 'Historical candles are incomplete for this range. Select a standard completed trading period.';
   if (detail.includes('INVALID_DATE_RANGE'))
     return 'Choose completed trading sessions from 2026 onward, ending before today.';
@@ -144,6 +150,7 @@ export const BacktestPage: React.FC = () => {
           totalPnl={result?.summary?.netProfit ?? null}
           maxDrawdown={result?.summary?.maxDrawdown ?? null}
           equityCurve={result?.equityCurve || []}
+          initialCapital={result?.initialCapital ?? 100000}
           loading={loading}
           onRunBacktest={runBacktest}
           onExportTrades={exportBacktest}
@@ -158,8 +165,7 @@ export const BacktestPage: React.FC = () => {
         />
 
         {error && (
-          <Alert severity="error" sx={{ mt: 3 }} action={error.includes('Dhan') ?
-            <Button color="inherit" size="small" onClick={() => navigate('/brokers')}>Brokers</Button> : undefined}>
+          <Alert severity="error" sx={{ mt: 3 }}>
             {error}
           </Alert>
         )}
@@ -199,13 +205,29 @@ export const BacktestPage: React.FC = () => {
                 gap: 1
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
                 <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a' }}>
                   Data Feed:
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#475569' }}>
                   {result.dataSource?.provider}
                 </Typography>
+                {result.dataSource?.isFreeTier && (
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      px: 1,
+                      py: 0.25,
+                      bgcolor: '#f1f5f9',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 0.5,
+                      color: '#16a34a',
+                      fontWeight: 600
+                    }}
+                  >
+                    100% Free · 0 INR Subscription
+                  </Typography>
+                )}
                 <Typography variant="caption" sx={{ color: '#64748b' }}>
                   {result.period?.startDate} to {result.period?.endDate}
                 </Typography>

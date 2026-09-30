@@ -2,13 +2,13 @@ import { EventEmitter } from 'events';
 import { logger } from '../../utils/logger';
 import { CandleEngine, Candle } from './CandleEngine';
 import { AtmResolver, LockedAtm } from './AtmResolver';
-import { StrategyStateMachine, StrategyConfig, StrategySignal, LegPosition, DEFAULT_CONFIG } from './StrategyStateMachine';
+import { StrategyStateMachine, StrategyConfig, StrategySignal, LegPosition } from './StrategyStateMachine';
 import { getStrategyConfig } from '../../config/strategyConfig';
 import { BrokerRegistry } from '../../brokers/BrokerRegistry';
 import { paperTradingManager } from '../../execution/PaperTradingManager';
 import { OrderRequest } from '../../brokers/types';
-import { calculateOptionPricing } from '../../utils/blackScholes';
-import { MarketStreamer } from '../../services/marketStreamer';
+import { DhanAdapter } from '../../brokers/dhan/DhanAdapter';
+import { DhanHistoricalDataService } from '../../backtest/DhanHistoricalDataService';
 import fs from 'fs';
 import path from 'path';
 
@@ -37,9 +37,12 @@ export class Nifty009Engine extends EventEmitter {
   private atmResolver: AtmResolver;
   private stateMachine: StrategyStateMachine;
 
-  private niftyLtp: number = 26180.00;
-  private ceLtp: number = 168.50;
-  private peLtp: number = 168.50;
+  private niftyLtp: number = 0;
+  private ceLtp: number = 0;
+  private peLtp: number = 0;
+  private feedAdapter: DhanAdapter | null = null;
+  private optionFeedListener: ((tick: any) => void) | null = null;
+  private targetProcessing = new Set<'CE' | 'PE'>();
 
   private eventsLog: StrategyEvent[] = [];
   private squareOffTimer: NodeJS.Timeout | null = null;
@@ -71,14 +74,15 @@ export class Nifty009Engine extends EventEmitter {
 
       // Check if CE reference candle is needed
       const ceLevels = this.stateMachine.getCeLevels();
-      if (ceLevels.referenceClose === null) {
+      if (ceLevels.referenceClose === null && new Date(candle.startTime).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }) === '09:15') {
         this.stateMachine.setCeReferenceCandle(candle);
       }
 
       // Process CE completed candle in state machine
       const signal = this.stateMachine.onCeCandleClosed(candle);
       if (signal) {
-        await this.handleCeSignal(signal);
+        try { await this.handleCeSignal(signal); }
+        catch (error: any) { this.pause(); this.logEvent('EXECUTION_FAILED', { leg: 'CE', reason: error.message }); }
       }
 
       this.updateStatusAndEmit();
@@ -91,14 +95,15 @@ export class Nifty009Engine extends EventEmitter {
 
       // Check if PE reference candle is needed
       const peLevels = this.stateMachine.getPeLevels();
-      if (peLevels.referenceClose === null) {
+      if (peLevels.referenceClose === null && new Date(candle.startTime).toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }) === '09:15') {
         this.stateMachine.setPeReferenceCandle(candle);
       }
 
       // Process PE completed candle in state machine
       const signal = this.stateMachine.onPeCandleClosed(candle);
       if (signal) {
-        await this.handlePeSignal(signal);
+        try { await this.handlePeSignal(signal); }
+        catch (error: any) { this.pause(); this.logEvent('EXECUTION_FAILED', { leg: 'PE', reason: error.message }); }
       }
 
       this.updateStatusAndEmit();
@@ -133,6 +138,37 @@ export class Nifty009Engine extends EventEmitter {
       return;
     }
 
+    if (mode === 'live') {
+      throw new Error('LIVE_EXECUTION_NOT_READY: Broker fills and partial fills are not safely reconciled. Live trading is blocked.');
+    }
+    const now = new Date();
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+    const time = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
+    if (time < '09:20' || time >= '15:10') throw new Error('STRATEGY_SESSION_CLOSED: Start between 09:20 and 15:10 IST.');
+    const auth = DhanHistoricalDataService.resolveAuth(userId);
+    if (!auth) throw new Error('DHAN_AUTH_REQUIRED: Connect Dhan before starting the strategy.');
+    const dhan = new DhanHistoricalDataService(auth);
+    const tomorrow = new Date(`${today}T00:00:00Z`);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    const toDate = tomorrow.toISOString().slice(0, 10);
+    const spot = await dhan.getIntradayCandles({ securityId: '13', exchangeSegment: 'IDX_I', instrument: 'INDEX', fromDate: today, toDate, interval: 5 });
+    const spotRef = spot.find(c => c.date === today && c.time === '09:15');
+    if (!spotRef || spotRef.close <= 0) throw new Error('DHAN_REFERENCE_UNAVAILABLE: Missing NIFTY 09:15–09:20 close.');
+    this.atmResolver.reset();
+    const lockedAtm = await this.atmResolver.resolveAndLockAtm(spotRef.close, getStrategyConfig().niftyLotSize, userId);
+    const [ceCandles, peCandles] = await Promise.all([
+      dhan.getIntradayCandles({ securityId: lockedAtm.ceSecurityId, exchangeSegment: 'NSE_FNO', instrument: 'OPTIDX', fromDate: today, toDate, interval: 5 }),
+      dhan.getIntradayCandles({ securityId: lockedAtm.peSecurityId, exchangeSegment: 'NSE_FNO', instrument: 'OPTIDX', fromDate: today, toDate, interval: 5 })
+    ]);
+    const ceRef = ceCandles.find(c => c.date === today && c.time === '09:15');
+    const peRef = peCandles.find(c => c.date === today && c.time === '09:15');
+    if (!ceRef || !peRef || ceRef.close <= 0 || peRef.close <= 0 || ceRef.volume <= 0 || peRef.volume <= 0) {
+      this.atmResolver.reset();
+      throw new Error('DHAN_REFERENCE_UNAVAILABLE: Missing traded 09:15–09:20 ATM option candles.');
+    }
+    const adapter = BrokerRegistry.getInstance().getPrimaryAdapter(userId) as DhanAdapter | null;
+    if (!adapter?.getStatus()) throw new Error('DHAN_AUTH_REQUIRED: Dhan market feed is disconnected.');
+
     this.isRunning = true;
     this.isPaused = false;
     this.isHalted = false;
@@ -142,77 +178,37 @@ export class Nifty009Engine extends EventEmitter {
     this.ceCandleEngine.reset();
     this.peCandleEngine.reset();
     this.spotCandleEngine.reset();
-    this.atmResolver.reset();
     this.stateMachine.setConfig(config);
-    this.stateMachine.start();
+    this.stateMachine.start(today);
     this.eventsLog = [];
     this.sessionPnl = 0;
+    this.targetProcessing.clear();
 
     this.logEvent('STRATEGY_STARTED', { mode: this.mode.toUpperCase(), config: this.stateMachine.getConfig() });
     logger.info(`[Nifty009Engine] 🚀 NIFTY ATM CE/PE Independent Breakout Started (${this.mode.toUpperCase()} MODE)`);
 
     // 1. Identify current NIFTY 50 spot & lock ATM CE + ATM PE contracts
-    const streamerPrice = MarketStreamer.getInstance()?.getPrice('NIFTY 50');
-    const baseSpot = streamerPrice || this.niftyLtp || 0;
-    
-    if (baseSpot > 0) {
-      this.niftyLtp = baseSpot;
-    }
-
-    const lockedAtm = await this.atmResolver.resolveAndLockAtm(
-      baseSpot > 0 ? baseSpot : 24100, // Safe default strike center if completely offline
-      getStrategyConfig().niftyLotSize,
-      this.userId
-    );
+    this.niftyLtp = spotRef.close;
+    this.ceLtp = lockedAtm.ceLtp;
+    this.peLtp = lockedAtm.peLtp;
     this.stateMachine.onAtmResolved(lockedAtm);
-
-    if (lockedAtm.ceLtp > 0) {
-      this.ceLtp = lockedAtm.ceLtp;
-    }
-    if (lockedAtm.peLtp > 0) {
-      this.peLtp = lockedAtm.peLtp;
-    }
-
-    // 2. Lock 09:15-09:20 Reference Candles if session is already active
-    if (this.ceLtp > 0) {
-      const refCeCandle: Candle = {
-        startTime: '09:15',
-        endTime: '09:20',
-        open: this.ceLtp,
-        high: this.ceLtp,
-        low: this.ceLtp,
-        close: this.ceLtp,
-        volume: 0,
-        isClosed: true
-      };
-      this.stateMachine.setCeReferenceCandle(refCeCandle);
-    }
-
-    if (this.peLtp > 0) {
-      const refPeCandle: Candle = {
-        startTime: '09:15',
-        endTime: '09:20',
-        open: this.peLtp,
-        high: this.peLtp,
-        low: this.peLtp,
-        close: this.peLtp,
-        volume: 0,
-        isClosed: true
-      };
-      this.stateMachine.setPeReferenceCandle(refPeCandle);
-    }
+    const toReference = (c: typeof ceRef): Candle => ({ startTime: `${today}T09:15:00+05:30`, endTime: `${today}T09:20:00+05:30`,
+      open: c!.open, high: c!.high, low: c!.low, close: c!.close, volume: c!.volume, isClosed: true });
+    this.stateMachine.setCeReferenceCandle(toReference(ceRef));
+    this.stateMachine.setPeReferenceCandle(toReference(peRef));
 
     // 3. Schedule 15:10 IST Force Square-Off
     this.scheduleSquareOffTimer();
 
     // 4. Subscribe to Dhan market feed if connected
-    this.subscribeDhanMarketFeed();
+    this.subscribeDhanMarketFeed(adapter, lockedAtm);
 
     this.updateStatusAndEmit();
     this.saveSession();
   }
 
   public setMode(mode: 'paper' | 'live'): void {
+    if (mode === 'live') throw new Error('LIVE_EXECUTION_NOT_READY: Broker fill reconciliation is required before live trading.');
     const old = this.mode;
     this.mode = mode;
     this.logEvent('TRADING_MODE_CHANGED', { from: old, to: mode });
@@ -247,24 +243,6 @@ export class Nifty009Engine extends EventEmitter {
       this.niftyLtp = price;
       this.spotCandleEngine.processTick(price, volume, new Date());
 
-      // Update Option Premiums dynamically based on official Black-Scholes model
-      const locked = this.atmResolver.getLockedAtm();
-      if (locked) {
-        const pricing = calculateOptionPricing(price, locked.atmStrike);
-        this.ceLtp = pricing.callPrice;
-        this.peLtp = pricing.putPrice;
-
-        this.atmResolver.updateOptionLtp('CE', this.ceLtp);
-        this.atmResolver.updateOptionLtp('PE', this.peLtp);
-
-        // Feed ticks into independent 5m candle engines
-        this.ceCandleEngine.processTick(this.ceLtp, volume, new Date());
-        this.peCandleEngine.processTick(this.peLtp, volume, new Date());
-
-        // Update active positions' LTP & unrealized PnL
-        this.stateMachine.updateLtp('CE', this.ceLtp);
-        this.stateMachine.updateLtp('PE', this.peLtp);
-      }
 
       const ceLevels = this.stateMachine.getCeLevels();
       const peLevels = this.stateMachine.getPeLevels();
@@ -304,400 +282,125 @@ export class Nifty009Engine extends EventEmitter {
       this.stateMachine.updateLtp('PE', price);
     }
 
+    void this.handleTickTarget(type, price);
+
     this.updateStatusAndEmit();
   }
 
-  /**
-   * Handle CE Signals (BUY_CE / EXIT_CE)
-   */
-  private async handleCeSignal(signal: StrategySignal): Promise<void> {
-    const lockedAtm = this.atmResolver.getLockedAtm();
-    if (!lockedAtm) return;
-
-    const qty = signal.quantity;
-
-    if (signal.type === 'BUY_CE') {
-      this.logEvent('CE_ENTRY_SIGNAL', signal);
-      const fillPrice = this.ceLtp;
-      const target1Pts = getStrategyConfig().target1Pts || 20.0;
-      const target2Pts = getStrategyConfig().target2Pts || 40.0;
-
-      const position: LegPosition = {
-        leg: 'CE',
-        symbol: lockedAtm.ceSymbol,
-        securityId: lockedAtm.ceSecurityId,
-        strike: lockedAtm.atmStrike,
-        entryPrice: fillPrice,
-        quantity: qty,
-        totalQty: qty,
-        remainingQty: qty,
-        entryTime: new Date().toISOString(),
-        currentLtp: fillPrice,
-        unrealizedPnl: 0,
-        realizedPnl: 0,
-        target1Price: Number((fillPrice + target1Pts).toFixed(2)),
-        target2Price: Number((fillPrice + target2Pts).toFixed(2)),
-        target1Hit: false
-      };
-
-      const orderReq: OrderRequest = {
-        symbol: lockedAtm.ceSymbol,
-        securityId: lockedAtm.ceSecurityId,
-        exchange: 'NFO',
-        side: 'BUY',
-        quantity: qty,
-        price: fillPrice,
-        orderType: 'MARKET',
-        productType: 'INTRADAY',
-        validity: 'DAY',
-        strategyId: STRATEGY_ID,
-        userId: this.userId,
-        isPaper: this.mode === 'paper'
-      };
-
-      if (this.mode === 'live') {
-        const isLiveAllowed = process.env.LIVE_TRADING_ENABLED === 'true' && process.env.TRADING_MODE === 'live';
-        if (!isLiveAllowed) {
-          logger.warn('[Nifty009Engine] Safety Block: Live real-money trading is disabled. Live CE order blocked.');
-          this.logEvent('LIVE_ORDER_BLOCKED', { reason: 'LIVE_TRADING_ENABLED is false', leg: 'CE' });
-          return;
-        }
-
-        const primary = BrokerRegistry.getInstance().getPrimaryAdapter(this.userId);
-        if (primary && primary.getStatus()) {
-          try {
-            await primary.placeOrder(orderReq);
-            this.logEvent('CE_ENTRY_ORDER', { symbol: lockedAtm.ceSymbol, qty, price: fillPrice });
-          } catch (e: any) {
-            logger.error('[Nifty009Engine] Live CE Order placement failed:', e);
-          }
-        }
-      } else {
-        await paperTradingManager.getExecutor(this.userId).executeOrder(orderReq);
-        this.logEvent('CE_ENTRY_ORDER', { mode: 'PAPER', symbol: lockedAtm.ceSymbol, qty, price: fillPrice });
+  private async handleTickTarget(type: 'CE' | 'PE', price: number): Promise<void> {
+    if (this.isPaused || this.mode !== 'paper' || this.targetProcessing.has(type)) return;
+    this.targetProcessing.add(type);
+    try {
+      for (let i = 0; i < 2; i++) {
+        const pos = type === 'CE' ? this.stateMachine.getCePosition() : this.stateMachine.getPePosition();
+        if (!pos) break;
+        const target1 = !pos.target1Hit && pos.target1Price && price >= pos.target1Price;
+        const target2 = pos.target2Price && price >= pos.target2Price;
+        if (!target1 && !target2) break;
+        const levels = type === 'CE' ? this.stateMachine.getCeLevels() : this.stateMachine.getPeLevels();
+        const signal: StrategySignal = {
+          id: `${type}_${target1 ? 'TARGET_1' : 'TARGET_2'}_${Date.now()}`,
+          leg: type,
+          type: `${target1 ? 'TARGET_1' : 'TARGET_2'}_${type}` as StrategySignal['type'],
+          triggerReason: `${type} option tick reached ${target1 ? 'target 1' : 'target 2'}`,
+          triggerPrice: target1 ? pos.target1Price! : pos.target2Price!,
+          timestamp: new Date().toISOString(),
+          upperLevel: levels.upperLevel!,
+          lowerLevel: levels.lowerLevel!,
+          quantity: target1 ? Math.min(this.atmResolver.getLockedAtm()!.lotSize, pos.quantity) : pos.quantity
+        };
+        if (type === 'CE') await this.handleCeSignal(signal);
+        else await this.handlePeSignal(signal);
       }
-
-      this.stateMachine.onCePositionOpened(position);
-      this.emit('order', { leg: 'CE', type: 'BUY', symbol: lockedAtm.ceSymbol, quantity: qty, price: fillPrice });
-    } else if (signal.type === 'TARGET_1_CE') {
-      this.logEvent('CE_TARGET_1_SIGNAL', signal);
-      const pos = this.stateMachine.getCePosition();
-      if (!pos) return;
-
-      const exitPrice = signal.triggerPrice || this.ceLtp;
-      const exitQty = signal.quantity; // 1 lot = 65 qty
-      const realized = (exitPrice - pos.entryPrice) * exitQty;
-      this.sessionPnl += realized;
-
-      const orderReq: OrderRequest = {
-        symbol: pos.symbol,
-        securityId: pos.securityId,
-        exchange: 'NFO',
-        side: 'SELL',
-        quantity: exitQty,
-        price: exitPrice,
-        orderType: 'MARKET',
-        productType: 'INTRADAY',
-        validity: 'DAY',
-        strategyId: STRATEGY_ID,
-        userId: this.userId,
-        isPaper: this.mode === 'paper'
-      };
-
-      if (this.mode === 'live') {
-        const isLiveAllowed = process.env.LIVE_TRADING_ENABLED === 'true' && process.env.TRADING_MODE === 'live';
-        if (isLiveAllowed) {
-          const primary = BrokerRegistry.getInstance().getPrimaryAdapter(this.userId);
-          if (primary && primary.getStatus()) {
-            try {
-              await primary.placeOrder(orderReq);
-              this.logEvent('CE_TARGET_1_ORDER', { symbol: pos.symbol, qty: exitQty, exitPrice, realizedPnl: realized });
-            } catch (e: any) {
-              logger.error('[Nifty009Engine] Live CE Target 1 Exit failed:', e);
-            }
-          }
-        }
-      } else {
-        await paperTradingManager.getExecutor(this.userId).executeOrder(orderReq);
-        this.logEvent('CE_TARGET_1_ORDER', { mode: 'PAPER', symbol: pos.symbol, qty: exitQty, exitPrice, realizedPnl: realized });
-      }
-
-      this.stateMachine.onCeTarget1Filled(exitPrice, exitQty);
-      this.emit('order', { leg: 'CE', type: 'SELL', symbol: pos.symbol, quantity: exitQty, price: exitPrice, realizedPnl: realized, reason: 'TARGET_1 (+20 pts)' });
-    } else if (signal.type === 'TARGET_2_CE' || signal.type === 'EXIT_CE') {
-      this.logEvent(signal.type === 'TARGET_2_CE' ? 'CE_TARGET_2_SIGNAL' : 'CE_EXIT_SIGNAL', signal);
-      const pos = this.stateMachine.getCePosition();
-      if (!pos) return;
-
-      const exitPrice = signal.triggerPrice || this.ceLtp;
-      const exitQty = signal.quantity || pos.quantity;
-      const realized = (exitPrice - pos.entryPrice) * exitQty;
-      this.sessionPnl += realized;
-
-      const orderReq: OrderRequest = {
-        symbol: pos.symbol,
-        securityId: pos.securityId,
-        exchange: 'NFO',
-        side: 'SELL',
-        quantity: exitQty,
-        price: exitPrice,
-        orderType: 'MARKET',
-        productType: 'INTRADAY',
-        validity: 'DAY',
-        strategyId: STRATEGY_ID,
-        userId: this.userId,
-        isPaper: this.mode === 'paper'
-      };
-
-      if (this.mode === 'live') {
-        const isLiveAllowed = process.env.LIVE_TRADING_ENABLED === 'true' && process.env.TRADING_MODE === 'live';
-        if (!isLiveAllowed) {
-          logger.warn('[Nifty009Engine] Safety Block: Live real-money trading is disabled. Live CE exit blocked.');
-          return;
-        }
-
-        const primary = BrokerRegistry.getInstance().getPrimaryAdapter(this.userId);
-        if (primary && primary.getStatus()) {
-          try {
-            await primary.placeOrder(orderReq);
-            this.logEvent('CE_EXIT_ORDER', { symbol: pos.symbol, qty: exitQty, exitPrice, realizedPnl: realized });
-          } catch (e: any) {
-            logger.error('[Nifty009Engine] Live CE Exit failed:', e);
-          }
-        }
-      } else {
-        await paperTradingManager.getExecutor(this.userId).executeOrder(orderReq);
-        this.logEvent('CE_EXIT_ORDER', { mode: 'PAPER', symbol: pos.symbol, qty: exitQty, exitPrice, realizedPnl: realized });
-      }
-
-      this.stateMachine.onCePositionClosed();
-      this.emit('order', { leg: 'CE', type: 'SELL', symbol: pos.symbol, quantity: exitQty, price: exitPrice, realizedPnl: realized, reason: signal.triggerReason });
+    } catch (error: any) {
+      this.pause();
+      this.logEvent('EXECUTION_FAILED', { leg: type, reason: error.message });
+    } finally {
+      this.targetProcessing.delete(type);
     }
   }
 
-  /**
-   * Handle PE Signals (BUY_PE / TARGET_1_PE / TARGET_2_PE / EXIT_PE)
-   */
-  private async handlePeSignal(signal: StrategySignal): Promise<void> {
-    const lockedAtm = this.atmResolver.getLockedAtm();
-    if (!lockedAtm) return;
-
-    const qty = signal.quantity;
-
-    if (signal.type === 'BUY_PE') {
-      this.logEvent('PE_ENTRY_SIGNAL', signal);
-      const fillPrice = this.peLtp;
-      const target1Pts = getStrategyConfig().target1Pts || 20.0;
-      const target2Pts = getStrategyConfig().target2Pts || 40.0;
-
-      const position: LegPosition = {
-        leg: 'PE',
-        symbol: lockedAtm.peSymbol,
-        securityId: lockedAtm.peSecurityId,
-        strike: lockedAtm.atmStrike,
-        entryPrice: fillPrice,
-        quantity: qty,
-        totalQty: qty,
-        remainingQty: qty,
-        entryTime: new Date().toISOString(),
-        currentLtp: fillPrice,
-        unrealizedPnl: 0,
-        realizedPnl: 0,
-        target1Price: Number((fillPrice + target1Pts).toFixed(2)),
-        target2Price: Number((fillPrice + target2Pts).toFixed(2)),
-        target1Hit: false
-      };
-
-      const orderReq: OrderRequest = {
-        symbol: lockedAtm.peSymbol,
-        securityId: lockedAtm.peSecurityId,
-        exchange: 'NFO',
-        side: 'BUY',
-        quantity: qty,
-        price: fillPrice,
-        orderType: 'MARKET',
-        productType: 'INTRADAY',
-        validity: 'DAY',
-        strategyId: STRATEGY_ID,
-        userId: this.userId,
-        isPaper: this.mode === 'paper'
-      };
-
-      if (this.mode === 'live') {
-        const isLiveAllowed = process.env.LIVE_TRADING_ENABLED === 'true' && process.env.TRADING_MODE === 'live';
-        if (!isLiveAllowed) {
-          logger.warn('[Nifty009Engine] Safety Block: Live real-money trading is disabled. Live PE order blocked.');
-          this.logEvent('LIVE_ORDER_BLOCKED', { reason: 'LIVE_TRADING_ENABLED is false', leg: 'PE' });
-          return;
-        }
-
-        const primary = BrokerRegistry.getInstance().getPrimaryAdapter(this.userId);
-        if (primary && primary.getStatus()) {
-          try {
-            await primary.placeOrder(orderReq);
-            this.logEvent('PE_ENTRY_ORDER', { symbol: lockedAtm.peSymbol, qty, price: fillPrice });
-          } catch (e: any) {
-            logger.error('[Nifty009Engine] Live PE Order placement failed:', e);
-          }
-        }
-      } else {
-        await paperTradingManager.getExecutor(this.userId).executeOrder(orderReq);
-        this.logEvent('PE_ENTRY_ORDER', { mode: 'PAPER', symbol: lockedAtm.peSymbol, qty, price: fillPrice });
-      }
-
-      this.stateMachine.onPePositionOpened(position);
-      this.emit('order', { leg: 'PE', type: 'BUY', symbol: lockedAtm.peSymbol, quantity: qty, price: fillPrice });
-    } else if (signal.type === 'TARGET_1_PE') {
-      this.logEvent('PE_TARGET_1_SIGNAL', signal);
-      const pos = this.stateMachine.getPePosition();
-      if (!pos) return;
-
-      const exitPrice = signal.triggerPrice || this.peLtp;
-      const exitQty = signal.quantity; // 1 lot = 65 qty
-      const realized = (exitPrice - pos.entryPrice) * exitQty;
-      this.sessionPnl += realized;
-
-      const orderReq: OrderRequest = {
-        symbol: pos.symbol,
-        securityId: pos.securityId,
-        exchange: 'NFO',
-        side: 'SELL',
-        quantity: exitQty,
-        price: exitPrice,
-        orderType: 'MARKET',
-        productType: 'INTRADAY',
-        validity: 'DAY',
-        strategyId: STRATEGY_ID,
-        userId: this.userId,
-        isPaper: this.mode === 'paper'
-      };
-
-      if (this.mode === 'live') {
-        const isLiveAllowed = process.env.LIVE_TRADING_ENABLED === 'true' && process.env.TRADING_MODE === 'live';
-        if (isLiveAllowed) {
-          const primary = BrokerRegistry.getInstance().getPrimaryAdapter(this.userId);
-          if (primary && primary.getStatus()) {
-            try {
-              await primary.placeOrder(orderReq);
-              this.logEvent('PE_TARGET_1_ORDER', { symbol: pos.symbol, qty: exitQty, exitPrice, realizedPnl: realized });
-            } catch (e: any) {
-              logger.error('[Nifty009Engine] Live PE Target 1 Exit failed:', e);
-            }
-          }
-        }
-      } else {
-        await paperTradingManager.getExecutor(this.userId).executeOrder(orderReq);
-        this.logEvent('PE_TARGET_1_ORDER', { mode: 'PAPER', symbol: pos.symbol, qty: exitQty, exitPrice, realizedPnl: realized });
-      }
-
-      this.stateMachine.onPeTarget1Filled(exitPrice, exitQty);
-      this.emit('order', { leg: 'PE', type: 'SELL', symbol: pos.symbol, quantity: exitQty, price: exitPrice, realizedPnl: realized, reason: 'TARGET_1 (+20 pts)' });
-    } else if (signal.type === 'TARGET_2_PE' || signal.type === 'EXIT_PE') {
-      this.logEvent(signal.type === 'TARGET_2_PE' ? 'PE_TARGET_2_SIGNAL' : 'PE_EXIT_SIGNAL', signal);
-      const pos = this.stateMachine.getPePosition();
-      if (!pos) return;
-
-      const exitPrice = signal.triggerPrice || this.peLtp;
-      const exitQty = signal.quantity || pos.quantity;
-      const realized = (exitPrice - pos.entryPrice) * exitQty;
-      this.sessionPnl += realized;
-
-      const orderReq: OrderRequest = {
-        symbol: pos.symbol,
-        securityId: pos.securityId,
-        exchange: 'NFO',
-        side: 'SELL',
-        quantity: exitQty,
-        price: exitPrice,
-        orderType: 'MARKET',
-        productType: 'INTRADAY',
-        validity: 'DAY',
-        strategyId: STRATEGY_ID,
-        userId: this.userId,
-        isPaper: this.mode === 'paper'
-      };
-
-      if (this.mode === 'live') {
-        const isLiveAllowed = process.env.LIVE_TRADING_ENABLED === 'true' && process.env.TRADING_MODE === 'live';
-        if (!isLiveAllowed) {
-          logger.warn('[Nifty009Engine] Safety Block: Live real-money trading is disabled. Live PE exit blocked.');
-          return;
-        }
-
-        const primary = BrokerRegistry.getInstance().getPrimaryAdapter(this.userId);
-        if (primary && primary.getStatus()) {
-          try {
-            await primary.placeOrder(orderReq);
-            this.logEvent('PE_EXIT_ORDER', { symbol: pos.symbol, qty: exitQty, exitPrice, realizedPnl: realized });
-          } catch (e: any) {
-            logger.error('[Nifty009Engine] Live PE Exit failed:', e);
-          }
-        }
-      } else {
-        await paperTradingManager.getExecutor(this.userId).executeOrder(orderReq);
-        this.logEvent('PE_EXIT_ORDER', { mode: 'PAPER', symbol: pos.symbol, qty: exitQty, exitPrice, realizedPnl: realized });
-      }
-
-      this.stateMachine.onPePositionClosed();
-      this.emit('order', { leg: 'PE', type: 'SELL', symbol: pos.symbol, quantity: exitQty, price: exitPrice, realizedPnl: realized, reason: signal.triggerReason });
+  private async executePaperOrder(orderReq: OrderRequest): Promise<number> {
+    const result = await paperTradingManager.getExecutor(this.userId).executeOrder(orderReq);
+    if (!result.success || result.status !== 'FILLED' || !Number.isFinite(result.averagePrice) || result.averagePrice! <= 0) {
+      throw new Error(`PAPER_ORDER_NOT_FILLED: ${result.rejectionReason || result.status}`);
     }
+    return result.averagePrice!;
+  }
+
+  private async handleCeSignal(signal: StrategySignal): Promise<void> {
+    await this.handlePaperSignal(signal, 'CE');
+  }
+
+  private async handlePeSignal(signal: StrategySignal): Promise<void> {
+    await this.handlePaperSignal(signal, 'PE');
+  }
+
+  private async handlePaperSignal(signal: StrategySignal, type: 'CE' | 'PE'): Promise<void> {
+    if (this.mode !== 'paper') throw new Error('LIVE_EXECUTION_NOT_READY');
+    const locked = this.atmResolver.getLockedAtm();
+    if (!locked) throw new Error('DHAN_ATM_CONTRACT_UNAVAILABLE');
+    const ltp = type === 'CE' ? this.ceLtp : this.peLtp;
+    if (!Number.isFinite(ltp) || ltp <= 0) throw new Error(`OPTION_PRICE_UNAVAILABLE: ${type}`);
+    const symbol = type === 'CE' ? locked.ceSymbol : locked.peSymbol;
+    const securityId = type === 'CE' ? locked.ceSecurityId : locked.peSecurityId;
+    const isEntry = signal.type === `BUY_${type}`;
+    const existing = type === 'CE' ? this.stateMachine.getCePosition() : this.stateMachine.getPePosition();
+    if (isEntry && existing) return;
+    if (!isEntry && !existing) return;
+    const isTarget1 = signal.type === `TARGET_1_${type}`;
+    const quantity = isEntry ? signal.quantity : Math.min(isTarget1 ? locked.lotSize : (signal.quantity || existing!.quantity), existing!.quantity);
+    if (!Number.isInteger(quantity) || quantity <= 0) throw new Error('INVALID_ORDER_QUANTITY');
+    const orderReq: OrderRequest = {
+      symbol, securityId, exchange: 'NFO', side: isEntry ? 'BUY' : 'SELL', quantity,
+      price: ltp, orderType: 'MARKET', productType: 'INTRADAY', validity: 'DAY',
+      strategyId: STRATEGY_ID, userId: this.userId, isPaper: true
+    };
+    const fillPrice = await this.executePaperOrder(orderReq);
+    if (isEntry) {
+      const position: LegPosition = {
+        leg: type, symbol, securityId, strike: locked.atmStrike, entryPrice: fillPrice,
+        quantity, totalQty: quantity, remainingQty: quantity, entryTime: new Date().toISOString(),
+        currentLtp: fillPrice, unrealizedPnl: 0, realizedPnl: 0,
+        target1Price: Number((fillPrice + getStrategyConfig().target1Pts).toFixed(2)),
+        target2Price: Number((fillPrice + getStrategyConfig().target2Pts).toFixed(2)), target1Hit: false
+      };
+      if (type === 'CE') this.stateMachine.onCePositionOpened(position);
+      else this.stateMachine.onPePositionOpened(position);
+    } else {
+      this.sessionPnl += (fillPrice - existing!.entryPrice) * quantity;
+      if (isTarget1 && quantity < existing!.quantity) {
+        if (type === 'CE') this.stateMachine.onCeTarget1Filled(fillPrice, quantity);
+        else this.stateMachine.onPeTarget1Filled(fillPrice, quantity);
+      } else if (type === 'CE') this.stateMachine.onCePositionClosed();
+      else this.stateMachine.onPePositionClosed();
+    }
+    this.logEvent('PAPER_ORDER_FILLED', { leg: type, side: orderReq.side, quantity, fillPrice, reason: signal.triggerReason });
+    this.emit('order', { leg: type, type: orderReq.side, symbol, quantity, price: fillPrice, reason: signal.triggerReason });
   }
 
   /**
    * 15:10 Force Square-Off
    */
   public async forceSquareOff(): Promise<void> {
-    logger.info('[Nifty009Engine] 🛑 15:10 Force Square-Off Triggered');
-    const { exitCe, exitPe } = this.stateMachine.onForceSquareOff();
-
+    if (!this.isRunning) return;
     const cePos = this.stateMachine.getCePosition();
     const pePos = this.stateMachine.getPePosition();
-
-    if (exitCe && cePos) {
-      const pnl = (this.ceLtp - cePos.entryPrice) * cePos.quantity;
-      this.sessionPnl += pnl;
-      const orderReq: OrderRequest = {
-        symbol: cePos.symbol,
-        securityId: cePos.securityId,
-        exchange: 'NFO',
-        side: 'SELL',
-        quantity: cePos.quantity,
-        price: this.ceLtp,
-        orderType: 'MARKET',
-        productType: 'INTRADAY',
-        validity: 'DAY',
-        strategyId: STRATEGY_ID,
-        userId: this.userId,
-        isPaper: this.mode === 'paper'
-      };
-      if (this.mode === 'paper') {
-        await paperTradingManager.getExecutor(this.userId).executeOrder(orderReq);
-      }
+    if (this.mode !== 'paper') throw new Error('LIVE_EXECUTION_NOT_READY');
+    for (const pos of [cePos, pePos]) {
+      if (!pos) continue;
+      const price = pos.leg === 'CE' ? this.ceLtp : this.peLtp;
+      if (!Number.isFinite(price) || price <= 0) throw new Error(`OPTION_PRICE_UNAVAILABLE: ${pos.leg}`);
+      const orderReq: OrderRequest = { symbol: pos.symbol, securityId: pos.securityId, exchange: 'NFO', side: 'SELL',
+        quantity: pos.quantity, price, orderType: 'MARKET', productType: 'INTRADAY', validity: 'DAY',
+        strategyId: STRATEGY_ID, userId: this.userId, isPaper: true };
+      const filledPrice = await this.executePaperOrder(orderReq);
+      this.sessionPnl += (filledPrice - pos.entryPrice) * pos.quantity;
+      if (pos.leg === 'CE') this.stateMachine.onCePositionClosed();
+      else this.stateMachine.onPePositionClosed();
     }
-
-    if (exitPe && pePos) {
-      const pnl = (this.peLtp - pePos.entryPrice) * pePos.quantity;
-      this.sessionPnl += pnl;
-      const orderReq: OrderRequest = {
-        symbol: pePos.symbol,
-        securityId: pePos.securityId,
-        exchange: 'NFO',
-        side: 'SELL',
-        quantity: pePos.quantity,
-        price: this.peLtp,
-        orderType: 'MARKET',
-        productType: 'INTRADAY',
-        validity: 'DAY',
-        strategyId: STRATEGY_ID,
-        userId: this.userId,
-        isPaper: this.mode === 'paper'
-      };
-      if (this.mode === 'paper') {
-        await paperTradingManager.getExecutor(this.userId).executeOrder(orderReq);
-      }
-    }
-
-    this.logEvent('FORCED_SQUAREOFF', { exitCe, exitPe, sessionPnl: this.sessionPnl });
+    this.stateMachine.onForceSquareOff();
+    this.logEvent('FORCED_SQUAREOFF', { exitCe: !!cePos, exitPe: !!pePos, sessionPnl: this.sessionPnl });
     this.updateStatusAndEmit();
     this.saveSession();
   }
@@ -715,6 +418,13 @@ export class Nifty009Engine extends EventEmitter {
     if (!this.isRunning) return;
     this.isRunning = false;
     this.isPaused = false;
+    if (this.feedAdapter && this.optionFeedListener) {
+      this.feedAdapter.off('tick', this.optionFeedListener);
+      const locked = this.atmResolver.getLockedAtm();
+      if (locked) void this.feedAdapter.unsubscribeMarketData(['IDX_I:13', `NSE_FNO:${locked.ceSecurityId}`, `NSE_FNO:${locked.peSecurityId}`]);
+    }
+    this.feedAdapter = null;
+    this.optionFeedListener = null;
     if (this.squareOffTimer) {
       clearTimeout(this.squareOffTimer);
       this.squareOffTimer = null;
@@ -738,7 +448,10 @@ export class Nifty009Engine extends EventEmitter {
     const delay = istTarget.getTime() - istNow.getTime();
     if (delay > 0) {
       this.squareOffTimer = setTimeout(() => {
-        this.forceSquareOff();
+        void this.forceSquareOff().catch((error: any) => {
+          this.pause();
+          this.logEvent('SQUARE_OFF_FAILED', { reason: error.message });
+        });
       }, delay);
       logger.info(`[Nifty009Engine] 15:10 IST force square-off scheduled in ${Math.round(delay / 60000)} minutes`);
     } else {
@@ -746,8 +459,20 @@ export class Nifty009Engine extends EventEmitter {
     }
   }
 
-  private subscribeDhanMarketFeed(): void {
-    // Managed via primary adapter
+  private subscribeDhanMarketFeed(adapter: DhanAdapter, locked: LockedAtm): void {
+    this.feedAdapter = adapter;
+    this.optionFeedListener = (tick: any) => {
+      if (!Number.isFinite(tick?.ltp) || tick.ltp <= 0) return;
+      if (tick.exchange === 'IDX_I' && String(tick.securityId) === '13') {
+        this.onMarketTick('NIFTY 50', tick.ltp, tick.volume || 0);
+        return;
+      }
+      if (tick.exchange !== 'NSE_FNO') return;
+      if (String(tick.securityId) === locked.ceSecurityId) this.onOptionTick('CE', tick.ltp, tick.volume || 0);
+      else if (String(tick.securityId) === locked.peSecurityId) this.onOptionTick('PE', tick.ltp, tick.volume || 0);
+    };
+    adapter.on('tick', this.optionFeedListener);
+    void adapter.subscribeMarketData(['IDX_I:13', `NSE_FNO:${locked.ceSecurityId}`, `NSE_FNO:${locked.peSecurityId}`]);
   }
 
   public async getDailyReport(): Promise<any> {
@@ -766,7 +491,7 @@ export class Nifty009Engine extends EventEmitter {
       peTrades: summary.pe.entryCount,
       totalTrades: summary.combined.totalTrades,
       grossPnl: this.sessionPnl,
-      netPnl: this.sessionPnl - (summary.combined.totalTrades * 40),
+      netPnl: null,
       status: this.isRunning ? 'RUNNING' : 'COMPLETED'
     };
   }
@@ -830,11 +555,11 @@ export class Nifty009Engine extends EventEmitter {
       },
 
       // Backwards-compatible fields for UI/charts
-      firstCandleClose: this.niftyLtp || 26180.00,
+      firstCandleClose: this.niftyLtp,
       upperLevel: ceLevels.upperLevel,
       lowerLevel: peLevels.lowerLevel,
-      spotUpperLevel: Number(((this.niftyLtp || 26180.00) * (1 + getStrategyConfig().breakoutPct)).toFixed(2)),
-      spotLowerLevel: Number(((this.niftyLtp || 26180.00) * (1 - getStrategyConfig().breakoutPct)).toFixed(2)),
+      spotUpperLevel: this.niftyLtp > 0 ? Number((this.niftyLtp * (1 + getStrategyConfig().breakoutPct)).toFixed(2)) : null,
+      spotLowerLevel: this.niftyLtp > 0 ? Number((this.niftyLtp * (1 - getStrategyConfig().breakoutPct)).toFixed(2)) : null,
       state: summary.status,
       activePosition: summary.ce.position || summary.pe.position || null
     };

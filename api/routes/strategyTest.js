@@ -1,7 +1,6 @@
 /**
  * Mavrix AlgoRooms - Production Strategy Test Route
- * Routes all backtesting to the authentic Black-Scholes + Real NSE backtest engine.
- * No hardcoded sample or fake data.
+ * Routes backtesting to the Dhan historical candle engine.
  */
 
 const express = require('express');
@@ -20,7 +19,7 @@ router.get('/quick-backtest', async (req, res) => {
       symbol,
       days,
       capital: 100000
-    });
+    }, req.headers.authorization);
 
     res.json({
       success: true,
@@ -54,7 +53,7 @@ router.post('/backtest', async (req, res) => {
       symbol,
       days: Number(days) || 5,
       capital: Number(capital) || 100000
-    });
+    }, req.headers.authorization);
 
     res.json({
       success: true,

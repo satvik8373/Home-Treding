@@ -117,10 +117,7 @@ export class DhanWebSocketClient extends EventEmitter {
       const subscribePayload = {
         RequestCode: 15,
         InstrumentCount: symbols.length,
-        InstrumentList: symbols.map(s => ({
-          ExchangeSegment: 'NSE_EQ',
-          SecurityId: s
-        }))
+        InstrumentList: symbols.map(s => this.instrument(s))
       };
 
       this.ws.send(JSON.stringify(subscribePayload));
@@ -139,10 +136,7 @@ export class DhanWebSocketClient extends EventEmitter {
       const unsubscribePayload = {
         RequestCode: 16,
         InstrumentCount: symbols.length,
-        InstrumentList: symbols.map(s => ({
-          ExchangeSegment: 'NSE_EQ',
-          SecurityId: s
-        }))
+        InstrumentList: symbols.map(s => this.instrument(s))
       };
 
       this.ws.send(JSON.stringify(unsubscribePayload));
@@ -158,16 +152,21 @@ export class DhanWebSocketClient extends EventEmitter {
         const subscribePayload = {
           RequestCode: 15,
           InstrumentCount: symbols.length,
-          InstrumentList: symbols.map(s => ({
-            ExchangeSegment: 'NSE_EQ',
-            SecurityId: s
-          }))
+          InstrumentList: symbols.map(s => this.instrument(s))
         };
         this.ws.send(JSON.stringify(subscribePayload));
       } catch (e) {
         // Ignored
       }
     }
+  }
+
+  private instrument(value: string): { ExchangeSegment: string; SecurityId: string } {
+    const [segment, securityId] = value.includes(':') ? value.split(':', 2) : ['NSE_EQ', value];
+    if (!['NSE_EQ', 'NSE_FNO', 'IDX_I', 'BSE_EQ', 'BSE_FNO'].includes(segment) || !/^\d+$/.test(securityId)) {
+      throw new Error(`INVALID_DHAN_SUBSCRIPTION: ${value}`);
+    }
+    return { ExchangeSegment: segment, SecurityId: securityId };
   }
 
   private handleMessage(data: WebSocket.Data): void {
@@ -184,18 +183,24 @@ export class DhanWebSocketClient extends EventEmitter {
   }
 
   private parseBinaryPacket(buffer: Buffer): void {
-    if (buffer.length < 8) return;
+    if (buffer.length < 12) return;
 
     try {
       const responseCode = buffer.readInt8(0);
-      if (responseCode === 2 || responseCode === 4) {
+      const packetLength = buffer.readInt16LE(1);
+      if ((responseCode === 2 || responseCode === 4 || responseCode === 8) &&
+          packetLength >= 12 && packetLength <= buffer.length) {
+        const segment = buffer.readUInt8(3);
+        const exchange = ({ 0: 'IDX_I', 1: 'NSE_EQ', 2: 'NSE_FNO', 4: 'BSE_EQ', 8: 'BSE_FNO' } as Record<number, string>)[segment];
+        if (!exchange) return;
         const securityId = buffer.readInt32LE(4).toString();
         const ltp = buffer.readFloatLE(8);
+        if (!Number.isFinite(ltp) || ltp <= 0) return;
 
         const tick: MarketTick = {
           symbol: securityId,
           securityId: securityId,
-          exchange: 'NSE',
+          exchange,
           ltp: Number(ltp.toFixed(2)),
           timestamp: new Date()
         };

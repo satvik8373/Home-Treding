@@ -223,7 +223,7 @@ export class DhanAdapter extends BrokerAdapter {
     return await this.optionChainService!.getOptionChain({ underlyingSecurityId, expiry });
   }
 
-  public async getExpiryList(underlyingSecurityId: string, exchangeSegment: string = 'NSE_FNO'): Promise<string[]> {
+  public async getExpiryList(underlyingSecurityId: string, exchangeSegment: string = 'IDX_I'): Promise<string[]> {
     this.ensureConnected();
     return await this.optionChainService!.getExpiryList(underlyingSecurityId, exchangeSegment);
   }

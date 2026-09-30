@@ -6,7 +6,7 @@ export interface OptionLegCandleSeries {
   strike?: number;
   expiry?: string;
   securityId?: string;
-  source: 'DHAN_EXPIRED_OPTIONS' | 'REAL_OPTION_FEED' | 'ESTIMATED_BSM';
+  source: 'DHAN_EXPIRED_OPTIONS' | 'REAL_OPTION_FEED' | 'NSE_FREE_ARCHIVE';
   isSynthetic: boolean;
   candles5m: OptionCandle[];
   candles1m: OptionCandle[];
@@ -172,11 +172,10 @@ export interface AlgoroomsPerformanceReport {
     signalResolution: string;
     executionResolution: string;
     syntheticPrices: boolean;
-    lookaheadBias: 'PASS';
     missingCandles: number;
     duplicateCandles: number;
     contractMapping: 'FIXED_STRIKE_MATCHED';
-    backtestReproducibility: 'PASS';
+    fillAssumption: string;
   };
   equityCurve: Array<{ date: string; timestamp: string; equity: number; pnl: number; drawdown: number }>;
   daywiseTransactions: DailyBreakdownReport[];
@@ -188,10 +187,8 @@ interface LegState {
   type: 'CE' | 'PE';
   candles5m: OptionCandle[];
   candles1m: OptionCandle[];
-  /** 09:15 reference candle high — used to compute upper breakout level */
-  refHigh: number;
-  /** 09:15 reference candle low — used to compute lower exit level */
-  refLow: number;
+  /** Completed 09:15–09:20 option candle close. */
+  refClose: number;
   upper: number;
   lower: number;
   entryPrice: number | null;
@@ -249,25 +246,17 @@ export class AlgoroomsStyleBacktester {
     validate(config.ceOptionSeries, 'CE');
     validate(config.peOptionSeries, 'PE');
 
-    const isBsm = config.ceOptionSeries?.source === 'ESTIMATED_BSM';
     this.dataQuality = {
-      dataSource: isBsm
-        ? 'Real NSE Exchange Feed (5m) + Black-Scholes ATM Series'
-        : 'DhanHQ Expired Options /charts/rollingoption',
-      ceHistoricalData: isBsm
-        ? 'Real NSE 5m candles + Black-Scholes 1m ATM pricing'
-        : 'DhanHQ expired option minute OHLC',
-      peHistoricalData: isBsm
-        ? 'Real NSE 5m candles + Black-Scholes 1m ATM pricing'
-        : 'DhanHQ expired option minute OHLC',
+      dataSource: 'DhanHQ Expired Options /charts/rollingoption',
+      ceHistoricalData: 'DhanHQ expired option minute OHLC',
+      peHistoricalData: 'DhanHQ expired option minute OHLC',
       signalResolution: '5 min',
       executionResolution: '1 min',
       syntheticPrices: false,
-      lookaheadBias: 'PASS',
       missingCandles: 0,
       duplicateCandles: 0,
       contractMapping: 'FIXED_STRIKE_MATCHED',
-      backtestReproducibility: 'PASS'
+      fillAssumption: 'Next 1m open for market signals; target price if touched by a traded 1m candle; historical bid/ask and slippage unavailable'
     };
   }
 
@@ -282,12 +271,14 @@ export class AlgoroomsStyleBacktester {
     const ce1m = this.config.ceOptionSeries?.candles1m.filter((c) => c.date === date) ?? [];
     const pe1m = this.config.peOptionSeries?.candles1m.filter((c) => c.date === date) ?? [];
     // Per strategy spec: reference candle is the 09:15–09:20 bar.
-    // Upper = High × (1 + breakoutPct); Lower = Low × (1 − breakoutPct).
-    const ceRefCandle = ce5m.find((c) => c.time === '09:15');
-    const peRefCandle = pe5m.find((c) => c.time === '09:15');
-    if (!ceRefCandle || !peRefCandle) throw new Error(`MISSING_REFERENCE_CANDLE: ${date}`);
-    const ce: LegState = this.createLeg('CE', ce5m, ce1m, ceRefCandle.high, ceRefCandle.low);
-    const pe: LegState = this.createLeg('PE', pe5m, pe1m, peRefCandle.high, peRefCandle.low);
+    // Both levels use the completed option premium close, as in the saved strategy.
+    const ceRefCandle = ce5m.find((c) => c.time === '09:15') ?? ce5m.find((c) => c.time === '09:20') ?? ce5m[0];
+    const peRefCandle = pe5m.find((c) => c.time === '09:15') ?? pe5m.find((c) => c.time === '09:20') ?? pe5m[0];
+    if (!ceRefCandle || !peRefCandle || ceRefCandle.volume <= 0 || peRefCandle.volume <= 0) {
+      throw new Error(`MISSING_TRADED_REFERENCE_CANDLE: ${date}`);
+    }
+    const ce: LegState = this.createLeg('CE', ce5m, ce1m, ceRefCandle.close);
+    const pe: LegState = this.createLeg('PE', pe5m, pe1m, peRefCandle.close);
 
     this.processLeg(ce, date);
     this.processLeg(pe, date);
@@ -297,19 +288,15 @@ export class AlgoroomsStyleBacktester {
     type: 'CE' | 'PE',
     candles5m: OptionCandle[],
     candles1m: OptionCandle[],
-    refHigh: number,
-    refLow: number
+    refClose: number
   ): LegState {
-    // Upper breakout level uses the reference candle High.
-    // Lower exit level uses the reference candle Low.
     return {
       type,
       candles5m,
       candles1m,
-      refHigh,
-      refLow,
-      upper: this.round(refHigh * (1 + this.breakoutPct)),
-      lower: this.round(refLow * (1 - this.breakoutPct)),
+      refClose,
+      upper: this.round(refClose * (1 + this.breakoutPct)),
+      lower: this.round(refClose * (1 - this.breakoutPct)),
       entryPrice: null,
       entryTime: null,
       remainingQty: 0,
@@ -320,19 +307,24 @@ export class AlgoroomsStyleBacktester {
   private processLeg(leg: LegState, date: string): void {
     const bars = new Map(leg.candles5m.map(c => [c.timestamp, c]));
     const minutes = [...leg.candles1m].sort((a, b) => a.timestamp - b.timestamp);
-    // A complete NSE session is 09:15–15:30, but we only need through 15:10 (EOD square-off).
-    // Allow minor gaps (e.g. auction minute, thin liquidity days) rather than hard-rejecting.
-    const MIN_EXPECTED = 355; // 09:15 through 15:09 inclusive
-    if (minutes.length < MIN_EXPECTED || minutes[0].time > '09:15' || minutes[minutes.length - 1].time < '15:10') {
+    // Standard exchange session: 09:15 through 15:09 (355 1m candles) or 15:10 (356 1m candles).
+    const isStandardLength = (minutes.length === 355 && minutes[minutes.length - 1]?.time === '15:09') ||
+                             (minutes.length === 356 && minutes[minutes.length - 1]?.time === '15:10');
+    if (!isStandardLength || minutes[0]?.time !== '09:15' ||
+        minutes.some((c, i) => c.date !== date || c.timestamp !== minutes[0].timestamp + i * 60)) {
       throw new Error(`INCOMPLETE_OPTION_DATA: ${leg.type} ${date} (${minutes.length} candles, first=${minutes[0]?.time}, last=${minutes[minutes.length - 1]?.time})`);
+    }
+    if (bars.size !== 71 || leg.candles5m.some((c, i) => c.timestamp !== minutes[0].timestamp + i * 300)) {
+      throw new Error(`INCOMPLETE_SIGNAL_CANDLES: ${leg.type} ${date}`);
     }
     let pending: 'ENTRY' | 'LOWER_EXIT' | null = null;
     let signalPrice = 0;
     for (const minute of minutes) {
-      if (minute.time === this.config.endTime) {
+      if (minute.time === this.config.endTime || (minute.time === '15:09' && minutes.length === 355)) {
         if (leg.trade) {
           this.requireTradedMinute(minute);
-          this.close(leg, 'FORCE_EXIT', minute.time, minute.isoTime, minute.open, leg.remainingQty);
+          const exitPrice = minute.time === '15:09' ? minute.close : minute.open;
+          this.close(leg, 'FORCE_EXIT', this.config.endTime, minute.isoTime, exitPrice, leg.remainingQty);
           this.finishTrade(leg, date);
         }
         break;
@@ -362,7 +354,7 @@ export class AlgoroomsStyleBacktester {
       // knowable only after the fifth 1-minute candle, never at the bar open.
       const opening = minute.timestamp - 4 * 60;
       const bar = bars.get(opening);
-      if (bar && bar.time !== '09:15') {
+      if (bar && bar.time !== '09:15' && bar.volume > 0) {
         if (leg.trade && bar.close < leg.lower) pending = 'LOWER_EXIT';
         else if (!leg.trade && bar.close >= leg.upper) {
           pending = 'ENTRY';
@@ -443,7 +435,7 @@ export class AlgoroomsStyleBacktester {
       .sort((a, b) => a.timestamp - b.timestamp)
       .pop();
     const spotVal = entrySpotCandle?.close ?? 0;
-    const optionRefText = `Ref H: ₹${leg.refHigh.toFixed(2)} | Ref L: ₹${leg.refLow.toFixed(2)} | Upper: ₹${leg.upper.toFixed(2)} | Lower: ₹${leg.lower.toFixed(2)}`;
+    const optionRefText = `Ref close: ₹${leg.refClose.toFixed(2)} | Upper: ₹${leg.upper.toFixed(2)} | Lower: ₹${leg.lower.toFixed(2)}`;
     const spotRefPrice = entrySpotCandle ? `Spot last completed 5m: ₹${spotVal.toFixed(2)}` : 'Spot unavailable';
 
     this.tradeLogs.push({
@@ -465,7 +457,7 @@ export class AlgoroomsStyleBacktester {
       quantity: this.qty,
       lotSize: this.lotSize,
       signalTime: trade.entry.time,
-      signalRefPrice: leg.refHigh,
+      signalRefPrice: leg.refClose,
       upperBreakoutLevel: leg.upper,
       lowerExitLevel: leg.lower,
       triggerClosePrice: trade.signalPrice,

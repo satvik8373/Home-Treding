@@ -98,15 +98,13 @@ router.post('/mode', optionalAuth, asyncHandler(async (req: AuthRequest, res: Re
     }
   }
 
-  currentTradingMode = mode;
-  process.env.TRADING_MODE = mode;
-
-  // Sync mode to strategy engines
   try {
     nifty009Engine.setMode(mode);
   } catch (err: any) {
-    logger.warn('[TradingRoutes] Error syncing mode with Nifty009Engine:', err.message);
+    return res.status(409).json({ success: false, message: err.message });
   }
+  currentTradingMode = mode;
+  process.env.TRADING_MODE = mode;
 
   logger.info(`🌐 [Global Trading Mode] Switched to ${mode.toUpperCase()} MODE by user: ${userId}`);
 

@@ -4,9 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const router = express.Router();
 
-// In-memory broker storage with /tmp persistence for serverless containers
+// Ephemeral per-instance storage. A cold serverless instance must request reconnection.
 const brokers = new Map();
-const TMP_BROKERS_PATH = path.join('/tmp', 'mavrix_brokers.json');
+const TMP_BROKERS_PATH = process.env.MAVRIX_BROKER_STORAGE_FILE || path.join('/tmp', 'mavrix_brokers.json');
 
 const loadBrokersFromDisk = () => {
   try {
@@ -22,10 +22,7 @@ const loadBrokersFromDisk = () => {
 };
 
 const saveBrokersToDisk = () => {
-  try {
-    const list = Array.from(brokers.values());
-    fs.writeFileSync(TMP_BROKERS_PATH, JSON.stringify(list), 'utf8');
-  } catch (_) {}
+  fs.writeFileSync(TMP_BROKERS_PATH, JSON.stringify(Array.from(brokers.values())), 'utf8');
 };
 
 // Initial load on container initialization
@@ -53,27 +50,41 @@ const findUserBroker = (userId, brokerId) => {
 };
 
 // Get broker list (support both / and /list)
-const handleGetBrokers = (req, res) => {
+const verifyDhanProfile = async (broker) => {
+  const response = await axios.get('https://api.dhan.co/v2/profile', {
+    headers: { 'access-token': broker.accessToken, 'client-id': broker.clientId, Accept: 'application/json' },
+    timeout: 10000
+  });
+  if (String(response.data?.dhanClientId || '') !== String(broker.clientId)) {
+    throw new Error('Dhan profile Client ID does not match this connection');
+  }
+  return response.data;
+};
+
+const publicBroker = (b) => ({
+  id: b.id, broker: b.broker, clientId: b.clientId, maskedClientId: b.maskedClientId,
+  accountName: b.accountName, status: b.status, terminalEnabled: b.terminalEnabled,
+  tradingEngineEnabled: b.tradingEngineEnabled, connectedAt: b.connectedAt,
+  lastActivity: b.lastActivity, dataPlan: b.dataPlan, tokenValidity: b.tokenValidity
+});
+
+const handleGetBrokers = async (req, res) => {
   try {
     loadBrokersFromDisk();
-    const { userId } = req.query;
     const all = Array.from(brokers.values());
-    const userBrokers = userId 
-      ? all.filter(b => b.userId === userId || !b.userId)
-      : all;
-
-    // Sanitize: do not send plaintext accessToken to client list
-    const sanitized = userBrokers.map(b => ({
-      id: b.id,
-      broker: b.broker,
-      clientId: b.clientId,
-      maskedClientId: b.maskedClientId,
-      accountName: b.accountName,
-      status: b.status,
-      terminalEnabled: b.terminalEnabled,
-      tradingEngineEnabled: b.tradingEngineEnabled,
-      connectedAt: b.connectedAt,
-      lastActivity: b.lastActivity
+    const sanitized = await Promise.all(all.map(async (b) => {
+      if (!b.accessToken) b.status = 'Disconnected';
+      else {
+        try {
+          const profile = await verifyDhanProfile(b);
+          b.status = 'Connected';
+          b.dataPlan = profile.dataPlan;
+          b.tokenValidity = profile.tokenValidity;
+        } catch (error) {
+          b.status = error.response?.status === 401 ? 'Expired' : 'Disconnected';
+        }
+      }
+      return publicBroker(b);
     }));
 
     res.json({
@@ -91,37 +102,9 @@ const handleGetBrokers = (req, res) => {
 router.get('/', handleGetBrokers);
 router.get('/list', handleGetBrokers);
 
-// Sync client broker to warm up serverless container
-const handleSyncBroker = (req, res) => {
-  try {
-    const { broker } = req.body;
-    if (broker && (broker.id || broker.clientId)) {
-      const id = broker.id || `dhan_${broker.clientId}`;
-      brokers.set(id, {
-        id,
-        broker: broker.broker || 'DHAN',
-        clientId: broker.clientId,
-        maskedClientId: broker.maskedClientId || broker.clientId,
-        accountName: broker.accountName || `DhanHQ (${broker.clientId})`,
-        status: broker.status || 'Connected',
-        terminalEnabled: broker.terminalEnabled ?? true,
-        tradingEngineEnabled: broker.tradingEngineEnabled ?? true,
-        accessToken: broker.accessToken || '',
-        userId: broker.userId || 'user_admin',
-        connectedAt: broker.connectedAt || new Date().toISOString(),
-        lastActivity: new Date().toISOString()
-      });
-      saveBrokersToDisk();
-      return res.json({ success: true, message: 'Broker synced' });
-    }
-    return res.json({ success: false, message: 'No broker provided' });
-  } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-router.post('/sync', handleSyncBroker);
-router.post('/dhan/sync', handleSyncBroker);
+// A browser-held status is never sufficient to create a broker connection.
+router.post(['/sync', '/dhan/sync'], (_req, res) =>
+  res.status(410).json({ success: false, message: 'Reconnect using a fresh Dhan access token.' }));
 
 // Toggle Terminal Status
 router.post('/terminal', (req, res) => {
@@ -206,10 +189,9 @@ router.post('/connect', async (req, res) => {
     const cleanClientId = String(clientId).trim();
     const cleanToken = String(accessToken).trim();
 
-    // Verify credentials directly with DhanHQ v2 API (Fund Limit endpoint)
-    console.log(`[Dhan] Validating credentials with DhanHQ v2 for client: ${cleanClientId}...`);
+    // Dhan's profile endpoint validates the token and reports Data API entitlement.
     try {
-      const dhanRes = await axios.get('https://api.dhan.co/v2/fundlimit', {
+      const dhanRes = await axios.get('https://api.dhan.co/v2/profile', {
         headers: {
           'access-token': cleanToken,
           'client-id': cleanClientId,
@@ -219,8 +201,10 @@ router.post('/connect', async (req, res) => {
         timeout: 10000
       });
 
-      console.log(`[Dhan] Credentials verified successfully for client: ${cleanClientId}`);
-      const fundData = dhanRes.data || {};
+      const profile = dhanRes.data || {};
+      if (String(profile.dhanClientId || '') !== cleanClientId) {
+        return res.status(400).json({ success: false, message: 'Dhan Client ID does not match the access token.' });
+      }
 
       const id = `dhan_${cleanClientId}`;
       const masked = cleanClientId.length > 4 
@@ -240,15 +224,8 @@ router.post('/connect', async (req, res) => {
         userId,
         connectedAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
-        funds: {
-          availableMargin: Number(fundData.availabelBalance || fundData.availableBalance || 0),
-          usedMargin: Number(fundData.utilizedAmount || 0),
-          totalAccountBalance: Number(fundData.availabelBalance || fundData.availableBalance || 0) + Number(fundData.utilizedAmount || 0),
-          collateralMargin: Number(fundData.collateralAmount || 0),
-          cashBalance: Number(fundData.availabelBalance || fundData.availableBalance || 0),
-          currency: 'INR',
-          timestamp: new Date().toISOString()
-        }
+        dataPlan: profile.dataPlan,
+        tokenValidity: profile.tokenValidity
       };
 
       brokers.set(id, brokerObj);
@@ -257,19 +234,7 @@ router.post('/connect', async (req, res) => {
       return res.json({
         success: true,
         message: 'Dhan broker account verified and connected successfully!',
-        broker: {
-          id: brokerObj.id,
-          broker: brokerObj.broker,
-          clientId: brokerObj.clientId,
-          maskedClientId: brokerObj.maskedClientId,
-          accountName: brokerObj.accountName,
-          status: brokerObj.status,
-          terminalEnabled: brokerObj.terminalEnabled,
-          tradingEngineEnabled: brokerObj.tradingEngineEnabled,
-          connectedAt: brokerObj.connectedAt,
-          lastActivity: brokerObj.lastActivity
-        },
-        funds: brokerObj.funds
+        broker: publicBroker(brokerObj)
       });
     } catch (dhanErr) {
       const status = dhanErr.response?.status;
@@ -290,7 +255,7 @@ router.post('/connect', async (req, res) => {
       return res.status(status && status >= 400 && status < 500 ? status : 400).json({
         success: false,
         message: clientMsg,
-        error: respData || dhanErr.message
+        error: respData?.errorCode || 'DHAN_PROFILE_VERIFICATION_FAILED'
       });
     }
   } catch (error) {
@@ -439,6 +404,7 @@ const handleConsumeConsent = async (req, res) => {
     }
 
     const resolvedClientId = data.dhanClientId || finalClientId || 'dhan_user';
+    const verifiedProfile = await verifyDhanProfile({ clientId: resolvedClientId, accessToken: data.accessToken });
     const id = `${userId}_dhan_${resolvedClientId}`;
     const masked = resolvedClientId.length > 4
       ? `${resolvedClientId.slice(0, 4)}***${resolvedClientId.slice(-3)}`
@@ -456,7 +422,9 @@ const handleConsumeConsent = async (req, res) => {
       accessToken: data.accessToken,
       userId,
       connectedAt: new Date().toISOString(),
-      lastActivity: new Date().toISOString()
+      lastActivity: new Date().toISOString(),
+      dataPlan: verifiedProfile.dataPlan,
+      tokenValidity: verifiedProfile.tokenValidity
     };
 
     brokers.set(id, brokerObj);
@@ -465,18 +433,7 @@ const handleConsumeConsent = async (req, res) => {
     return res.json({
       success: true,
       message: 'Dhan broker connected successfully via official Developer API Key & Secret!',
-      broker: {
-        id: brokerObj.id,
-        broker: 'DHAN',
-        clientId: brokerObj.clientId,
-        maskedClientId: brokerObj.maskedClientId,
-        accountName: brokerObj.accountName,
-        status: brokerObj.status,
-        terminalEnabled: true,
-        tradingEngineEnabled: true,
-        connectedAt: brokerObj.connectedAt,
-        expiryTime: data.expiryTime
-      }
+      broker: publicBroker(brokerObj)
     });
   } catch (error) {
     console.error('[Dhan Consume Consent Error]:', error.response?.data || error.message);
@@ -636,10 +593,8 @@ const handleGetFunds = async (req, res) => {
           funds: broker.funds || null
         });
       }
-      return res.json({
-        success: true,
-        funds: broker.funds || null
-      });
+      broker.status = 'Disconnected';
+      return res.status(502).json({ success: false, message: 'Dhan funds could not be verified.', funds: null });
     }
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -750,28 +705,8 @@ router.delete('/:brokerId', (req, res) => {
 
 // Order Placement Handler
 const handlePlaceOrder = async (req, res) => {
-  try {
-    const { symbol, side, quantity, price, orderType = 'MARKET', productType = 'INTRADAY' } = req.body || {};
-    const orderId = `DHAN_ORD_${Date.now()}`;
-    return res.json({
-      success: true,
-      message: `Order submitted: ${side || 'BUY'} ${quantity || 1} of ${symbol || 'NIFTY 50'}`,
-      orderId,
-      order: {
-        orderId,
-        symbol: (symbol || 'NIFTY 50').toUpperCase(),
-        side: (side || 'BUY').toUpperCase(),
-        quantity: Number(quantity) || 1,
-        price: Number(price) || 0,
-        orderType,
-        productType,
-        status: 'PLACED',
-        orderTimestamp: new Date().toISOString()
-      }
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
+  return res.status(501).json({ success: false,
+    message: 'Live order placement is unavailable until Dhan order execution is configured.' });
 };
 
 router.post(['/place-order', '/orders/place'], handlePlaceOrder);

@@ -9,7 +9,7 @@ export interface BrokerSummary {
   clientId: string;
   maskedClientId: string;
   accountName: string;
-  status: 'Connected' | 'Disconnected' | 'Expired';
+  status: 'Connected' | 'Disconnected' | 'Expired' | 'Error';
   terminalEnabled: boolean;
   tradingEngineEnabled: boolean;
   staticIp?: string;
@@ -122,62 +122,27 @@ export const brokerApi = {
     localOrders = [];
     if (typeof window !== 'undefined') {
       localStorage.removeItem('mavrix_saved_brokers');
+      localStorage.removeItem('dhan_connected_broker');
     }
   },
 
   hasActiveBroker(): boolean {
-    return !!this.getActiveBroker();
+    return this.getActiveBroker() !== null;
   },
 
   getActiveBroker(): BrokerSummary | null {
-    if (localBrokers.length > 0) {
-      const active = localBrokers.find(b => b.status === 'Connected');
-      if (active) return active;
-      return localBrokers[0];
-    }
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('dhan_connected_broker');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && (parsed.status === 'Connected' || parsed.clientId)) {
-            localBrokers = [parsed];
-            return parsed;
-          }
-        }
-      } catch (_) {}
-    }
-    return null;
+    return localBrokers.find(b => b.status === 'Connected') || null;
   },
 
   // --- Broker Connections ---
   async getBrokers(userId?: string): Promise<BrokerSummary[]> {
-    let savedBroker: BrokerSummary | null = null;
-    if (typeof window !== 'undefined') {
-      try {
-        const raw = localStorage.getItem('dhan_connected_broker');
-        if (raw) savedBroker = JSON.parse(raw);
-      } catch (_) {}
-    }
-
     try {
       const res = await axios.get(`${getBaseUrl()}/api/brokers/list`, { timeout: 8000 });
-      if (Array.isArray(res.data?.brokers) && res.data.brokers.length > 0) {
+      if (Array.isArray(res.data?.brokers)) {
         localBrokers = res.data.brokers;
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('dhan_connected_broker', JSON.stringify(res.data.brokers[0]));
-        }
         return localBrokers;
       }
     } catch (_) {}
-
-    // If serverless container has empty memory, use verified saved broker without flicker
-    if (savedBroker && (savedBroker.status === 'Connected' || savedBroker.clientId)) {
-      localBrokers = [savedBroker];
-      // Keep serverless container in sync in background
-      axios.post(`${getBaseUrl()}/api/brokers/sync`, { broker: savedBroker }).catch(() => {});
-      return localBrokers;
-    }
 
     localBrokers = [];
     return [];
@@ -193,9 +158,6 @@ export const brokerApi = {
 
         if (res.data?.success && res.data?.broker) {
           localBrokers = [res.data.broker, ...localBrokers.filter(b => b.clientId !== params.clientId.trim())];
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('dhan_connected_broker', JSON.stringify(res.data.broker));
-          }
           return res.data;
         }
 
@@ -235,9 +197,6 @@ export const brokerApi = {
     const res = await axios.post(`${getBaseUrl()}/api/brokers/dhan/consume-consent`, params, { timeout: 15000 });
     if (res.data?.success && res.data?.broker) {
       localBrokers = [res.data.broker, ...localBrokers.filter(b => b.clientId !== res.data.broker.clientId)];
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('dhan_connected_broker', JSON.stringify(res.data.broker));
-      }
     }
     return res.data;
   },

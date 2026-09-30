@@ -4,7 +4,6 @@ import { paperExecutor } from '../execution/PaperExecutor';
 import { paperTradingManager } from '../execution/PaperTradingManager';
 import { brokerRegistry } from '../brokers/BrokerRegistry';
 import { authenticate, optionalAuth, AuthRequest } from '../middleware/auth';
-import { MarketStreamer } from '../services/marketStreamer';
 import fs from 'fs';
 import path from 'path';
 
@@ -299,7 +298,7 @@ router.post('/', optionalAuth, (req: AuthRequest, res: Response) => {
       endTime = '15:10',
       tradingDays = ['MON', 'TUE', 'WED', 'THU', 'FRI'],
       legs = [],
-      maxLoss = 2500,
+      maxLoss = 0,
       maxProfit = 5000,
       trailingSl = 'No Trailing',
       noTradeAfter = '15:10',
@@ -916,11 +915,17 @@ router.post('/deploy', optionalAuth, async (req: AuthRequest, res: Response) => 
     }
 
     const lossLimit = Number(maxLoss);
-    if (isNaN(lossLimit) || lossLimit <= 0) {
-      return res.status(400).json({ success: false, message: 'Max Daily Loss must be greater than ₹0' });
+    if (!Number.isFinite(lossLimit) || lossLimit < 0) {
+      return res.status(400).json({ success: false, message: 'Max Daily Loss must be zero or positive' });
     }
 
     const targetStrategyId = strategyId || templateType || 'custom_strategy';
+    if (targetStrategyId !== 'nifty-atm-independent-breakout') {
+      return res.status(422).json({ success: false, message: 'No verified execution engine exists for this strategy.' });
+    }
+    if (multiplier !== 1 || lossLimit !== 0 || Number(maxProfit) !== 0 || squareOff !== '15:10') {
+      return res.status(422).json({ success: false, message: 'This saved strategy requires 3 lots, no daily P&L override, and a 15:10 square-off.' });
+    }
 
     // Fetch actual strategy logic from custom strategies or templates library
     const custom = customStrategies.get(targetStrategyId) || (strategyId ? customStrategies.get(strategyId) : undefined);
@@ -928,6 +933,9 @@ router.post('/deploy', optionalAuth, async (req: AuthRequest, res: Response) => 
     const sourceStrategy = custom || template;
 
     const actualSymbol = sourceStrategy?.symbol || (sourceStrategy as any)?.symbols?.[0] || symbol;
+    if (actualSymbol !== 'NIFTY 50') {
+      return res.status(422).json({ success: false, message: 'This execution engine supports only NIFTY 50.' });
+    }
 
     // Duplicate Check strictly within this user's deployments
     const existingRunning = Array.from(activeDeployments.values()).find(
@@ -946,77 +954,8 @@ router.post('/deploy', optionalAuth, async (req: AuthRequest, res: Response) => 
 
     const deploymentId = `dep_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
-    // Build initial positions for this strategy deployment matching institutional format
-    const now = new Date();
-    const dateFormatted = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
-    const timeFormatted = `${dateFormatted} ${now.toTimeString().split(' ')[0]}`;
-
+    // Deployment records do not represent fills. Positions are added only from executions.
     const positions: StrategyPosition[] = [];
-    const legs = sourceStrategy?.legs && sourceStrategy.legs.length > 0 ? sourceStrategy.legs : [];
-    const baseLot = sourceStrategy?.lotSize || (actualSymbol.includes('BANK') ? 30 : 65);
-    const totalQty = baseLot * multiplier;
-
-    if (legs.length > 0) {
-      legs.forEach((leg, idx) => {
-        const optionType = leg.optionType || (idx % 2 === 0 ? 'PE' : 'CE');
-        const strike = leg.strike || (optionType === 'PE' ? '22500' : '22750');
-        const cleanSymbol = actualSymbol.replace(/\s+/g, '').toUpperCase();
-        const script = `${cleanSymbol}26302${strike}${optionType}`;
-        const entryPrice = optionType === 'PE' ? 84.05 : 83.70;
-        const ltp = optionType === 'PE' ? 83.25 : 84.60;
-        const pnl = leg.action === 'SELL' ? (entryPrice - ltp) * totalQty : (ltp - entryPrice) * totalQty;
-
-        positions.push({
-          id: `pos_${deploymentId}_${idx + 1}`,
-          script,
-          transaction: `${leg.action || 'SELL'} ${totalQty}`,
-          entryPrice: Number(entryPrice.toFixed(2)),
-          sl: leg.slValue || 0.00,
-          target: leg.targetValue || 1.00,
-          exitPrice: 0.00,
-          ltp: Number(ltp.toFixed(2)),
-          timeStamp: dateFormatted,
-          entryTime: timeFormatted,
-          exitTime: '--/--/---- --:--:--',
-          pnl: Number(pnl.toFixed(2)),
-          status: 'EXECUTED'
-        });
-      });
-    } else {
-      const cleanSymbol = actualSymbol.replace(/\s+/g, '').toUpperCase();
-      positions.push({
-        id: `pos_${deploymentId}_1`,
-        script: `${cleanSymbol}2630225500PE`,
-        transaction: `SELL ${totalQty}`,
-        entryPrice: 84.05,
-        sl: 0.00,
-        target: 1.00,
-        exitPrice: 0.00,
-        ltp: 83.25,
-        timeStamp: dateFormatted,
-        entryTime: timeFormatted,
-        exitTime: '--/--/---- --:--:--',
-        pnl: Number((-0.80 * totalQty).toFixed(2)) || -6.50,
-        status: 'EXECUTED'
-      });
-      positions.push({
-        id: `pos_${deploymentId}_2`,
-        script: `${cleanSymbol}2630225750CE`,
-        transaction: `SELL ${totalQty}`,
-        entryPrice: 83.70,
-        sl: 0.00,
-        target: 1.00,
-        exitPrice: 0.00,
-        ltp: 84.60,
-        timeStamp: dateFormatted,
-        entryTime: timeFormatted,
-        exitTime: '--/--/---- --:--:--',
-        pnl: Number((-0.90 * totalQty).toFixed(2)) || 0.00,
-        status: 'EXECUTED'
-      });
-    }
-
-    const calculatedPnl = positions.reduce((acc, pos) => acc + pos.pnl, 0);
 
     const deployment: DeployedStrategy = {
       deploymentId,
@@ -1029,10 +968,10 @@ router.post('/deploy', optionalAuth, async (req: AuthRequest, res: Response) => 
       status: 'RUNNING',
       qtyMultiplier: multiplier,
       maxProfit: Number(maxProfit) || sourceStrategy?.maxProfit || 0,
-      maxLoss: lossLimit || sourceStrategy?.maxLoss || 2500,
+      maxLoss: 0,
       deployedAt: new Date().toISOString(),
-      tradesExecuted: positions.length,
-      pnl: Number(calculatedPnl.toFixed(2)),
+      tradesExecuted: 0,
+      pnl: 0,
       config: {
         broker: type === 'live' ? 'dhan' : 'paper',
         type,
@@ -1049,26 +988,13 @@ router.post('/deploy', optionalAuth, async (req: AuthRequest, res: Response) => 
       positions
     };
 
+    try {
+      await nifty009Engine.start({ lotMultiplier: 3, lotSize: 65, maxDailyLoss: 0, squareOffTime: '15:10' }, deployment.mode, userId);
+    } catch (err: any) {
+      return res.status(422).json({ success: false, message: err.message });
+    }
     activeDeployments.set(deploymentId, deployment);
     saveDeployments();
-
-    // If deploying the NIFTY ATM CE/PE breakout, activate the live/paper engine
-    if (targetStrategyId === 'nifty-atm-independent-breakout' || templateType === 'nifty-atm-independent-breakout') {
-      try {
-        await nifty009Engine.start(
-          {
-            lotSize: (deployment.config?.lotSize || 65) * multiplier,
-            maxDailyLoss: deployment.maxLoss,
-            squareOffTime: deployment.config?.squareOff || '15:10'
-          },
-          deployment.mode,
-          userId
-        );
-        logger.info(`[Strategy Engine] Auto-started for deployment ${deploymentId} (${deployment.mode.toUpperCase()} mode)`);
-      } catch (err: any) {
-        logger.error(`[Strategy Engine] Failed to auto-start: ${err.message}`);
-      }
-    }
 
     const userExecutor = paperTradingManager.getExecutor(userId);
     userExecutor.recordAudit('STRATEGY_SIGNAL', actualSymbol, {
@@ -1105,6 +1031,11 @@ router.post('/deployment/:id/status', optionalAuth, (req: AuthRequest, res: Resp
     return res.status(404).json({ success: false, message: 'Deployment not found' });
   }
 
+  if (!nifty009Engine.getStatus().isRunning) {
+    return res.status(409).json({ success: false, message: 'Strategy engine is not running.' });
+  }
+  if (status === 'RUNNING') nifty009Engine.resume();
+  else nifty009Engine.pause();
   deployment.status = status === 'RUNNING' ? 'RUNNING' : 'PAUSED';
   activeDeployments.set(id, deployment);
   saveDeployments();
@@ -1128,6 +1059,11 @@ router.post('/deployment/:id/mode', optionalAuth, (req: AuthRequest, res: Respon
   if (!deployment) {
     return res.status(404).json({ success: false, message: 'Deployment not found' });
   }
+
+  if (mode === 'live') {
+    return res.status(409).json({ success: false, message: 'LIVE_EXECUTION_NOT_READY: Broker fill reconciliation is required.' });
+  }
+  nifty009Engine.setMode('paper');
 
   deployment.mode = mode === 'live' ? 'live' : 'paper';
   if (deployment.config) {
@@ -1156,35 +1092,15 @@ router.post('/deployment/:id/squareoff', optionalAuth, async (req: AuthRequest, 
     return res.status(404).json({ success: false, message: 'Deployment not found' });
   }
 
-  const now = new Date();
-  const dateFormatted = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
-  const timeFormatted = `${dateFormatted} ${now.toTimeString().split(' ')[0]}`;
-
-  if (deployment.positions) {
-    deployment.positions.forEach(pos => {
-      if (pos.status !== 'CLOSED') {
-        pos.exitPrice = pos.ltp || pos.entryPrice;
-        pos.exitTime = timeFormatted;
-        pos.status = 'CLOSED';
-      }
-    });
+  try {
+    await nifty009Engine.manualSquareOff();
+    nifty009Engine.stop('Deployment squared off');
+  } catch (err: any) {
+    return res.status(409).json({ success: false, message: err.message });
   }
-
   deployment.status = 'STOPPED';
   activeDeployments.set(id, deployment);
   saveDeployments();
-
-  if (deployment.mode === 'live') {
-    const userId = req.userId || 'user_admin';
-    const adapter = brokerRegistry.getPrimaryAdapter(userId);
-    if (adapter && typeof (adapter as any).exitAllPositions === 'function') {
-      try {
-        await (adapter as any).exitAllPositions();
-      } catch (err: any) {
-        logger.warn(`Broker live square-off warning: ${err.message}`);
-      }
-    }
-  }
 
   res.json({
     success: true,
@@ -1203,157 +1119,13 @@ router.delete('/deployment/:id', optionalAuth, (req: AuthRequest, res: Response)
   if (!existing) {
     return res.status(404).json({ success: false, message: 'Deployment not found' });
   }
+  if (existing.status === 'RUNNING' || existing.status === 'PAUSED') {
+    return res.status(409).json({ success: false, message: 'Square off or stop the strategy before removing it.' });
+  }
 
   activeDeployments.delete(id);
   saveDeployments();
   return res.json({ success: true, message: 'Deployment removed' });
-});
-
-/**
- * POST /api/strategies/test-trigger
- * Executes all actual configured strategy legs with real market prices, virtual margins, slippage, and live broker routing.
- */
-router.post('/test-trigger', optionalAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.userId || (req.query.userId as string) || (req.body && req.body.userId) || 'user_admin';
-    const executor = paperTradingManager.getExecutor(userId);
-    const { deploymentId, symbol = 'NIFTY 50', side = 'BUY', quantity = 25 } = req.body;
-
-    const deployment = deploymentId ? activeDeployments.get(deploymentId) : null;
-    const configuredLegs: StrategyLeg[] = deployment?.config?.legs || [];
-    const activeLegs = configuredLegs.filter((l) => l.isActive !== false);
-
-    logger.info(`⚡ [Strategy Trigger Execution] Deployment: "${deployment?.name || 'Standalone'}" (${activeLegs.length} active legs) for user ${userId}`);
-
-    // If strategy has real multi-legs configured, execute each leg with its real parameters!
-    if (activeLegs.length > 0 && deployment) {
-      const executedLegs: any[] = [];
-      const liveOrders: any[] = [];
-
-      for (const leg of activeLegs) {
-        const legSymbol = `${deployment.symbol} ${leg.strikeType || leg.strike || 'ATM 0'} ${leg.optionType}`;
-        const legQty = (Number(leg.quantity) || deployment.config?.lotSize || 30) * deployment.qtyMultiplier;
-        const legSide = leg.action || 'BUY';
-        const productType = deployment.config?.orderType === 'CNC' ? 'CNC' : 'INTRADAY';
-
-        let liveOrderRes: any = null;
-        if (deployment.mode === 'live') {
-          const adapter = brokerRegistry.getPrimaryAdapter(userId);
-          if (adapter) {
-            try {
-              liveOrderRes = await adapter.placeOrder({
-                symbol: legSymbol,
-                exchange: legSymbol.includes('NIFTY') || legSymbol.includes('BANK') ? 'NFO' : 'NSE',
-                side: legSide,
-                orderType: 'MARKET',
-                productType,
-                validity: 'DAY',
-                quantity: legQty
-              });
-              liveOrders.push({ legId: leg.id, symbol: legSymbol, result: liveOrderRes });
-              logger.info(`[Live Dhan Strategy Order] Leg ${leg.id} placed: ${JSON.stringify(liveOrderRes)}`);
-            } catch (err: any) {
-              logger.error(`[Live Dhan Strategy Order Failed] Leg ${leg.id}:`, err.message);
-              liveOrders.push({ legId: leg.id, symbol: legSymbol, error: err.message });
-            }
-          }
-        }
-
-        // Execute in virtual execution engine for full portfolio, margin, and P&L tracking
-        const paperOrderRes = await executor.executeOrder({
-          symbol: legSymbol,
-          exchange: 'NSE',
-          side: legSide,
-          orderType: 'MARKET',
-          productType,
-          validity: 'DAY',
-          quantity: legQty,
-          strategyId: deployment.strategyId
-        });
-
-        executedLegs.push({
-          legId: leg.id,
-          symbol: legSymbol,
-          side: legSide,
-          quantity: legQty,
-          strike: leg.strikeType || leg.strike,
-          optionType: leg.optionType,
-          slType: leg.slType,
-          slValue: leg.slValue,
-          targetType: leg.targetType || leg.tpType,
-          targetValue: leg.targetValue || leg.tpValue,
-          paperOrder: paperOrderRes,
-          liveOrder: liveOrderRes
-        });
-      }
-
-      deployment.tradesExecuted += activeLegs.length;
-      deployment.lastTriggerAt = new Date().toISOString();
-      activeDeployments.set(deployment.deploymentId, deployment);
-      saveDeployments();
-
-      return res.json({
-        success: true,
-        message: `Real strategy execution: ${activeLegs.length} leg(s) executed for "${deployment.name}" (${deployment.mode.toUpperCase()} mode)`,
-        deployment,
-        executedLegs,
-        liveOrders
-      });
-    }
-
-    // Fallback for single-order trigger when no multi-legs are attached
-    const targetSymbol = deployment ? deployment.symbol : symbol;
-    const tradeQty = deployment ? deployment.qtyMultiplier * quantity : quantity;
-
-    let liveOrderResult: any = null;
-    if (deployment && deployment.mode === 'live') {
-      const adapter = brokerRegistry.getPrimaryAdapter(userId);
-      if (adapter) {
-        try {
-          liveOrderResult = await adapter.placeOrder({
-            symbol: targetSymbol,
-            exchange: targetSymbol.includes('NIFTY') ? 'NFO' : 'NSE',
-            side: side as 'BUY' | 'SELL',
-            orderType: 'MARKET',
-            productType: 'INTRADAY',
-            validity: 'DAY',
-            quantity: tradeQty
-          });
-        } catch (err: any) {
-          liveOrderResult = { success: false, message: err.message };
-        }
-      }
-    }
-
-    const orderResult = await executor.executeOrder({
-      symbol: targetSymbol,
-      exchange: 'NSE',
-      side: side as 'BUY' | 'SELL',
-      orderType: 'MARKET',
-      productType: 'INTRADAY',
-      validity: 'DAY',
-      quantity: tradeQty,
-      strategyId: deployment ? deployment.strategyId : 'standalone'
-    });
-
-    if (deployment) {
-      deployment.tradesExecuted += 1;
-      deployment.lastTriggerAt = new Date().toISOString();
-      activeDeployments.set(deployment.deploymentId, deployment);
-      saveDeployments();
-    }
-
-    res.json({
-      success: true,
-      message: `Trigger executed: ${side} ${tradeQty} Qty of ${targetSymbol}${deployment?.mode === 'live' ? ' (LIVE DHAN GATEWAY)' : ' (PAPER SIMULATED)'}`,
-      orderResult,
-      liveOrderResult,
-      deployment
-    });
-  } catch (error: any) {
-    logger.error('Test trigger error:', error);
-    res.status(500).json({ success: false, message: 'Failed to test strategy trigger', error: error.message });
-  }
 });
 
 /**
@@ -1367,17 +1139,15 @@ router.post('/stop', optionalAuth, async (req: AuthRequest, res: Response) => {
     return res.status(404).json({ success: false, message: 'Deployment not found' });
   }
 
+  try {
+    await nifty009Engine.manualSquareOff();
+    nifty009Engine.stop('User stopped deployment');
+  } catch (err: any) {
+    return res.status(409).json({ success: false, message: err.message });
+  }
   deployment.status = 'STOPPED';
   activeDeployments.set(deploymentId, deployment);
   saveDeployments();
-
-  if (deployment.strategyId === 'nifty-atm-independent-breakout' || deployment.templateType === 'nifty-atm-independent-breakout') {
-    try {
-      await nifty009Engine.stop('User stopped deployment');
-    } catch (e: any) {
-      logger.warn('[Stop deployment] Strategy engine stop notice:', e.message);
-    }
-  }
 
   const userExecutor = paperTradingManager.getExecutor(req.userId || 'user_admin');
   userExecutor.recordAudit('STRATEGY_SIGNAL', deployment.symbol, {
@@ -1416,45 +1186,13 @@ router.get('/:id', (req: Request, res: Response) => {
 // ============================================================
 
 import { nifty009Engine } from '../strategies/nifty009/Nifty009Engine';
-import { DEFAULT_CONFIG } from '../strategies/nifty009/StrategyStateMachine';
-
-/**
- * POST /api/strategies/nifty009/start
- */
-router.post('/nifty009/start', async (req: Request, res: Response) => {
-  try {
-    const {
-      lotSize,
-      capitalAllocation,
-      squareOffTime,
-      maxTradesPerDay,
-      maxDailyLoss,
-      enableReEntry
-    } = req.body;
-
-    const config: Partial<typeof DEFAULT_CONFIG> = {};
-    if (lotSize) config.lotSize = Number(lotSize);
-    if (capitalAllocation) config.capitalAllocation = Number(capitalAllocation);
-    if (squareOffTime) config.squareOffTime = squareOffTime;
-    if (maxTradesPerDay) config.maxTradesPerDay = Number(maxTradesPerDay);
-    if (maxDailyLoss) config.maxDailyLoss = Number(maxDailyLoss);
-    if (enableReEntry !== undefined) config.enableReEntry = Boolean(enableReEntry);
-
-    await nifty009Engine.start(config);
-
-    logger.info('[Route] NIFTY 0.09% strategy started', config);
-    res.json({ success: true, message: 'NIFTY 0.09% ATM Full-Day Breakout strategy started (PAPER MODE)', status: nifty009Engine.getStatus() });
-  } catch (err: any) {
-    logger.error('[Route] nifty009/start error:', err.message);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
 
 /**
  * POST /api/strategies/nifty009/stop
  */
 router.post('/nifty009/stop', async (req: Request, res: Response) => {
   try {
+    await nifty009Engine.manualSquareOff();
     await nifty009Engine.stop('Manual stop via API');
     res.json({ success: true, message: 'Strategy stopped', status: nifty009Engine.getStatus() });
   } catch (err: any) {
@@ -1528,8 +1266,7 @@ router.get('/nifty009/status', (_req: Request, res: Response) => {
 router.get('/nifty009/candles', async (_req: Request, res: Response) => {
   try {
     const status = nifty009Engine.getStatus();
-    const liveStreamPrice = MarketStreamer.getInstance()?.getPrice('NIFTY 50');
-    const currentPrice = status.niftyLtp || liveStreamPrice || status.firstCandleClose || 0;
+    const currentPrice = status.niftyLtp;
 
     // Fetch real completed candles from engine
     const engineCandles = (nifty009Engine as any).spotCandleEngine?.getCompletedCandles() || [];
@@ -1550,7 +1287,7 @@ router.get('/nifty009/candles', async (_req: Request, res: Response) => {
       success: true,
       candles: formattedCandles,
       levels: {
-        spotBase: status.firstCandleClose || currentPrice,
+        spotBase: status.firstCandleClose,
         upperLevel: status.upperLevel,
         lowerLevel: status.lowerLevel,
         liveLtp: currentPrice

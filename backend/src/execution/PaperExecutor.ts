@@ -61,18 +61,6 @@ export class PaperExecutor extends ExecutionProvider {
     const safeUserId = this.userId.replace(/[^a-zA-Z0-9_-]/g, '_');
     this.stateFilePath = path.join(__dirname, `../../data/paper-trading/${safeUserId}.json`);
 
-    // Seed realistic live Indian equity & index baseline prices
-    this.lastKnownPrices.set('NIFTY 50', 24100.70);
-    this.lastKnownPrices.set('BANKNIFTY', 57336.05);
-    this.lastKnownPrices.set('FINNIFTY', 26204.00);
-    this.lastKnownPrices.set('RELIANCE', 1283.60);
-    this.lastKnownPrices.set('TCS', 2339.10);
-    this.lastKnownPrices.set('INFY', 1137.20);
-    this.lastKnownPrices.set('HDFCBANK', 714.60);
-    this.lastKnownPrices.set('ICICIBANK', 1419.90);
-    this.lastKnownPrices.set('SBIN', 1046.70);
-    this.lastKnownPrices.set('BHARTIARTL', 1877.80);
-
     // Auto-restore persisted state from disk
     this.loadState();
   }
@@ -150,7 +138,10 @@ export class PaperExecutor extends ExecutionProvider {
 
   public async executeOrder(orderRequest: OrderRequest): Promise<OrderResult> {
     const orderId = orderRequest.id || `paper_ord_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    const ltp = this.lastKnownPrices.get(orderRequest.symbol) || orderRequest.price || 100;
+    const ltp = orderRequest.price;
+    if (!ltp || !Number.isFinite(ltp) || ltp <= 0) {
+      return { success: false, orderId, status: 'REJECTED', rejectionReason: 'No verified price available for paper execution', timestamp: new Date() };
+    }
     
     // Realistic slippage: Market orders experience 0.05% slippage
     const slippageMultiplier = orderRequest.side === 'BUY' ? 1.0005 : 0.9995;

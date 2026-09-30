@@ -33,7 +33,6 @@ import {
   KeyboardArrowDown,
   KeyboardArrowUp,
   AccessTime,
-  Bolt
 } from '@mui/icons-material';
 import Layout from '../components/Layout';
 import { EmptyState } from '../components/ui';
@@ -143,8 +142,8 @@ export const Strategies: React.FC = () => {
   const [selectedBrokers, setSelectedBrokers] = useState<string[]>(['dhan_primary']);
   const [deployQtyMultiplier, setDeployQtyMultiplier] = useState<number>(1);
   const [deployMaxProfit, setDeployMaxProfit] = useState<number | string>(0);
-  const [deployMaxLoss, setDeployMaxLoss] = useState<number | string>(2500);
-  const [autoSquareOffTime, setAutoSquareOffTime] = useState<string>('15:15');
+  const [deployMaxLoss, setDeployMaxLoss] = useState<number | string>(0);
+  const [autoSquareOffTime, setAutoSquareOffTime] = useState<string>('15:10');
   const [acceptTerms, setAcceptTerms] = useState<boolean>(false);
 
   const loadData = useCallback(async () => {
@@ -198,8 +197,8 @@ export const Strategies: React.FC = () => {
     setSelectedBrokers(['dhan_primary']);
     setDeployQtyMultiplier(1);
     setDeployMaxProfit(strategy.maxProfit || 0);
-    setDeployMaxLoss(strategy.maxLoss || 2500);
-    setAutoSquareOffTime(strategy.endTime || '15:15');
+    setDeployMaxLoss(strategy.maxLoss ?? 0);
+    setAutoSquareOffTime(strategy.endTime || '15:10');
     setAcceptTerms(false);
     setDeployModalOpen(true);
   };
@@ -220,7 +219,7 @@ export const Strategies: React.FC = () => {
         templateType: stratId,
         qtyMultiplier: Number(deployQtyMultiplier) || 1,
         maxProfit: Number(deployMaxProfit) || 0,
-        maxLoss: Number(deployMaxLoss) || 2500,
+        maxLoss: Number(deployMaxLoss),
         squareOff: autoSquareOffTime,
         type: deploymentType === 'Live' ? 'live' : 'paper'
       });
@@ -848,7 +847,7 @@ export const Strategies: React.FC = () => {
                               Max Loss
                             </Typography>
                             <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.85rem' }}>
-                              {dep.maxLoss || 2500}
+                              {dep.maxLoss ?? 0}
                             </Typography>
                           </Box>
 
@@ -1252,6 +1251,7 @@ export const Strategies: React.FC = () => {
                   type="number"
                   size="small"
                   value={deployQtyMultiplier}
+                  disabled
                   onChange={(e) => setDeployQtyMultiplier(Math.max(1, parseInt(e.target.value, 10) || 1))}
                   fullWidth
                   InputProps={{
@@ -1273,6 +1273,7 @@ export const Strategies: React.FC = () => {
                   type="number"
                   size="small"
                   value={deployMaxProfit}
+                  disabled
                   onChange={(e) => setDeployMaxProfit(e.target.value)}
                   fullWidth
                   InputProps={{
@@ -1297,6 +1298,7 @@ export const Strategies: React.FC = () => {
                   type="number"
                   size="small"
                   value={deployMaxLoss}
+                  disabled
                   onChange={(e) => setDeployMaxLoss(e.target.value)}
                   fullWidth
                   InputProps={{
@@ -1317,6 +1319,7 @@ export const Strategies: React.FC = () => {
                 <TextField
                   size="small"
                   value={autoSquareOffTime}
+                  disabled
                   onChange={(e) => setAutoSquareOffTime(e.target.value)}
                   fullWidth
                   InputProps={{
@@ -1444,24 +1447,6 @@ export const Strategies: React.FC = () => {
         >
           {depMenuSelected && (
             <>
-              <MenuItem
-                onClick={async () => {
-                  setDepMenuAnchor(null);
-                  try {
-                    await axios.post(`${API_CONFIG.BASE_URL}/api/strategies/test-trigger`, {
-                      deploymentId: depMenuSelected.deploymentId,
-                      symbol: depMenuSelected.symbol
-                    });
-                    setStatusMessage({ type: 'success', text: `Test trigger executed for ${depMenuSelected.name}` });
-                    await loadData();
-                  } catch (e) {
-                    setStatusMessage({ type: 'error', text: 'Test trigger failed' });
-                  }
-                }}
-                sx={{ fontSize: '0.82rem', fontWeight: 600, gap: 1.5 }}
-              >
-                <Bolt fontSize="small" sx={{ color: '#2563eb' }} /> Test Trigger
-              </MenuItem>
               <MenuItem
                 onClick={() => {
                   setDepMenuAnchor(null);

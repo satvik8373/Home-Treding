@@ -32,6 +32,7 @@ interface BacktestControlsProps {
   totalPnl: number | null;
   maxDrawdown: number | null;
   equityCurve: EquityPoint[];
+  initialCapital: number;
   loading: boolean;
   onRunBacktest: () => void;
   onExportTrades: (format: 'csv' | 'json') => void;
@@ -51,6 +52,7 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
   totalPnl,
   maxDrawdown,
   equityCurve,
+  initialCapital,
   loading,
   onRunBacktest,
   onExportTrades,
@@ -271,7 +273,7 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
           </Box>
 
           <Typography sx={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
-            Completed 2026 sessions only. Dhan historical option access is required.
+            Completed sessions from 2026 onward. Historical minute options require broker data access.
           </Typography>
         </Box>
       )}
@@ -411,9 +413,7 @@ export const BacktestControls: React.FC<BacktestControlsProps> = ({
       ) : (
         <InteractiveEquitySvgChart
           data={equityCurve.map((item, idx) => {
-            const displayPnl = (item as any).cumulativePnl !== undefined
-              ? (item as any).cumulativePnl
-              : (item.equity >= 50000 ? item.equity - 100000 : item.equity);
+            const displayPnl = item.equity - initialCapital;
             return {
               date: item.date,
               displayPnl: Math.round(displayPnl * 10) / 10,

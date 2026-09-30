@@ -77,6 +77,30 @@ const flat = run('flat');
 assert.equal(flat.summary.totalTrades, 0);
 assert.equal(flat.summary.tradingDays, 1);
 assert.equal(flat.daywiseTransactions[0].pnl, 0);
+const spot: Candle[] = [{ date, time: '09:15', timestamp: epoch('09:15'),
+  isoTime: `${date}T09:15:00+05:30`, open: 24000, high: 24000,
+  low: 24000, close: 24000, volume: 1000 }];
+
+// Wicks on the reference candle must not move levels away from the saved close rule.
+const wickCe = series('CE', 'targets');
+wickCe.candles5m[0].high = 140;
+wickCe.candles5m[0].low = 60;
+const wickReport = new AlgoroomsStyleBacktester(spot, {
+  strategyName: 'NIFTY ATM CE/PE', symbol: 'NIFTY 50', initialCapital: 100000,
+  startTime: '09:20', endTime: '15:10', ceOptionSeries: wickCe,
+  peOptionSeries: series('PE', 'flat')
+}).run();
+assert.equal(wickReport.trades[0].signalRefPrice, 100);
+assert.equal(wickReport.trades[0].upperBreakoutLevel, 100.9);
+assert.equal(wickReport.trades[0].lowerExitLevel, 99.1);
+
+const gappedCe = series('CE', 'flat');
+gappedCe.candles1m.splice(100, 1);
+assert.throws(() => new AlgoroomsStyleBacktester(spot, {
+  strategyName: 'NIFTY ATM CE/PE', symbol: 'NIFTY 50', initialCapital: 100000,
+  startTime: '09:20', endTime: '15:10', ceOptionSeries: gappedCe,
+  peOptionSeries: series('PE', 'flat')
+}).run(), /INCOMPLETE_OPTION_DATA/);
 
 assert.throws(() => new AlgoroomsStyleBacktester([], {
   strategyName: 'bad', symbol: 'NIFTY 50', initialCapital: 100000,
@@ -87,9 +111,6 @@ assert.throws(() => new AlgoroomsStyleBacktester([], {
 
 const illiquidCe = series('CE', 'eod');
 illiquidCe.candles1m[10].volume = 0;
-const spot: Candle[] = [{ date, time: '09:15', timestamp: epoch('09:15'),
-  isoTime: `${date}T09:15:00+05:30`, open: 24000, high: 24000,
-  low: 24000, close: 24000, volume: 1000 }];
 assert.throws(() => new AlgoroomsStyleBacktester(spot, {
   strategyName: 'NIFTY ATM CE/PE', symbol: 'NIFTY 50', initialCapital: 100000,
   startTime: '09:20', endTime: '15:10', ceOptionSeries: illiquidCe,

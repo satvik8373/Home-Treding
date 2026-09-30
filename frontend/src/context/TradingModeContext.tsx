@@ -36,7 +36,7 @@ export const TradingModeProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const brokersList = await brokerApi.getBrokers();
       const connected = brokersList.find(b => b.status === 'Connected') || brokersList[0] || null;
       setBroker(connected);
-      const hasConnected = !!(connected && (connected.status === 'Connected' || connected.terminalEnabled));
+      const hasConnected = connected?.status === 'Connected';
       setIsBrokerConnected(hasConnected);
 
       // 2. Sync trading mode with backend

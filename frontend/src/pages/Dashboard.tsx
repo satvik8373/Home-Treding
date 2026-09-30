@@ -186,7 +186,7 @@ const Dashboard: React.FC = () => {
   }
 
   const dhanBroker = brokers.find(b => b.broker?.toUpperCase() === 'DHAN') || brokers[0];
-  const isDhanConnected = Boolean(dhanBroker && (dhanBroker.status === 'Connected' || dhanBroker.terminalEnabled));
+  const isDhanConnected = dhanBroker?.status === 'Connected';
   const brokerDisplayName = dhanBroker ? `${dhanBroker.broker} (${dhanBroker.maskedClientId || dhanBroker.clientId})` : 'Dhan (Not Connected)';
   const brokerStatusText = isDhanConnected ? 'Connected' : 'Disconnected';
   const userDisplayName = user?.name || dhanBroker?.accountName || user?.email || 'Mavrix Trader';

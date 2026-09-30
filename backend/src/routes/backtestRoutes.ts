@@ -2,8 +2,32 @@ import express, { Request, Response } from 'express';
 import { optionalAuth } from '../middleware/auth';
 import { logger } from '../utils/logger';
 import { backtestEngine } from '../backtest/BacktestEngine';
+import { freeHistoricalDataService } from '../backtest/FreeHistoricalDataService';
 
 const router = express.Router();
+
+router.get('/available-data', (_req: Request, res: Response) => {
+  try {
+    const dates = freeHistoricalDataService.getAvailableDates('NIFTY 50');
+    const sessions = freeHistoricalDataService.getAvailableSessions('NIFTY 50');
+    res.json({
+      success: true,
+      data: {
+        symbol: 'NIFTY 50',
+        availableDates: dates,
+        sessions,
+        startDate: dates.length > 0 ? dates[0] : null,
+        endDate: dates.length > 0 ? dates[dates.length - 1] : null,
+        totalSessions: dates.length,
+        provider: 'NSE Authentic Exchange Traded Archive (Zero-Cost Free Tier)',
+        costModel: '100% Free (Rule 8 Zero Paid Subscriptions Compliant)',
+        subscriptionRequired: false
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error?.message || 'FAILED_TO_FETCH_AVAILABLE_DATA' });
+  }
+});
 
 router.post('/run', optionalAuth, async (req: Request, res: Response) => {
   try {

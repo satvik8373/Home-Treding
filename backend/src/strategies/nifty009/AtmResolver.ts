@@ -1,7 +1,6 @@
 import { BrokerRegistry } from '../../brokers/BrokerRegistry';
-import { logger } from '../../utils/logger';
+import { DhanAdapter } from '../../brokers/dhan/DhanAdapter';
 import { getStrategyConfig } from '../../config/strategyConfig';
-import { calculateOptionPricing } from '../../utils/blackScholes';
 
 export interface LockedAtm {
   atmStrike: number;
@@ -22,130 +21,60 @@ export class AtmResolver {
   private lockedAtm: LockedAtm | null = null;
 
   public static getInstance(): AtmResolver {
-    if (!AtmResolver.instance) {
-      AtmResolver.instance = new AtmResolver();
-    }
-    return AtmResolver.instance;
+    return AtmResolver.instance ?? (AtmResolver.instance = new AtmResolver());
   }
 
-  /**
-   * Round NIFTY spot to nearest 50 strike
-   */
   public getNearestStrike(spotPrice: number): number {
+    if (!Number.isFinite(spotPrice) || spotPrice <= 0) throw new Error('LIVE_SPOT_REQUIRED');
     return Math.round(spotPrice / 50) * 50;
   }
 
-  /**
-   * Get formatted nearest weekly expiry (e.g. DD-MMM-YYYY)
-   */
-  public getNearestWeeklyExpiry(fromDate = new Date()): string {
-    const d = new Date(fromDate);
-    const day = d.getDay();
-    // NSE NIFTY options expire on Thursdays (day 4)
-    let diff = 4 - day;
-    if (diff < 0) diff += 7;
-    // If today is Thursday after 15:30, move to next Thursday
-    if (diff === 0 && d.getHours() >= 15 && d.getMinutes() >= 30) {
-      diff = 7;
-    }
-    d.setDate(d.getDate() + diff);
+  public async resolveAndLockAtm(spotPrice: number, lotSize?: number, userId?: string): Promise<LockedAtm> {
+    if (this.lockedAtm) return this.lockedAtm;
+    const adapter = BrokerRegistry.getInstance().getPrimaryAdapter(userId) as DhanAdapter | null;
+    if (!adapter?.getStatus()) throw new Error('DHAN_AUTH_REQUIRED: Connect Dhan before starting the live strategy.');
 
-    const dayStr = String(d.getDate()).padStart(2, '0');
-    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-    const monthStr = months[d.getMonth()];
-    const yearStr = d.getFullYear();
-    return `${dayStr}-${monthStr}-${yearStr}`;
-  }
-
-  /**
-   * Resolve and lock ATM strike at 09:20 IST.
-   */
-  public async resolveAndLockAtm(spotPrice: number, defaultLotSize?: number, userId?: string): Promise<LockedAtm> {
-    if (this.lockedAtm) {
-      if (Math.abs(this.lockedAtm.spotPriceAtResolution - spotPrice) > 500) {
-        logger.warn(`[AtmResolver] Stale locked ATM (${this.lockedAtm.atmStrike}) deviates >500pts from current spot (${spotPrice}). Re-resolving.`);
-        this.lockedAtm = null;
-      } else {
-        logger.info(`[AtmResolver] ATM already locked at ${this.lockedAtm.atmStrike}. Re-using locked strike.`);
-        return this.lockedAtm;
-      }
-    }
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date());
+    const expiries = await adapter.getExpiryList('13', 'IDX_I');
+    const expiry = expiries.filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date) && date >= today).sort()[0];
+    if (!expiry) throw new Error('DHAN_EXPIRY_UNAVAILABLE: Dhan returned no active NIFTY expiry.');
 
     const atmStrike = this.getNearestStrike(spotPrice);
-    const expiry = this.getNearestWeeklyExpiry();
-    const lotSize = defaultLotSize || getStrategyConfig().niftyLotSize;
-
-    const ceSymbol = `NIFTY ${expiry} ${atmStrike} CE`;
-    const peSymbol = `NIFTY ${expiry} ${atmStrike} PE`;
-
-    let ceSecurityId = `NIFTY_${atmStrike}_CE`;
-    let peSecurityId = `NIFTY_${atmStrike}_PE`;
-    const initialPricing = calculateOptionPricing(spotPrice, atmStrike);
-    let ceLtp = initialPricing.callPrice;
-    let peLtp = initialPricing.putPrice;
-
-    try {
-      const brokerRegistry = BrokerRegistry.getInstance();
-      const primaryAdapter = brokerRegistry.getPrimaryAdapter(userId) as any;
-
-      if (primaryAdapter && typeof primaryAdapter.getOptionChain === 'function') {
-        // Attempt to fetch live option chain from Dhan (UnderlyingSecurityId '13' for NIFTY 50)
-        let chain = await primaryAdapter.getOptionChain('13', expiry);
-        if (!chain || !chain.strikes || chain.strikes.length === 0) {
-          chain = await primaryAdapter.getOptionChain('NIFTY', expiry);
-        }
-        if (chain && chain.strikes) {
-          const matched = chain.strikes.find((s: any) => s.strikePrice === atmStrike);
-          if (matched) {
-            if (matched.ce) {
-              ceSecurityId = String(matched.ce.securityId || ceSecurityId);
-              ceLtp = matched.ce.ltp || ceLtp;
-            }
-            if (matched.pe) {
-              peSecurityId = String(matched.pe.securityId || peSecurityId);
-              peLtp = matched.pe.ltp || peLtp;
-            }
-          }
-        }
-      }
-    } catch (err: any) {
-      logger.warn('[AtmResolver] Dhan option chain lookup error, using computed contract specs:', err.message);
+    const chain = await adapter.getOptionChain('13', expiry);
+    const strike = chain?.strikes.find(row => row.strikePrice === atmStrike);
+    const ce = strike?.ce;
+    const pe = strike?.pe;
+    if (!ce?.securityId || !pe?.securityId || ce.ltp <= 0 || pe.ltp <= 0 ||
+        !/^\d+$/.test(ce.securityId) || !/^\d+$/.test(pe.securityId)) {
+      throw new Error('DHAN_ATM_CONTRACT_UNAVAILABLE: Dhan did not verify both ATM option contracts and prices.');
     }
 
     this.lockedAtm = {
-      atmStrike,
-      expiry,
-      ceSecurityId,
-      ceSymbol,
-      ceLtp,
-      peSecurityId,
-      peSymbol,
-      peLtp,
-      lotSize,
+      atmStrike, expiry,
+      ceSecurityId: ce.securityId,
+      ceSymbol: ce.symbol || `NIFTY ${expiry} ${atmStrike} CE`,
+      ceLtp: ce.ltp,
+      peSecurityId: pe.securityId,
+      peSymbol: pe.symbol || `NIFTY ${expiry} ${atmStrike} PE`,
+      peLtp: pe.ltp,
+      lotSize: lotSize ?? getStrategyConfig().niftyLotSize,
       spotPriceAtResolution: spotPrice,
       resolvedAt: new Date().toISOString()
     };
-
-    logger.info(`[AtmResolver] 🔒 LOCKED ATM for day: Strike=${atmStrike} | CE=${ceSymbol} (₹${ceLtp}) | PE=${peSymbol} (₹${peLtp})`);
     return this.lockedAtm;
   }
 
-  public getLockedAtm(): LockedAtm | null {
-    return this.lockedAtm;
-  }
+  public getLockedAtm(): LockedAtm | null { return this.lockedAtm; }
 
   public updateOptionLtp(type: 'CE' | 'PE', ltp: number): void {
-    if (!this.lockedAtm || ltp <= 0) return;
-    if (type === 'CE') {
-      this.lockedAtm.ceLtp = ltp;
-    } else {
-      this.lockedAtm.peLtp = ltp;
-    }
+    if (!this.lockedAtm || !Number.isFinite(ltp) || ltp <= 0) return;
+    if (type === 'CE') this.lockedAtm.ceLtp = ltp;
+    else this.lockedAtm.peLtp = ltp;
   }
 
-  public reset(): void {
-    this.lockedAtm = null;
-  }
+  public reset(): void { this.lockedAtm = null; }
 }
 
 export const atmResolver = AtmResolver.getInstance();

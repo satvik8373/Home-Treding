@@ -1,6 +1,7 @@
 // Vercel Serverless Function - Main Entry Point
 const express = require('express');
 const cors = require('cors');
+const axios = require('axios');
 
 // Create Express app
 const app = express();
@@ -20,9 +21,7 @@ app.use(express.json());
 const authRoutes = require('./routes/auth');
 const brokerRoutes = require('./routes/brokers');
 const marketRoutes = require('./routes/market');
-const strategyRoutes = require('./routes/strategies');
 const portfolioRoutes = require('./routes/portfolio');
-const tradingRoutes = require('./routes/trading');
 const paperRoutes = require('./routes/paper');
 const riskRoutes = require('./routes/risk');
 const backtestRoutes = require('./routes/backtest');
@@ -65,24 +64,40 @@ app.get(['/api/health', '/health'], (req, res) => {
 });
 
 // Mount routes (support both with and without /api prefix)
+// Account, strategy, and trading requests use one backend and connection store.
+if (process.env.MAVRIX_BACKTEST_ENGINE_URL) {
+  app.use(['/api/auth', '/auth', '/api/broker', '/broker', '/api/brokers', '/brokers',
+    '/api/strategies', '/strategies', '/api/trading', '/trading'], async (req, res) => {
+    const base = process.env.MAVRIX_BACKTEST_ENGINE_URL.replace(/\/$/, '');
+    const endpoint = req.originalUrl.startsWith('/api/') ? req.originalUrl : `/api${req.originalUrl}`;
+    try {
+      const response = await axios({
+        url: `${base}${endpoint}`, method: req.method, data: req.body,
+        headers: { authorization: req.headers.authorization, 'content-type': 'application/json' },
+        timeout: 30000, validateStatus: () => true
+      });
+      res.status(response.status).json(response.data);
+    } catch {
+      res.status(502).json({ success: false, message: 'Trading service is unavailable.' });
+    }
+  });
+}
 ['/api/auth', '/auth'].forEach(p => app.use(p, authRoutes));
 ['/api/broker', '/broker', '/api/brokers', '/brokers'].forEach(p => app.use(p, brokerRoutes));
 ['/api/market', '/market'].forEach(p => app.use(p, marketRoutes));
-['/api/strategies', '/strategies'].forEach(p => app.use(p, strategyRoutes));
+if (!process.env.MAVRIX_BACKTEST_ENGINE_URL) {
+  app.use(['/api/strategies', '/strategies'], (_req, res) => res.status(503).json({ success: false, message: 'Strategy service is not configured.' }));
+  app.use(['/api/trading', '/trading'], (_req, res) => res.status(503).json({ success: false, message: 'Trading service is not configured.' }));
+}
 ['/api/portfolio', '/portfolio'].forEach(p => app.use(p, portfolioRoutes));
-['/api/trading', '/trading'].forEach(p => app.use(p, tradingRoutes));
 ['/api/paper', '/paper'].forEach(p => app.use(p, paperRoutes));
 ['/api/risk', '/risk'].forEach(p => app.use(p, riskRoutes));
 ['/api/backtest', '/backtest'].forEach(p => app.use(p, backtestRoutes));
 ['/api/strategy-test', '/strategy-test'].forEach(p => app.use(p, strategyTestRoutes));
 
-// Dhan Partner OAuth callback
+// Partner callbacks require a verified consent exchange before any connection exists.
 app.all(['/api/dhan-partner/callback', '/dhan-partner/callback'], (req, res) => {
-  res.json({
-    success: true,
-    message: 'Dhan partner callback handled successfully',
-    broker: { broker: 'dhan', status: 'Connected' }
-  });
+  res.status(410).json({ success: false, message: 'Use the Dhan access token connection flow.' });
 });
 
 // Graceful socket.io stub for serverless environments (prevents 404 polling errors)

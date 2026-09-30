@@ -60,19 +60,27 @@ export interface OptionChainResponse {
 
 export class DhanOptionChainService {
   private client: DhanHttpClient;
+  private nextRequestAt = 0;
 
   constructor(client: DhanHttpClient) {
     this.client = client;
   }
 
+  private async waitForRateLimit(): Promise<void> {
+    const delay = Math.max(0, this.nextRequestAt - Date.now());
+    if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+    this.nextRequestAt = Date.now() + 3100;
+  }
+
   /**
    * Fetch list of available expiry dates for an underlying
    */
-  public async getExpiryList(underlyingSecurityId: string, exchangeSegment: string = 'NSE_FNO'): Promise<string[]> {
+  public async getExpiryList(underlyingSecurityId: string, exchangeSegment: string = 'IDX_I'): Promise<string[]> {
     try {
+      await this.waitForRateLimit();
       const response = await this.client.post<any>(DHAN_CONFIG.ENDPOINTS.OPTION_CHAIN_EXPIRIES, {
-        UnderlyingSecurityId: Number(underlyingSecurityId) || underlyingSecurityId,
-        UnderlyingExchangeSegment: exchangeSegment
+        UnderlyingScrip: Number(underlyingSecurityId),
+        UnderlyingSeg: exchangeSegment
       });
 
       if (response && Array.isArray(response.data)) {
@@ -95,12 +103,13 @@ export class DhanOptionChainService {
     underlyingExchangeSegment?: string;
     expiry: string;
   }): Promise<OptionChainResponse | null> {
-    const { underlyingSecurityId, underlyingExchangeSegment = 'NSE_FNO', expiry } = params;
+    const { underlyingSecurityId, underlyingExchangeSegment = 'IDX_I', expiry } = params;
 
     try {
+      await this.waitForRateLimit();
       const response = await this.client.post<any>(DHAN_CONFIG.ENDPOINTS.OPTION_CHAIN, {
-        UnderlyingSecurityId: Number(underlyingSecurityId) || underlyingSecurityId,
-        UnderlyingExchangeSegment: underlyingExchangeSegment,
+        UnderlyingScrip: Number(underlyingSecurityId),
+        UnderlyingSeg: underlyingExchangeSegment,
         Expiry: expiry
       });
 

@@ -10,7 +10,6 @@ import {
   MenuItem,
   TextField,
   InputAdornment,
-  Tooltip,
   Alert,
   styled
 } from '@mui/material';
@@ -65,39 +64,12 @@ const CustomSwitch = styled((props: any) => (
 }));
 
 export const Brokers: React.FC = () => {
-  const [brokers, setBrokers] = useState<BrokerSummary[]>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('dhan_connected_broker');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && (parsed.status === 'Connected' || parsed.clientId)) return [parsed];
-        }
-      } catch (_) {}
-    }
-    return [];
-  });
-  const [loading, setLoading] = useState<boolean>(() => {
-    if (typeof window !== 'undefined' && localStorage.getItem('dhan_connected_broker')) {
-      return false;
-    }
-    return true;
-  });
-  const [viewMode, setViewMode] = useState<'list' | 'add' | 'profile'>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('dhan_connected_broker');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && (parsed.status === 'Connected' || parsed.clientId)) return 'list';
-        }
-      } catch (_) {}
-    }
-    return 'add';
-  });
+  const [brokers, setBrokers] = useState<BrokerSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'add' | 'profile'>('list');
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const initialMethod = searchParams.get('method') === 'token' ? 'token' : 'developer';
+  const initialMethod = searchParams.get('method') === 'developer' ? 'developer' : 'token';
 
   // Form Fields (Matching Screenshot 2) - retain previous input for easy re-auth
   const [clientId, setClientId] = useState(() => localStorage.getItem('dhan_pending_client_id') || localStorage.getItem('dhan_saved_client_id') || '');
@@ -106,8 +78,6 @@ export const Brokers: React.FC = () => {
   const [accessToken, setAccessToken] = useState('');
   const [authMethod, setAuthMethod] = useState<'developer' | 'token'>(initialMethod);
   const [showSecret, setShowSecret] = useState(false);
-  const [testingPing, setTestingPing] = useState(false);
-  const [pingLatency, setPingLatency] = useState<number | null>(null);
 
   // Status & Feedback
   const [submitting, setSubmitting] = useState(false);
@@ -135,11 +105,8 @@ export const Brokers: React.FC = () => {
         setBrokers(list);
         setViewMode('list');
       } else {
-        const saved = typeof window !== 'undefined' ? localStorage.getItem('dhan_connected_broker') : null;
-        if (!saved) {
-          setBrokers([]);
-          setViewMode('add');
-        }
+        setBrokers([]);
+        setViewMode('add');
       }
     } catch (error) {
       console.error('Failed to fetch brokers:', error);
@@ -283,9 +250,6 @@ export const Brokers: React.FC = () => {
         setSubmitting(false);
         setBrokers([res.broker]);
         setViewMode('list');
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('dhan_connected_broker', JSON.stringify(res.broker));
-        }
       } else {
         setFormError(res.message || 'Verification failed. Please check your credentials.');
         setSubmitting(false);
@@ -302,12 +266,10 @@ export const Brokers: React.FC = () => {
   };
 
   const handleTestConnection = async (brokerId: string) => {
-    setTestingPing(true);
     const start = Date.now();
     try {
       const f = await brokerApi.getFunds(brokerId);
       const elapsed = Date.now() - start;
-      setPingLatency(elapsed);
 
       if (f) {
         await fetchBrokers();
@@ -326,8 +288,6 @@ export const Brokers: React.FC = () => {
         message: `Dhan Connection Notice: ${e.message}`,
         severity: 'warning'
       });
-    } finally {
-      setTestingPing(false);
     }
   };
 
@@ -428,7 +388,7 @@ export const Brokers: React.FC = () => {
               variant="contained"
               onClick={() => {
                 setViewMode('add');
-                setAuthMethod('developer');
+                setAuthMethod('token');
                 setFormError('');
                 setFormSuccess('');
               }}
@@ -474,7 +434,7 @@ export const Brokers: React.FC = () => {
                 variant="contained"
                 onClick={() => {
                   setViewMode('add');
-                  setAuthMethod('developer');
+                  setAuthMethod('token');
                   setFormError('');
                   setFormSuccess('');
                 }}
@@ -540,25 +500,6 @@ export const Brokers: React.FC = () => {
                         <Typography sx={{ color: isConnected ? '#16a34a' : '#dc2626', fontWeight: 700, fontSize: '0.78rem', mt: 0.2 }}>
                           {broker.status}
                         </Typography>
-                        {isConnected && broker.dataPlan && broker.dataPlan !== 'Active' && (
-                          <Tooltip
-                            title="Your Dhan account has not subscribed to DhanHQ's paid 'Data APIs' (dataPlan: Deactive). Live trading and automated order execution are 100% active. Backtesting automatically runs using our Free Real NSE Market Data feed at zero cost. To use official Dhan historical candles, activate 'Data APIs' in your web.dhan.co profile."
-                            arrow
-                          >
-                            <Typography
-                              sx={{
-                                color: '#64748b',
-                                fontSize: '0.75rem',
-                                cursor: 'help',
-                                textDecoration: 'underline dotted #94a3b8',
-                                display: 'inline-block',
-                                mt: 0.2
-                              }}
-                            >
-                              Historical data access inactive (Using Free NSE Mode)
-                            </Typography>
-                          </Tooltip>
-                        )}
                       </Box>
                     </Box>
 

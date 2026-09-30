@@ -68,12 +68,9 @@ export class BrokerRegistry {
     // Connect to broker
     const profile = await adapter.connect({ clientId, accessToken });
 
-    // Store in active adapter map
     const connectionKey = this.makeKey(userId, broker, clientId);
-    this.adapters.set(connectionKey, adapter);
-
     // Save encrypted connection to disk
-    this.persistConnection({
+    try { this.persistConnection({
       id: connectionKey,
       userId,
       broker,
@@ -87,7 +84,11 @@ export class BrokerRegistry {
       encryptedAccessToken: encryptToken(accessToken),
       connectedAt: profile.connectedAt.toISOString(),
       lastHeartbeat: new Date().toISOString()
-    });
+    }); } catch (error) {
+      await adapter.disconnect().catch(() => {});
+      throw error;
+    }
+    this.adapters.set(connectionKey, adapter);
 
     return profile;
   }
@@ -99,7 +100,7 @@ export class BrokerRegistry {
     const list = this.readStorage();
     let updated = false;
     for (const c of list) {
-      if (!brokerId || c.id === brokerId || c.clientId === brokerId || (userId && c.userId === userId)) {
+      if (c.userId === userId && (!brokerId || c.id === brokerId || c.clientId === brokerId)) {
         Object.assign(c, meta);
         updated = true;
       }

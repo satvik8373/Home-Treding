@@ -10,13 +10,13 @@ const router = express.Router();
 
 /**
  * POST /api/strategy-test/backtest
- * Backtest strategy with historical candles or Dhan API
+ * Backtest the saved option strategy with historical option candles.
  */
 router.post('/backtest', backtestStrategy);
 
 /**
  * GET /api/strategy-test/quick-backtest
- * Quick backtest on recent Dhan market candles
+ * Quick backtest on recent broker historical candles.
  */
 router.get('/quick-backtest', quickBacktest);
 

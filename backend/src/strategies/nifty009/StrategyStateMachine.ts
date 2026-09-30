@@ -377,56 +377,11 @@ export class StrategyStateMachine extends EventEmitter {
       return signal;
     }
 
-    // CE Exit Conditions (Target 2, Target 1, Lower Level Exit)
+    // CE lower exit uses the completed option candle close.
     if (this.ceState === 'LONG' && this.cePosition) {
       const pos = this.cePosition;
 
-      // 1. Target 2 (+40 pts from entry fill price -> Full Exit of Remaining Quantity)
-      if (pos.target2Price && (candle.high >= pos.target2Price || candle.close >= pos.target2Price)) {
-        const signalId = `SIG_CE_TARGET_2_${this.sessionDate}_${candle.startTime}`;
-        const signal: StrategySignal = {
-          id: signalId,
-          leg: 'CE',
-          type: 'TARGET_2_CE',
-          triggerReason: `CE Target 2 Reached (+₹40 from entry ₹${pos.entryPrice}) @ ₹${pos.target2Price}`,
-          triggerPrice: pos.target2Price,
-          timestamp: candle.endTime,
-          upperLevel: this.ceUpperLevel,
-          lowerLevel: this.ceLowerLevel,
-          quantity: pos.remainingQty || pos.quantity
-        };
-        this.lastCeSignal = signal;
-        this.signalsHistory.push(signal);
-        logger.info(`[StateMachine] 🎯 CE TARGET 2 HIT: ${signal.triggerReason} | Qty=${signal.quantity}`);
-        this.emit('event', { type: 'CE_TARGET_2_HIT', data: signal });
-        this.emit('signal', signal);
-        return signal;
-      }
-
-      // 2. Target 1 (+20 pts from entry fill price -> Partial Exit of 1 lot = 65 Qty)
-      if (!pos.target1Hit && pos.target1Price && (candle.high >= pos.target1Price || candle.close >= pos.target1Price)) {
-        const lotSize = this.lockedAtm.lotSize || getStrategyConfig().niftyLotSize;
-        const signalId = `SIG_CE_TARGET_1_${this.sessionDate}_${candle.startTime}`;
-        const signal: StrategySignal = {
-          id: signalId,
-          leg: 'CE',
-          type: 'TARGET_1_CE',
-          triggerReason: `CE Target 1 Reached (+₹20 from entry ₹${pos.entryPrice}) @ ₹${pos.target1Price} (Sell 1 lot)`,
-          triggerPrice: pos.target1Price,
-          timestamp: candle.endTime,
-          upperLevel: this.ceUpperLevel,
-          lowerLevel: this.ceLowerLevel,
-          quantity: lotSize
-        };
-        this.lastCeSignal = signal;
-        this.signalsHistory.push(signal);
-        logger.info(`[StateMachine] 🎯 CE TARGET 1 HIT: ${signal.triggerReason} | Qty=${lotSize}`);
-        this.emit('event', { type: 'CE_TARGET_1_HIT', data: signal });
-        this.emit('signal', signal);
-        return signal;
-      }
-
-      // 3. Lower Level Exit (Close < Lower Level -> Exit Remaining Quantity)
+      // Lower level exits use a completed 5m close; targets are handled on real option ticks.
       if (close < this.ceLowerLevel) {
         const signalId = `SIG_CE_EXIT_${this.sessionDate}_${candle.startTime}`;
         const signal: StrategySignal = {
@@ -529,56 +484,11 @@ export class StrategyStateMachine extends EventEmitter {
       return signal;
     }
 
-    // PE Exit Conditions (Target 2, Target 1, Lower Level Exit)
+    // PE lower exit uses the completed option candle close.
     if (this.peState === 'LONG' && this.pePosition) {
       const pos = this.pePosition;
 
-      // 1. Target 2 (+40 pts from entry fill price -> Full Exit of Remaining Quantity)
-      if (pos.target2Price && (candle.high >= pos.target2Price || candle.close >= pos.target2Price)) {
-        const signalId = `SIG_PE_TARGET_2_${this.sessionDate}_${candle.startTime}`;
-        const signal: StrategySignal = {
-          id: signalId,
-          leg: 'PE',
-          type: 'TARGET_2_PE',
-          triggerReason: `PE Target 2 Reached (+₹40 from entry ₹${pos.entryPrice}) @ ₹${pos.target2Price}`,
-          triggerPrice: pos.target2Price,
-          timestamp: candle.endTime,
-          upperLevel: this.peUpperLevel,
-          lowerLevel: this.peLowerLevel,
-          quantity: pos.remainingQty || pos.quantity
-        };
-        this.lastPeSignal = signal;
-        this.signalsHistory.push(signal);
-        logger.info(`[StateMachine] 🎯 PE TARGET 2 HIT: ${signal.triggerReason} | Qty=${signal.quantity}`);
-        this.emit('event', { type: 'PE_TARGET_2_HIT', data: signal });
-        this.emit('signal', signal);
-        return signal;
-      }
-
-      // 2. Target 1 (+20 pts from entry fill price -> Partial Exit of 1 lot = 65 Qty)
-      if (!pos.target1Hit && pos.target1Price && (candle.high >= pos.target1Price || candle.close >= pos.target1Price)) {
-        const lotSize = this.lockedAtm.lotSize || getStrategyConfig().niftyLotSize;
-        const signalId = `SIG_PE_TARGET_1_${this.sessionDate}_${candle.startTime}`;
-        const signal: StrategySignal = {
-          id: signalId,
-          leg: 'PE',
-          type: 'TARGET_1_PE',
-          triggerReason: `PE Target 1 Reached (+₹20 from entry ₹${pos.entryPrice}) @ ₹${pos.target1Price} (Sell 1 lot)`,
-          triggerPrice: pos.target1Price,
-          timestamp: candle.endTime,
-          upperLevel: this.peUpperLevel,
-          lowerLevel: this.peLowerLevel,
-          quantity: lotSize
-        };
-        this.lastPeSignal = signal;
-        this.signalsHistory.push(signal);
-        logger.info(`[StateMachine] 🎯 PE TARGET 1 HIT: ${signal.triggerReason} | Qty=${lotSize}`);
-        this.emit('event', { type: 'PE_TARGET_1_HIT', data: signal });
-        this.emit('signal', signal);
-        return signal;
-      }
-
-      // 3. Lower Level Exit (Close < Lower Level -> Exit Remaining Quantity)
+      // Lower level exits use a completed 5m close; targets are handled on real option ticks.
       if (close < this.peLowerLevel) {
         const signalId = `SIG_PE_EXIT_${this.sessionDate}_${candle.startTime}`;
         const signal: StrategySignal = {

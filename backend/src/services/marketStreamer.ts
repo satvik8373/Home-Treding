@@ -2,7 +2,6 @@ import { Server as SocketIOServer } from 'socket.io';
 import { brokerRegistry } from '../brokers/BrokerRegistry';
 import { logger } from '../utils/logger';
 import { isMarketOpen, getMarketStatus } from '../utils/marketHours';
-import { nifty009Engine } from '../strategies/nifty009/Nifty009Engine';
 import { INDIAN_INSTRUMENTS, fetchLiveQuote } from '../controllers/marketController';
 
 export interface MarketTickData {
@@ -124,10 +123,6 @@ export class MarketStreamer {
         this.io.to(`market_${symbol}`).emit('market_tick', tickData);
         this.io.emit('market_tick', tickData);
 
-        // Feed real tick into strategy engine
-        if (symbol === 'NIFTY 50' || symbol === 'NIFTY') {
-          nifty009Engine.onMarketTick(symbol, price, tick.volume || 0);
-        }
       });
 
       this.isListeningToDhanWs = true;
@@ -230,9 +225,7 @@ export class MarketStreamer {
         this.io.to(`market_${q.symbol}`).emit('market_tick', tickData);
 
         // Feed real tick into strategy engine (only for NIFTY 50)
-        if (q.symbol === 'NIFTY 50' || q.symbol === 'NIFTY') {
-          nifty009Engine.onMarketTick(q.symbol, price, q.volume || 0);
-        }
+        // UI quotes may come from other sources; only the verified Dhan feed drives strategy candles.
 
         return tickData;
       });
