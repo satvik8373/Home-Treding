@@ -1,0 +1,362 @@
+import express from "express";
+import type { ErrorRequestHandler } from "express";
+import { randomBytes, timingSafeEqual } from "node:crypto";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import type { Controller } from "./controller.ts";
+import { MarketCharts } from "./charts.ts";
+import type { MStock } from "./broker.ts";
+import { Backtests, MemoryRepository } from "./backtest/service.ts";
+import { HistoricalData, CONTRACT_SCHEMA } from './backtest/historical.ts';
+import type { BacktestRepository } from "./backtest/service.ts";
+import { DATASET_SCHEMA } from "./backtest/schema.ts";
+import { AccountDiagnostics } from "./diagnostics.ts";
+
+export function createApp(
+  controller: Controller,
+  root: string,
+  port = 4310,
+  backtestRepository?: BacktestRepository,
+  gatewaySecret = process.env.N009_GATEWAY_SECRET ?? '',
+) {
+  const app = express(),
+    csrf = randomBytes(32).toString("hex");
+  const subscribers = new Set<express.Response>();
+  const repository = backtestRepository ?? new MemoryRepository();
+  const historical = new HistoricalData(controller.broker as MStock, () => ({ connected: controller.connected(), account: controller.broker.credentials?.account ?? null, session: controller.session }), repository);
+  const accountDiagnostics = new AccountDiagnostics(controller.broker as MStock, controller.feed, Date.now, () => controller.session);
+  const charts = new MarketCharts(controller.broker as MStock, () => ({
+    connected: controller.connected(),
+    account: controller.broker.credentials?.account ?? null,
+    session: controller.session,
+  }));
+  const backtests = new Backtests(
+    controller.broker as MStock,
+    () => ({
+      connected: controller.connected(),
+      account: controller.broker.credentials?.account ?? null,
+      session: controller.session,
+    }),
+    repository,
+    Date.now,
+    historical,
+  );
+  const allowed = new Set([
+    `127.0.0.1:${port}`,
+    `localhost:${port}`,
+    "127.0.0.1:5173",
+    "localhost:5173",
+  ]);
+  app.disable("x-powered-by");
+  app.use((req, res, next) => {
+    const localAllowed = new Set([
+      ...allowed,
+      `127.0.0.1:${req.socket.localPort}`,
+      `localhost:${req.socket.localPort}`,
+    ]);
+    const provided = Buffer.from(req.get('x-009-gateway-secret') ?? ''), expectedGateway = Buffer.from(gatewaySecret);
+    const gatewayAuthenticated = !!gatewaySecret && provided.length === expectedGateway.length && timingSafeEqual(provided, expectedGateway);
+    if (gatewaySecret && !gatewayAuthenticated) return res.status(401).json({ error: 'Authenticated gateway required.' });
+    if (!gatewayAuthenticated && !localAllowed.has(req.headers.host ?? ""))
+      return res.status(403).json({ error: "Invalid local host." });
+    res.set({
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "Referrer-Policy": "no-referrer",
+    });
+    if (req.path.startsWith("/api")) res.set("Cache-Control", "no-store");
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      const origin = req.get("origin");
+      if (origin) {
+        try {
+          if (
+            !localAllowed.has(new URL(origin).host) ||
+            new URL(origin).protocol !== "http:"
+          )
+            throw new Error();
+        } catch {
+          return res
+            .status(403)
+            .json({ error: "Cross-site requests are blocked." });
+        }
+      }
+      if (req.get("sec-fetch-site") === "cross-site")
+        return res
+          .status(403)
+          .json({ error: "Cross-site requests are blocked." });
+      const supplied = Buffer.from(req.get("x-009-csrf") ?? ""),
+        expected = Buffer.from(csrf);
+      if (
+        supplied.length !== expected.length ||
+        !timingSafeEqual(supplied, expected)
+      )
+        return res
+          .status(403)
+          .json({ error: "Refresh the app before continuing." });
+      if (!req.is("application/json"))
+        return res.status(415).json({ error: "JSON request required." });
+    }
+    next();
+  });
+  const smallJson = express.json({ limit: "8kb" }),
+    importJson = express.json({ limit: "2mb" });
+  app.use((req, res, next) =>
+    (['/api/backtest/import', '/api/history/contracts'].includes(req.path) ? importJson : smallJson)(
+      req,
+      res,
+      next,
+    ),
+  );
+  app.get("/api/state", (_req, res) => res.json(controller.snapshot(csrf)));
+  app.get('/api/broker/diagnostics', async (_req, res) => {
+    if (!controller.connected()) return res.status(409).json({ error: 'Connect mStock before running account checks.' });
+    res.json(await accountDiagnostics.read());
+  });
+  app.get("/api/health", (_req, res) =>
+    res.json({ ok: true, service: "nifty-009" }),
+  );
+  app.get("/api/backtest/dates", (_req, res) =>
+    res.json({ dates: backtests.dates() }),
+  );
+  app.get('/api/backtest/latest', (_req, res) => res.json({ job: backtests.latest() }));
+  app.post('/api/history/fetch', (req, res) => res.status(202).json(historical.start(req.body)));
+  app.get('/api/history/latest', (_req, res) => res.json({ job: historical.latest() }));
+  app.get('/api/history/jobs/:id', (req, res) => res.json(historical.job(String(req.params.id))));
+  app.get('/api/history/jobs/:id/data', (req, res) => {
+    const bundle = historical.bundle(String(req.params.id));
+    res.set('Content-Disposition', `attachment; filename="009-history-${bundle.job.startDate ?? bundle.job.rows[0]?.date ?? 'saved'}-${bundle.job.endDate ?? bundle.job.rows.at(-1)?.date ?? 'data'}.json"`).json(bundle);
+  });
+  app.post('/api/history/contracts', (req, res) => res.json(historical.importContracts(req.body)));
+  app.get('/api/history/contracts/schema', (_req, res) => res.set('Content-Disposition', 'attachment; filename="009-historical-contracts.schema.json"').json(CONTRACT_SCHEMA));
+  app.get('/api/history/spot/:date', (req, res) => {
+    const saved = historical.spot(String(req.params.date));
+    if (!saved) return res.status(404).json({ error: 'No NIFTY spot history has been downloaded for this date.' });
+    res.set('Content-Disposition', `attachment; filename="009-nifty-${saved.date}.json"`).json(saved);
+  });
+  app.get("/api/backtest/schema", (_req, res) => {
+    res
+      .set(
+        "Content-Disposition",
+        'attachment; filename="009-candles.schema.json"',
+      )
+      .json(DATASET_SCHEMA);
+  });
+  app.post("/api/backtest/import", (req, res) =>
+    res.json(backtests.import(req.body)),
+  );
+  app.post("/api/backtest/run", (req, res) =>
+    res.status(202).json(backtests.start(req.body)),
+  );
+  app.get("/api/backtest/jobs/:id", (req, res) =>
+    res.json(backtests.job(String(req.params.id))),
+  );
+  app.get("/api/backtest/jobs/:id/data/:date", (req, res) => {
+    const saved = backtests.jobDataset(
+      String(req.params.id),
+      String(req.params.date),
+    );
+    if (!saved)
+      return res
+        .status(404)
+        .json({ error: "No tested dataset for this run and date." });
+    res
+      .set(
+        "Content-Disposition",
+        `attachment; filename="009-candles-${saved.date}.json"`,
+      )
+      .json(saved);
+  });
+  app.get("/api/backtest/jobs/:id/trades.csv", (req, res) => {
+    const job = backtests.job(String(req.params.id));
+    if (!job.result)
+      return res
+        .status(409)
+        .json({ error: "Wait for the backtest to complete." });
+    const cell = (value: unknown) =>
+      `"${String(value ?? "")
+        .replaceAll('"', '""')
+        .replace(/^[=+@-]/, "'$&")}"`;
+    const columns = [
+      "time_utc",
+      "side",
+      "symbol",
+      "transaction",
+      "quantity",
+      "price",
+      "reason",
+      "fee",
+      "gross_pnl",
+      "cycle_id",
+      "timing",
+    ];
+    const rows = job.result.days
+      .flatMap((day) => day.fills)
+      .sort((a, b) => a.at - b.at)
+      .map((fill) =>
+        [
+          new Date(fill.at).toISOString(),
+          fill.side,
+          fill.symbol,
+          fill.transaction,
+          fill.quantity,
+          fill.price,
+          fill.reason,
+          fill.fee,
+          fill.grossPnl,
+          fill.cycleId,
+          fill.timing,
+        ]
+          .map(cell)
+          .join(","),
+      );
+    res
+      .set({
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": 'attachment; filename="009-backtest-trades.csv"',
+      })
+      .send([columns.join(","), ...rows].join("\r\n"));
+  });
+  app.get("/api/backtest/archive/:date", (req, res) => {
+    const saved = backtests.archive(String(req.params.date));
+    if (!saved)
+      return res.status(404).json({ error: "No saved dataset for this date." });
+    res
+      .set(
+        "Content-Disposition",
+        `attachment; filename="009-candles-${saved.date}.json"`,
+      )
+      .json(saved);
+  });
+  app.get("/api/market/chart", async (req, res) => {
+    const symbol = req.query.symbol ?? "NIFTY";
+    if (symbol !== "NIFTY" && symbol !== "CE" && symbol !== "PE")
+      return res.status(400).json({ error: "Choose NIFTY, CE or PE." });
+    if (!controller.connected())
+      return res
+        .status(409)
+        .json({ error: "Connect mStock to view market data." });
+    res.json(await charts.read(symbol));
+  });
+  app.get("/api/events", (req, res) => {
+    res.set({ "Content-Type": "text/event-stream", Connection: "keep-alive" });
+    res.flushHeaders();
+    res.write(`data: ${JSON.stringify(controller.snapshot())}\n\n`);
+    subscribers.add(res);
+    const heartbeat = setInterval(() => res.write(": heartbeat\n\n"), 15_000);
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      subscribers.delete(res);
+    });
+  });
+  let sendTimer: ReturnType<typeof setTimeout> | null = null;
+  controller.onChange = () => {
+    if (sendTimer) return;
+    sendTimer = setTimeout(() => {
+      sendTimer = null;
+      const event = `data: ${JSON.stringify(controller.snapshot())}\n\n`;
+      for (const res of subscribers)
+        if (!res.write(event)) {
+          subscribers.delete(res);
+          res.end();
+        }
+    }, 150);
+  };
+  let loginAttempts: number[] = [];
+  const field = (body: unknown, key: string, max = 256): string => {
+    if (!body || typeof body !== "object" || Array.isArray(body))
+      throw new Error("Invalid request body.");
+    const value = (body as Record<string, unknown>)[key];
+    if (typeof value !== "string" || !value.trim() || value.length > max)
+      throw new Error(`Enter a valid ${key}.`);
+    return value;
+  };
+  app.post("/api/broker/login", async (req, res) => {
+    loginAttempts = loginAttempts.filter((at) => Date.now() - at < 60_000);
+    if (loginAttempts.length >= 5)
+      return res
+        .status(429)
+        .json({ error: "Wait one minute before another login attempt." });
+    loginAttempts.push(Date.now());
+    const flowId = await controller.beginLogin(
+      field(req.body, "username", 64).trim(),
+      field(req.body, "password"),
+      field(req.body, "apiKey", 1024).trim(),
+    );
+    res.json({ flowId });
+  });
+  app.post("/api/broker/verify", async (req, res) => {
+    const method = field(req.body, "method"),
+      code = field(req.body, "code", 6);
+    if (!["otp", "totp"].includes(method) || !/^\d{6}$/.test(code))
+      throw new Error("Enter the current six-digit OTP or authenticator code.");
+    await controller.verifyLogin(
+      field(req.body, "flowId", 64),
+      code,
+      method as "otp" | "totp",
+    );
+    res.json({ ok: true });
+  });
+  app.post("/api/broker/disconnect", async (_req, res) => {
+    await controller.disconnect();
+    res.json({ ok: true });
+  });
+  app.post("/api/strategy/start", async (req, res) => {
+    const mode = field(req.body, "mode");
+    if (!["paper", "live"].includes(mode))
+      throw new Error("Choose Paper or Live mode.");
+    if (mode === "live" && req.body.liveAcknowledged !== true)
+      throw new Error("Confirm live orders before starting.");
+    await controller.start(mode as "paper" | "live");
+    res.status(202).json({ ok: true });
+  });
+  app.post("/api/strategy/stop", async (_req, res) => {
+    await controller.stop();
+    res.status(202).json({ ok: true });
+  });
+  app.post("/api/strategy/reconcile", async (_req, res) => {
+    await controller.reconcile();
+    res.json({ ok: true });
+  });
+  app.get("/api/trades.csv", (_req, res) => {
+    const cell = (value: unknown) =>
+      `"${String(value ?? "")
+        .replaceAll('"', '""')
+        .replace(/^[=+@-]/, "'$&")}"`;
+    const columns = [
+      "at",
+      "side",
+      "symbol",
+      "transaction",
+      "quantity",
+      "price",
+      "reason",
+      "orderId",
+      "mode",
+      "pnl",
+    ] as const;
+    const rows = (controller.session?.trades ?? []).map((t) =>
+      columns.map((key) => cell(t[key])).join(","),
+    );
+    res.set({
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": 'attachment; filename="009-trades.csv"',
+    });
+    res.send([columns.join(","), ...rows].join("\r\n"));
+  });
+  const dist = join(root, "dist");
+  if (existsSync(dist)) {
+    app.use(express.static(dist));
+    app.get("/", (_req, res) => res.sendFile(join(dist, "index.html")));
+  } else
+    app.get("/", (_req, res) =>
+      res.status(503).send("Run npm run build first, or use npm run dev."),
+    );
+  app.use(((error, _req, res, _next) => {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "The request could not be completed.";
+    res.status(400).json({ error: message.slice(0, 300) });
+  }) as ErrorRequestHandler);
+  return app;
+}

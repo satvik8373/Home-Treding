@@ -29,3 +29,7 @@ This document defines mandatory, non-negotiable styling, design, and content gui
 ## 7. Zero Unwanted Elements & Text Clutter
 - Strictly PROHIBITED: Redundant toggles, duplicate cards, repetitive disclaimers, clunky technical error dumps, and decorative widgets.
 - Required: High-density, institutional-quality, production-ready trading interface where every pixel and character has a functional purpose.
+
+## 8. Zero Paid Subscriptions / 100% Free Architecture
+- Strictly PROHIBITED: Requiring paid subscriptions, paid third-party APIs, paid data feeds, paid add-ons, or asking the user to purchase any subscription-based plan.
+- Required: Completely free, zero-cost operations. All platform capabilities (market data, strategies, backtesting, paper/live execution, and broker integrations) must operate using completely free tiers, free broker APIs, or zero-cost data sources without requiring any paid subscriptions.

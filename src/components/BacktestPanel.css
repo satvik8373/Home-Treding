@@ -1,0 +1,29 @@
+.workspace-nav { display: flex; gap: 5px; border-bottom: 1px solid #e2e8f0; margin: -5px 0 22px; }
+.workspace-nav button { background: #fff; color: #64748b; padding: 11px 15px; font-size: 12px; }
+.workspace-nav button.active { background: #f1f5f9; color: #0f172a; }
+.backtest-view > .panel, .backtest-view > .notice { margin-bottom: 16px; }
+.bt-periods { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 18px 0; }
+.bt-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 14px; align-items: end; padding: 16px 18px; }
+.bt-form .field { margin: 0; font-size: 11px; }
+.bt-form input, .bt-form .button { min-height: 38px; }
+.bt-help { color: #64748b; font-size: 11px; line-height: 1.7; padding: 0 18px 16px; }
+.bt-options { border-top: 1px solid #e2e8f0; }
+.bt-options summary, .bt-details > summary { cursor: pointer; padding: 15px 18px; font-size: 12px; color: #475569; }
+.bt-format { display: inline-block; margin: 0 18px 16px; }
+.bt-status { display: flex; flex-direction: column; gap: 9px; padding: 18px; color: #475569; font-size: 12px; line-height: 1.6; }
+.bt-status strong { color: #0f172a; }
+.bt-status progress { width: 100%; height: 6px; accent-color: #64748b; }
+.bt-result-heading { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 20px 0 16px; }
+.bt-result-heading h2 { font-size: 14px; }
+.bt-result-heading p { margin-top: 6px; color: #64748b; font-size: 11px; }
+.bt-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; border: 1px solid #e2e8f0; background: #e2e8f0; margin-bottom: 16px; }
+.bt-metrics > div { background: #fff; display: flex; flex-direction: column; gap: 10px; padding: 18px; }
+.bt-metrics span, .bt-metrics small { color: #64748b; font-size: 11px; line-height: 1.5; }
+.bt-metrics strong { color: #0f172a; font-size: 21px; font-variant-numeric: tabular-nums; }
+.bt-equity, .bt-days { margin-bottom: 16px; }
+.bt-equity-canvas { height: 235px; width: 100%; }
+.bt-details ul { margin: 0; padding: 0 18px 18px 32px; font-size: 11px; color: #64748b; line-height: 1.8; }
+.bt-details li { padding-bottom: 8px; }
+.bt-details li b { display: inline-block; min-width: 100px; color: #475569; }
+.bt-details .history-panel { margin: 0; border: none; }
+@media (max-width: 700px) { .bt-metrics { grid-template-columns: 1fr 1fr; } .bt-form { grid-template-columns: 1fr 1fr; } .bt-form > .button { grid-column: span 2; } .bt-details li b { display: block; } }

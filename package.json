@@ -1,18 +1,41 @@
 {
-  "name": "mavrix-trading-platform",
-  "version": "3.0.0",
+  "name": "nifty-009",
   "private": true,
-  "description": "Mavrix AlgoRooms Trading Platform - Institutional Backtest & Execution Engine",
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
-    "start": "node build.js",
-    "build": "node build.js"
+    "dev": "concurrently -k -n engine,react \"tsx watch server/index.ts\" \"vite --host 127.0.0.1\"",
+    "build": "tsc --noEmit -p tsconfig.check.json && vite build",
+    "start": "tsx server/index.ts",
+    "doctor": "tsx server/doctor.ts",
+    "test": "tsx --test tests/strategy.test.ts tests/broker.test.ts tests/controller.test.ts tests/feed.test.ts tests/http.test.ts tests/charts.test.ts tests/backtest.test.ts tests/diagnostics.test.ts tests/historical.test.ts tests/deployment.test.ts",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "build:vercel": "node scripts/build-vercel.mjs"
   },
   "dependencies": {
-    "axios": "^1.20.0",
-    "cors": "^2.8.5",
-    "express": "^4.21.2"
+    "csv-parse": "^7.0.3",
+    "express": "^5.3.0",
+    "lightweight-charts": "^5.2.1",
+    "lucide-react": "^1.61.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "ws": "^8.22.0"
   },
-  "engines": {
-    "node": ">=18.0.0"
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^6.1.2",
+    "concurrently": "^10.0.6",
+    "oxlint": "^1.88.0",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.4"
   }
 }
