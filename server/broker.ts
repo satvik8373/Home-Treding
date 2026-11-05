@@ -48,7 +48,9 @@ export class MStock implements TradingBroker {
     try { body = record(JSON.parse(raw)) } catch { /* CSV is the only non-JSON endpoint used. */ }
     if (!response.ok || body.status === 'error') {
       // Never include requests, headers, credentials, or full response bodies in errors.
-      const message = typeof body.message === 'string' ? body.message.slice(0, 240) : `mStock request failed (HTTP ${response.status}).`
+      let message = typeof body.message === 'string' ? body.message.slice(0, 240) : `mStock request failed (HTTP ${response.status}).`
+      for (const secret of [this.credentials?.apiKey, this.credentials?.accessToken, ...Object.values(form ?? {})])
+        if (secret && secret.length >= 4) message = message.split(secret).join('[redacted]')
       throw new BrokerError(message, response.status < 500 && response.status !== 408)
     }
     if (text) return raw

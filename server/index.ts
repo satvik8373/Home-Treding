@@ -12,6 +12,7 @@ import { MStock } from "./broker.ts";
 import { MarketFeed } from "./feed.ts";
 import { Controller, hasExposure } from "./controller.ts";
 import { createApp } from "./http.ts";
+import { Workspaces } from './workspaces.ts';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const data = process.env.N009_DATA_DIR
@@ -42,16 +43,18 @@ process.on("exit", () => {
     /* already released */
   }
 });
-const store = new Store(data),
-  feed = new MarketFeed(),
-  controller = new Controller(new MStock(), store, feed);
 const port = Number(process.env.PORT || 4310);
 if (!Number.isInteger(port) || port < 1024 || port > 65535)
   throw new Error("PORT must be between 1024 and 65535.");
 const host = process.env.N009_HOST || '127.0.0.1';
 if (process.env.N009_GATEWAY_SECRET && process.env.N009_GATEWAY_SECRET.length < 32) throw new Error('N009_GATEWAY_SECRET requires at least 32 characters.');
 if (host !== '127.0.0.1' && (!process.env.N009_GATEWAY_SECRET || process.env.N009_GATEWAY_SECRET.length < 32)) throw new Error('A remote engine requires N009_GATEWAY_SECRET with at least 32 characters.');
-const app = createApp(controller, root, port, store);
+const multiuser = process.env.N009_MULTIUSER === 'true';
+const workspaces = multiuser ? new Workspaces(data, process.env.N009_GATEWAY_SECRET ?? '', Number(process.env.N009_MAX_WORKSPACES || 4)) : null;
+const store = workspaces ? null : new Store(data);
+const feed = workspaces ? null : new MarketFeed();
+const controller = store && feed ? new Controller(new MStock(), store, feed) : null;
+const app = workspaces?.app ?? createApp(controller!, root, port, store!);
 const server = app.listen(port, host, () =>
   console.log(`NIFTY 009: http://127.0.0.1:${port}`),
 );
@@ -59,13 +62,14 @@ server.on("error", (error) => {
   console.error(error.message);
   process.exit(1);
 });
-await controller.restore();
-const timer = setInterval(() => void controller.pump(), 1000);
+if (workspaces) await workspaces.restore(); else await controller!.restore();
+const timer = setInterval(() => void (workspaces ? workspaces.pump() : controller!.pump()), 1000);
 let shuttingDown = false;
 async function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
-  if (hasExposure(controller.session)) {
+  if (workspaces && !await workspaces.close()) { shuttingDown = false; return; }
+  if (controller && hasExposure(controller.session)) {
     console.log(
       "Stopping entries and closing strategy exposure before shutdown. Uncertain orders remain saved for reconciliation.",
     );
@@ -84,8 +88,8 @@ async function shutdown() {
     }
   }
   clearInterval(timer);
-  feed.close();
-  store.close();
+  feed?.close();
+  store?.close();
   server.close();
   process.exit(0);
 }

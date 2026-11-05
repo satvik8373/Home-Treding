@@ -1,6 +1,6 @@
 # Persistent AWS engine with Vercel dashboard
 
-The dashboard and authenticated gateway run on Vercel. A dedicated Ubuntu systemd service runs the original execution engine continuously, with SQLite and its encryption key under `/var/lib/nifty009`. The browser can close without stopping the engine. The external engine supports the existing Paper and Live paths; choosing Live and starting a strategy remains an explicit user action.
+The dashboard and authenticated gateway run on Vercel. A dedicated Ubuntu systemd service runs the original execution engine continuously, with SQLite and its encryption key under `/var/lib/nifty009`. The browser can close without stopping the engine. The external engine supports the existing Paper and Live paths; choosing Live and starting a strategy remains an explicit user action. See [Google sign-in](GOOGLE_LOGIN.md) for separate user workspaces and its bounded host capacity.
 
 ## Build and install
 

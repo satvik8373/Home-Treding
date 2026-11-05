@@ -19,6 +19,7 @@ export const hasExposure = (s: TradingSession | null) => !!s && (!!s.pending || 
 class PositionReadError extends Error {}
 
 export class Controller {
+  authorizeBroker?: (account: string) => void
   execution?: { kind: 'hosted-paper'; liveExecution: false; reason: string }
   session: TradingSession | null
   marks: Record<string, Mark> = {}
@@ -131,6 +132,7 @@ export class Controller {
     }
     this.broker.credentials = saved
     try {
+      this.authorizeBroker?.(saved.account)
       await this.broker.verifyAccount?.(); this.verified = true
       this.subscribe()
       if (this.session?.mode === 'paper' && this.session.status === 'running' && !this.session.pending && this.session.date === istDate(this.now())
@@ -168,7 +170,7 @@ export class Controller {
       if (hasExposure(this.session) && this.session!.account !== credentials.account) throw new Error('Reconnect the same account that owns the saved strategy position.')
       const previous = this.broker.credentials
       this.broker.credentials = credentials
-      try { await this.broker.verifyAccount?.() } catch (error) { this.broker.credentials = previous; throw error }
+      try { await this.broker.verifyAccount?.(); this.authorizeBroker?.(credentials.account) } catch (error) { this.broker.credentials = previous; throw error }
       this.store.saveBroker(credentials); this.verified = true; this.auth = null; this.subscribe(); this.onChange()
     })
   }

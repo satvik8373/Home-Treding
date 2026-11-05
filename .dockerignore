@@ -10,3 +10,7 @@ releases
 *.log
 *.zip
 *.pem
+.runtime
+.aws
+.ssh
+*.tar.gz

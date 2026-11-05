@@ -4,6 +4,11 @@ data
 .env*
 *.sqlite*
 *.key
+*.pem
+*.tar.gz
+.runtime
+.aws
+.ssh
 tests
 releases
 dhan-cloud

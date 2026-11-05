@@ -16,7 +16,7 @@ export class Store {
   private db: DatabaseSync;
   private key: Buffer;
   constructor(directory: string, encryptionKey?: Buffer) {
-    mkdirSync(directory, { recursive: true });
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
     this.db = new DatabaseSync(join(directory, "009.sqlite"));
     this.db.exec(
       "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS records (key TEXT PRIMARY KEY, value TEXT NOT NULL);",

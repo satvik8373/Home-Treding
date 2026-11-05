@@ -69,7 +69,7 @@ Set `N009_EXECUTION_LOCATION=hosted` on the hosted engine. Optionally set `N009_
 
 Connected users can enter primary/secondary IP values copied from their mStock API-key screen. `POST /api/setup/network` saves this reference with CSRF protection, scoped to broker account **and API key**. It never changes mStock settings. A match is labelled as a comparison against user-entered values, never as broker verification. Connection checks cannot place, modify or cancel an order. The existing funds, NFO/MIS/MARKET, REST, stream and real-fill checks remain separate.
 
-This deployment still owns **one private broker workspace**. Do not share one dashboard password or one engine data volume among unrelated users who need independent accounts; one engine per private deployment keeps their connections, settings and histories separate. No new platform signup/account system is introduced here. A centrally shared multi-account service would require a separate tenant-isolation implementation.
+The external engine supports [Google sign-in and isolated workspaces](GOOGLE_LOGIN.md) when `N009_MULTIUSER=true` is enabled on both the engine and gateway. Each verified Firebase UID has separate storage, encryption key and execution context. The owner password opens only the original owner workspace and must not be shared. Without multiuser mode, this remains one private broker workspace. The optional cloud Paper transport remains a single private workspace.
 
 ## Container deployment on a persistent host
 

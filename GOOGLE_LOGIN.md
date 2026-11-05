@@ -1,0 +1,21 @@
+# Google sign-in and separate trading workspaces
+
+The public dashboard uses Firebase Authentication's Google popup. The Firebase web configuration identifies the project and is public by design; it is not a broker credential. Analytics, Firestore and Storage are not enabled by this integration. No Firebase service-account private key is needed or shipped.
+
+Enable Google in Firebase Console → Authentication → Sign-in method and authorize the actual dashboard domain in Authentication → Settings → Authorized domains. The production client uses project `mavrix-trading` and auth domain `mavrix-trading.firebaseapp.com`. Preview domains must be authorized separately before testing Google there. The code uses the Firebase modular app/auth packages only.
+
+Set `N009_FIREBASE_PROJECT_ID=mavrix-trading` and `N009_MULTIUSER=true` on Vercel. Deploy the updated external engine and set `N009_MULTIUSER=true` there **before** exposing Google access. Both sides must use the same private gateway secret. The legacy cloud Paper transport does not support these workspaces.
+
+The server verifies Firebase ID tokens with RS256 signatures and Google's fixed public certificate endpoint, including issuer, project audience, expiry, issued-at, subject, verified email, Google provider and recent authentication. See [Firebase's verification requirements](https://firebase.google.com/docs/auth/admin/verify-id-tokens). Successful sign-in exchanges the token for a Secure, HttpOnly, SameSite=Strict signed cookie, valid at most one hour and never beyond the Firebase token expiry. Browser Firebase state is cleared after exchange; no broker secrets are stored there. Logout removes the dashboard cookie. Sessions are stateless: account disable/revocation in Firebase does not immediately invalidate an existing dashboard cookie. Rotate the gateway secret to revoke all cookies immediately. Otherwise they expire within the stated lifetime.
+
+The gateway derives a workspace ID from the verified project and Firebase UID. Email addresses and browser-supplied UID/tenant headers do not select a workspace. It signs a separate short-lived engine assertion. AWS requires both the gateway secret and this assertion. Assertion and browser-cookie signatures have different purposes and cannot substitute for each other.
+
+Each Google user gets a separate controller, market feed, CSRF token, SQLite database, random encryption key, settings, broker connection, sessions, backtests and history under `/var/lib/nifty009/tenants/<opaque-id>`. Nothing is copied from the owner account into a new Google workspace. **Owner access** retains the existing private password and original root workspace; do not share that password with other users. Google identities are not automatically linked to it.
+
+A persistent broker-account ownership index prevents linking the same verified mStock account into different workspaces. Disconnect does not transfer ownership. An explicit, verified administrative migration is required to move an existing owner broker to a Google workspace. This index intentionally retains ownership when a token expires or a user disconnects.
+
+Every user must connect their own mStock account, register the actual AWS outbound IP in their own API key, and run their own diagnostics. Signing in never starts a strategy or places an order. Saved workspaces restore on engine startup and retain their individual existing session rules. Closing a browser does not stop a started session.
+
+The current small host has bounded admission: `N009_MAX_WORKSPACES=4` Google workspaces plus the owner, to avoid unlimited process growth. Capacity errors fail closed; they never fall back to the owner workspace. This is not a claim of unlimited concurrency or load-test certification. Database and controller isolation is application-level within one dedicated service, not a separate VM per user. Host administrators can access server state. Back up every workspace's database **with its encryption key** and preserve the owner ownership index.
+
+Upgrade only when sessions are stopped and flat. The pre-migration owner backup is retained privately on the engine host. Caddy's default runtime logger removes request headers, including gateway authentication and workspace assertions. Do not enable body logging or copy environment files into source or static assets.
