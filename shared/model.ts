@@ -56,6 +56,8 @@ export interface Leg {
   exitReason: Exclude<Reason, "BREAKOUT"> | null;
 }
 export interface OrderIntent {
+  instrumentToken?: string;
+  expiry?: string;
   id: string;
   tag: string;
   orderId?: string;
@@ -68,6 +70,7 @@ export interface OrderIntent {
   cancelRequested?: boolean;
 }
 export interface Fill {
+  rejectionReason?: string;
   orderId: string;
   quantity: number;
   average: number;

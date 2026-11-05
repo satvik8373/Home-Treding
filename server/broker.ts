@@ -3,6 +3,7 @@ import type { Candle, Contract, Fill, Mark, OrderIntent } from '../shared/model.
 import { FIVE_MINUTES, istDate, istTime, parseBrokerTime } from './time.ts'
 import { validCandle } from './strategy.ts'
 import type { SavedBroker } from './store.ts'
+import { matchesOrderRow, rejectionSummary } from './orderIdentity.ts'
 
 const ROOT = 'https://api.mstock.trade/openapi/typea'
 export const INDEX_TOKEN = '26000'
@@ -152,11 +153,7 @@ export class MStock implements TradingBroker {
   async findOrder(intent: OrderIntent): Promise<string | null> {
     const data = await this.request('/orders'), raw = data === null ? [] : data
     if (!Array.isArray(raw)) throw new BrokerError('Order book unavailable for reconciliation.')
-    const matches = raw.map(record).filter(row => {
-      const tags = Array.isArray(row.tag) ? row.tag : [row.tag]
-      return tags.includes(intent.tag) && row.tradingsymbol === intent.symbol && row.exchange === 'NFO'
-        && String(row.transaction_type).toUpperCase() === intent.transaction && Number(row.quantity) === intent.quantity
-    })
+    const matches = raw.map(record).filter(row => matchesOrderRow(row, intent, true))
     if (matches.length > 1) throw new BrokerError('Multiple orders match the saved intent. Check mStock before continuing.')
     return matches.length === 1 && matches[0].order_id ? String(matches[0].order_id) : null
   }
@@ -215,14 +212,12 @@ export function parseReceipt(raw: unknown, intent: OrderIntent): Fill | null {
   const rows = (Array.isArray(raw) ? raw : [raw]).map(record).filter(row => String(row.order_id) === intent.orderId)
   if (!rows.length) return null
   for (const row of rows) {
-    if (row.tradingsymbol && row.tradingsymbol !== intent.symbol || row.exchange && row.exchange !== 'NFO'
-      || row.transaction_type && String(row.transaction_type).toUpperCase() !== intent.transaction
-      || row.quantity != null && Number(row.quantity) !== intent.quantity) throw new BrokerError('Broker order details do not match the saved intent.')
+    if (!matchesOrderRow(row, intent)) throw new BrokerError('Broker order details do not match the saved intent.')
   }
   const terminal = (row: Row) => ['COMPLETE', 'COMPLETED', 'TRADED', 'EXECUTED', 'CANCELLED', 'CANCELED', 'REJECTED'].includes(String(row.status).toUpperCase())
   rows.sort((a, b) => Number(b.filled_quantity || 0) - Number(a.filled_quantity || 0) || Number(terminal(b)) - Number(terminal(a)))
   const row = rows[0], quantity = Number(row.filled_quantity || 0), average = Number(row.average_price || 0)
   if (!Number.isInteger(quantity) || quantity < 0 || quantity > intent.quantity || quantity > 0 && (!Number.isFinite(average) || average <= 0)) throw new BrokerError('Broker execution quantities or prices are invalid.')
   if (!terminal(row)) return null
-  return { orderId: intent.orderId!, quantity, average, status: String(row.status) }
+  return { orderId: intent.orderId!, quantity, average, status: String(row.status), ...(String(row.status).toUpperCase() === 'REJECTED' ? { rejectionReason: rejectionSummary(row.status_message) } : {}) }
 }

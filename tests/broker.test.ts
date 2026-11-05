@@ -9,6 +9,7 @@ import { parseBrokerTime, istTime } from '../server/time.ts'
 import { Store } from '../server/store.ts'
 import { DAY } from './helpers.ts'
 import type { OrderIntent } from '../shared/model.ts'
+import { sameTradingSymbol } from '../server/orderIdentity.ts'
 
 test('official form-based OTP and TOTP flows send the documented fields', async () => {
   const calls: Array<{ url: string; body: string; headers: Headers }> = []
@@ -134,3 +135,43 @@ test('malformed position lists and error responses cannot be treated as flat', a
   broker.credentials = { apiKey: 'test', accessToken: 'test', account: 'test', name: 'Test', expiresAt: Date.now() + 60_000 };
   await assert.rejects(() => broker.positions(), /Unavailable/);
 });
+
+const pendingNifty: OrderIntent = { id: 'pending-test', tag: 'unique-tag-test', side: 'CE', symbol: 'NIFTY26N0924350CE', instrumentToken: '39997', expiry: '2026-11-09', transaction: 'BUY', quantity: 195, reason: 'BREAKOUT', submittedAt: 1 }
+const reportedNifty = { order_id: 'broker-test-1', exchange: 'NSE', tradingsymbol: 'NIFTY-09Nov2026-24350-CE', instrument_token: 39997, transaction_type: 'BUY', product: 'INTRADAY', quantity: 195, tag: ['unique-tag-test'], status: 'Rejected', filled_quantity: 0, average_price: 0,
+  status_message: 'RMS:private-account,FUND LIMIT INSUFFICIENT,AVAILABLE FUND =20,ADDITIONAL REQUIRED FUND=33868,CALCULATED SPAN & EXPOSURE FOR ORDER=33888' }
+
+test('tagged Type A derivative aliases reconcile a rejected order without another placement', async () => {
+  const calls: string[] = []
+  const broker = new MStock(async (url, options) => {
+    calls.push(`${options?.method}:${String(url).split('/typea')[1]}`)
+    return new Response(JSON.stringify({ status: 'success', data: String(url).endsWith('/orders') ? [reportedNifty] : [{ ...reportedNifty, tag: 'unique-tag-test', instrument_token: 0 }] }))
+  })
+  broker.credentials = { apiKey: 'mock', accessToken: 'mock', account: 'mock', name: 'Mock', expiresAt: Date.now() + 60_000 }
+  const id = await broker.findOrder(pendingNifty)
+  assert.equal(id, 'broker-test-1')
+  const result = await broker.order({ ...pendingNifty, orderId: id! })
+  assert.equal(result!.quantity, 0)
+  assert.equal(result!.status, 'Rejected')
+  assert.match(result!.rejectionReason!, /Available ₹20.00; broker requires ₹33888.00/)
+  assert.equal(JSON.stringify(result).includes('private-account'), false)
+  assert.deepEqual(calls, ['GET:/orders', 'POST:/order/details'])
+})
+
+test('order aliases still reject other tags, contracts, tokens, sides, quantities and ambiguous matches', async () => {
+  for (const changed of [{ tag: ['wrong-tag'] }, { tradingsymbol: 'NIFTY-09Nov2026-24350-PE' }, { instrument_token: 99999 }, { quantity: 65 }, { exchange: 'BSE' }, { transaction_type: 'SELL' }, { product: 'CNC' }]) {
+    const broker = new MStock(async () => new Response(JSON.stringify({ status: 'success', data: [{ ...reportedNifty, ...changed }] })))
+    broker.credentials = { apiKey: 'mock', accessToken: 'mock', account: 'mock', name: 'Mock', expiresAt: Date.now() + 60_000 }
+    assert.equal(await broker.findOrder(pendingNifty), null)
+    assert.throws(() => parseReceipt([{ ...reportedNifty, ...changed }], { ...pendingNifty, orderId: 'broker-test-1' }), /do not match/)
+  }
+  const broker = new MStock(async () => new Response(JSON.stringify({ status: 'success', data: [reportedNifty, { ...reportedNifty, order_id: 'broker-test-2' }] })))
+  broker.credentials = { apiKey: 'mock', accessToken: 'mock', account: 'mock', name: 'Mock', expiresAt: Date.now() + 60_000 }
+  await assert.rejects(() => broker.findOrder(pendingNifty), /Multiple orders/)
+})
+
+test('monthly aliases require the saved full expiry; invalid dates never normalize', () => {
+  assert.equal(sameTradingSymbol('NIFTY26NOV24350CE', 'NIFTY-24Nov2026-24350-CE'), false)
+  assert.equal(sameTradingSymbol('NIFTY26NOV24350CE', 'NIFTY-24Nov2026-24350-CE', '2026-11-24'), true)
+  assert.equal(sameTradingSymbol('NIFTY26N0924350CE', 'NIFTY-10Nov2026-24350-CE'), false)
+  assert.equal(sameTradingSymbol('NIFTY26N3124350CE', 'NIFTY-31Nov2026-24350-CE'), false)
+})

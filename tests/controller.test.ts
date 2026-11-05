@@ -80,6 +80,29 @@ test('unknown submission persists and is never automatically retried', async () 
   assert.equal(f.broker.submitted.length, 1)
   assert.equal(f.controller.session!.legs.CE!.position, null)
 })
+
+test('verified rejected zero-fill pending order reconciles to stopped without a resend or cancellation', async () => {
+  const f = await fixture(); await f.start()
+  f.broker.timeoutSubmission = true
+  await candle(f, '09:20')
+  assert.ok(f.controller.session!.pending)
+  // Old saved intents may lack the new metadata; recover it from the locked contract.
+  delete f.controller.session!.pending!.instrumentToken
+  delete f.controller.session!.pending!.expiry
+  f.broker.findOrder = async intent => {
+    assert.equal(intent.instrumentToken, '101')
+    assert.equal(intent.expiry, '2026-10-27')
+    return 'verified-rejected'
+  }
+  f.broker.order = async () => ({ orderId: 'verified-rejected', quantity: 0, average: 0, status: 'Rejected', rejectionReason: 'Insufficient funds.' })
+  await f.controller.reconcile()
+  assert.equal(f.controller.session!.status, 'stopped')
+  assert.equal(f.controller.session!.pending, null)
+  assert.equal(f.controller.session!.trades.length, 0)
+  assert.equal(f.broker.submitted.length, 1)
+  assert.equal(f.broker.cancellations.length, 0)
+  assert.ok(f.controller.session!.activity.some(item => item.message.includes('Insufficient funds.')))
+})
 test('pending cancellation must be confirmed before a partial fill becomes a position', async () => {
   const f = await fixture(); await f.start()
   f.broker.plans.push({ pending: true })

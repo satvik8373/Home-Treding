@@ -265,7 +265,7 @@ export class Controller {
       this.note(`${side} entry skipped: the live price became stale during broker verification.`); return
     }
     const intent: OrderIntent = { id: randomUUID(), tag: `n009${randomUUID().replaceAll('-', '').slice(0, 14)}`,
-      side, symbol: leg.contract.symbol, transaction: buy ? 'BUY' : 'SELL', quantity, reason, submittedAt: this.now() }
+      side, symbol: leg.contract.symbol, instrumentToken: leg.contract.token, expiry: leg.contract.expiry, transaction: buy ? 'BUY' : 'SELL', quantity, reason, submittedAt: this.now() }
     if (session.mode === 'paper') {
       if (!mark) { this.note(`${side} paper exit is waiting for a verified market price.`); return }
       applyFill(session, intent, { orderId: `PAPER-${intent.id}`, quantity, average: mark.price, status: 'COMPLETE' }, this.now())
@@ -286,18 +286,20 @@ export class Controller {
   private async resolvePending(): Promise<void> {
     const session = this.session!, intent = session.pending
     if (!intent) return
+    const contract = session.legs[intent.side]?.contract
+    const expected = { ...intent, instrumentToken: intent.instrumentToken ?? contract?.token, expiry: intent.expiry ?? contract?.expiry }
     this.lastPendingAttempt = this.now()
     if (!intent.orderId) {
-      intent.orderId = (await this.broker.findOrder(intent)) ?? undefined; this.save()
+      intent.orderId = (await this.broker.findOrder(expected)) ?? undefined; this.save()
       if (!intent.orderId) { session.status = 'blocked'; this.note('The broker has not identified the submitted order. Verify its status in mStock before trading again.', 'error'); return }
     }
-    const fill = await this.broker.order(intent)
+    const fill = await this.broker.order({ ...expected, orderId: intent.orderId })
     if (fill) {
       applyFill(session, intent, fill, this.now())
       this.backoff[intent.side] = this.now() + (fill.quantity ? 0 : 3000)
       if (session.status === 'blocked') session.status = this.stopRequested ? 'stopping' : 'running'
       this.note(fill.quantity ? `${intent.side} ${intent.transaction} confirmed: ${fill.quantity} units at ₹${fill.average.toFixed(2)} · ${intent.reason}`
-        : `${intent.side} order ended ${fill.status}; no fill recorded.`, fill.quantity ? 'info' : 'error')
+        : `${intent.side} order ended ${fill.status}; no fill recorded.${fill.rejectionReason ? ` ${fill.rejectionReason}` : ''}`, fill.quantity ? 'info' : 'error')
     } else if (this.now() - intent.submittedAt >= 12_000 && !intent.cancelRequested) {
       // Save BEFORE cancellation as well; reconcile completion after a timeout.
       intent.cancelRequested = true; this.save()
