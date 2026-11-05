@@ -4,9 +4,8 @@ import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { cloudDispatch } from '../cloud-runtime/dispatch.mjs'
 import type { CloudRequest, CloudResponse } from '../server/cloud/database.ts'
-import { openIdentity, sealIdentity, tenantId } from '../shared/identity.ts'
-import { verifyGoogleUser } from '../server/auth/firebase.ts'
-import type { VerifiedUser } from '../server/auth/firebase.ts'
+import { openIdentity, sealIdentity, tenantId, verifyGoogleUser } from '../cloud-runtime/identity.mjs'
+import type { VerifiedUser } from '../cloud-runtime/identity.mjs'
 
 const COOKIE = '__Host-n009', TTL = 12 * 60 * 60_000
 const equal = (a: string, b: string) => timingSafeEqual(createHash('sha256').update(a).digest(), createHash('sha256').update(b).digest())
