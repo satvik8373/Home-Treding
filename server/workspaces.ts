@@ -45,6 +45,7 @@ export class Workspaces {
       if (offered.length !== expected.length || !timingSafeEqual(offered, expected) || !identity || identity.expires > Date.now() + 65_000)
         return void res.status(401).json({ error: 'Authenticated workspace required.' })
       if (this.closing) return void res.status(503).json({ error: 'Engine maintenance in progress. Retry shortly.' })
+      if (req.path === '/api/health' && req.method === 'GET') return void res.json({ ok: true, service: 'nifty-009', workspaceIsolation: true })
       try {
         const workspace = await this.get(identity.tenant)
         workspace.app(req, res)

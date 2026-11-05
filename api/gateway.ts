@@ -50,10 +50,10 @@ export function createGateway(environment: () => NodeJS.ProcessEnv = () => proce
     const token = (req.headers.cookie ?? '').split(';').map(item => item.trim()).find(item => item.startsWith(`${COOKIE}=`))?.slice(COOKIE.length + 1) ?? ''
     const [expiry, signature = ''] = token.split('.')
     const legacyAuthenticated = /^\d+$/.test(expiry ?? '') && Number(expiry) > Date.now() && Number(expiry) <= Date.now() + TTL && equal(signature, sign(expiry, secret))
-    const identity = openIdentity(token, secret, 'dashboard')
+    const googleEnabled = !!env.N009_FIREBASE_PROJECT_ID && env.N009_MULTIUSER === 'true' && !hosted
+    const identity = googleEnabled ? openIdentity(token, secret, `dashboard:${env.N009_FIREBASE_PROJECT_ID}`) : null
     const workspace = identity?.expires && identity.expires <= Date.now() + TTL ? identity.tenant : legacyAuthenticated ? 'owner' : null
     const authenticated = workspace !== null
-    const googleEnabled = !!env.N009_FIREBASE_PROJECT_ID && env.N009_MULTIUSER === 'true' && !hosted
     if (route === 'access') {
       if (req.method === 'GET') return reply(res, 200, { configured: true, authenticated, googleEnabled })
       if (req.method === 'DELETE') { res.setHeader('Set-Cookie', `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`); return reply(res, 200, { authenticated: false }) }
@@ -66,7 +66,7 @@ export function createGateway(environment: () => NodeJS.ProcessEnv = () => proce
             const user = await verifyUser(body.idToken, env.N009_FIREBASE_PROJECT_ID!)
             const expires = Math.min(user.expires, Date.now() + 60 * 60_000)
             if (!user.uid || user.uid.length > 128 || expires <= Date.now()) throw new Error()
-            const session = sealIdentity({ tenant: tenantId(`${env.N009_FIREBASE_PROJECT_ID}:${user.uid}`), expires }, secret, 'dashboard')
+            const session = sealIdentity({ tenant: tenantId(`${env.N009_FIREBASE_PROJECT_ID}:${user.uid}`), expires }, secret, `dashboard:${env.N009_FIREBASE_PROJECT_ID}`)
             res.setHeader('Set-Cookie', `${COOKIE}=${session}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${Math.floor((expires - Date.now()) / 1000)}`)
             return reply(res, 200, { authenticated: true })
           } catch { return reply(res, 401, { error: 'Google sign-in could not be verified. Sign in again.' }) }
@@ -95,6 +95,12 @@ export function createGateway(environment: () => NodeJS.ProcessEnv = () => proce
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 25_000)
     res.on('close', () => controller.abort())
     try {
+      if (workspace !== 'owner') {
+        // A misconfigured or rolled-back single-user engine must never serve its owner data to Google users.
+        const capability = await fetcher(new URL('/api/health', engine), { headers, redirect: 'error', signal: controller.signal })
+        const proof = capability.ok ? await capability.json() as { workspaceIsolation?: unknown } : null
+        if (proof?.workspaceIsolation !== true) return reply(res, 503, { error: 'Separate user workspaces are not available on this engine.' })
+      }
       const body = ['GET', 'HEAD'].includes(req.method ?? 'GET') ? undefined : await bodyOf(req)
       const upstream = await fetcher(target, { method: req.method, headers, body, redirect: 'error', signal: controller.signal })
       res.statusCode = upstream.status

@@ -39,7 +39,7 @@ test('Firebase verification checks cryptographic signature, project, issuer, exp
 
 test('Google tokens are verified server-side and browser-supplied tenant headers never select a workspace', async t => {
   const calls: RequestInit[] = []
-  const root = await serve(t, createGateway(() => env, async (_url, options) => { calls.push(options!); return Response.json({ ok: true }) }, undefined, async (token, project) => {
+  const root = await serve(t, createGateway(() => env, async (url, options) => { if (String(url).endsWith('/api/health')) return Response.json({ workspaceIsolation: true }); calls.push(options!); return Response.json({ ok: true }) }, undefined, async (token, project) => {
     assert.equal(project, 'test-project')
     if (!['user-a-token', 'user-b-token'].includes(token)) throw Error('Invalid signature')
     return { uid: token, expires: Date.now() + 3600_000 }
@@ -58,6 +58,19 @@ test('Google tokens are verified server-side and browser-supplied tenant headers
   assert.equal((await fetch(`${root}/api/access`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ idToken: 'forged' }) })).status, 401)
   assert.equal((await fetch(`${root}/api/state`, { headers: { cookie: cookies[0] + 'forged' } })).status, 401)
   assert.equal((await fetch(`${root}/api/access`, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://attacker.test' }, body: JSON.stringify({ idToken: 'user-a-token' }) })).status, 403)
+})
+
+test('Google access fails closed when the transport, project or engine isolation changes', async t => {
+  let settings = { ...env }, calledState = false
+  const root = await serve(t, createGateway(() => settings, async url => { if (String(url).includes('/state')) calledState = true; return Response.json({ ok: true }) }, undefined, async () => ({ uid: 'alice', expires: Date.now() + 3600_000 })))
+  const login = await fetch(`${root}/api/access`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ idToken: 'valid-test-token' }) })
+  const cookie = login.headers.get('set-cookie')!.split(';')[0]
+  assert.equal((await fetch(`${root}/api/state`, { headers: { cookie } })).status, 503)
+  assert.equal(calledState, false)
+  settings = { ...settings, N009_MULTIUSER: 'false' }
+  assert.equal((await fetch(`${root}/api/state`, { headers: { cookie } })).status, 401)
+  settings = { ...env, N009_FIREBASE_PROJECT_ID: 'other-project' }
+  assert.equal((await fetch(`${root}/api/state`, { headers: { cookie } })).status, 401)
 })
 
 test('workspace signatures reject expired, traversal, wrong-purpose and altered claims', () => {
