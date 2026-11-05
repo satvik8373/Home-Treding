@@ -11,7 +11,7 @@
     "build": "tsc --noEmit -p tsconfig.check.json && vite build",
     "start": "tsx server/index.ts",
     "doctor": "tsx server/doctor.ts",
-    "test": "tsx --test tests/strategy.test.ts tests/broker.test.ts tests/controller.test.ts tests/feed.test.ts tests/http.test.ts tests/charts.test.ts tests/backtest.test.ts tests/diagnostics.test.ts tests/historical.test.ts tests/deployment.test.ts tests/transparency.test.ts",
+    "test": "tsx --test tests/strategy.test.ts tests/broker.test.ts tests/controller.test.ts tests/feed.test.ts tests/http.test.ts tests/charts.test.ts tests/backtest.test.ts tests/diagnostics.test.ts tests/historical.test.ts tests/deployment.test.ts tests/transparency.test.ts tests/setup.test.ts",
     "lint": "oxlint",
     "preview": "vite preview",
     "build:vercel": "node scripts/build-vercel.mjs"

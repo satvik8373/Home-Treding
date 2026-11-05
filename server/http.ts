@@ -13,6 +13,7 @@ import { DATASET_SCHEMA } from "./backtest/schema.ts";
 import { AccountDiagnostics } from "./diagnostics.ts";
 import { AccountAudit } from './audit.ts';
 import { DEFAULT_SETTINGS } from '../shared/settings.ts';
+import { ExecutionNetwork } from './setup.ts';
 
 export function createApp(
   controller: Controller,
@@ -20,11 +21,13 @@ export function createApp(
   port = 4310,
   backtestRepository?: BacktestRepository,
   gatewaySecret = process.env.N009_GATEWAY_SECRET ?? '',
+  networkObserver?: () => Promise<string>,
 ) {
   const app = express(),
     csrf = randomBytes(32).toString("hex");
   const subscribers = new Set<express.Response>();
   const repository = backtestRepository ?? new MemoryRepository();
+  const setup = new ExecutionNetwork(repository, () => controller.connected() && controller.broker.credentials ? { account: controller.broker.credentials.account, apiKey: controller.broker.credentials.apiKey } : null, undefined, networkObserver);
   const historical = new HistoricalData(controller.broker as MStock, () => ({ connected: controller.connected(), account: controller.broker.credentials?.account ?? null, session: controller.session }), repository);
   const accountDiagnostics = new AccountDiagnostics(controller.broker as MStock, controller.feed, Date.now, () => controller.session);
   const audit = new AccountAudit(accountDiagnostics, () => controller.snapshot());
@@ -111,6 +114,8 @@ export function createApp(
     ),
   );
   app.get("/api/state", (_req, res) => res.json(controller.snapshot(csrf)));
+  app.get('/api/setup/network', async (_req, res) => res.json(await setup.read()));
+  app.post('/api/setup/network', (req, res) => res.json(setup.save(req.body)));
   app.get('/api/strategy/settings', (_req, res) => res.json({ saved: controller.strategySettings(), effective: controller.session?.settings ?? DEFAULT_SETTINGS, defaults: DEFAULT_SETTINGS }));
   app.post('/api/strategy/settings', (req, res) => { const saved = controller.saveStrategySettings(req.body); repository.put('strategy:settings', saved); res.json({ saved, appliesTo: 'next session; current session rules remain locked' }); });
   app.get('/api/audit', async (_req, res) => res.json(await audit.read()));

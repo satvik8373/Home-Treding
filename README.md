@@ -27,6 +27,8 @@ For development, `npm run dev` runs the React UI at **http://127.0.0.1:5173** an
 
 Tokens are encrypted in the backend’s local SQLite store. Passwords and OTPs are never persisted. Reconnect when the broker session expires. No AI service or additional market-data subscription is used by the application.
 
+**Broker & execution IP setup**, inside Connect mStock, guides the same connection flow on a hosted deployment. It observes the engine's actual outbound IPv4, offers copy/recheck, detects recorded IP changes and optionally compares user-entered primary/secondary IP references scoped to the account and API key. It does not claim an observed IP is static or broker-approved. The hosted container configuration and production setup flow are documented in [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md); frontend deployment alone does not provision a persistent engine.
+
 ## Default strategy rules
 
 - Underlying: NIFTY 50. Select the nearest available ATM strike from the **09:20 NIFTY opening-candle close**, using the nearest unexpired CE/PE pair and the broker’s current lot size. A late start still uses that historical opening close.

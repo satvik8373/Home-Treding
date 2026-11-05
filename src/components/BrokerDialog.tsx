@@ -12,6 +12,7 @@ import type { useDashboard } from "../hooks/useDashboard";
 import { clock } from "../lib/format";
 import { Dialog } from "./Dialog";
 import { BrokerDiagnostics } from './BrokerDiagnostics';
+import { BrokerSetup } from './BrokerSetup';
 
 type Props = {
   broker?: BrokerStatus;
@@ -34,6 +35,7 @@ export function BrokerDialog({
   const [flowId, setFlowId] = useState(""),
     [method, setMethod] = useState<"otp" | "totp">("totp");
   const [refreshLogin, setRefreshLogin] = useState(false);
+  const [connectionRevision, setConnectionRevision] = useState(0);
   const showConnection = broker?.connected && !refreshLogin;
   const [form, setForm] = useState({
     username: "",
@@ -64,6 +66,7 @@ export function BrokerDialog({
     ) {
       setFlowId('');
       setRefreshLogin(false);
+      setConnectionRevision(value => value + 1);
       setForm({ username: '', password: '', apiKey: '', code: '' });
     }
   }
@@ -92,6 +95,7 @@ export function BrokerDialog({
           {error}
         </div>
       )}
+      <BrokerSetup key={`${broker?.connected ? broker.account : 'disconnected'}:${connectionRevision}`} account={broker?.connected ? broker.account : null} action={action} working={working} />
       {showConnection ? (
         <>
           <dl className="connection-details">

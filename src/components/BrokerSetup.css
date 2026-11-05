@@ -1,0 +1,15 @@
+.broker-setup { margin: 18px 0; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; text-align: left; }
+.broker-setup > summary, .setup-compare > summary { padding: 13px; cursor: pointer; font-size: 12px; color: #334155; }
+.setup-steps { list-style: none; margin: 0; padding: 0 13px; }
+.setup-steps li { border-top: 1px solid #e2e8f0; padding: 12px 0; }
+.setup-steps strong { color: #0f172a; font-size: 12px; }
+.broker-setup p { margin: 9px 0; color: #64748b; font-size: 11px; line-height: 1.7; }
+.setup-address { padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.setup-address small { display: block; color: #64748b; font-size: 10px; margin-bottom: 8px; }
+.setup-address code { font-size: 15px; color: #0f172a; user-select: all; }
+.setup-links { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; font-size: 11px; }
+.setup-compare { border-top: 1px solid #e2e8f0; padding: 0 13px 12px; }
+.setup-compare > summary { padding-left: 0; }
+.setup-compare input { min-width: 0; }
+.broker-setup .setup-attention { color: #92400e; }
+.broker-setup .setup-note { padding: 0 13px 12px; }

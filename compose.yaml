@@ -1,0 +1,22 @@
+services:
+  engine:
+    build: .
+    restart: unless-stopped
+    stop_grace_period: 90s
+    environment:
+      N009_GATEWAY_SECRET: ${N009_GATEWAY_SECRET:?Set a private gateway secret of at least 32 characters}
+      N009_EXECUTION_IPV4: ${N009_EXECUTION_IPV4:-}
+    volumes:
+      - engine-data:/var/lib/n009
+    ports:
+      - "127.0.0.1:${N009_HOST_PORT:-4310}:4310"
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4310/api/health',{headers:{'x-009-gateway-secret':process.env.N009_GATEWAY_SECRET}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+volumes:
+  engine-data:
