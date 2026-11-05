@@ -35,6 +35,8 @@ Do not prefix any of these values with `VITE_`. Do not put them in GitHub. Redep
 
 The website shows **Connect your trading engine** until configuration exists, then requests the dashboard password. The access cookie is signed, HttpOnly, Secure and SameSite=Strict. Use **Lock dashboard** to clear it; rotating the gateway secret revokes existing access cookies. Account tokens and live order state remain encrypted in the persistent engine's SQLite directory.
 
+If a hosted engine origin is not available, use **Open local dashboard** on the setup screen from the engine computer. It opens `http://127.0.0.1:4310` without exposing the engine publicly. This option does not make the engine reachable from other devices.
+
 ## 3. Verify
 
 Unlock the dashboard, connect mStock, run read-only broker diagnostics, and test paper mode/backtesting. Confirm displayed timestamps and segment permissions. Building/deploying this repository does not verify a live order or actual broker fill.
