@@ -70,7 +70,8 @@ export function SessionControls({
           <button
             disabled={locked || !liveAvailable}
             className={shownMode === "live" ? "active live" : ""}
-            title={!liveAvailable ? liveReason : undefined}
+            title={!liveAvailable ? 'Live unavailable on this hosted engine' : undefined}
+            aria-describedby={!liveAvailable ? 'live-unavailable-reason' : undefined}
             onClick={() => setMode("live")}
           >
             Live
@@ -81,7 +82,7 @@ export function SessionControls({
             ? "Simulated orders · real market data"
             : "Real orders · connected mStock account"}
         </p>
-        {!liveAvailable && <p className="form-hint">{liveReason}</p>}
+        {!liveAvailable && <details className="execution-limit"><summary id="live-unavailable-reason">Why Live is unavailable</summary><p>{liveReason}</p><p>A match with your saved IP reference does not verify that the broker approved the IP or that the address is static.</p></details>}
         <dl className="session-rules">
           <div>
             <dt>Signal candle</dt>

@@ -21,6 +21,9 @@
 .deployment-notice p { margin: 7px 0 0; font-size: 12px; line-height: 1.7; color: #64748b; }
 .deployment-notice details { flex-basis: 100%; font-size: 11px; }
 .deployment-notice summary { cursor: pointer; }
+.execution-limit { margin: 12px 0; color: #64748b; font-size: 11px; line-height: 1.7; }
+.execution-limit summary { cursor: pointer; color: #475569; }
+.execution-limit p { margin: 8px 0 0; }
 .brand-image { border-radius: 6px; object-fit: cover; }
 .topbar { height: 64px; background: var(--ui-surface); border-color: var(--ui-border); }
 .wordmark { color: #0f172a; }
