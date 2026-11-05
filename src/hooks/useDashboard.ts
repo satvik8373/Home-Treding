@@ -40,6 +40,7 @@ export function useDashboard() {
           cache: "no-store",
           signal: AbortSignal.timeout(8000),
         });
+        if (response.status === 401 && alive) window.dispatchEvent(new Event('n009:session-expired'));
         if (!response.ok) throw new Error();
         accept(await response.json());
       } catch {
@@ -91,6 +92,7 @@ export function useDashboard() {
         signal: AbortSignal.timeout(25_000),
       });
       const result = await response.json();
+      if (response.status === 401) window.dispatchEvent(new Event('n009:session-expired'));
       if (!response.ok)
         throw new Error(result.error || "The request could not be completed.");
       return result;

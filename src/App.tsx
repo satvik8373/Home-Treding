@@ -3,6 +3,7 @@ import { Check, Clock3, Link2, Radio, RefreshCw, X } from 'lucide-react'
 import type { Mode, Side } from '../shared/model'
 import { freshMark } from '../shared/market'
 import { BrokerDialog } from './components/BrokerDialog'
+import { AccountProfile } from './components/AccountProfile'
 import { LegCard } from './components/LegCard'
 import { MarketChart } from './components/MarketChart'
 import { RulesDialog } from './components/RulesDialog'
@@ -78,6 +79,7 @@ export default function App() {
             <Link2 size={15} />{connected ? 'mStock connected' : 'Connect mStock'}
             {connected && <Check size={14} />}
           </button>
+          <AccountProfile broker={broker} onBroker={() => setBrokerDialog(true)} onSettings={() => navigate('audit')} />
         </div>
       </header>
 

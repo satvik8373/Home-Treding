@@ -1,0 +1,40 @@
+.auth-page { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 20px; background: #f8fafc; color: #0f172a; }
+.auth-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; color: #0f172a; text-decoration: none; font-size: 20px; font-weight: 750; letter-spacing: .08em; }
+.auth-brand img { border-radius: 8px; object-fit: cover; }
+.auth-brand span { display: grid; gap: 3px; }
+.auth-brand small { font-size: 9px; font-weight: 600; letter-spacing: .24em; color: #64748b; }
+.auth-card { width: min(100%, 440px); padding: 36px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
+.auth-eyebrow { font-size: 10px; font-weight: 650; letter-spacing: .12em; color: #64748b; }
+.auth-card h1 { margin: 12px 0; font-size: 26px; letter-spacing: -.03em; line-height: 1.25; }
+.auth-description { margin: 0 0 28px; color: #64748b; font-size: 13px; line-height: 1.7; }
+.google-signin { display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%; min-height: 48px; padding: 12px 16px; border: 1px solid #cbd5e1; border-radius: 7px; color: #0f172a; background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.google-signin:hover { background: #f8fafc; }
+.google-signin:disabled { color: #64748b; cursor: wait; }
+.google-letter { font-family: Arial, sans-serif; font-size: 21px; font-weight: 700; }
+.auth-privacy { display: flex; align-items: flex-start; gap: 9px; margin: 18px 0 26px; color: #64748b; font-size: 11px; line-height: 1.6; }
+.auth-privacy svg { flex-shrink: 0; margin-top: 2px; }
+.auth-owner { padding-top: 20px; border-top: 1px solid #e2e8f0; }
+.auth-owner summary { width: fit-content; font-size: 12px; color: #475569; cursor: pointer; }
+.auth-owner form > p, .auth-unavailable p, .auth-status { color: #64748b; font-size: 12px; line-height: 1.7; margin: 16px 0; }
+.auth-owner .field { margin-top: 16px; }
+.auth-owner input { min-height: 42px; width: 100%; margin: 8px 0 16px; }
+.auth-owner .button { width: 100%; }
+.auth-footer { max-width: 420px; text-align: center; margin: 26px 0 0; color: #64748b; font-size: 10px; line-height: 1.8; }
+.auth-footer span { padding: 0 6px; }
+.profile-button { display: flex; align-items: center; gap: 7px; min-height: 34px; padding: 7px 10px; border: 1px solid #e2e8f0; border-radius: 6px; color: #334155; background: #fff; font-size: 11px; cursor: pointer; }
+.profile-button:hover { background: #f8fafc; }
+.profile-heading { display: flex; align-items: center; gap: 14px; padding-right: 24px; margin-bottom: 24px; }
+.profile-avatar { display: grid; place-items: center; width: 48px; height: 48px; flex-shrink: 0; border-radius: 50%; background: #f1f5f9; color: #475569; }
+.profile-heading h2 { margin: 0; font-size: 19px; }
+.profile-heading p { margin: 5px 0 0; color: #64748b; font-size: 12px; overflow-wrap: anywhere; }
+.profile-details { margin: 0 0 20px; }
+.profile-details > div { display: flex; justify-content: space-between; gap: 20px; padding: 12px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+.profile-details dt { color: #64748b; }
+.profile-details dd { margin: 0; color: #0f172a; text-align: right; overflow-wrap: anywhere; }
+.profile-actions { display: grid; gap: 8px; }
+.profile-actions .button { justify-content: flex-start; gap: 9px; }
+.profile-privacy { display: flex; align-items: center; gap: 8px; margin: 20px 0; color: #64748b; font-size: 11px; line-height: 1.6; }
+.profile-logout { padding-top: 18px; border-top: 1px solid #e2e8f0; }
+.profile-logout p { margin: 0 0 14px; color: #64748b; font-size: 12px; line-height: 1.7; }
+.profile-logout .button { gap: 8px; }
+@media (max-width: 600px) { .auth-page { padding: 32px 16px; } .auth-card { padding: 28px 24px; } .auth-card h1 { font-size: 24px; } .profile-button span { display: none; } .profile-button { padding: 8px; } }

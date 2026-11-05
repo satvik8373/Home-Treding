@@ -55,7 +55,7 @@ export function createGateway(environment: () => NodeJS.ProcessEnv = () => proce
     const workspace = identity?.expires && identity.expires <= Date.now() + TTL ? identity.tenant : legacyAuthenticated ? 'owner' : null
     const authenticated = workspace !== null
     if (route === 'access') {
-      if (req.method === 'GET') return reply(res, 200, { configured: true, authenticated, googleEnabled })
+      if (req.method === 'GET') return reply(res, 200, { configured: true, authenticated, googleEnabled, user: !authenticated ? null : workspace === 'owner' ? { kind: 'owner', name: 'Workspace owner', email: null, expiresAt: Number(expiry) } : { kind: 'google', name: identity?.profile?.name || 'Google account', email: identity?.profile?.email || null, expiresAt: identity?.expires } })
       if (req.method === 'DELETE') { res.setHeader('Set-Cookie', `${COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`); return reply(res, 200, { authenticated: false }) }
       if (req.method !== 'POST') return reply(res, 405, { error: 'Method not allowed.' })
       try {
@@ -66,7 +66,7 @@ export function createGateway(environment: () => NodeJS.ProcessEnv = () => proce
             const user = await verifyUser(body.idToken, env.N009_FIREBASE_PROJECT_ID!)
             const expires = Math.min(user.expires, Date.now() + 60 * 60_000)
             if (!user.uid || user.uid.length > 128 || expires <= Date.now()) throw new Error()
-            const session = sealIdentity({ tenant: tenantId(`${env.N009_FIREBASE_PROJECT_ID}:${user.uid}`), expires }, secret, `dashboard:${env.N009_FIREBASE_PROJECT_ID}`)
+            const session = sealIdentity({ tenant: tenantId(`${env.N009_FIREBASE_PROJECT_ID}:${user.uid}`), expires, profile: { name: user.name?.slice(0, 100), email: user.email?.slice(0, 254) } }, secret, `dashboard:${env.N009_FIREBASE_PROJECT_ID}`)
             res.setHeader('Set-Cookie', `${COOKIE}=${session}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${Math.floor((expires - Date.now()) / 1000)}`)
             return reply(res, 200, { authenticated: true })
           } catch { return reply(res, 401, { error: 'Google sign-in could not be verified. Sign in again.' }) }

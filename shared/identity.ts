@@ -7,7 +7,7 @@ export function sealIdentity(value: object, secret: string, purpose: string) {
   const payload = Buffer.from(JSON.stringify(value)).toString('base64url')
   return `${payload}.${signature(payload, secret, purpose)}`
 }
-export function openIdentity(token: string, secret: string, purpose: string, now = Date.now()): { tenant: string; expires: number } | null {
+export function openIdentity(token: string, secret: string, purpose: string, now = Date.now()): { tenant: string; expires: number; profile?: { name?: string; email?: string } } | null {
   try {
     if (token.length > 2048) return null
     const [payload, signed, extra] = token.split('.')

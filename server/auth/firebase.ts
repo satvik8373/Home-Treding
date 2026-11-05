@@ -1,7 +1,7 @@
 import { importX509, jwtVerify } from 'jose'
 import type { JWTVerifyGetKey } from 'jose'
 
-export interface VerifiedUser { uid: string; expires: number }
+export interface VerifiedUser { uid: string; expires: number; name?: string; email?: string }
 const CERTIFICATES = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com'
 let certificates: Record<string, string> = {}, expires = 0, pending: Promise<void> | null = null
 async function refresh() {
@@ -36,7 +36,7 @@ export function createGoogleVerifier(resolveKey: JWTVerifyGetKey = googleKey) {
     if (firebase?.sign_in_provider !== 'google.com' || user.email_verified !== true || !user.sub || user.sub.length > 128
       || typeof user.auth_time !== 'number' || !Number.isFinite(user.auth_time) || now - user.auth_time > 300 || user.auth_time > now
       || typeof user.iat !== 'number' || user.iat > now || typeof user.exp !== 'number') throw new Error('Sign in with Google again.')
-    return { uid: user.sub, expires: user.exp * 1000 }
+    return { uid: user.sub, expires: user.exp * 1000, name: typeof user.name === 'string' ? user.name.slice(0, 100) : undefined, email: typeof user.email === 'string' ? user.email.slice(0, 254) : undefined }
   }
 }
 export const verifyGoogleUser = createGoogleVerifier()

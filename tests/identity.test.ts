@@ -42,13 +42,15 @@ test('Google tokens are verified server-side and browser-supplied tenant headers
   const root = await serve(t, createGateway(() => env, async (url, options) => { if (String(url).endsWith('/api/health')) return Response.json({ workspaceIsolation: true }); calls.push(options!); return Response.json({ ok: true }) }, undefined, async (token, project) => {
     assert.equal(project, 'test-project')
     if (!['user-a-token', 'user-b-token'].includes(token)) throw Error('Invalid signature')
-    return { uid: token, expires: Date.now() + 3600_000 }
+    return { uid: token, expires: Date.now() + 3600_000, name: 'Verified account', email: 'verified@example.test' }
   }))
   const cookies = []
   for (const token of ['user-a-token', 'user-b-token']) {
     const response = await fetch(`${root}/api/access`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ idToken: token, uid: 'owner' }) })
     assert.equal(response.status, 200)
     const cookie = response.headers.get('set-cookie')!.split(';')[0]; cookies.push(cookie)
+    const profile = await (await fetch(`${root}/api/access`, { headers: { cookie } })).json() as { user: { name: string; email: string; kind: string } }
+    assert.deepEqual({ name: profile.user.name, email: profile.user.email, kind: profile.user.kind }, { name: 'Verified account', email: 'verified@example.test', kind: 'google' })
     assert.equal((await fetch(`${root}/api/state`, { headers: { cookie, 'x-009-workspace': assertion('owner')['x-009-workspace'] } })).status, 200)
   }
   const identities = calls.map(call => openIdentity(new Headers(call.headers).get('x-009-workspace')!, secret, 'engine')!)
