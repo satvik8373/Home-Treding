@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { AppState } from "../../shared/model";
+import { useDeployment } from '../lib/deployment';
 
 export function useDashboard() {
+  const { available } = useDeployment();
   const [data, setData] = useState<AppState | null>(null),
     [online, setOnline] = useState(false);
   const [now, setNow] = useState(() => Date.now()),
@@ -12,6 +14,10 @@ export function useDashboard() {
   const refreshState = useRef<() => Promise<void>>(async () => {});
   const actionPending = useRef(false);
   useEffect(() => {
+    if (!available) {
+      const tick = setInterval(() => setNow(Date.now()), 1000);
+      return () => clearInterval(tick);
+    }
     let alive = true,
       inFlight = false,
       lastAccepted = 0,
@@ -66,8 +72,9 @@ export function useDashboard() {
       clearInterval(poll);
       clearInterval(tick);
     };
-  }, []);
+  }, [available]);
   async function action(path: string, body: object, name: string) {
+    if (!available) { setError('The execution engine is not connected. Broker and trading actions are unavailable.'); return null; }
     if (actionPending.current) return null;
     actionPending.current = true;
     setError("");

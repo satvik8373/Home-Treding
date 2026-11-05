@@ -1,24 +1,43 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
+import { accessStatus } from '../../shared/deployment'
+import type { DeploymentStatus } from '../../shared/deployment'
+import { DeploymentContext } from '../lib/deployment'
 
+/** Configured private deployments stay locked. An unconfigured site exposes only an empty, offline UI. */
 export function DeploymentGate({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<'checking' | 'setup' | 'locked' | 'open'>(import.meta.env.VITE_DEPLOY_TARGET === 'vercel' ? 'checking' : 'open')
-  const [password, setPassword] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false)
-  async function check() {
-    try { const response = await fetch('/api/access', { cache: 'no-store' }); const body = await response.json(); setError(''); setStatus(!body.configured ? 'setup' : body.authenticated ? 'open' : 'locked') }
-    catch { setStatus('setup'); setError('Could not check the deployment connection. Try again.') }
-  }
+  const deployed = import.meta.env.VITE_DEPLOY_TARGET === 'vercel'
+  const [status, setStatus] = useState<DeploymentStatus>(deployed ? 'checking' : 'open')
+  const [password, setPassword] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false), [revision, setRevision] = useState(0)
   useEffect(() => {
-    if (import.meta.env.VITE_DEPLOY_TARGET !== 'vercel') return
+    if (!deployed) return
     const controller = new AbortController()
-    void fetch('/api/access', { cache: 'no-store', signal: controller.signal }).then(response => response.json())
-      .then(body => { if (!controller.signal.aborted) setStatus(!body.configured ? 'setup' : body.authenticated ? 'open' : 'locked') })
-      .catch(() => { if (!controller.signal.aborted) { setStatus('setup'); setError('Could not check the deployment connection. Try again.') } })
+    void fetch('/api/access', { cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]) })
+      .then(async response => accessStatus(response.status, await response.json()))
+      .then(next => { if (!controller.signal.aborted) { setStatus(next); setError(next === 'unavailable' ? 'Could not verify dashboard access. Try again.' : '') } })
+      .catch(() => { if (!controller.signal.aborted) { setStatus('unavailable'); setError('Could not verify dashboard access. Try again.') } })
+      .finally(() => { if (!controller.signal.aborted) setBusy(false) })
     return () => controller.abort()
-  }, [])
-  if (status === 'open') return <>{import.meta.env.VITE_DEPLOY_TARGET === 'vercel' && <div className="deployment-session"><button className="text-button" onClick={async () => { await fetch('/api/access', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: '{}' }); window.location.reload() }}>Lock dashboard</button></div>}{children}</>
-  return <main className="deployment-gate"><section><h1>{status === 'setup' ? 'Hosted engine setup required' : status === 'checking' ? 'Checking dashboard access…' : 'Private trading dashboard'}</h1>
-    {status === 'setup' ? <><p>The website is deployed, but the hosted execution engine is not configured. The deployment owner must connect it before users can set up mStock from this website.</p><div className="deployment-actions"><a className="button primary" href="https://github.com/satvik8373/Home-Treding/blob/main/VERCEL_DEPLOYMENT.md" target="_blank" rel="noreferrer">Hosted setup guide</a><button className="button secondary" onClick={() => void check()}>Check connection</button></div><details><summary>Using an engine on this computer?</summary><p><a href="http://127.0.0.1:4310">Open this computer's dashboard</a>. This does not connect the hosted website.</p></details></> : status === 'locked' ? <form onSubmit={async event => { event.preventDefault(); setBusy(true); setError(''); try { const response = await fetch('/api/access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) }); const body = await response.json(); if (!response.ok) throw new Error(body.error || 'Could not unlock dashboard.'); setPassword(''); setStatus('open') } catch (error) { setError(error instanceof Error ? error.message : 'Connection unavailable.') } finally { setBusy(false) } }}><p>Enter your dashboard password to access your broker connection.</p><label className="field">Dashboard password<input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required /></label><button className="button primary" disabled={busy}>{busy ? 'Unlocking…' : 'Unlock dashboard'}</button></form> : null}
+  }, [deployed, revision])
+  const retry = () => { setBusy(true); setRevision(value => value + 1) }
+  if (status === 'open' || status === 'setup' || status === 'unavailable') return <DeploymentContext.Provider value={{ available: status === 'open', reason: status === 'open' ? undefined : status, checking: busy, retry }}>
+    {deployed && status === 'open' && <div className="deployment-session">{error && <span role="alert">{error}</span>}<button className="text-button" onClick={async () => {
+      try { const response = await fetch('/api/access', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(8000) }); if (!response.ok) throw new Error(); window.location.reload() }
+      catch { setError('Could not lock the dashboard. Try again.') }
+    }}>Lock dashboard</button></div>}
+    <Fragment key={status === 'open' ? 'active' : 'offline'}>{children}</Fragment>
+  </DeploymentContext.Provider>
+  return <main className="deployment-gate"><section><h1>{status === 'checking' ? 'Checking dashboard access…' : 'Private trading dashboard'}</h1>
+    {status === 'locked' && <form onSubmit={async event => {
+      event.preventDefault(); setBusy(true); setError('')
+      try {
+        const response = await fetch('/api/access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }), signal: AbortSignal.timeout(8000) })
+        const body = await response.json()
+        if (!response.ok || body.authenticated !== true) throw new Error(response.status === 401 ? 'Incorrect dashboard password.' : 'Could not unlock dashboard.')
+        setPassword(''); setStatus('open')
+      } catch (error) { setError(error instanceof Error ? error.message : 'Connection unavailable.') }
+      finally { setBusy(false) }
+    }}><p>Enter your dashboard password to access your broker connection.</p><label className="field">Dashboard password<input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required /></label><button className="button primary" disabled={busy}>{busy ? 'Unlocking…' : 'Unlock dashboard'}</button></form>}
     {error && <p className="inline-error" role="alert">{error}</p>}
   </section></main>
 }

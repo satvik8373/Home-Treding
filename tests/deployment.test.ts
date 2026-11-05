@@ -6,6 +6,7 @@ import type { TestContext } from 'node:test'
 import { createGateway } from '../api/gateway.ts'
 import { createApp } from '../server/http.ts'
 import { fixture } from './helpers.ts'
+import { accessStatus } from '../shared/deployment.ts'
 
 const env = { N009_ENGINE_ORIGIN: 'https://engine.example.test', N009_GATEWAY_SECRET: 'a'.repeat(40), N009_DASHBOARD_PASSWORD: 'b'.repeat(32) }
 async function serve(t: TestContext, handler: Parameters<typeof createServer>[1]) {
@@ -27,6 +28,16 @@ test('unconfigured Vercel deployment fails closed with an explicit setup respons
   const response = await fetch(`${root}/api/gateway?route=state`)
   assert.equal(response.status, 503)
   assert.equal((await response.json() as { configured: boolean }).configured, false)
+})
+
+test('dashboard access enables engine requests only for an explicit successful authenticated response', () => {
+  assert.equal(accessStatus(503, { configured: false }), 'setup')
+  assert.equal(accessStatus(200, { configured: false }), 'setup')
+  assert.equal(accessStatus(200, { configured: true, authenticated: false }), 'locked')
+  assert.equal(accessStatus(200, { configured: true, authenticated: true }), 'open')
+  for (const [status, body] of [[503, { configured: true, authenticated: true }], [401, { configured: true, authenticated: true }], [500, { configured: false }], [200, null], [200, {}], [200, { configured: 'true', authenticated: true }], [200, { configured: true, authenticated: 'true' }], [200, []]] as const) {
+    assert.equal(accessStatus(status, body), 'unavailable')
+  }
 })
 
 test('dashboard login blocks unauthenticated access, wrong passwords, cross-site login and tampered sessions', async t => {

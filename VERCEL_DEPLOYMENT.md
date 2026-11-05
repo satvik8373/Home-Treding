@@ -33,9 +33,9 @@ Set these server-side environment variables for each deployment environment you 
 
 Do not prefix any of these values with `VITE_`. Do not put them in GitHub. Redeploy after setting them. No real secrets are shipped in `.env.example`.
 
-The website shows **Connect your trading engine** until configuration exists, then requests the dashboard password. The access cookie is signed, HttpOnly, Secure and SameSite=Strict. Use **Lock dashboard** to clear it; rotating the gateway secret revokes existing access cookies. Account tokens and live order state remain encrypted in the persistent engine's SQLite directory.
+The website shows an empty offline dashboard until configuration exists, then requests the dashboard password before enabling engine requests or loading account data. The access cookie is signed, HttpOnly, Secure and SameSite=Strict. Use **Lock dashboard** to clear it; rotating the gateway secret revokes existing access cookies. Account tokens and live order state remain encrypted in the persistent engine's SQLite directory.
 
-The setup screen prioritizes the **Hosted setup guide**. Its optional computer-local link is only a development fallback; it does not connect the production website.
+When the engine connection is unconfigured, the website opens the actual dashboard with empty data and an **Execution engine not connected** notice. Users can inspect the layout and rules; broker login, data fetching, backtests and orders stay unavailable. No engine polling or event stream is started in that state. **Check connection** retries the access check. A configured private deployment still requires the dashboard password before its account data is loaded. A malformed, failed or timed-out access response never enables engine requests. The offline dashboard is a UI fallback, not a working hosted engine.
 
 ## Production broker and IP setup
 

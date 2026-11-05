@@ -13,6 +13,7 @@ import { TransparencyPanel } from './components/TransparencyPanel'
 import { DEFAULT_SETTINGS, settingsFor } from '../shared/settings'
 import { useDashboard } from './hooks/useDashboard'
 import { clock, date, money } from './lib/format'
+import { useDeployment } from './lib/deployment'
 import './App.css'
 import './minimal-ui.css'
 
@@ -23,6 +24,7 @@ const statusLabels: Record<string, string> = {
 const currentView = () => window.location.hash === '#backtest' ? 'backtest' as const : window.location.hash === '#audit' ? 'audit' as const : 'market' as const
 
 export default function App() {
+  const deployment = useDeployment()
   const { data, online, now, error, setError, working, action } = useDashboard()
   const [brokerDialog, setBrokerDialog] = useState(false)
   const [rulesDialog, setRulesDialog] = useState(false)
@@ -72,7 +74,7 @@ export default function App() {
             {online ? 'Engine online' : 'Engine offline'}
           </span>
           <span className="clock"><Clock3 size={14} />{clock(now, true)} <small>IST</small></span>
-          <button className="broker-button" onClick={() => setBrokerDialog(true)}>
+          <button className="broker-button" disabled={!deployment.available} title={!deployment.available ? 'Connect the hosted execution engine first.' : undefined} onClick={() => setBrokerDialog(true)}>
             <Link2 size={15} />{connected ? 'mStock connected' : 'Connect mStock'}
             {connected && <Check size={14} />}
           </button>
@@ -83,10 +85,11 @@ export default function App() {
         <div className="page-heading">
           <div><h1>009 Breakout</h1><p>NIFTY 50 <span>·</span> Independent CALL & PUT</p></div>
           <span className={`tag ${session?.mode === 'live' ? 'live-tag' : ''}`}>
-            {session?.mode === 'live' ? 'LIVE SESSION' : 'PAPER SESSION'}
+            {!session ? 'NO SESSION' : session.mode === 'live' ? 'LIVE SESSION' : 'PAPER SESSION'}
           </span>
         </div>
-        {!online && <div className="notice" role="status">Waiting for the trading engine to reconnect.</div>}
+        {!deployment.available ? <section className="deployment-notice" role="status"><div><strong>{deployment.reason === 'setup' ? 'Execution engine not connected' : 'Dashboard connection could not be verified'}</strong><p>You can view the dashboard and strategy rules. Market data, broker connection, backtests and orders are unavailable until the hosted engine is connected.</p></div><button className="button secondary" disabled={deployment.checking} onClick={deployment.retry}>{deployment.checking ? 'Checking…' : 'Check connection'}</button><details><summary>Deployment setup</summary><p>The deployment owner must configure the hosted engine connection and private dashboard access. <a href="https://github.com/satvik8373/Home-Treding/blob/main/VERCEL_DEPLOYMENT.md" target="_blank" rel="noreferrer">Open setup guide</a>.</p></details></section>
+          : !online && <div className="notice" role="status">Waiting for the trading engine to reconnect.</div>}
         {error && (
           <div className="notice error" role="alert">
             <span>{error}</span><button aria-label="Dismiss error" onClick={() => setError('')}><X size={16} /></button>

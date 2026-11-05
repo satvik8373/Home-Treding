@@ -72,7 +72,7 @@ export function SessionControls({
           </button>
         </div>
         <p className="mode-description">
-          {shownMode === "paper"
+          {!online ? 'Execution engine offline' : !connected ? 'Connect mStock for market data' : shownMode === "paper"
             ? "Simulated orders · real market data"
             : "Real orders · connected mStock account"}
         </p>
