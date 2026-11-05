@@ -1,10 +1,10 @@
 # Deploy Home-Treding / NIFTY 009
 
-Vercel hosts the React dashboard and an authenticated API gateway. There are two execution transports: a Vercel-native hosted **Paper** worker with encrypted PostgreSQL persistence, or the original external persistent engine. Vercel Functions do not guarantee persistent local filesystem storage: https://vercel.com/kb/guide/is-sqlite-supported-in-vercel. The gateway does not itself start a trading loop.
+Vercel hosts the React dashboard and an authenticated API gateway. Production uses the external persistent engine for Paper and user-controlled Live execution. See [AWS engine deployment](AWS_DEPLOYMENT.md). Vercel Functions do not guarantee persistent local filesystem storage: https://vercel.com/kb/guide/is-sqlite-supported-in-vercel. The gateway does not itself start a trading loop.
 
 ## Vercel-native hosted Paper engine
 
-`vercel.json` includes one `nifty-engine` daemon in `iad1` with 1 GiB memory. It builds the existing Docker image and runs `server/cloud/worker.ts`. Because Vercel Daemons cannot receive inbound HTTP, the authenticated gateway exchanges encrypted, expiring RPC requests with the worker through PostgreSQL. Dashboard state is published by the worker every two seconds; `/api/events` returns 204 and the existing four-second polling is used. The worker's broker WebSocket and strategy loop continue independently of browser requests.
+This optional Paper-only transport is retained in source, but is not enabled in the production `vercel.json`. It runs `server/cloud/worker.ts` as a persistent daemon. Because Vercel Daemons cannot receive inbound HTTP, the authenticated gateway exchanges encrypted, expiring RPC requests with the worker through PostgreSQL. Dashboard state is published by the worker every two seconds; `/api/events` returns 204 and the existing four-second polling is used. The worker's broker WebSocket and strategy loop continue independently of browser requests. Do not select this transport when deploying the external engine.
 
 Set these **production server-side secrets** in Vercel before deployment:
 

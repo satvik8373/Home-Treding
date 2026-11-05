@@ -1,0 +1,25 @@
+[Unit]
+Description=NIFTY009 persistent trading engine
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nifty009
+Group=nifty009
+WorkingDirectory=/opt/nifty009/current
+EnvironmentFile=/etc/nifty009/engine.env
+ExecStart=/opt/n009-runtime/node/bin/node --max-old-space-size=256 /opt/nifty009/current/server/index.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=90
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/nifty009
+MemoryMax=384M
+
+[Install]
+WantedBy=multi-user.target
