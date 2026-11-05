@@ -4,7 +4,7 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build:vercel",
   "outputDirectory": "dist",
-  "functions": { "api/gateway.ts": { "maxDuration": 30 } },
+  "functions": { "api/gateway.ts": { "maxDuration": 30, "includeFiles": "cloud-runtime/**" } },
   "daemons": {
     "nifty-engine": {
       "root": ".",

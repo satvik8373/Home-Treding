@@ -6,7 +6,7 @@ COPY . .
 RUN npm run build
 
 FROM node:22-bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends util-linux && apt-get clean
+RUN apt-get update && apt-get install -y --no-install-recommends util-linux ca-certificates && apt-get clean
 ENV NODE_ENV=production N009_HOST=0.0.0.0 PORT=4310 N009_DATA_DIR=/var/lib/n009 N009_EXECUTION_LOCATION=hosted
 WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules ./node_modules

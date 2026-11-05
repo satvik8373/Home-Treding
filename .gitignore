@@ -22,6 +22,7 @@ releases/
 *.tgz
 dist
 dist-ssr
+cloud-runtime/*.mjs
 *.local
 
 # Editor directories and files

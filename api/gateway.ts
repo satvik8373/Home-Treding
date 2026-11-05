@@ -2,7 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { cloudDispatch } from '../server/cloud/api.ts'
+import { cloudDispatch } from '../cloud-runtime/dispatch.mjs'
 import type { CloudRequest, CloudResponse } from '../server/cloud/database.ts'
 
 const COOKIE = '__Host-n009', TTL = 12 * 60 * 60_000
