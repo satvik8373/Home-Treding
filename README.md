@@ -13,7 +13,7 @@ npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:4310**. Keep the backend terminal running while a strategy is active. Closing the browser does not stop monitoring. The server binds to this computer by default. For Vercel hosting and the authenticated persistent-engine gateway, follow [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md).
+Open **http://127.0.0.1:4310**. Keep the backend terminal running while a strategy is active. Closing the browser does not stop monitoring. The server binds to this computer by default. For the Vercel-native hosted Paper worker, encrypted cloud storage, or the external-engine gateway, follow [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md).
 
 For development, `npm run dev` runs the React UI at **http://127.0.0.1:5173** and proxies API requests to the backend. Development reloads can interrupt a session; use the built app with `npm start` for trading.
 

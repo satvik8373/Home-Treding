@@ -12,13 +12,14 @@ import type { StrategySettings } from '../shared/settings.ts'
 import { rejectionSummary } from './orderIdentity.ts'
 
 type Feed = Pick<MarketFeed, 'status' | 'lastTickAt' | 'connect' | 'close' | 'onMark' | 'onChange'>
-type Repository = Pick<Store, 'session' | 'loadSession' | 'saveSession' | 'broker' | 'saveBroker'> & Partial<Pick<Store, 'get' | 'put'>>
+type Repository = Pick<Store, 'session' | 'loadSession' | 'saveSession' | 'broker' | 'saveBroker'> & Partial<Pick<Store, 'get' | 'put' | 'persist'>>
 const SIDES: Side[] = ['CE', 'PE']
 const active = (s: TradingSession | null) => !!s && ['armed', 'preparing', 'running', 'stopping'].includes(s.status)
 export const hasExposure = (s: TradingSession | null) => !!s && (!!s.pending || SIDES.some(side => !!s.legs[side]?.position))
 class PositionReadError extends Error {}
 
 export class Controller {
+  execution?: { kind: 'hosted-paper'; liveExecution: false; reason: string }
   session: TradingSession | null
   marks: Record<string, Mark> = {}
   busy = false
@@ -74,7 +75,7 @@ export class Controller {
   }
   snapshot(csrf = ''): AppState {
     const credentials = this.broker.credentials
-    return { csrf, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { connected: this.connected(),
+    return { csrf, runtime: this.execution, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { connected: this.connected(),
       account: this.connected() ? credentials!.account : null, name: this.connected() ? credentials!.name : null,
       expiresAt: credentials?.expiresAt ?? null, feed: this.feed.status, lastTickAt: this.feed.lastTickAt },
       session: this.session, marks: this.marks }
@@ -115,7 +116,9 @@ export class Controller {
   private exclusive<T>(work: () => Promise<T>): Promise<T> {
     const result = this.queue.catch(() => {}).then(async () => {
       this.busy = true; this.onChange()
-      try { return await work() } finally { this.busy = false; this.onChange() }
+      try { return await work() } finally {
+        try { await this.store.persist?.() } finally { this.busy = false; this.onChange() }
+      }
     })
     this.queue = result
     return result
@@ -178,6 +181,7 @@ export class Controller {
   }
   async start(mode: Mode): Promise<void> {
     await this.exclusive(async () => {
+      if (mode === 'live' && this.execution?.liveExecution === false) throw new Error(this.execution.reason)
       const now = this.now(), date = istDate(now)
       if (!this.connected()) throw new Error('Connect and verify your mStock account first.')
       const permissions = this.broker.credentials?.permissions

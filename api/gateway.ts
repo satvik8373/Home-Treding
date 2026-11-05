@@ -2,6 +2,8 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
+import { cloudDispatch } from '../server/cloud/api.ts'
+import type { CloudRequest, CloudResponse } from '../server/cloud/database.ts'
 
 const COOKIE = '__Host-n009', TTL = 12 * 60 * 60_000
 const equal = (a: string, b: string) => timingSafeEqual(createHash('sha256').update(a).digest(), createHash('sha256').update(b).digest())
@@ -19,14 +21,20 @@ async function bodyOf(req: IncomingMessage & { body?: unknown }): Promise<string
 }
 
 /** Authenticated stateless gateway only. SQLite and the trading loop stay on one persistent engine. */
-export function createGateway(environment: () => NodeJS.ProcessEnv = () => process.env, fetcher: typeof fetch = fetch) {
+export function createGateway(environment: () => NodeJS.ProcessEnv = () => process.env, fetcher: typeof fetch = fetch, cloud: (request: CloudRequest, env: NodeJS.ProcessEnv) => Promise<CloudResponse> = cloudDispatch) {
   return async function gateway(req: IncomingMessage & { body?: unknown }, res: ServerResponse) {
     res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff')
     const env = environment(), secret = env.N009_GATEWAY_SECRET ?? '', password = env.N009_DASHBOARD_PASSWORD ?? ''
-    let engine: URL
+    const hosted = env.N009_ENGINE_TRANSPORT === 'cloud'
+    let engine: URL | undefined
     try {
-      engine = new URL(env.N009_ENGINE_ORIGIN ?? '')
-      if (engine.protocol !== 'https:' || engine.username || engine.password || engine.pathname !== '/' || engine.search || engine.hash || secret.length < 32 || password.length < 24) throw new Error()
+      if (secret.length < 32 || password.length < 24) throw new Error()
+      if (hosted) {
+        if (!/^postgres(?:ql)?:\/\//.test(env.DATABASE_URL ?? '') || !/^[a-f0-9]{64}$/i.test(env.N009_STATE_KEY ?? '')) throw new Error()
+      } else {
+        engine = new URL(env.N009_ENGINE_ORIGIN ?? '')
+        if (engine.protocol !== 'https:' || engine.username || engine.password || engine.pathname !== '/' || engine.search || engine.hash) throw new Error()
+      }
     } catch { return reply(res, 503, { configured: false, error: 'Deployment setup required. Configure the engine connection and dashboard access in Vercel.' }) }
     const url = new URL(req.url ?? '/', 'https://dashboard.invalid')
     const route = url.searchParams.get('route') ?? url.pathname.replace(/^\/api\//, '')
@@ -53,6 +61,15 @@ export function createGateway(environment: () => NodeJS.ProcessEnv = () => proce
       } catch { return reply(res, 400, { error: 'Invalid login request.' }) }
     }
     if (!authenticated) return reply(res, 401, { error: 'Unlock the private dashboard to continue.' })
+    if (hosted) {
+      try {
+        const result = await cloud({ route, method: req.method ?? 'GET', query: url.search, csrf: typeof req.headers['x-009-csrf'] === 'string' ? req.headers['x-009-csrf'] : '', body: ['GET', 'HEAD'].includes(req.method ?? 'GET') ? undefined : await bodyOf(req) }, env)
+        res.statusCode = result.status
+        for (const name of ['content-type', 'content-disposition']) if (result.headers[name]) res.setHeader(name, result.headers[name])
+        res.end(req.method === 'HEAD' ? undefined : result.body)
+      } catch { reply(res, 503, { error: 'Hosted engine unavailable. Refresh status before repeating an action.' }) }
+      return
+    }
     const target = new URL(`/api/${route}`, engine); target.search = url.search
     const headers: Record<string, string> = { 'x-009-gateway-secret': secret }
     if (typeof req.headers['x-009-csrf'] === 'string') headers['x-009-csrf'] = req.headers['x-009-csrf']

@@ -6,6 +6,8 @@ import { DEFAULT_SETTINGS } from '../../shared/settings';
 import type { StrategySettings } from '../../shared/settings';
 
 type Props = {
+  liveAvailable?: boolean;
+  liveReason?: string;
   settings?: StrategySettings;
   onSettings?: () => void;
   session?: TradingSession | null;
@@ -36,6 +38,8 @@ export function SessionControls({
   onRules,
   settings = DEFAULT_SETTINGS,
   onSettings,
+  liveAvailable = true,
+  liveReason,
 }: Props) {
   const shownMode = locked ? session!.mode : mode;
   const local = new Date(now + 330 * 60_000),
@@ -64,8 +68,9 @@ export function SessionControls({
             Paper
           </button>
           <button
-            disabled={locked}
+            disabled={locked || !liveAvailable}
             className={shownMode === "live" ? "active live" : ""}
+            title={!liveAvailable ? liveReason : undefined}
             onClick={() => setMode("live")}
           >
             Live
@@ -76,6 +81,7 @@ export function SessionControls({
             ? "Simulated orders · real market data"
             : "Real orders · connected mStock account"}
         </p>
+        {!liveAvailable && <p className="form-hint">{liveReason}</p>}
         <dl className="session-rules">
           <div>
             <dt>Signal candle</dt>

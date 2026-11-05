@@ -15,16 +15,16 @@ export interface SavedBroker {
 export class Store {
   private db: DatabaseSync;
   private key: Buffer;
-  constructor(directory: string) {
+  constructor(directory: string, encryptionKey?: Buffer) {
     mkdirSync(directory, { recursive: true });
     this.db = new DatabaseSync(join(directory, "009.sqlite"));
     this.db.exec(
       "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS records (key TEXT PRIMARY KEY, value TEXT NOT NULL);",
     );
     const keyPath = join(directory, "session.key");
-    if (!existsSync(keyPath))
+    if (!encryptionKey && !existsSync(keyPath))
       writeFileSync(keyPath, randomBytes(32), { mode: 0o600, flag: "wx" });
-    this.key = readFileSync(keyPath);
+    this.key = encryptionKey ?? readFileSync(keyPath);
     if (this.key.length !== 32)
       throw new Error("The local session encryption key is invalid.");
   }
@@ -106,4 +106,5 @@ export class Store {
   close(): void {
     this.db.close();
   }
+  async persist(): Promise<void> { /* Local SQLite writes are synchronously durable already. */ }
 }

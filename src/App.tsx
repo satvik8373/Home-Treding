@@ -133,7 +133,7 @@ export default function App() {
           )}
           <div className="workspace">
             <MarketChart connected={connected} identity={identity} now={now} marks={data?.marks ?? {}} legs={session?.legs ?? {}} trades={session?.trades ?? []} settings={settingsFor(session)} />
-            <SessionControls session={session} locked={locked} connected={connected} online={online} working={working} now={now} mode={mode} setMode={setMode} liveAck={liveAck} setLiveAck={setLiveAck} action={action} onRules={() => setRulesDialog(true)} settings={locked ? settingsFor(session) : data?.savedSettings ?? DEFAULT_SETTINGS} onSettings={() => navigate('audit')} />
+            <SessionControls session={session} locked={locked} connected={connected} online={online} working={working} now={now} mode={mode} setMode={setMode} liveAck={liveAck} setLiveAck={setLiveAck} action={action} onRules={() => setRulesDialog(true)} settings={locked ? settingsFor(session) : data?.savedSettings ?? DEFAULT_SETTINGS} onSettings={() => navigate('audit')} liveAvailable={data?.runtime?.liveExecution !== false} liveReason={data?.runtime?.reason} />
           </div>
           <div className="section-heading"><h2>Strategy positions</h2><span>References stay fixed for the session</span></div>
           <div className="legs-grid">{sides.map(side => <LegCard key={side} side={side} leg={session?.legs[side]} mark={markFor(side)} now={now} settings={settingsFor(session)} />)}</div>

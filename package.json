@@ -11,7 +11,7 @@
     "build": "tsc --noEmit -p tsconfig.check.json && vite build",
     "start": "tsx server/index.ts",
     "doctor": "tsx server/doctor.ts",
-    "test": "tsx --test tests/strategy.test.ts tests/broker.test.ts tests/controller.test.ts tests/feed.test.ts tests/http.test.ts tests/charts.test.ts tests/backtest.test.ts tests/diagnostics.test.ts tests/historical.test.ts tests/deployment.test.ts tests/transparency.test.ts tests/setup.test.ts",
+    "test": "tsx --test tests/strategy.test.ts tests/broker.test.ts tests/controller.test.ts tests/feed.test.ts tests/http.test.ts tests/charts.test.ts tests/backtest.test.ts tests/diagnostics.test.ts tests/historical.test.ts tests/deployment.test.ts tests/transparency.test.ts tests/setup.test.ts tests/cloud.test.ts",
     "lint": "oxlint",
     "preview": "vite preview",
     "build:vercel": "node scripts/build-vercel.mjs"
@@ -21,6 +21,7 @@
     "express": "^5.3.0",
     "lightweight-charts": "^5.2.1",
     "lucide-react": "^1.61.0",
+    "pg": "^8.23.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "ws": "^8.22.0"
@@ -28,6 +29,7 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/ws": "^8.18.2",

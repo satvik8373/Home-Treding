@@ -130,6 +130,7 @@ export interface BrokerStatus {
   lastTickAt: number | null;
 }
 export interface AppState {
+  runtime?: { kind: 'hosted-paper'; liveExecution: false; reason: string };
   savedSettings?: StrategySettings;
   csrf: string;
   serverTime: number;

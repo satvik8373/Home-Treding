@@ -1,6 +1,28 @@
 # Deploy Home-Treding / NIFTY 009
 
-Vercel hosts the React dashboard and an authenticated API gateway. The existing Node engine runs continuously on your own computer or another persistent host, with its SQLite data directory retained. Vercel Functions do not guarantee persistent local filesystem storage: https://vercel.com/kb/guide/is-sqlite-supported-in-vercel. The gateway never starts a second trading engine or stores broker credentials in Vercel.
+Vercel hosts the React dashboard and an authenticated API gateway. There are two execution transports: a Vercel-native hosted **Paper** worker with encrypted PostgreSQL persistence, or the original external persistent engine. Vercel Functions do not guarantee persistent local filesystem storage: https://vercel.com/kb/guide/is-sqlite-supported-in-vercel. The gateway does not itself start a trading loop.
+
+## Vercel-native hosted Paper engine
+
+`vercel.json` includes one `nifty-engine` daemon in `iad1` with 1 GiB memory. It builds the existing Docker image and runs `server/cloud/worker.ts`. Because Vercel Daemons cannot receive inbound HTTP, the authenticated gateway exchanges encrypted, expiring RPC requests with the worker through PostgreSQL. Dashboard state is published by the worker every two seconds; `/api/events` returns 204 and the existing four-second polling is used. The worker's broker WebSocket and strategy loop continue independently of browser requests.
+
+Set these **production server-side secrets** in Vercel before deployment:
+
+- `N009_ENGINE_TRANSPORT=cloud`
+- `DATABASE_URL`: a PostgreSQL connection string from a free Neon project. Connections enforce TLS certificate verification.
+- `N009_STATE_KEY`: 32 random bytes as 64 hex characters. Keep it stable and private; changing it makes existing encrypted records unreadable.
+- `N009_GATEWAY_SECRET`: at least 32 random characters.
+- `N009_DASHBOARD_PASSWORD`: at least 24 characters, separate from broker credentials.
+
+This transport does not need `N009_ENGINE_ORIGIN`. Login with the private dashboard password, then connect mStock yourself. Local credentials/history are not migrated automatically. Each deployment is one private workspace; do not share its dashboard password among unrelated traders.
+
+`CloudStore` uses SQLite only as an ephemeral working cache. Durable records and API payloads are authenticated-encrypted with AES-256-GCM in PostgreSQL. Serialized controller operations await the cloud checkpoint before completion. A database lease elects one active worker across rolling deployments; checkpoint/publish writes are fenced by ownership and lease expiry. Expired/unavailable workers cannot appear online: state older than 15 seconds is rejected. Queued commands expire after 24 seconds; claimed requests are not replayed after a crash, and sensitive request payloads are removed when claimed. Queue rows have short TTL cleanup. A timed-out request must be checked before repeating it. Paper sessions recover from the cloud checkpoint using the same controller's current-day recovery rules.
+
+**Hosted Live execution remains disabled in both the controller and broker adapter.** This deployment has no verified stable broker-approved outbound IP. It can connect an account, read real broker/data endpoints, save settings, download available history, backtest and run Paper execution. Read access and Paper fills do not establish live execution. The original locally/external-hosted Live implementation is unchanged. Do not remove this guard as a substitute for qualifying an actual live execution host and its broker IP configuration.
+
+Vercel Hobby and Neon Free have finite runtime, storage and transfer quotas. Vercel stops Hobby daemons when CPU or provisioned-memory quotas are exhausted; a continually running 1 GiB worker can exceed a monthly allowance. Neon can also suspend compute at its free limit. No paid plan is enabled by this configuration, and this deployment must not be represented as an unlimited or guaranteed-uptime live service. Operator monitoring/scaling and free-tier capacity remain necessary. See [Vercel Daemons limits](https://vercel.com/docs/daemons/limits) and [Neon Free limits](https://neon.com/docs/introduction/plans).
+
+Verify `vercel daemons inspect nifty-engine --scope <your-team>`, authenticated `/api/state`, queued settings reads/writes, broker diagnostics and restart recovery. Never test production deployment by placing a real order. In this implementation a hosted Live start is explicitly rejected before any broker submission.
 
 ## 1. Persistent engine
 
