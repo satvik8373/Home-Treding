@@ -2,8 +2,12 @@ import { BookOpen, Play, Square } from "lucide-react";
 import type { Mode, TradingSession } from "../../shared/model";
 import type { useDashboard } from "../hooks/useDashboard";
 import { clock } from '../lib/format';
+import { DEFAULT_SETTINGS } from '../../shared/settings';
+import type { StrategySettings } from '../../shared/settings';
 
 type Props = {
+  settings?: StrategySettings;
+  onSettings?: () => void;
   session?: TradingSession | null;
   locked: boolean;
   connected: boolean;
@@ -30,20 +34,22 @@ export function SessionControls({
   setLiveAck,
   action,
   onRules,
+  settings = DEFAULT_SETTINGS,
+  onSettings,
 }: Props) {
   const shownMode = locked ? session!.mode : mode;
   const local = new Date(now + 330 * 60_000),
     minutes = local.getUTCHours() * 60 + local.getUTCMinutes();
   const inWindow =
-    ![0, 6].includes(local.getUTCDay()) && minutes >= 540 && minutes < 910;
+    ![0, 6].includes(local.getUTCDay()) && minutes >= 540 && minutes < Number(settings.cutoff.slice(0, 2)) * 60 + Number(settings.cutoff.slice(3));
   return (
     <section className="panel session-panel">
       <div className="panel-title">
         <h2>009 Strategy</h2>
-        <button className="text-button" onClick={onRules}>
+        <div className="session-rule-actions">{onSettings && <button className="text-button" onClick={onSettings}>Settings</button>}<button className="text-button" onClick={onRules}>
           <BookOpen size={13} />
           Rules
-        </button>
+        </button></div>
       </div>
       <div className="session-body">
         <div className="mode-switch" aria-label="Execution mode">
@@ -81,19 +87,19 @@ export function SessionControls({
           </div>
           <div>
             <dt>Breakout / exit</dt>
-            <dd>+0.09% / −0.09%</dd>
+            <dd>+{settings.breakoutPercent}% / −{settings.exitPercent}%</dd>
           </div>
           <div>
             <dt>Entry size</dt>
-            <dd>3 lots</dd>
+            <dd>{settings.entryLots} lots · {settings.enabledSides.join(' + ')}</dd>
           </div>
           <div>
             <dt>Profit targets</dt>
-            <dd>+₹20 / +₹40</dd>
+            <dd>+₹{settings.target1Points} / +₹{settings.target2Points}</dd>
           </div>
           <div>
             <dt>Square off</dt>
-            <dd>15:10 IST</dd>
+            <dd>{settings.cutoff} IST</dd>
           </div>
         </dl>
         {shownMode === "live" && !locked && (
@@ -143,7 +149,7 @@ export function SessionControls({
           {!connected
             ? "Connect your broker to start."
             : !inWindow && !locked
-              ? "Start window: weekdays 09:00–15:10 IST."
+              ? `Start window: weekdays 09:00–${settings.cutoff} IST.`
               : "The backend monitors even when this tab is closed."}
         </p>
         {session?.pending && <div className="pending-order" role="status">

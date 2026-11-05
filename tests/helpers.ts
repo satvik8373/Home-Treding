@@ -10,6 +10,9 @@ export const bar = (time: string, close = 100): Candle => ({ start: istTime(DAY,
 export const contract = (side: 'CE' | 'PE'): Contract => ({ token: side === 'CE' ? '101' : '102', symbol: `NIFTY-TEST-${side}`,
   expiry: '2026-10-27', strike: 25000, lotSize: 65, side })
 export class MemoryStore {
+  values = new Map<string, unknown>()
+  get<T>(key: string): T | null { return structuredClone(this.values.get(key) as T ?? null) }
+  put(key: string, value: unknown) { this.values.set(key, structuredClone(value)) }
   saved: TradingSession | null = null
   savedBroker: SavedBroker | null = null
   writes: TradingSession[] = []

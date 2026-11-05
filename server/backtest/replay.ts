@@ -2,6 +2,7 @@ import type { BacktestCycle, BacktestDataset, BacktestDay, BacktestOptions, Back
 import type { Reason, Side } from '../../shared/model.ts'
 import { RULES } from '../../shared/model.ts'
 import { istTime } from '../time.ts'
+import { DEFAULT_SETTINGS } from '../../shared/settings.ts'
 
 export const ENGINE = 'nifty-009-ohlc-v2'
 const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
@@ -18,29 +19,30 @@ type Position = { average: number; quantity: number; firstTarget: boolean; cycle
 
 /** Standalone deterministic OHLC engine. No live strategy/session/broker objects. */
 export function replay(data: BacktestDataset, config: BacktestOptions): BacktestDay {
-  const cutoff = istTime(data.date, RULES.cutoff)
+  const settings = config.strategySettings ?? DEFAULT_SETTINGS
+  const cutoff = istTime(data.date, settings.cutoff)
   const maps = { CE: new Map(data.candles.CE.map(bar => [bar.start, bar])), PE: new Map(data.candles.PE.map(bar => [bar.start, bar])) }
   const complete = sides.every(side => maps[side].has(cutoff))
   const asOf = Math.min(cutoff, ...sides.map(side => data.candles[side].at(-1)!.end))
   const reference = Object.fromEntries(sides.map(side => {
     const close = data.candles[side][0].close
-    return [side, { close, upper: round(close * (1 + RULES.multiplier)), lower: round(close * (1 - RULES.multiplier)) }]
+    return [side, { close, upper: round(close * (1 + settings.breakoutPercent / 100)), lower: round(close * (1 - settings.exitPercent / 100)) }]
   })) as BacktestDay['reference']
   const result: BacktestDay = { date: data.date, source: data.source, contractSource: data.contractSource, status: complete ? 'complete' : 'partial', asOf,
     atm: data.contracts.CE.strike, expiry: data.contracts.CE.expiry, lotSize: data.contracts.CE.lotSize, reference,
     fills: [], cycles: [], equity: [{ at: istTime(data.date, RULES.referenceEnd), netPnl: 0 }], grossPnl: 0, fees: 0, netRealizedPnl: 0, openPnl: 0, markedNetPnl: 0, maxDrawdown: 0 }
-  const positions: Partial<Record<Side, Position>> = {}, pending: Partial<Record<Side, 'BREAKOUT' | 'LOWER_CLOSE'>> = {}
+  const positions: Partial<Record<Side, Position>> = {}, pending: Partial<Record<Side, 'BREAKOUT' | 'LOWER_CLOSE'>> = {}, entries: Record<Side, number> = { CE: 0, PE: 0 }
   let peak = 0
   function execute(side: Side, reason: Reason, market: number, at: number, timing: NonNullable<BacktestDay['fills'][number]['timing']>) {
     const buy = reason === 'BREAKOUT', contract = data.contracts[side], position = positions[side]
     if (buy && position || !buy && !position) throw new Error('Invalid backtest position transition.')
-    const quantity = buy ? contract.lotSize * RULES.entryLots : reason === 'TARGET_1' ? contract.lotSize * RULES.target1Lots : position!.quantity
+    const quantity = buy ? contract.lotSize * settings.entryLots : reason === 'TARGET_1' ? contract.lotSize * settings.target1Lots : position!.quantity
     const price = round(Math.max(0.01, market + (buy ? config.slippagePoints : -config.slippagePoints)))
     const id = `V2-${data.date}-${side}-${result.fills.length + 1}`
     let cycle = position?.cycle
     if (buy) {
       cycle = { id, date: data.date, side, symbol: contract.symbol, entryAt: at, entryPrice: price, exitAt: null, quantity, remaining: quantity, grossPnl: 0, fees: 0, netPnl: 0 }
-      result.cycles.push(cycle); positions[side] = { average: price, quantity, firstTarget: false, cycle }
+      result.cycles.push(cycle); entries[side]++; positions[side] = { average: price, quantity, firstTarget: settings.target1Lots === 0, cycle }
     }
     const grossPnl = buy ? null : round((price - position!.average) * quantity)
     result.fills.push({ id, cycleId: cycle!.id, at, side, symbol: contract.symbol, transaction: buy ? 'BUY' : 'SELL', quantity, price, reason, fee: config.feePerOrder, grossPnl, timing })
@@ -74,12 +76,12 @@ export function replay(data: BacktestDataset, config: BacktestOptions): Backtest
       for (const target of ['TARGET_1', 'TARGET_2'] as const) {
         const p = positions[side]
         if (!p || target === 'TARGET_1' && p.firstTarget || target === 'TARGET_2' && !p.firstTarget) continue
-        const level = round(p.average + (target === 'TARGET_1' ? RULES.target1 : RULES.target2))
+        const level = round(p.average + (target === 'TARGET_1' ? settings.target1Points : settings.target2Points))
         if (bar.high >= level) execute(side, target, Math.max(bar.open, level), bar.open >= level ? bar.start : bar.end, bar.open >= level ? 'gap-open' : 'intrabar-unknown')
       }
       if (bar.end < cutoff && bar.end >= istTime(data.date, RULES.firstSignal)) {
         if (positions[side] && bar.close < reference[side].lower) pending[side] = 'LOWER_CLOSE'
-        else if (!positions[side] && bar.close >= reference[side].upper) pending[side] = 'BREAKOUT'
+        else if (!positions[side] && settings.enabledSides.includes(side) && (!settings.maxEntriesPerLeg || entries[side] < settings.maxEntriesPerLeg) && bar.close >= reference[side].upper) pending[side] = 'BREAKOUT'
       }
     }
     mark(ce.end, { CE: ce.close, PE: pe.close })
@@ -101,7 +103,7 @@ export function report(days: BacktestDay[], skipped: BacktestReport['skipped'], 
     offset = round(offset + day.markedNetPnl)
   }
   const losing = Math.abs(losses.reduce((total, cycle) => total + cycle.netPnl, 0))
-  return { engine: ENGINE, startDate, endDate, options: config, generatedAt: now, days: ordered, skipped, equity, assumptions: ASSUMPTIONS,
+  return { engine: ENGINE, startDate, endDate, options: config, generatedAt: now, days: ordered, skipped, equity, assumptions: [...ASSUMPTIONS.filter(text => !text.startsWith('The 15:10')), `Square-off uses the ${(config.strategySettings ?? DEFAULT_SETTINGS).cutoff} candle open. Without that candle the session is partial.`],
     summary: { sessions: ordered.length, completeSessions: ordered.filter(day => day.status === 'complete').length, partialSessions: ordered.filter(day => day.status === 'partial').length,
       closedTrades: closed.length, openTrades: ordered.flatMap(day => day.cycles).length - closed.length, wins: wins.length, losses: losses.length,
       winRate: closed.length ? round(wins.length / closed.length * 100) : null, profitFactor: losing ? round(wins.reduce((total, cycle) => total + cycle.netPnl, 0) / losing) : null,

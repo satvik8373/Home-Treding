@@ -50,6 +50,7 @@ h2 { color: var(--ui-text); font-size: 14px; font-weight: 800; letter-spacing: -
 .mode-description, .control-hint { color: #64748b; font-size: 11px; }
 .session-rules dt { color: var(--ui-muted); font-size: 12px; }
 .session-rules dd { color: var(--ui-text); font-size: 12px; font-weight: 600; }
+.session-rule-actions { display: flex; align-items: center; gap: 12px; }
 .button { border-radius: 6px; font-size: 12px; font-weight: 700; min-height: 36px; box-shadow: none; }
 .button.primary { background: var(--ui-primary); }
 .button.primary:hover:not(:disabled) { background: var(--ui-primary-hover); }

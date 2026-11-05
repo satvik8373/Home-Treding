@@ -62,6 +62,7 @@ export class Store {
     this.db.exec("BEGIN IMMEDIATE");
     try {
       this.put("session", value);
+      this.put(`session:history:${value.id}`, value);
       this.put(`session:${value.date}:${value.account}:${value.mode}`, value);
       this.db.exec("COMMIT");
     } catch (error) {

@@ -6,12 +6,14 @@ import type { useDashboard } from '../hooks/useDashboard'
 import { clock, money, price } from '../lib/format'
 import { BacktestEquity } from './BacktestEquity'
 import { HistoricalDataPanel } from './HistoricalDataPanel'
+import { DEFAULT_SETTINGS } from '../../shared/settings'
+import type { StrategySettings } from '../../shared/settings'
 import './BacktestPanel.css'
 
-type Props = { visible: boolean; now: number; connected: boolean; online: boolean; working: string; action: ReturnType<typeof useDashboard>['action'] }
+type Props = { visible: boolean; now: number; connected: boolean; online: boolean; working: string; action: ReturnType<typeof useDashboard>['action']; settings?: StrategySettings }
 const dayOf = (now: number) => new Date(now + 330 * 60_000).toISOString().slice(0, 10)
 
-export function BacktestPanel({ visible, now, connected, online, working, action }: Props) {
+export function BacktestPanel({ visible, now, connected, online, working, action, settings = DEFAULT_SETTINGS }: Props) {
   const [from, setFrom] = useState(() => dayOf(now)), [to, setTo] = useState(() => dayOf(now))
   const [slippage, setSlippage] = useState('0.05'), [fee, setFee] = useState('0')
   const [job, setJob] = useState<BacktestJob | null>(null), [history, setHistory] = useState<HistoricalFetchJob | null>(null)
@@ -69,7 +71,7 @@ export function BacktestPanel({ visible, now, connected, online, working, action
       <div className="panel-title"><h2>NIFTY 009 · Backtest</h2><span className="tag">SIMULATION</span></div>
       <div className="bt-periods"><button className="button secondary" disabled={busy} onClick={() => choose(dayOf(now), dayOf(now))}>Today</button><button className="button secondary" disabled={busy} onClick={() => { const range = pastTwoMonths(now); choose(range.startDate, range.endDate) }}>Past 2 months</button></div>
       <div className="bt-form"><label className="field">From<input aria-label="Backtest from date" type="date" max={dayOf(now)} value={from} disabled={busy} onChange={event => choose(event.target.value, to)} /></label><label className="field">To<input aria-label="Backtest to date" type="date" min={from} max={dayOf(now)} value={to} disabled={busy} onChange={event => choose(from, event.target.value)} /></label><button className="button primary" disabled={!online || busy || !from || !to} onClick={() => void run()}><Play size={13} />{running ? 'Running…' : 'Run backtest'}</button></div>
-      <p className="bt-help">Original NIFTY ATM CALL + PUT · 5-minute candles · 3 lots · independent legs. Available broker data loads automatically.</p>
+      <p className="bt-help">Next run: {settings.entryLots} lots · breakout +{settings.breakoutPercent}% / exit −{settings.exitPercent}% · targets +{settings.target1Points}/+{settings.target2Points} · cutoff {settings.cutoff}. Uses saved strategy settings; available broker data loads automatically.</p>
       <details className="bt-options"><summary>Costs & data import</summary><div className="bt-form"><label className="field">Slippage · points / fill<input aria-label="Slippage points" type="number" min="0" max="10" step="0.01" value={slippage} disabled={busy} onChange={event => setSlippage(event.target.value)} /></label><label className="field">Cost · ₹ / order<input aria-label="Cost per order" type="number" min="0" max="1000" value={fee} disabled={busy} onChange={event => setFee(event.target.value)} /></label><input ref={file} type="file" hidden accept="application/json,.json" onChange={event => { void importFile(event.target.files?.[0]); event.target.value = '' }} /><button className="button secondary" disabled={!online || busy} onClick={() => file.current?.click()}><Upload size={13} />Import option data</button></div><a className="text-button bt-format" href="/api/backtest/schema">Download data format</a></details>
     </section>
     {(error || refreshError || importNote) && <p className="notice" role="status">{error || refreshError || importNote}</p>}

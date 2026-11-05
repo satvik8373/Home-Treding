@@ -1,3 +1,4 @@
+import type { StrategySettings } from './settings.ts';
 export type Side = "CE" | "PE";
 export type Mode = "paper" | "live";
 export type RunStatus =
@@ -45,6 +46,7 @@ export interface Position {
   entryQuantity: number;
 }
 export interface Leg {
+  lastDecision?: { candle: Candle; evaluatedAt: number; signal: 'BREAKOUT' | 'LOWER_CLOSE' | null; explanation: string };
   contract: Contract;
   reference: Candle;
   upper: number;
@@ -94,7 +96,17 @@ export interface Activity {
   level: "info" | "error";
   message: string;
 }
+export interface OrderAudit {
+  events?: { at: number; status: OrderAudit['status']; detail: string }[];
+  id: string; tag: string; orderId?: string; side: Side; symbol: string; transaction: 'BUY' | 'SELL'; quantity: number;
+  reason: Reason; submittedAt: number; updatedAt: number; mode: Mode;
+  status: 'submitting' | 'acknowledged' | 'unknown' | 'rejected' | 'cancel-requested' | 'filled' | 'partial-terminal' | 'cancelled' | 'simulated';
+  filled: number | null; average: number | null; detail: string;
+}
 export interface TradingSession {
+  decisionAudit?: { side: Side; candle: Candle; evaluatedAt: number; signal: 'BREAKOUT' | 'LOWER_CLOSE' | null; explanation: string }[];
+  settings?: StrategySettings;
+  orderAudit?: OrderAudit[];
   id: string;
   date: string;
   mode: Mode;
@@ -118,6 +130,7 @@ export interface BrokerStatus {
   lastTickAt: number | null;
 }
 export interface AppState {
+  savedSettings?: StrategySettings;
   csrf: string;
   serverTime: number;
   broker: BrokerStatus;

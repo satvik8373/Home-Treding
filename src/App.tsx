@@ -9,6 +9,8 @@ import { RulesDialog } from './components/RulesDialog'
 import { SessionControls } from './components/SessionControls'
 import { TradesPanel } from './components/TradesPanel'
 import { BacktestPanel } from './components/BacktestPanel'
+import { TransparencyPanel } from './components/TransparencyPanel'
+import { DEFAULT_SETTINGS, settingsFor } from '../shared/settings'
 import { useDashboard } from './hooks/useDashboard'
 import { clock, date, money } from './lib/format'
 import './App.css'
@@ -18,7 +20,7 @@ const statusLabels: Record<string, string> = {
   idle: 'Not started', armed: 'Armed', preparing: 'Loading reference',
   running: 'Running', stopping: 'Closing positions', stopped: 'Stopped', blocked: 'Needs attention',
 }
-const currentView = () => window.location.hash === '#backtest' ? 'backtest' as const : 'market' as const
+const currentView = () => window.location.hash === '#backtest' ? 'backtest' as const : window.location.hash === '#audit' ? 'audit' as const : 'market' as const
 
 export default function App() {
   const { data, online, now, error, setError, working, action } = useDashboard()
@@ -26,7 +28,7 @@ export default function App() {
   const [rulesDialog, setRulesDialog] = useState(false)
   const [mode, setMode] = useState<Mode>('paper')
   const [liveAck, setLiveAck] = useState(false)
-  const [view, setView] = useState<'market' | 'backtest'>(currentView)
+  const [view, setView] = useState<'market' | 'backtest' | 'audit'>(currentView)
 
   useEffect(() => {
     const update = () => setView(currentView())
@@ -34,7 +36,7 @@ export default function App() {
     return () => window.removeEventListener('hashchange', update)
   }, [])
 
-  function navigate(next: 'market' | 'backtest') {
+  function navigate(next: 'market' | 'backtest' | 'audit') {
     setView(next)
     window.history.replaceState(null, '', `#${next}`)
   }
@@ -93,6 +95,7 @@ export default function App() {
         <nav className="workspace-nav" aria-label="Workspace">
           <button className={view === 'market' ? 'active' : ''} aria-current={view === 'market' ? 'page' : undefined} onClick={() => navigate('market')}>Live market</button>
           <button className={view === 'backtest' ? 'active' : ''} aria-current={view === 'backtest' ? 'page' : undefined} onClick={() => navigate('backtest')}>Backtest</button>
+          <button className={view === 'audit' ? 'active' : ''} aria-current={view === 'audit' ? 'page' : undefined} onClick={() => navigate('audit')}>Money, audit & settings</button>
         </nav>
 
         <div hidden={view !== 'market'}>
@@ -126,11 +129,11 @@ export default function App() {
             </div>
           )}
           <div className="workspace">
-            <MarketChart connected={connected} identity={identity} now={now} marks={data?.marks ?? {}} legs={session?.legs ?? {}} trades={session?.trades ?? []} />
-            <SessionControls session={session} locked={locked} connected={connected} online={online} working={working} now={now} mode={mode} setMode={setMode} liveAck={liveAck} setLiveAck={setLiveAck} action={action} onRules={() => setRulesDialog(true)} />
+            <MarketChart connected={connected} identity={identity} now={now} marks={data?.marks ?? {}} legs={session?.legs ?? {}} trades={session?.trades ?? []} settings={settingsFor(session)} />
+            <SessionControls session={session} locked={locked} connected={connected} online={online} working={working} now={now} mode={mode} setMode={setMode} liveAck={liveAck} setLiveAck={setLiveAck} action={action} onRules={() => setRulesDialog(true)} settings={locked ? settingsFor(session) : data?.savedSettings ?? DEFAULT_SETTINGS} onSettings={() => navigate('audit')} />
           </div>
           <div className="section-heading"><h2>Strategy positions</h2><span>References stay fixed for the session</span></div>
-          <div className="legs-grid">{sides.map(side => <LegCard key={side} side={side} leg={session?.legs[side]} mark={markFor(side)} now={now} />)}</div>
+          <div className="legs-grid">{sides.map(side => <LegCard key={side} side={side} leg={session?.legs[side]} mark={markFor(side)} now={now} settings={settingsFor(session)} />)}</div>
           <TradesPanel trades={session?.trades ?? []} />
           <details className="panel activity-panel">
             <summary>Session activity <span>{session?.activity.length ?? 0} events</span></summary>
@@ -143,15 +146,16 @@ export default function App() {
         </div>
 
         <div hidden={view !== 'backtest'}>
-          <BacktestPanel visible={view === 'backtest'} now={now} connected={connected} online={online} working={working} action={action} />
+          <BacktestPanel visible={view === 'backtest'} now={now} connected={connected} online={online} working={working} action={action} settings={data?.savedSettings ?? DEFAULT_SETTINGS} />
         </div>
+        <div hidden={view !== 'audit'}><TransparencyPanel data={data} visible={view === 'audit'} now={now} online={online} working={working} action={action} /></div>
         <footer className="page-footer">
           <span>MAVRIX / 009 · {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' }).format(now)}</span>
           <a href="https://tradingapi.mstock.com/docs/v1/Introduction/" target="_blank" rel="noreferrer">Official mStock API</a>
         </footer>
       </main>
       {brokerDialog && <BrokerDialog broker={broker} locked={locked} online={online} working={working} error={error} action={action} onClose={() => setBrokerDialog(false)} />}
-      {rulesDialog && <RulesDialog onClose={() => setRulesDialog(false)} />}
+      {rulesDialog && <RulesDialog settings={settingsFor(session ?? { settings: data?.savedSettings })} onClose={() => setRulesDialog(false)} />}
     </div>
   )
 }

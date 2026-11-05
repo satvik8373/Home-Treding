@@ -1,4 +1,5 @@
 import type { Candle, Contract, Reason, Side } from "./model";
+import type { StrategySettings } from './settings';
 
 export interface BacktestDataset {
   version: 1;
@@ -11,6 +12,7 @@ export interface BacktestDataset {
   contractSource?: 'broker' | 'import' | 'session' | 'master-snapshot';
 }
 export interface BacktestOptions {
+  strategySettings?: StrategySettings;
   slippagePoints: number;
   feePerOrder: number;
 }

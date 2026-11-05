@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { Activity, AppState, Candle, Mark, Mode, OrderIntent, Reason, Side, TradingSession } from '../shared/model.ts'
+import type { Activity, AppState, Candle, Mark, Mode, OrderAudit, OrderIntent, Reason, Side, TradingSession } from '../shared/model.ts'
 import { RULES } from '../shared/model.ts'
 import { freshMark } from '../shared/market.ts'
 import { BrokerError, INDEX_TOKEN, type TradingBroker, type MStock } from './broker.ts'
@@ -7,9 +7,12 @@ import { applyFill, candleSignal, levels, orderQuantity, targetSignal } from './
 import { completedBoundary, isTradingDay, istDate, istTime } from './time.ts'
 import type { Store } from './store.ts'
 import type { MarketFeed } from './feed.ts'
+import { DEFAULT_SETTINGS, sameSettings, settingsFor, validateSettings } from '../shared/settings.ts'
+import type { StrategySettings } from '../shared/settings.ts'
+import { rejectionSummary } from './orderIdentity.ts'
 
 type Feed = Pick<MarketFeed, 'status' | 'lastTickAt' | 'connect' | 'close' | 'onMark' | 'onChange'>
-type Repository = Pick<Store, 'session' | 'loadSession' | 'saveSession' | 'broker' | 'saveBroker'>
+type Repository = Pick<Store, 'session' | 'loadSession' | 'saveSession' | 'broker' | 'saveBroker'> & Partial<Pick<Store, 'get' | 'put'>>
 const SIDES: Side[] = ['CE', 'PE']
 const active = (s: TradingSession | null) => !!s && ['armed', 'preparing', 'running', 'stopping'].includes(s.status)
 export const hasExposure = (s: TradingSession | null) => !!s && (!!s.pending || SIDES.some(side => !!s.legs[side]?.position))
@@ -34,9 +37,12 @@ export class Controller {
   private retryAt = 0
   private pumpTask: Promise<void> | null = null
   private savedSession = ''
+  private preferences: StrategySettings = structuredClone(DEFAULT_SETTINGS)
   constructor(public broker: TradingBroker & Partial<Pick<MStock, 'login' | 'verify' | 'verifyAccount' | 'logout'>>,
     private store: Repository, public feed: Feed, private now = Date.now) {
     this.session = store.session()
+    const savedSettings = store.get?.('strategy:settings')
+    if (savedSettings) this.preferences = validateSettings(savedSettings)
     feed.onMark = mark => {
       if (!freshMark(mark, this.now())) return
       const previous = this.marks[mark.token]
@@ -49,7 +55,7 @@ export class Controller {
         for (const side of SIDES) {
           const leg = this.session.legs[side]
           if (leg?.contract.token === mark.token && !leg.exitReason && this.session.pending?.side !== side) {
-            const target = targetSignal(leg, mark.price)
+            const target = targetSignal(leg, mark.price, settingsFor(this.session))
             if (target) { leg.exitReason = target; this.save() }
           }
         }
@@ -59,9 +65,16 @@ export class Controller {
     feed.onChange = () => this.onChange()
   }
   connected(): boolean { return this.verified && !!this.broker.credentials && this.broker.credentials.expiresAt > this.now() }
+  strategySettings(): StrategySettings { return structuredClone(this.preferences) }
+  saveStrategySettings(input: unknown): StrategySettings {
+    const settings = validateSettings(input)
+    if (!this.store.put) throw new Error('Persistent settings storage is unavailable.')
+    this.store.put('strategy:settings', settings); this.preferences = settings; this.onChange()
+    return this.strategySettings()
+  }
   snapshot(csrf = ''): AppState {
     const credentials = this.broker.credentials
-    return { csrf, serverTime: this.now(), busy: this.busy, broker: { connected: this.connected(),
+    return { csrf, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { connected: this.connected(),
       account: this.connected() ? credentials!.account : null, name: this.connected() ? credentials!.name : null,
       expiresAt: credentials?.expiresAt ?? null, feed: this.feed.status, lastTickAt: this.feed.lastTickAt },
       session: this.session, marks: this.marks }
@@ -85,6 +98,20 @@ export class Controller {
     this.session.activity = this.session.activity.slice(-150)
     this.save()
   }
+  private audit(intent: OrderIntent, change: Partial<OrderAudit>): void {
+    if (!this.session) return
+    this.session.orderAudit ??= []
+    let entry = this.session.orderAudit.find(item => item.id === intent.id)
+    if (!entry) {
+      entry = { id: intent.id, tag: intent.tag, orderId: intent.orderId, side: intent.side, symbol: intent.symbol, transaction: intent.transaction, quantity: intent.quantity,
+        reason: intent.reason, submittedAt: intent.submittedAt, updatedAt: this.now(), mode: this.session.mode, status: 'unknown', filled: null, average: null, detail: '' }
+      this.session.orderAudit.push(entry)
+    }
+    Object.assign(entry, change, { updatedAt: this.now(), orderId: intent.orderId ?? change.orderId ?? entry.orderId })
+    entry.events ??= []
+    if (entry.events.at(-1)?.status !== entry.status || entry.events.at(-1)?.detail !== entry.detail) entry.events.push({ at: this.now(), status: entry.status, detail: entry.detail })
+    this.save()
+  }
   private exclusive<T>(work: () => Promise<T>): Promise<T> {
     const result = this.queue.catch(() => {}).then(async () => {
       this.busy = true; this.onChange()
@@ -103,6 +130,12 @@ export class Controller {
     try {
       await this.broker.verifyAccount?.(); this.verified = true
       this.subscribe()
+      if (this.session?.mode === 'paper' && this.session.status === 'running' && !this.session.pending && this.session.date === istDate(this.now())
+        && this.session.legs.CE && this.session.legs.PE && this.now() < istTime(this.session.date, settingsFor(this.session).cutoff)) {
+        for (const leg of Object.values(this.session.legs)) if (leg) leg.lastCandleEnd = completedBoundary(this.now())
+        this.note('Paper session restored with its original rule snapshot and positions. Waiting for fresh prices; earlier entry signals will not be replayed.')
+        return
+      }
       if (hasExposure(this.session)) await this.reconcile()
       else if (active(this.session)) { this.session!.status = 'stopped'; this.note('Previous flat session restored. Start when ready.') }
     } catch { this.verified = false; this.onChange() }
@@ -154,13 +187,20 @@ export class Controller {
       }
       if (active(this.session)) throw new Error('The strategy is already running.')
       if (hasExposure(this.session)) throw new Error('Reconcile the saved position or order before starting.')
-      if (!isTradingDay(now) || now < istTime(date, '09:00') || now >= istTime(date, RULES.cutoff)) throw new Error('Start on a trading weekday between 09:00 and 15:10 IST.')
+      const preferences = this.strategySettings()
+      if (!isTradingDay(now) || now < istTime(date, '09:00') || now >= istTime(date, preferences.cutoff)) throw new Error(`Start on a trading weekday between 09:00 and ${preferences.cutoff} IST.`)
       const previous = this.session
       if (!previous || previous.date !== date || previous.account !== this.broker.credentials!.account || previous.mode !== mode) {
         this.session = this.store.loadSession(this.broker.credentials!.account, date, mode) ?? { id: randomUUID(), date, mode, account: this.broker.credentials!.account, status: 'armed',
           message: '', atm: null, expiry: null, legs: {}, pending: null, pnlVerified: true, trades: [], activity: [] }
       }
       if (hasExposure(this.session)) throw new Error('This mode has saved exposure that needs reconciliation before starting.')
+      if (!sameSettings(settingsFor(this.session), preferences)) {
+        if (this.session) this.store.put?.(`session:history:${this.session.id}`, this.session)
+        this.session = { id: randomUUID(), date, mode, account: this.broker.credentials!.account, status: 'armed', message: '', atm: null, expiry: null,
+          legs: {}, pending: null, pnlVerified: true, trades: [], activity: [], orderAudit: [], settings: structuredClone(preferences) }
+      }
+      this.session!.settings ??= structuredClone(preferences)
       this.stopRequested = false
       this.session!.status = 'armed'
       // A restart never backfills entry signals from earlier candles.
@@ -205,7 +245,7 @@ export class Controller {
       const bars = await this.broker.history(contract.token, 'NFO', session.date, this.now())
       const reference = bars.find(c => c.start === opening.start)
       if (!reference) throw new Error(`The 09:15–09:20 ${contract.side} reference candle is unavailable. No levels were guessed.`)
-      legs[contract.side] = { contract, reference, ...levels(reference.close), position: null, realized: 0,
+      legs[contract.side] = { contract, reference, ...levels(reference.close, settingsFor(session)), position: null, realized: 0,
         entries: 0, lastCandleEnd: completedBoundary(this.now()), exitReason: null }
     }
     if (session.mode === 'live') await this.requireNoExistingNifty()
@@ -248,7 +288,7 @@ export class Controller {
     if (session.pending || this.now() < (this.backoff[side] ?? 0)) return
     const buy = reason === 'BREAKOUT'
     if (buy && (this.stopRequested || session.status !== 'running' || !session.pnlVerified
-      || this.now() >= istTime(session.date, RULES.cutoff))) return
+      || !settingsFor(session).enabledSides.includes(side) || this.now() >= istTime(session.date, settingsFor(session).cutoff))) return
     const mark = this.fresh(side)
     if (buy && !mark) {
       this.note(`${side} entry skipped: waiting for a fresh official market price.`); return
@@ -257,10 +297,10 @@ export class Controller {
       await this.checkPositions()
       if (buy && !session.pnlVerified) return
     }
-    const quantity = orderQuantity(leg, reason)
+    const quantity = orderQuantity(leg, reason, settingsFor(session))
     if (quantity <= 0) return
     // Stop can arrive while broker position verification is in flight.
-    if (buy && (this.stopRequested || this.now() >= istTime(session.date, RULES.cutoff))) return
+    if (buy && (this.stopRequested || this.now() >= istTime(session.date, settingsFor(session).cutoff))) return
     if (buy && !this.fresh(side)) {
       this.note(`${side} entry skipped: the live price became stale during broker verification.`); return
     }
@@ -269,16 +309,19 @@ export class Controller {
     if (session.mode === 'paper') {
       if (!mark) { this.note(`${side} paper exit is waiting for a verified market price.`); return }
       applyFill(session, intent, { orderId: `PAPER-${intent.id}`, quantity, average: mark.price, status: 'COMPLETE' }, this.now())
+      this.audit(intent, { orderId: `PAPER-${intent.id}`, status: 'simulated', filled: quantity, average: mark.price, detail: 'Simulated fill from a fresh market price. No broker order or cash debit.' })
       this.note(`${side} ${intent.transaction}: ${quantity} units at ₹${mark.price.toFixed(2)} · ${reason}`); return
     }
-    session.pending = intent; this.save()
+    session.pending = intent; this.audit(intent, { status: 'submitting', detail: 'Intent saved before submission. Waiting for a broker acknowledgement.' })
     try {
-      intent.orderId = await this.broker.place(intent); this.save()
+      intent.orderId = await this.broker.place(intent); this.audit(intent, { status: 'acknowledged', detail: 'Broker order ID received. Acknowledgement is not a fill.' })
     } catch (error) {
       if (error instanceof BrokerError && error.definitive) {
         session.pending = null; this.backoff[side] = this.now() + 3000
+        this.audit(intent, { status: 'rejected', filled: 0, average: 0, detail: rejectionSummary(error.message) })
         this.note(`${side} order rejected: ${error.message}`, 'error'); return
       }
+      this.audit(intent, { status: 'unknown', detail: 'Submission outcome unknown. Do not assume rejected or filled. No automatic resend.' })
       session.status = 'blocked'; this.note('Order submission outcome is unknown. Reconciling by its saved tag; it will never be resent automatically.', 'error'); return
     }
     await this.resolvePending()
@@ -292,10 +335,13 @@ export class Controller {
     if (!intent.orderId) {
       intent.orderId = (await this.broker.findOrder(expected)) ?? undefined; this.save()
       if (!intent.orderId) { session.status = 'blocked'; this.note('The broker has not identified the submitted order. Verify its status in mStock before trading again.', 'error'); return }
+      this.audit(intent, { status: 'acknowledged', detail: 'Order ID recovered by its exact saved tag and contract identity.' })
     }
     const fill = await this.broker.order({ ...expected, orderId: intent.orderId })
     if (fill) {
       applyFill(session, intent, fill, this.now())
+      this.audit(intent, { status: fill.quantity === intent.quantity ? 'filled' : fill.quantity > 0 ? 'partial-terminal' : String(fill.status).toUpperCase() === 'REJECTED' ? 'rejected' : 'cancelled',
+        filled: fill.quantity, average: fill.average, detail: fill.rejectionReason ?? `Broker confirmed terminal status ${fill.status}.` })
       this.backoff[intent.side] = this.now() + (fill.quantity ? 0 : 3000)
       if (session.status === 'blocked') session.status = this.stopRequested ? 'stopping' : 'running'
       this.note(fill.quantity ? `${intent.side} ${intent.transaction} confirmed: ${fill.quantity} units at ₹${fill.average.toFixed(2)} · ${intent.reason}`
@@ -303,6 +349,7 @@ export class Controller {
     } else if (this.now() - intent.submittedAt >= 12_000 && !intent.cancelRequested) {
       // Save BEFORE cancellation as well; reconcile completion after a timeout.
       intent.cancelRequested = true; this.save()
+      this.audit(intent, { status: 'cancel-requested', detail: 'Cancellation requested; terminal broker status is still required.' })
       await this.broker.cancel(intent.orderId)
       this.note('Pending order cancellation requested. Waiting for a terminal broker status.')
     }
@@ -316,7 +363,7 @@ export class Controller {
       try {
         if (!this.connected()) throw new Error('Broker session unavailable. Reconnect the same account to continue monitoring.')
         const now = this.now()
-        if (istDate(now) !== session.date || now >= istTime(session.date, RULES.cutoff) || this.stopRequested) session.status = 'stopping'
+        if (istDate(now) !== session.date || now >= istTime(session.date, settingsFor(session).cutoff) || this.stopRequested) session.status = 'stopping'
         if (session.pending) {
           if (now - this.lastPendingAttempt >= 1500) await this.resolvePending()
           return
@@ -350,7 +397,7 @@ export class Controller {
         // Targets act on fresh prices. Never infer an executable fill from a past candle high.
         for (const side of SIDES) {
           const leg = session.legs[side]!, mark = this.fresh(side)
-          const reason = leg.exitReason || (mark ? targetSignal(leg, mark.price) : null)
+          const reason = leg.exitReason || (mark ? targetSignal(leg, mark.price, settingsFor(session)) : null)
           if (reason) {
             leg.exitReason = reason; this.save(); await this.submit(side, reason)
             if (session.pending) return
@@ -399,14 +446,17 @@ export class Controller {
         }
         await this.exclusive(async () => {
           if (this.session !== session || session.status !== 'running' || session.pending || this.stopRequested
-            || this.now() >= istTime(session.date, RULES.cutoff)) return
+            || this.now() >= istTime(session.date, settingsFor(session).cutoff)) return
           const unseen = bars.filter(c => c.end <= boundary && c.end > leg.lastCandleEnd).sort((a, b) => a.end - b.end)
           // A delayed history response may contain several closes. Preserve the
           // first protective exit even if a later candle recovered above lower.
           // Flat legs still consider only the latest close, never replay entries.
-          const candle = (leg.position ? unseen.find(c => candleSignal(leg, c, this.now(), session.date) === 'LOWER_CLOSE') : null) ?? unseen.at(-1)
+          const candle = (leg.position ? unseen.find(c => candleSignal(leg, c, this.now(), session.date, settingsFor(session)) === 'LOWER_CLOSE') : null) ?? unseen.at(-1)
           if (!candle) return
-          const signal = candleSignal(leg, candle, this.now(), session.date)
+          const signal = candleSignal(leg, candle, this.now(), session.date, settingsFor(session))
+          leg.lastDecision = { candle, evaluatedAt: this.now(), signal, explanation: signal === 'BREAKOUT' ? 'Completed close reached the breakout level while flat.' : signal === 'LOWER_CLOSE' ? 'Completed close fell below the lower exit while holding units.' : leg.position ? 'No completed-candle lower exit. Fresh-price targets remain monitored.' : !settingsFor(session).enabledSides.includes(side) ? 'Leg disabled in this session settings.' : settingsFor(session).maxEntriesPerLeg && leg.entries >= settingsFor(session).maxEntriesPerLeg ? 'Configured entry limit reached.' : this.now() - candle.end > 90_000 ? 'Candle too old for a new entry.' : 'Completed close did not meet the entry rule.' }
+          session.decisionAudit ??= []
+          session.decisionAudit.push({ side, ...leg.lastDecision })
           leg.lastCandleEnd = candle.end; this.save()
           if (signal === 'LOWER_CLOSE') leg.exitReason = signal
           if (signal) await this.submit(side, signal)

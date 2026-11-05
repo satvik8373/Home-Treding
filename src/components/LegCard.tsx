@@ -2,18 +2,21 @@ import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import type { Leg, Mark, Side } from "../../shared/model";
 import { freshMark } from "../../shared/market";
 import { money, price } from "../lib/format";
-import { RULES } from '../../shared/model';
+import { DEFAULT_SETTINGS } from '../../shared/settings';
+import type { StrategySettings } from '../../shared/settings';
 
 export function LegCard({
   side,
   leg,
   mark,
   now,
+  settings = DEFAULT_SETTINGS,
 }: {
   side: Side;
   leg?: Leg;
   mark?: Mark;
   now: number;
+  settings?: StrategySettings;
 }) {
   const fresh = freshMark(mark, now),
     position = leg?.position;
@@ -70,15 +73,15 @@ export function LegCard({
         </div>
         <div>
           <dt>Target 1</dt>
-          <dd>{position ? price(position.average + 20) : "—"}</dd>
+          <dd>{position && settings.target1Lots > 0 ? price(position.average + settings.target1Points) : "—"}</dd>
         </div>
         <div>
           <dt>Target 2</dt>
-          <dd>{position ? price(position.average + 40) : "—"}</dd>
+          <dd>{position ? price(position.average + settings.target2Points) : "—"}</dd>
         </div>
       </dl>
       <div className="leg-footer">
-        <span>{leg?.entries ?? 0} entries{leg ? ` · lot ${leg.contract.lotSize} · entry ${RULES.entryLots * leg.contract.lotSize} units` : ''}</span>
+        <span>{leg?.entries ?? 0} entries{leg ? ` · lot ${leg.contract.lotSize} · entry ${settings.entryLots * leg.contract.lotSize} units` : ''}</span>
         <span>
           Open P&L{" "}
           <b

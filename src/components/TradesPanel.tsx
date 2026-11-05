@@ -25,6 +25,7 @@ export function TradesPanel({ trades }: { trades: Trade[] }) {
                   "Action",
                   "Qty",
                   "Fill",
+                  "Premium amount",
                   "Reason",
                   "Gross P&L",
                   "Order",
@@ -47,6 +48,7 @@ export function TradesPanel({ trades }: { trades: Trade[] }) {
                   </td>
                   <td>{t.quantity}</td>
                   <td>₹{price(t.price)}</td>
+                  <td>{money(t.quantity * t.price)}</td>
                   <td>{t.reason.replaceAll("_", " ")}</td>
                   <td>{money(t.pnl)}</td>
                   <td className="subtle">

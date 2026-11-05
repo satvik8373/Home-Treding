@@ -22,8 +22,11 @@ import { useMarketChart } from "../hooks/useMarketChart";
 import { chartCandles, tradeMarkers } from "../lib/chartData";
 import { clock, price } from "../lib/format";
 import { freshMark } from '../../shared/market';
+import { DEFAULT_SETTINGS } from '../../shared/settings';
+import type { StrategySettings } from '../../shared/settings';
 
 type Props = {
+  settings?: StrategySettings;
   connected: boolean;
   identity: string;
   now: number;
@@ -32,6 +35,7 @@ type Props = {
   trades: Trade[];
 };
 export function MarketChart({
+  settings = DEFAULT_SETTINGS,
   connected,
   identity,
   now,
@@ -229,8 +233,8 @@ export function MarketChart({
     if (average != null)
       lines.push(
         { value: average, label: "Avg fill", color: "#6c7489" },
-        { value: average + 20, label: target1Remaining ? "T1" : "T1 filled", color: "#598269" },
-        { value: average + 40, label: "T2", color: "#598269" },
+        ...(settings.target1Lots ? [{ value: average + settings.target1Points, label: target1Remaining ? "T1" : "T1 filled", color: "#598269" }] : []),
+        { value: average + settings.target2Points, label: "T2", color: "#598269" },
       );
     levels.current = lines.map((line) =>
       s.createPriceLine({
@@ -243,7 +247,7 @@ export function MarketChart({
       }),
     );
   }, [
-    referenceClose, upper, lower, average, target1Remaining,
+    referenceClose, upper, lower, average, target1Remaining, settings.target1Lots, settings.target1Points, settings.target2Points,
     symbol,
     identity,
   ]);

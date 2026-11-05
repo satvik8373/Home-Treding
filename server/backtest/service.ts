@@ -9,6 +9,8 @@ import { dateRange, dataset, options, tradingDate } from './validation.ts'
 import { ENGINE, replay, report } from './replay.ts'
 import { nonSessionReason } from './calendar.ts'
 import type { HistoricalData } from './historical.ts'
+import { DEFAULT_SETTINGS, validateSettings } from '../../shared/settings.ts'
+import type { StrategySettings } from '../../shared/settings.ts'
 
 export interface BacktestRepository { get<T>(key: string): T | null; put(key: string, value: unknown): void; keys(prefix: string): string[] }
 export class MemoryRepository implements BacktestRepository {
@@ -19,7 +21,7 @@ export class MemoryRepository implements BacktestRepository {
 }
 type Context = { connected: boolean; account: string | null; session: TradingSession | null }
 const INDEX = 'backtest:v2:job-index', jobKey = (id: string) => `backtest:v2:job:${id}`
-export const completeDataset = (data: BacktestDataset) => (['CE', 'PE'] as const).every(side => data.candles[side].some(bar => bar.start === istTime(data.date, RULES.cutoff)))
+export const completeDataset = (data: BacktestDataset, settings: StrategySettings = DEFAULT_SETTINGS) => (['CE', 'PE'] as const).every(side => data.candles[side].some(bar => bar.start === istTime(data.date, settings.cutoff)))
 
 /** One job: obtain source data, validate, replay, persist. No execution/controller API. */
 export class Backtests {
@@ -57,12 +59,13 @@ export class Backtests {
     if (this.running) throw new Error('A backtest is already running. Wait for it to finish.')
     const body = input as Record<string, unknown> | null
     const dates = dateRange(body?.startDate, body?.endDate, this.now()), config = options(body?.options ?? {})
+    config.strategySettings ??= validateSettings(this.repository.get('strategy:settings') ?? DEFAULT_SETTINGS)
     const id = randomUUID(), job: BacktestJob = { id, startDate: dates[0], endDate: dates.at(-1), status: 'running', completed: 0, total: dates.length, message: 'Checking original option data…', result: null }
     this.records.set(id, { job, datasets: [] }); this.running = true
     while (this.records.size > 10) this.records.delete(this.records.keys().next().value!)
     try { this.persist(id); this.repository.put(INDEX, [...this.records.keys()]) } catch (error) { this.records.delete(id); this.running = false; throw error }
     void (async () => {
-      if (this.history && this.context().connected && dates.some(date => !nonSessionReason(date) && (!this.archive(date) || date === istDate(this.now()) || !completeDataset(this.archive(date)!)))) {
+      if (this.history && this.context().connected && dates.some(date => !nonSessionReason(date) && (!this.archive(date) || date === istDate(this.now()) || !completeDataset(this.archive(date)!, config.strategySettings)))) {
         job.message = 'Downloading available NIFTY and original option candles…'
         const current = this.history.latest()
         if (current?.status === 'running' && (current.startDate !== dates[0] || current.endDate !== dates.at(-1))) throw new Error('Another date range is downloading. Wait for it to finish.')
@@ -76,7 +79,7 @@ export class Backtests {
         try {
           const closed = nonSessionReason(date); if (closed) throw new Error(closed)
           const data = await this.load(date), day = replay(data, config)
-          if (day.status === 'partial' && date !== istDate(this.now())) throw new Error('Historical session is incomplete: original option candles including the 15:10 open are required.')
+          if (day.status === 'partial' && date !== istDate(this.now())) throw new Error(`Historical session is incomplete: original option candles including the ${config.strategySettings!.cutoff} open are required.`)
           days.push(day); this.records.get(id)!.datasets.push(structuredClone(data))
         } catch (error) { skipped.push({ date, reason: error instanceof Error ? error.message : 'Source data unavailable.' }) }
         job.completed++

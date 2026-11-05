@@ -2,6 +2,7 @@ import type { MStock } from './broker.ts'
 import type { BrokerCheck, BrokerDiagnostics } from '../shared/diagnostics.ts'
 import type { TradingSession } from '../shared/model.ts'
 import { istDate } from './time.ts'
+import { rejectionSummary, sameTradingSymbol } from './orderIdentity.ts'
 
 type Broker = Pick<MStock, 'credentials' | 'request' | 'positions'>
 type Stream = { status: string; lastTickAt: number | null; diagnostics?: { lastError: string } }
@@ -57,7 +58,7 @@ export class AccountDiagnostics {
         if (!Array.isArray(raw)) throw new Error('Orders unavailable')
         brokerOrders = raw.map(row)
         report.orderCount = raw.length
-        report.orders = raw.slice(-20).reverse().map(item => { const value = row(item); return { id: label(value.order_id), symbol: label(value.tradingsymbol), side: label(value.transaction_type), quantity: number(value.quantity), filled: number(value.filled_quantity), average: number(value.average_price), status: label(value.status), at: label(value.order_timestamp) } })
+        report.orders = raw.map(item => { const value = row(item); return { id: label(value.order_id), symbol: label(value.tradingsymbol), side: label(value.transaction_type), quantity: number(value.quantity), filled: number(value.filled_quantity), average: number(value.average_price), status: label(value.status), at: label(value.order_timestamp), rejectionReason: String(value.status).toUpperCase() === 'REJECTED' ? rejectionSummary(value.status_message) : null } }).sort((a, b) => b.at.localeCompare(a.at))
         return `${raw.length} order-book record(s) returned. Read access is separate from order placement.`
       }),
       check('NIFTY REST quote', async () => {
@@ -73,7 +74,7 @@ export class AccountDiagnostics {
     const session = this.session()
     const recorded = session?.mode === 'live' && session.account === credentials.account && session.date === istDate(this.now()) ? session.trades.filter(trade => trade.mode === 'live') : []
     const confirmed = recorded.find(trade => brokerOrders.some(order =>
-      String(order.order_id) === trade.orderId && order.tradingsymbol === trade.symbol && order.exchange === 'NFO'
+      String(order.order_id) === trade.orderId && sameTradingSymbol(order.tradingsymbol, trade.symbol) && ['NFO', 'NSE'].includes(String(order.exchange))
       && String(order.transaction_type).toUpperCase() === trade.transaction
       && ['COMPLETE', 'COMPLETED', 'TRADED', 'EXECUTED', 'CANCELLED', 'CANCELED'].includes(String(order.status).toUpperCase())
       && trade.quantity > 0 && number(order.filled_quantity) === trade.quantity && trade.price > 0

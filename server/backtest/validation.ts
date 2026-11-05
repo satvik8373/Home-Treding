@@ -5,6 +5,7 @@ import type {
 import type { Candle, Contract, Side } from "../../shared/model.ts";
 import { FIVE_MINUTES, isTradingDay, istDate, istTime } from "../time.ts";
 import { MAX_HISTORY_DAYS } from '../../shared/history.ts';
+import { validateSettings } from '../../shared/settings.ts';
 
 export const SIDES: Side[] = ["CE", "PE"];
 const object = (value: unknown): Record<string, unknown> => {
@@ -49,6 +50,7 @@ export function options(input: unknown): BacktestOptions {
   return {
     slippagePoints: number("slippagePoints", 0.05, 10),
     feePerOrder: number("feePerOrder", 0, 1000),
+    ...(body.strategySettings != null ? { strategySettings: validateSettings(body.strategySettings) } : {}),
   };
 }
 export function historicalContracts(input: unknown, date: string): Record<Side, Contract> {

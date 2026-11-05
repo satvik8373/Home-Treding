@@ -12,7 +12,7 @@ export interface BrokerDiagnostics {
   checks: BrokerCheck[];
   funds: { segment: string; available: number | null; utilized: number | null }[];
   positions: { symbol: string; exchange: string; product: string; quantity: number }[];
-  orders: { id: string; symbol: string; side: string; quantity: number | null; filled: number | null; average: number | null; status: string; at: string }[];
+  orders: { id: string; symbol: string; side: string; quantity: number | null; filled: number | null; average: number | null; status: string; at: string; rejectionReason?: string | null }[];
   orderCount: number;
   stream: { status: string; lastTickAt: number | null; error: string };
 }

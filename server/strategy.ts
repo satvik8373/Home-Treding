@@ -1,6 +1,8 @@
 import type { Candle, Fill, Leg, OrderIntent, Reason, TradingSession } from '../shared/model.ts'
 import { RULES } from '../shared/model.ts'
 import { FIVE_MINUTES, istTime } from './time.ts'
+import { DEFAULT_SETTINGS, settingsFor } from '../shared/settings.ts'
+import type { StrategySettings } from '../shared/settings.ts'
 
 export const money = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
 export function validCandle(c: Candle): boolean {
@@ -8,26 +10,27 @@ export function validCandle(c: Candle): boolean {
     && c.high >= Math.max(c.open, c.close, c.low) && c.low <= Math.min(c.open, c.close)
     && c.end - c.start === FIVE_MINUTES
 }
-export function levels(referenceClose: number): { upper: number; lower: number } {
+export function levels(referenceClose: number, settings: StrategySettings = DEFAULT_SETTINGS): { upper: number; lower: number } {
   if (!Number.isFinite(referenceClose) || referenceClose <= 0) throw new Error('A valid reference close is required.')
-  return { upper: money(referenceClose * 1.0009), lower: money(referenceClose * 0.9991) }
+  return { upper: money(referenceClose * (1 + settings.breakoutPercent / 100)), lower: money(referenceClose * (1 - settings.exitPercent / 100)) }
 }
-export function candleSignal(leg: Leg, candle: Candle, now: number, day: string): 'BREAKOUT' | 'LOWER_CLOSE' | null {
+export function candleSignal(leg: Leg, candle: Candle, now: number, day: string, settings: StrategySettings = DEFAULT_SETTINGS): 'BREAKOUT' | 'LOWER_CLOSE' | null {
   if (!validCandle(candle) || candle.end <= leg.lastCandleEnd || candle.end > now
-    || candle.start < istTime(day, RULES.referenceEnd) || candle.end >= istTime(day, RULES.cutoff)) return null
+    || candle.start < istTime(day, RULES.referenceEnd) || candle.end >= istTime(day, settings.cutoff)) return null
   if (leg.position && candle.close < leg.lower) return 'LOWER_CLOSE'
   // Old candles can explain history but may never place a late BUY.
-  if (!leg.position && now - candle.end <= 90_000 && candle.close >= leg.upper) return 'BREAKOUT'
+  if (!leg.position && settings.enabledSides.includes(leg.contract.side) && (!settings.maxEntriesPerLeg || leg.entries < settings.maxEntriesPerLeg)
+    && now - candle.end <= 90_000 && candle.close >= leg.upper) return 'BREAKOUT'
   return null
 }
-export function targetSignal(leg: Leg, price: number): 'TARGET_1' | 'TARGET_2' | null {
+export function targetSignal(leg: Leg, price: number, settings: StrategySettings = DEFAULT_SETTINGS): 'TARGET_1' | 'TARGET_2' | null {
   if (!leg.position || !Number.isFinite(price) || price <= 0) return null
-  if (leg.position.target1Remaining > 0 && price >= money(leg.position.average + RULES.target1)) return 'TARGET_1'
-  if (leg.position.target1Remaining === 0 && price >= money(leg.position.average + RULES.target2)) return 'TARGET_2'
+  if (leg.position.target1Remaining > 0 && price >= money(leg.position.average + settings.target1Points)) return 'TARGET_1'
+  if (leg.position.target1Remaining === 0 && price >= money(leg.position.average + settings.target2Points)) return 'TARGET_2'
   return null
 }
-export function orderQuantity(leg: Leg, reason: Reason): number {
-  if (reason === 'BREAKOUT') return RULES.entryLots * leg.contract.lotSize
+export function orderQuantity(leg: Leg, reason: Reason, settings: StrategySettings = DEFAULT_SETTINGS): number {
+  if (reason === 'BREAKOUT') return settings.entryLots * leg.contract.lotSize
   if (!leg.position) return 0
   return reason === 'TARGET_1' ? Math.min(leg.position.quantity, leg.position.target1Remaining) : leg.position.quantity
 }
@@ -40,7 +43,7 @@ export function applyFill(session: TradingSession, intent: OrderIntent, fill: Fi
   if (fill.quantity > 0 && intent.transaction === 'BUY') {
     if (leg.position) throw new Error('A confirmed BUY would overlap an existing strategy position.')
     leg.position = { quantity: fill.quantity, average: fill.average, entryQuantity: fill.quantity,
-      target1Remaining: Math.min(leg.contract.lotSize, fill.quantity) }
+      target1Remaining: Math.min(settingsFor(session).target1Lots * leg.contract.lotSize, fill.quantity) }
     leg.entries++
   } else if (fill.quantity > 0 && intent.transaction === 'SELL') {
     if (!leg.position || fill.quantity > leg.position.quantity) throw new Error('SELL fill exceeds the tracked long quantity.')
