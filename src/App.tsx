@@ -160,7 +160,7 @@ export default function App() {
         </footer>
       </main>
       {brokerDialog && <BrokerDialog broker={broker} locked={locked} online={online} working={working} error={error} action={action} onClose={() => setBrokerDialog(false)} />}
-      {rulesDialog && <RulesDialog settings={settingsFor(session ?? { settings: data?.savedSettings })} onClose={() => setRulesDialog(false)} />}
+      {rulesDialog && <RulesDialog settings={locked ? settingsFor(session) : data?.savedSettings ?? DEFAULT_SETTINGS} onClose={() => setRulesDialog(false)} />}
     </div>
   )
 }
