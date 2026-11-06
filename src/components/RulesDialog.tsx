@@ -25,7 +25,7 @@ const rules = (settings: StrategySettings) => [
   ],
   [
     "Re-entry",
-    `Allowed on a later qualifying candle, subject to ${settings.maxEntriesPerLeg ? `${settings.maxEntriesPerLeg} entries per leg in this session` : 'no configured entry-count cap'}. Entry legs: ${settings.enabledSides.join(' + ')}. Both ATM references are fetched.`,
+    `After a full exit, a completed 5m candle must close below the original buy level. A later candle must close strictly above that same level before another BUY. The morning reference never changes. ${settings.maxEntriesPerLeg ? `Maximum ${settings.maxEntriesPerLeg} entries per leg.` : 'No configured entry-count cap.'}`,
   ],
   [
     "Cutoff",

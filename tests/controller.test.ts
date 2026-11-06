@@ -42,11 +42,15 @@ test('a partial target stays latched even when the next price falls', async () =
   assert.equal(f.controller.session!.legs.CE!.position!.quantity, 130)
   assert.equal(f.controller.session!.legs.CE!.position!.target1Remaining, 0)
 })
-test('lower close exits and a later completed candle permits re-entry', async () => {
+test('after lower-close exit a separate below-level close must reset re-entry before a later breakout', async () => {
   const f = await fixture(); await f.start(); await candle(f, '09:20')
   await candle(f, '09:25', 99)
   assert.equal(f.controller.session!.legs.CE!.position, null)
   await candle(f, '09:30', 101)
+  assert.equal(f.controller.session!.legs.CE!.entries, 1)
+  await candle(f, '09:35', 99)
+  assert.equal(f.controller.session!.legs.CE!.position, null)
+  await candle(f, '09:40', 101)
   assert.equal(f.controller.session!.legs.CE!.entries, 2)
   assert.deepEqual(f.broker.submitted.map(o => o.transaction), ['BUY', 'SELL', 'BUY'])
 })

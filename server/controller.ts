@@ -3,7 +3,7 @@ import type { Activity, AppState, Candle, Mark, Mode, OrderAudit, OrderIntent, R
 import { RULES } from '../shared/model.ts'
 import { freshMark } from '../shared/market.ts'
 import { BrokerError, INDEX_TOKEN, type TradingBroker, type MStock } from './broker.ts'
-import { applyFill, candleSignal, levels, orderQuantity, targetSignal } from './strategy.ts'
+import { applyFill, candleSignal, levels, observeReentry, orderQuantity, targetSignal } from './strategy.ts'
 import { completedBoundary, isTradingDay, istDate, istTime } from './time.ts'
 import type { Store } from './store.ts'
 import type { MarketFeed } from './feed.ts'
@@ -454,13 +454,18 @@ export class Controller {
           if (this.session !== session || session.status !== 'running' || session.pending || this.stopRequested
             || this.now() >= istTime(session.date, settingsFor(session).cutoff)) return
           const unseen = bars.filter(c => c.end <= boundary && c.end > leg.lastCandleEnd).sort((a, b) => a.end - b.end)
+          if (!leg.position && leg.entries > 0) {
+            // Older saved sessions have no gate metadata: infer the last full exit while flat and fail closed without one.
+            leg.lastExitAt ??= session.trades.findLast(trade => trade.side === side && trade.transaction === 'SELL')?.at ?? this.now()
+            for (const bar of unseen) observeReentry(leg, bar, this.now())
+          }
           // A delayed history response may contain several closes. Preserve the
           // first protective exit even if a later candle recovered above lower.
           // Flat legs still consider only the latest close, never replay entries.
           const candle = (leg.position ? unseen.find(c => candleSignal(leg, c, this.now(), session.date, settingsFor(session)) === 'LOWER_CLOSE') : null) ?? unseen.at(-1)
           if (!candle) return
           const signal = candleSignal(leg, candle, this.now(), session.date, settingsFor(session))
-          leg.lastDecision = { candle, evaluatedAt: this.now(), signal, explanation: signal === 'BREAKOUT' ? 'Completed close reached the breakout level while flat.' : signal === 'LOWER_CLOSE' ? 'Completed close fell below the lower exit while holding units.' : leg.position ? 'No completed-candle lower exit. Fresh-price targets remain monitored.' : !settingsFor(session).enabledSides.includes(side) ? 'Leg disabled in this session settings.' : settingsFor(session).maxEntriesPerLeg && leg.entries >= settingsFor(session).maxEntriesPerLeg ? 'Configured entry limit reached.' : this.now() - candle.end > 90_000 ? 'Candle too old for a new entry.' : 'Completed close did not meet the entry rule.' }
+          leg.lastDecision = { candle, evaluatedAt: this.now(), signal, explanation: signal === 'BREAKOUT' ? leg.entries > 0 ? 'A post-exit close below the fixed breakout level was followed by a later close above it.' : 'Completed close reached the breakout level while flat.' : signal === 'LOWER_CLOSE' ? 'Completed close fell below the lower exit while holding units.' : leg.position ? 'No completed-candle lower exit. Fresh-price targets remain monitored.' : !settingsFor(session).enabledSides.includes(side) ? 'Leg disabled in this session settings.' : settingsFor(session).maxEntriesPerLeg && leg.entries >= settingsFor(session).maxEntriesPerLeg ? 'Configured entry limit reached.' : leg.entries > 0 && !leg.reentryReady ? 'Re-entry locked: waiting for a completed close below the original breakout level after the full exit.' : this.now() - candle.end > 90_000 ? 'Candle too old for a new entry.' : 'Completed close did not meet the entry rule.' }
           session.decisionAudit ??= []
           session.decisionAudit.push({ side, ...leg.lastDecision })
           leg.lastCandleEnd = candle.end; this.save()

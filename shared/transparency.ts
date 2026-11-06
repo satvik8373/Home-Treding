@@ -48,5 +48,6 @@ export function explainLeg(session: TradingSession | null, side: Side, marks: Re
       { name: 'No pending order', ready: !session?.pending, detail: session?.pending ? 'Broker confirmation is outstanding.' : 'No unresolved order intent.' },
       { name: 'Flat before entry', ready: !leg?.position, detail: leg?.position ? `Holding ${leg.position.quantity} units.` : 'No tracked position on this leg.' },
       { name: 'Entry quota', ready: quota, detail: settings.maxEntriesPerLeg ? `${leg?.entries ?? 0}/${settings.maxEntriesPerLeg} entries this session.` : 'No configured entry-count limit.' },
+      { name: 'Fresh breakout for re-entry', ready: !!leg && (leg.entries === 0 || leg.reentryReady === true), detail: !leg ? 'Opening reference not yet available.' : leg.entries === 0 ? 'First entry can use the original breakout level.' : leg.reentryReady ? `Reset confirmed. Waiting for a later close strictly above ${leg.upper}.` : `After full exit, a completed close below ${leg.upper} must occur before a later close above it. Reference remains ${leg.reference.close}.` },
     ] }
 }

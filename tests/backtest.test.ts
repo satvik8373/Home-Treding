@@ -39,6 +39,11 @@ function input(ce: number[][], pe?: number[][]): BacktestDataset {
 const reference = [100, 110, 90, 100],
   signal = [100, 110, 99, 101];
 const next = [100, 110, 99, 105];
+test('target exit followed by continuously above-level closes never repeats a BUY', () => {
+  const result = replay(input([reference, signal, [100, 150, 95, 145], [145, 160, 140, 155], [155, 170, 150, 165]]), ZERO)
+  assert.equal(result.fills.filter(fill => fill.transaction === 'BUY').length, 1)
+  assert.deepEqual(result.reference.CE, { close: 100, upper: 100.09, lower: 99.91 })
+})
 const complete = () => [
   reference,
   signal,
@@ -144,9 +149,9 @@ test("a gap beyond targets fills at the observed open and never at an invented p
   );
   assert.equal(result.grossPnl, 9750);
 });
-test("targets precede a same-bar lower close, and a later close can queue re-entry", () => {
+test("an intrabar target exit needs a subsequent below-level close before a fresh breakout", () => {
   const result = replay(
-    input([reference, signal, [100, 150, 95, 99], signal, next]),
+    input([reference, signal, [100, 150, 95, 99], [100, 105, 95, 99], signal, next]),
     ZERO,
   );
   assert.equal(
@@ -154,7 +159,7 @@ test("targets precede a same-bar lower close, and a later close can queue re-ent
     false,
   );
   assert.equal(result.cycles.length, 2);
-  assert.equal(result.cycles[1].entryAt, istTime(DAY, "09:35"));
+  assert.equal(result.cycles[1].entryAt, istTime(DAY, "09:40"));
 });
 test("15:10 closes at the observed cutoff open and blocks new buys", () => {
   const candles = complete();
@@ -430,7 +435,7 @@ test('a shorter PUT series caps both legs at the last common completed candle', 
 })
 
 test('hand-calculated stop and re-entry ledger reconciles quantities, fees and marked P&L', () => {
-  const data = input([reference, signal, [105, 110, 98, 99], [95, 110, 90, 101], [103, 110, 100, 104]])
+  const data = input([reference, signal, [105, 110, 98, 99], [95, 110, 90, 99], signal, [103, 110, 100, 104]])
   const before = JSON.stringify(data), result = replay(data, { slippagePoints: 0, feePerOrder: 2 })
   assert.deepEqual(result.fills.map(fill => [fill.reason, fill.price, fill.quantity]), [['BREAKOUT', 105, 195], ['LOWER_CLOSE', 95, 195], ['BREAKOUT', 103, 195]])
   assert.equal(result.grossPnl, -1950)

@@ -4,7 +4,7 @@ import { RULES } from '../../shared/model.ts'
 import { istTime } from '../time.ts'
 import { DEFAULT_SETTINGS } from '../../shared/settings.ts'
 
-export const ENGINE = 'nifty-009-ohlc-v2'
+export const ENGINE = 'nifty-009-ohlc-v3'
 const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
 const sides: Side[] = ['CE', 'PE']
 export const ASSUMPTIONS = [
@@ -14,6 +14,7 @@ export const ASSUMPTIONS = [
   'CALL and PUT use independent positions, original session contracts and historical lot sizes. All simulated orders fill in full; liquidity, latency, margin and partial fills are not modelled.',
   'Costs are a fixed estimate per simulated order. Zero costs exclude brokerage and taxes. Drawdown uses synchronized candle-close marks, not the unknown intrabar path.',
   'Imported contracts are user-supplied. Missing option data is never replaced by NIFTY spot prices or current expiry contracts.',
+  'References stay fixed all day. After a full exit, re-entry requires a completed close below the original upper level followed by a later close strictly above it. An intrabar-unknown exit cannot use that same bar as its reset.',
 ]
 type Position = { average: number; quantity: number; firstTarget: boolean; cycle: BacktestCycle }
 
@@ -32,6 +33,7 @@ export function replay(data: BacktestDataset, config: BacktestOptions): Backtest
     atm: data.contracts.CE.strike, expiry: data.contracts.CE.expiry, lotSize: data.contracts.CE.lotSize, reference,
     fills: [], cycles: [], equity: [{ at: istTime(data.date, RULES.referenceEnd), netPnl: 0 }], grossPnl: 0, fees: 0, netRealizedPnl: 0, openPnl: 0, markedNetPnl: 0, maxDrawdown: 0 }
   const positions: Partial<Record<Side, Position>> = {}, pending: Partial<Record<Side, 'BREAKOUT' | 'LOWER_CLOSE'>> = {}, entries: Record<Side, number> = { CE: 0, PE: 0 }
+  const reentryReady: Record<Side, boolean> = { CE: false, PE: false }, lastExitAt: Partial<Record<Side, number>> = {}
   let peak = 0
   function execute(side: Side, reason: Reason, market: number, at: number, timing: NonNullable<BacktestDay['fills'][number]['timing']>) {
     const buy = reason === 'BREAKOUT', contract = data.contracts[side], position = positions[side]
@@ -43,6 +45,7 @@ export function replay(data: BacktestDataset, config: BacktestOptions): Backtest
     if (buy) {
       cycle = { id, date: data.date, side, symbol: contract.symbol, entryAt: at, entryPrice: price, exitAt: null, quantity, remaining: quantity, grossPnl: 0, fees: 0, netPnl: 0 }
       result.cycles.push(cycle); entries[side]++; positions[side] = { average: price, quantity, firstTarget: settings.target1Lots === 0, cycle }
+      reentryReady[side] = false
     }
     const grossPnl = buy ? null : round((price - position!.average) * quantity)
     result.fills.push({ id, cycleId: cycle!.id, at, side, symbol: contract.symbol, transaction: buy ? 'BUY' : 'SELL', quantity, price, reason, fee: config.feePerOrder, grossPnl, timing })
@@ -50,7 +53,7 @@ export function replay(data: BacktestDataset, config: BacktestOptions): Backtest
     result.grossPnl = round(result.grossPnl + (grossPnl ?? 0)); result.fees = round(result.fees + config.feePerOrder)
     if (!buy) {
       position!.quantity -= quantity; position!.firstTarget = true; cycle!.remaining = position!.quantity
-      if (!position!.quantity) { cycle!.exitAt = at; delete positions[side] }
+      if (!position!.quantity) { cycle!.exitAt = at; delete positions[side]; lastExitAt[side] = at; reentryReady[side] = false }
     }
   }
   function mark(at: number, prices: Record<Side, number>) {
@@ -80,8 +83,9 @@ export function replay(data: BacktestDataset, config: BacktestOptions): Backtest
         if (bar.high >= level) execute(side, target, Math.max(bar.open, level), bar.open >= level ? bar.start : bar.end, bar.open >= level ? 'gap-open' : 'intrabar-unknown')
       }
       if (bar.end < cutoff && bar.end >= istTime(data.date, RULES.firstSignal)) {
+        if (!positions[side] && entries[side] > 0 && lastExitAt[side] != null && bar.end > lastExitAt[side]! && bar.close < reference[side].upper) reentryReady[side] = true
         if (positions[side] && bar.close < reference[side].lower) pending[side] = 'LOWER_CLOSE'
-        else if (!positions[side] && settings.enabledSides.includes(side) && (!settings.maxEntriesPerLeg || entries[side] < settings.maxEntriesPerLeg) && bar.close >= reference[side].upper) pending[side] = 'BREAKOUT'
+        else if (!positions[side] && settings.enabledSides.includes(side) && (!settings.maxEntriesPerLeg || entries[side] < settings.maxEntriesPerLeg) && (entries[side] === 0 ? bar.close >= reference[side].upper : reentryReady[side] && bar.close > reference[side].upper)) pending[side] = 'BREAKOUT'
       }
     }
     mark(ce.end, { CE: ce.close, PE: pe.close })

@@ -54,6 +54,8 @@ export interface Leg {
   position: Position | null;
   realized: number;
   entries: number;
+  lastExitAt?: number;
+  reentryReady?: boolean;
   lastCandleEnd: number;
   exitReason: Exclude<Reason, "BREAKOUT"> | null;
 }
