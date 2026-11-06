@@ -3,6 +3,7 @@ import type { PositionRow, TradingBroker } from '../server/broker.ts'
 import type { SavedBroker } from '../server/store.ts'
 import { Controller } from '../server/controller.ts'
 import { istTime } from '../server/time.ts'
+import { LEGACY_SETTINGS } from '../shared/settings.ts'
 
 export const DAY = '2026-10-26'
 export const bar = (time: string, close = 100): Candle => ({ start: istTime(DAY, time), end: istTime(DAY, time) + 300_000,
@@ -75,6 +76,8 @@ export async function fixture() {
   store.savedBroker = broker.credentials
   const feed = { status: 'disconnected' as 'disconnected' | 'connected' | 'connecting', lastTickAt: null as number | null,
     connect() { this.status = 'connected' }, close() { this.status = 'disconnected' }, onMark: (_mark: import('../shared/model.ts').Mark) => {}, onChange() {} }
+  // Existing execution fixtures cover saved 3-lot sessions and their 1+2 split.
+  store.put('strategy:settings', LEGACY_SETTINGS)
   const controller = new Controller(broker, store, feed, () => time)
   await controller.restore()
   return { controller, broker, store, feed, now: () => time, setTime: (value: number) => { time = value },

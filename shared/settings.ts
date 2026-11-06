@@ -5,8 +5,10 @@ export interface StrategySettings {
   target1Points: number; target2Points: number; cutoff: string; maxEntriesPerLeg: number;
   enabledSides: Side[]; feePerOrderEstimate: number;
 }
-export const DEFAULT_SETTINGS: StrategySettings = { breakoutPercent: 0.09, exitPercent: 0.09, entryLots: 3, target1Lots: 1,
+export const DEFAULT_SETTINGS: StrategySettings = { breakoutPercent: 0.09, exitPercent: 0.09, entryLots: 4, target1Lots: 2,
   target1Points: 20, target2Points: 40, cutoff: '15:10', maxEntriesPerLeg: 0, enabledSides: ['CE', 'PE'], feePerOrderEstimate: 0 }
+// Sessions saved before rule snapshots existed used 3 lots and a 1+2 split.
+export const LEGACY_SETTINGS: StrategySettings = { ...DEFAULT_SETTINGS, entryLots: 3, target1Lots: 1 }
 export function validateSettings(input: unknown): StrategySettings {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Strategy settings must be an object.')
   const body = input as Record<string, unknown>
@@ -26,5 +28,5 @@ export function validateSettings(input: unknown): StrategySettings {
   return { breakoutPercent: number('breakoutPercent', 0.01, 10), exitPercent: number('exitPercent', 0.01, 10), entryLots, target1Lots, target1Points, target2Points,
     cutoff: body.cutoff, maxEntriesPerLeg: number('maxEntriesPerLeg', 0, 100, true), enabledSides: [...body.enabledSides].sort() as Side[], feePerOrderEstimate: number('feePerOrderEstimate', 0, 1000) }
 }
-export function settingsFor(session?: { settings?: StrategySettings } | null): StrategySettings { return session?.settings ?? DEFAULT_SETTINGS }
+export function settingsFor(session?: { settings?: StrategySettings } | null): StrategySettings { return session ? session.settings ?? LEGACY_SETTINGS : DEFAULT_SETTINGS }
 export function sameSettings(a: StrategySettings, b: StrategySettings) { return JSON.stringify(validateSettings(a)) === JSON.stringify(validateSettings(b)) }

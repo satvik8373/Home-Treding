@@ -171,8 +171,8 @@ export interface MarketChart {
 }
 export const RULES = {
   multiplier: 0.0009,
-  entryLots: 3,
-  target1Lots: 1,
+  entryLots: 4,
+  target1Lots: 2,
   target1: 20,
   target2: 40,
   referenceStart: "09:15",

@@ -8,8 +8,9 @@ import { Backtests } from "../server/backtest/service.ts";
 import type { BacktestRepository } from "../server/backtest/service.ts";
 import { DAY, contract, fixture } from "./helpers.ts";
 import { istTime } from "../server/time.ts";
+import { LEGACY_SETTINGS } from '../shared/settings.ts'
 
-const ZERO = { slippagePoints: 0, feePerOrder: 0 };
+const ZERO = { slippagePoints: 0, feePerOrder: 0, strategySettings: LEGACY_SETTINGS };
 const NOW = istTime(DAY, "16:00");
 function input(ce: number[][], pe?: number[][]): BacktestDataset {
   const bars = (values: number[][]): Candle[] =>
@@ -39,6 +40,10 @@ function input(ce: number[][], pe?: number[][]): BacktestDataset {
 const reference = [100, 110, 90, 100],
   signal = [100, 110, 99, 101];
 const next = [100, 110, 99, 105];
+test('new default backtest buys 4 lots and exits 2 lots at each target', () => {
+  const result = replay(input([reference, signal, [100, 150, 95, 101]]), { slippagePoints: 0, feePerOrder: 0 })
+  assert.deepEqual(result.fills.map(fill => [fill.reason, fill.quantity]), [['BREAKOUT', 260], ['TARGET_1', 130], ['TARGET_2', 130]])
+})
 test('target exit followed by continuously above-level closes never repeats a BUY', () => {
   const result = replay(input([reference, signal, [100, 150, 95, 145], [145, 160, 140, 155], [155, 170, 150, 165]]), ZERO)
   assert.equal(result.fills.filter(fill => fill.transaction === 'BUY').length, 1)
@@ -97,7 +102,7 @@ test("independent CALL and PUT use historical lot sizes, not a hard-coded quanti
 });
 test("same-bar targets close one lot then two lots, with fees allocated to the full cycle", () => {
   const result = replay(input([reference, signal, [100, 150, 95, 101]]), {
-    slippagePoints: 0,
+    ...ZERO, slippagePoints: 0,
     feePerOrder: 20,
   });
   assert.deepEqual(
@@ -116,7 +121,7 @@ test("same-bar targets close one lot then two lots, with fees allocated to the f
 });
 test("slippage worsens both entry and exit fills and targets follow the slipped entry", () => {
   const result = replay(input([reference, signal, [100, 150, 95, 101]]), {
-    slippagePoints: 0.05,
+    ...ZERO, slippagePoints: 0.05,
     feePerOrder: 20,
   });
   assert.equal(result.fills[0].price, 100.05);
@@ -199,13 +204,13 @@ test("no signal produces no fills and no synthetic performance statistics", () =
 });
 test("combined P&L and drawdown preserve fee debits and closed-trade statistics", () => {
   const result = replay(input([reference, signal, [100, 150, 95, 101]]), {
-    slippagePoints: 0,
+    ...ZERO, slippagePoints: 0,
     feePerOrder: 20,
   });
   const summary = report(
     [result],
     [],
-    { slippagePoints: 0, feePerOrder: 20 },
+    { ...ZERO, slippagePoints: 0, feePerOrder: 20 },
     DAY,
     DAY,
     NOW,
@@ -436,14 +441,14 @@ test('a shorter PUT series caps both legs at the last common completed candle', 
 
 test('hand-calculated stop and re-entry ledger reconciles quantities, fees and marked P&L', () => {
   const data = input([reference, signal, [105, 110, 98, 99], [95, 110, 90, 99], signal, [103, 110, 100, 104]])
-  const before = JSON.stringify(data), result = replay(data, { slippagePoints: 0, feePerOrder: 2 })
+  const before = JSON.stringify(data), result = replay(data, { ...ZERO, slippagePoints: 0, feePerOrder: 2 })
   assert.deepEqual(result.fills.map(fill => [fill.reason, fill.price, fill.quantity]), [['BREAKOUT', 105, 195], ['LOWER_CLOSE', 95, 195], ['BREAKOUT', 103, 195]])
   assert.equal(result.grossPnl, -1950)
   assert.equal(result.fees, 6)
   assert.equal(result.openPnl, 195)
   assert.equal(result.markedNetPnl, -1761)
   assert.equal(JSON.stringify(data), before)
-  assert.deepEqual(replay(data, { slippagePoints: 0, feePerOrder: 2 }), result)
+  assert.deepEqual(replay(data, { ...ZERO, slippagePoints: 0, feePerOrder: 2 }), result)
 })
 
 test('old engine reports are not restored into rebuilt backtesting', async () => {

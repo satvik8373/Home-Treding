@@ -24,10 +24,28 @@ async function signal(f: Awaited<ReturnType<typeof fixture>>, time: string) {
 }
 
 test('settings reject invalid quantities, percentages, leg sets and cutoff boundaries', () => {
-  for (const changed of [{ entryLots: 0 }, { entryLots: 2.5 }, { target1Lots: 3 }, { target2Points: 10 }, { breakoutPercent: NaN }, { enabledSides: [] }, { enabledSides: ['CE', 'CE'] }, { cutoff: '15:11' }, { cutoff: '15:65' }, { cutoff: '09:25' }, { feePerOrderEstimate: -1 }]) {
+  for (const changed of [{ entryLots: 0 }, { entryLots: 2.5 }, { target1Lots: 4 }, { target2Points: 10 }, { breakoutPercent: NaN }, { enabledSides: [] }, { enabledSides: ['CE', 'CE'] }, { cutoff: '15:11' }, { cutoff: '15:65' }, { cutoff: '09:25' }, { feePerOrderEstimate: -1 }]) {
     assert.throws(() => validateSettings({ ...DEFAULT_SETTINGS, ...changed }))
   }
   assert.deepEqual(validateSettings(DEFAULT_SETTINGS), DEFAULT_SETTINGS)
+})
+
+test('new defaults buy 4 lots and sell 2 at each target; manual splits execute the saved quantities', async () => {
+  assert.equal(DEFAULT_SETTINGS.entryLots, 4)
+  assert.equal(DEFAULT_SETTINGS.target1Lots, 2)
+  for (const [entryLots, firstLots] of [[4, 2], [5, 3]]) {
+    const f = await fixture()
+    f.controller.saveStrategySettings({ ...DEFAULT_SETTINGS, entryLots, target1Lots: firstLots, enabledSides: ['CE'] })
+    await f.start('paper'); await signal(f, '09:20')
+    const leg = f.controller.session!.legs.CE!, lot = leg.contract.lotSize
+    assert.equal(leg.position!.quantity, entryLots * lot)
+    f.mark('CE', 121); await f.controller.pump()
+    assert.equal(leg.position!.quantity, (entryLots - firstLots) * lot)
+    f.mark('CE', 141); await f.controller.pump()
+    assert.equal(leg.position, null)
+    assert.deepEqual(f.controller.session!.trades.map(trade => trade.quantity), [entryLots * lot, firstLots * lot, (entryLots - firstLots) * lot])
+  }
+  assert.equal(settingsFor({}).entryLots, 3, 'legacy sessions without a rule snapshot retain their original size')
 })
 
 test('adjusted rules control levels, entry size, disabled legs and a skipped first target', async () => {
