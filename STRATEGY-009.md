@@ -15,7 +15,7 @@ CE/PE independently run karenge; dono open ho sakte hain. Entry/Lower exit compl
 
 ## Selectable target rules
 
-Default T1/T2 remain entry +20/+40 premium points, selling 2+2 of the 4 bought lots. Settings let each target independently select points above actual entry, percentage above actual entry, fixed option premium, whole minutes after original entry, or a fixed IST clock. T1 sells its configured lots (0 skips T1); T2 sells all remaining units after T1 completes. Mixed types are supported; T2 never bypasses a pending T1. For matching types, T2 must be above/later than T1.
+Default T1/T2 remain entry +20/+40 premium points, selling 2+2 of the 4 bought lots. Settings show only two target choices: **Price** (premium points above actual entry) and **Time** (whole minutes after original entry). Previously saved advanced rule snapshots are still interpreted as saved. T1 sells its configured lots (0 skips T1); T2 sells all remaining units after T1 completes. Mixed types are supported; T2 never bypasses a pending T1. For matching types, T2 must be above/later than T1.
 
 Time exits are scheduled exits regardless of profit or loss. Both minute deadlines count from the original confirmed entry timestamp, including after partial exits and process recovery. A clock deadline already passed becomes due after entry. Fresh market data is still required; broker confirmation, latency and outages can delay execution. The reference stop, completed-candle lower exit, explicit Stop and square-off remain active. Changes apply next trading day, while new backtests use saved preferences.
 

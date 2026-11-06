@@ -25,14 +25,15 @@ test('target types validate and legacy settings keep point-based defaults', () =
   assert.doesNotThrow(() => validateSettings({ ...DEFAULT_SETTINGS, target1Rule: { kind: 'minutes', value: 10 }, target2Rule: { kind: 'percent', value: 5 } }))
 })
 
-test('settings renders all target choices and saving preferences preserves the locked day snapshot', async () => {
+test('settings renders only Price and Time choices and saving preferences preserves the locked day snapshot', async () => {
   const f = await fixture(); await f.start('paper')
   const before = JSON.stringify(f.controller.session!.settings)
   const saved = f.controller.saveStrategySettings({ ...DEFAULT_SETTINGS, target1Rule: { kind: 'minutes', value: 10 }, target2Rule: { kind: 'clock', time: '11:00' } })
   assert.equal(JSON.stringify(f.controller.session!.settings), before)
   assert.deepEqual(f.store.get('strategy:settings'), saved)
   const html = renderToStaticMarkup(createElement(StrategySettingsPanel, { saved, effective: DEFAULT_SETTINGS, active: true, online: true, working: '', action: async () => null }))
-  for (const kind of ['points', 'percent', 'price', 'minutes', 'clock']) assert.equal((html.match(new RegExp(`option value="${kind}"`, 'g')) ?? []).length, 2)
+  for (const kind of ['price', 'time']) assert.equal((html.match(new RegExp(`option value="${kind}"`, 'g')) ?? []).length, 2)
+  assert.equal((html.match(/<option /g) ?? []).length, 4)
   assert.match(html, /Minutes after original entry/)
   assert.match(html, /Exit time · IST/)
   assert.equal(f.broker.submitted.length, 0)
