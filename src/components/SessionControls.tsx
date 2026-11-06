@@ -46,6 +46,7 @@ export function SessionControls({
     minutes = local.getUTCHours() * 60 + local.getUTCMinutes();
   const inWindow =
     ![0, 6].includes(local.getUTCDay()) && minutes >= 540 && minutes < Number(settings.cutoff.slice(0, 2)) * 60 + Number(settings.cutoff.slice(3));
+  const resumeDay = session?.date === local.toISOString().slice(0, 10) && session.mode === shownMode;
   return (
     <section className="panel session-panel">
       <div className="panel-title">
@@ -150,7 +151,7 @@ export function SessionControls({
             }
           >
             <Play size={14} fill="currentColor" />
-            {working === "start" ? "Starting…" : "Start strategy"}
+            {working === "start" ? "Starting…" : resumeDay ? "Resume day session" : "Start strategy"}
           </button>
         )}
         <p className="control-hint">

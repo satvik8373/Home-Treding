@@ -1,6 +1,7 @@
 # NIFTY 009 — Strategy Logic
 
 - **Reference:** 09:15–09:20 IST NIFTY CLOSE se nearest ATM aur nearest valid expiry ka CE/PE pair select karke session ke liye lock karo.
+- **Day continuity:** Har account aur Paper/Live mode ka ek saved day-session rahega. Same day engine restart, Stop/Start ya settings save karne par session ID, opening reference, contracts, trade history, entry count aur reset state fresh nahi honge. Settings changes next trading day par apply honge. Process shutdown sirf durable checkpoint karta hai; explicit “Stop & square off” positions close karta hai. Valid broker login aur quantity checks ke baad interrupted running session resume hota hai; unknown orders reconcile hone tak fresh order nahi bheja jata. Stopped session apne aap start nahi hota.
 - **Levels:** Har option ke apne opening candle CLOSE se `Upper = CLOSE × 1.0009`, `Lower = CLOSE × 0.9991`; dono 2 decimals tak round karo (**±0.09%**).
 - **Entry:** Leg flat ho aur new completed 5-minute candle CLOSE **>= Upper** ho to **4 lots BUY**. First possible signal **09:25 IST**.
 - **Target 1:** Actual entry average **+₹20 premium points** par **2 lots SELL**.

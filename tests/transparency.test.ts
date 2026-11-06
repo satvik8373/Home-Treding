@@ -12,7 +12,7 @@ import { replay } from '../server/backtest/replay.ts'
 import { dataset } from '../server/backtest/validation.ts'
 import { istTime } from '../server/time.ts'
 import { DAY, bar, fixture } from './helpers.ts'
-import type { OrderIntent, TradingSession } from '../shared/model.ts'
+import type { OrderIntent } from '../shared/model.ts'
 
 async function signal(f: Awaited<ReturnType<typeof fixture>>, time: string) {
   f.setTime(istTime(DAY, time) + 303_000)
@@ -65,7 +65,7 @@ test('adjusted rules control levels, entry size, disabled legs and a skipped fir
   assert.equal(targetSignal(leg, 110, settings), 'TARGET_2')
 })
 
-test('saving preferences cannot mutate a running session; changed preferences create a fresh archived session', async () => {
+test('setting changes and Stop/Start retain the same daily session, reference, entries and re-entry gate', async () => {
   const f = await fixture(); await f.start('paper')
   const oldId = f.controller.session!.id
   const saved = f.controller.saveStrategySettings({ ...DEFAULT_SETTINGS, entryLots: 4, target1Lots: 2 })
@@ -77,11 +77,13 @@ test('saving preferences cannot mutate a running session; changed preferences cr
   await f.controller.stop(); await f.controller.pump(); await f.controller.pump()
   assert.equal(f.controller.session!.status, 'stopped')
   await f.start('paper')
-  assert.notEqual(f.controller.session!.id, oldId)
-  assert.equal(f.controller.session!.settings!.entryLots, 4)
-  assert.equal(f.store.get<TradingSession>(`session:history:${oldId}`)!.trades.length, 2)
+  assert.equal(f.controller.session!.id, oldId)
+  assert.equal(f.controller.session!.settings!.entryLots, 3)
+  assert.equal(f.controller.session!.trades.length, 2)
+  assert.equal(f.controller.session!.legs.CE!.reference.close, 100)
   await signal(f, '09:25')
-  assert.equal(f.controller.session!.legs.CE!.position!.quantity, 260)
+  assert.equal(f.controller.session!.legs.CE!.position, null)
+  assert.equal(f.controller.session!.legs.CE!.entries, 1)
   assert.equal(f.controller.session!.orderAudit!.at(-1)!.status, 'simulated')
   assert.match(f.controller.session!.orderAudit!.at(-1)!.orderId!, /^PAPER-/)
   assert.ok(f.controller.session!.decisionAudit!.length)

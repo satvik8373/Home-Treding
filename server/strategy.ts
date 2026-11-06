@@ -16,8 +16,10 @@ export function levels(referenceClose: number, settings: StrategySettings = DEFA
 }
 /** Only a completed close after the full exit may reset the fixed-level re-entry gate. */
 export function observeReentry(leg: Leg, candle: Candle, now: number): void {
-  if (!leg.position && leg.entries > 0 && leg.lastExitAt != null && validCandle(candle)
-    && candle.end > leg.lastExitAt && candle.end <= now && candle.close < leg.upper) leg.reentryReady = true
+  const afterExit = leg.entries > 0 && leg.lastExitAt != null && candle.end > leg.lastExitAt
+  const afterMissedFirst = leg.entries === 0 && leg.firstSignalConsumed === true && candle.end > leg.lastCandleEnd
+  if (!leg.position && (afterExit || afterMissedFirst) && validCandle(candle)
+    && candle.end <= now && candle.close < leg.upper) leg.reentryReady = true
 }
 export function candleSignal(leg: Leg, candle: Candle, now: number, day: string, settings: StrategySettings = DEFAULT_SETTINGS): 'BREAKOUT' | 'LOWER_CLOSE' | null {
   if (!validCandle(candle) || candle.end <= leg.lastCandleEnd || candle.end > now
@@ -25,7 +27,7 @@ export function candleSignal(leg: Leg, candle: Candle, now: number, day: string,
   if (leg.position && candle.close < leg.lower) return 'LOWER_CLOSE'
   // Old candles can explain history but may never place a late BUY.
   if (!leg.position && settings.enabledSides.includes(leg.contract.side) && (!settings.maxEntriesPerLeg || leg.entries < settings.maxEntriesPerLeg)
-    && now - candle.end <= 90_000 && (leg.entries === 0 ? candle.close >= leg.upper : leg.reentryReady === true && candle.close > leg.upper)) return 'BREAKOUT'
+    && now - candle.end <= 90_000 && (leg.entries === 0 && !leg.firstSignalConsumed ? candle.close >= leg.upper : leg.reentryReady === true && candle.close > leg.upper)) return 'BREAKOUT'
   return null
 }
 export function targetSignal(leg: Leg, price: number, settings: StrategySettings = DEFAULT_SETTINGS): 'TARGET_1' | 'TARGET_2' | null {

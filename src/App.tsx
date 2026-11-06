@@ -49,6 +49,8 @@ export default function App() {
   const sides: Side[] = ['CE', 'PE']
   const positions = sides.filter(side => !!session?.legs[side]?.position)
   const locked = running || positions.length > 0 || !!session?.pending
+  const dayLocked = !!session && session.date === new Date(now + 330 * 60_000).toISOString().slice(0, 10) && session.mode === mode
+    && (!broker?.account || session.account === broker.account)
   const realized = session?.pnlVerified
     ? Object.values(session.legs).reduce((sum, leg) => sum + leg!.realized, 0)
     : null
@@ -135,7 +137,7 @@ export default function App() {
           )}
           <div className="workspace">
             <MarketChart connected={connected} identity={identity} now={now} marks={data?.marks ?? {}} legs={session?.legs ?? {}} trades={session?.trades ?? []} settings={settingsFor(session)} />
-            <SessionControls session={session} locked={locked} connected={connected} online={online} working={working} now={now} mode={mode} setMode={setMode} liveAck={liveAck} setLiveAck={setLiveAck} action={action} onRules={() => setRulesDialog(true)} settings={locked ? settingsFor(session) : data?.savedSettings ?? DEFAULT_SETTINGS} onSettings={() => navigate('audit')} liveAvailable={data?.runtime?.liveExecution !== false} liveReason={data?.runtime?.reason} />
+            <SessionControls session={session} locked={locked} connected={connected} online={online} working={working} now={now} mode={mode} setMode={setMode} liveAck={liveAck} setLiveAck={setLiveAck} action={action} onRules={() => setRulesDialog(true)} settings={locked || dayLocked ? settingsFor(session) : data?.savedSettings ?? DEFAULT_SETTINGS} onSettings={() => navigate('audit')} liveAvailable={data?.runtime?.liveExecution !== false} liveReason={data?.runtime?.reason} />
           </div>
           <div className="section-heading"><h2>Strategy positions</h2><span>References stay fixed for the session</span></div>
           <div className="legs-grid">{sides.map(side => <LegCard key={side} side={side} leg={session?.legs[side]} mark={markFor(side)} now={now} settings={settingsFor(session)} />)}</div>
@@ -160,7 +162,7 @@ export default function App() {
         </footer>
       </main>
       {brokerDialog && <BrokerDialog broker={broker} locked={locked} online={online} working={working} error={error} action={action} onClose={() => setBrokerDialog(false)} />}
-      {rulesDialog && <RulesDialog settings={locked ? settingsFor(session) : data?.savedSettings ?? DEFAULT_SETTINGS} onClose={() => setRulesDialog(false)} />}
+      {rulesDialog && <RulesDialog settings={locked || dayLocked ? settingsFor(session) : data?.savedSettings ?? DEFAULT_SETTINGS} onClose={() => setRulesDialog(false)} />}
     </div>
   )
 }

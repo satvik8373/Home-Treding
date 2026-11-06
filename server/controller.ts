@@ -3,7 +3,7 @@ import type { Activity, AppState, Candle, Mark, Mode, OrderAudit, OrderIntent, R
 import { RULES } from '../shared/model.ts'
 import { freshMark } from '../shared/market.ts'
 import { BrokerError, INDEX_TOKEN, type TradingBroker, type MStock } from './broker.ts'
-import { applyFill, candleSignal, levels, observeReentry, orderQuantity, priceExitSignal } from './strategy.ts'
+import { applyFill, candleSignal, levels, observeReentry, orderQuantity, priceExitSignal, validCandle } from './strategy.ts'
 import { completedBoundary, isTradingDay, istDate, istTime } from './time.ts'
 import type { Store } from './store.ts'
 import type { MarketFeed } from './feed.ts'
@@ -39,6 +39,7 @@ export class Controller {
   private retryAt = 0
   private pumpTask: Promise<void> | null = null
   private savedSession = ''
+  private suspended = false
   private preferences: StrategySettings = structuredClone(DEFAULT_SETTINGS)
   constructor(public broker: TradingBroker & Partial<Pick<MStock, 'login' | 'verify' | 'verifyAccount' | 'logout'>>,
     private store: Repository, public feed: Feed, private now = Date.now) {
@@ -46,6 +47,7 @@ export class Controller {
     const savedSettings = store.get?.('strategy:settings')
     if (savedSettings) this.preferences = validateSettings(savedSettings)
     feed.onMark = mark => {
+      if (this.suspended) return
       if (!freshMark(mark, this.now())) return
       const previous = this.marks[mark.token]
       if (previous && (mark.receivedAt < previous.receivedAt
@@ -137,10 +139,14 @@ export class Controller {
       this.authorizeBroker?.(saved.account)
       await this.broker.verifyAccount?.(); this.verified = true
       this.subscribe()
-      if (this.session?.mode === 'paper' && this.session.status === 'running' && !this.session.pending && this.session.date === istDate(this.now())
-        && this.session.legs.CE && this.session.legs.PE && this.now() < istTime(this.session.date, settingsFor(this.session).cutoff)) {
-        for (const leg of Object.values(this.session.legs)) if (leg) leg.lastCandleEnd = completedBoundary(this.now())
-        this.note('Paper session restored with its original rule snapshot and positions. Waiting for fresh prices; earlier entry signals will not be replayed.')
+      if (this.session && ['armed', 'preparing', 'running'].includes(this.session.status) && this.session.date === istDate(this.now())
+        && this.now() < istTime(this.session.date, settingsFor(this.session).cutoff)) {
+        if (this.session.mode === 'live' && !this.session.pending) {
+          await this.checkPositions()
+          if (!this.session.pnlVerified) { this.session.status = 'blocked'; this.note('Saved broker quantities do not match. Reconcile this same day-session before resuming.', 'error'); return }
+        }
+        this.session.status = this.session.legs.CE && this.session.legs.PE ? 'running' : 'armed'
+        this.note('Same day-session restored: original references, rules, trades, positions, entry counts and reset state retained. Unresolved orders reconcile before new actions.')
         return
       }
       if (hasExposure(this.session)) await this.reconcile()
@@ -200,23 +206,25 @@ export class Controller {
       const previous = this.session
       if (!previous || previous.date !== date || previous.account !== this.broker.credentials!.account || previous.mode !== mode) {
         this.session = this.store.loadSession(this.broker.credentials!.account, date, mode) ?? { id: randomUUID(), date, mode, account: this.broker.credentials!.account, status: 'armed',
-          message: '', atm: null, expiry: null, legs: {}, pending: null, pnlVerified: true, trades: [], activity: [] }
+          message: '', atm: null, expiry: null, legs: {}, pending: null, pnlVerified: true, trades: [], activity: [], settings: structuredClone(preferences) }
       }
       if (hasExposure(this.session)) throw new Error('This mode has saved exposure that needs reconciliation before starting.')
-      if (!sameSettings(settingsFor(this.session), preferences)) {
-        if (this.session) this.store.put?.(`session:history:${this.session.id}`, this.session)
-        this.session = { id: randomUUID(), date, mode, account: this.broker.credentials!.account, status: 'armed', message: '', atm: null, expiry: null,
-          legs: {}, pending: null, pnlVerified: true, trades: [], activity: [], orderAudit: [], settings: structuredClone(preferences) }
-      }
-      this.session!.settings ??= structuredClone(preferences)
+      this.session!.settings ??= structuredClone(settingsFor(this.session))
       this.stopRequested = false
       this.session!.status = 'armed'
       // A restart never backfills entry signals from earlier candles.
       for (const side of SIDES) if (this.session!.legs[side]) this.session!.legs[side]!.lastCandleEnd = completedBoundary(now)
       this.note(now < istTime(date, RULES.referenceEnd) ? 'Armed. Waiting for the 09:15–09:20 reference candle to complete.' : 'Loading official NIFTY opening candle and ATM contracts.')
+      if (!sameSettings(settingsFor(this.session), preferences)) this.note('Resuming today\'s existing day-session and locked rules. Saved setting changes apply on the next trading day.')
     })
     void this.pump()
   }
+  async checkpointForRestart(): Promise<void> {
+    this.suspended = true
+    try { await this.exclusive(async () => { this.save() }) }
+    catch (error) { this.suspended = false; throw error }
+  }
+  resumeAfterAbortedRestart(): void { this.suspended = false }
   async stop(): Promise<void> {
     // Set outside the serial queue so a slow order request cannot allow a second BUY.
     this.stopRequested = true
@@ -255,6 +263,10 @@ export class Controller {
       if (!reference) throw new Error(`The 09:15–09:20 ${contract.side} reference candle is unavailable. No levels were guessed.`)
       legs[contract.side] = { contract, reference, ...levels(reference.close, settingsFor(session)), position: null, realized: 0,
         entries: 0, lastCandleEnd: completedBoundary(this.now()), exitReason: null }
+      const leg = legs[contract.side]!
+      const past = bars.filter(bar => validCandle(bar) && bar.start >= istTime(session.date, RULES.referenceEnd) && bar.end <= leg.lastCandleEnd).sort((a, b) => a.end - b.end)
+      leg.firstSignalConsumed = past.some(bar => bar.close >= leg.upper)
+      leg.reentryReady = leg.firstSignalConsumed && !!past.length && past.at(-1)!.close < leg.upper
     }
     if (session.mode === 'live') await this.requireNoExistingNifty()
     session.legs = legs; session.atm = contracts[0].strike; session.expiry = contracts[0].expiry
@@ -363,6 +375,7 @@ export class Controller {
     }
   }
   async pump(): Promise<void> {
+    if (this.suspended) return
     if (this.pumpTask) return this.pumpTask
     if (this.busy || !this.session || !active(this.session) && !hasExposure(this.session) || this.now() < this.retryAt) return
     this.pumpTask = this.exclusive(async () => {
@@ -457,10 +470,13 @@ export class Controller {
           if (this.session !== session || session.status !== 'running' || session.pending || this.stopRequested
             || this.now() >= istTime(session.date, settingsFor(session).cutoff)) return
           const unseen = bars.filter(c => c.end <= boundary && c.end > leg.lastCandleEnd).sort((a, b) => a.end - b.end)
-          if (!leg.position && leg.entries > 0) {
+          if (!leg.position && (leg.entries > 0 || leg.firstSignalConsumed)) {
             // Older saved sessions have no gate metadata: infer the last full exit while flat and fail closed without one.
-            leg.lastExitAt ??= session.trades.findLast(trade => trade.side === side && trade.transaction === 'SELL')?.at ?? this.now()
-            for (const bar of unseen) observeReentry(leg, bar, this.now())
+            if (leg.entries > 0) leg.lastExitAt ??= session.trades.findLast(trade => trade.side === side && trade.transaction === 'SELL')?.at ?? this.now()
+            for (const bar of unseen) {
+              observeReentry(leg, bar, this.now())
+              if (bar !== unseen.at(-1) && validCandle(bar) && bar.close > leg.upper) leg.reentryReady = false
+            }
           }
           // A delayed history response may contain several closes. Preserve the
           // first protective exit even if a later candle recovered above lower.
@@ -468,7 +484,8 @@ export class Controller {
           const candle = (leg.position ? unseen.find(c => candleSignal(leg, c, this.now(), session.date, settingsFor(session)) === 'LOWER_CLOSE') : null) ?? unseen.at(-1)
           if (!candle) return
           const signal = candleSignal(leg, candle, this.now(), session.date, settingsFor(session))
-          leg.lastDecision = { candle, evaluatedAt: this.now(), signal, explanation: signal === 'BREAKOUT' ? leg.entries > 0 ? 'A post-exit close below the fixed breakout level was followed by a later close above it.' : 'Completed close reached the breakout level while flat.' : signal === 'LOWER_CLOSE' ? 'Completed close fell below the lower exit while holding units.' : leg.position ? 'No completed-candle lower exit. Fresh-price targets remain monitored.' : !settingsFor(session).enabledSides.includes(side) ? 'Leg disabled in this session settings.' : settingsFor(session).maxEntriesPerLeg && leg.entries >= settingsFor(session).maxEntriesPerLeg ? 'Configured entry limit reached.' : leg.entries > 0 && !leg.reentryReady ? 'Re-entry locked: waiting for a completed close below the original breakout level after the full exit.' : this.now() - candle.end > 90_000 ? 'Candle too old for a new entry.' : 'Completed close did not meet the entry rule.' }
+          if (!leg.position && validCandle(candle) && candle.close > leg.upper) { leg.firstSignalConsumed = true; leg.reentryReady = false }
+          leg.lastDecision = { candle, evaluatedAt: this.now(), signal, explanation: signal === 'BREAKOUT' ? leg.entries > 0 ? 'A post-exit close below the fixed breakout level was followed by a later close above it.' : 'Completed close reached the breakout level while flat.' : signal === 'LOWER_CLOSE' ? 'Completed close fell below the lower exit while holding units.' : leg.position ? 'No completed-candle lower exit. Fresh-price targets remain monitored.' : !settingsFor(session).enabledSides.includes(side) ? 'Leg disabled in this session settings.' : settingsFor(session).maxEntriesPerLeg && leg.entries >= settingsFor(session).maxEntriesPerLeg ? 'Configured entry limit reached.' : (leg.entries > 0 || leg.firstSignalConsumed) && !leg.reentryReady ? 'Fresh-cross gate locked: waiting for a completed close below the original breakout level, then a later close above it.' : this.now() - candle.end > 90_000 ? 'Candle too old for a new entry.' : 'Completed close did not meet the entry rule.' }
           session.decisionAudit ??= []
           session.decisionAudit.push({ side, ...leg.lastDecision })
           leg.lastCandleEnd = candle.end; this.save()

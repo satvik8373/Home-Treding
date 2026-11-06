@@ -6,7 +6,7 @@ import { openIdentity } from '../shared/identity.ts'
 import { Store } from './store.ts'
 import { MStock } from './broker.ts'
 import { MarketFeed } from './feed.ts'
-import { Controller, hasExposure } from './controller.ts'
+import { Controller } from './controller.ts'
 import { createApp } from './http.ts'
 
 export interface Workspace {
@@ -94,12 +94,8 @@ export class Workspaces {
     this.closing = true
     await Promise.allSettled([...this.tasks.values()])
     const workspaces = [...this.values.values()]
-    for (const { controller } of workspaces) if (hasExposure(controller.session)) await controller.stop()
-    const deadline = Date.now() + 30_000
-    while (workspaces.some(({ controller }) => hasExposure(controller.session)) && Date.now() < deadline) {
-      await this.pump(); await new Promise(resolve => setTimeout(resolve, 500))
-    }
-    if (workspaces.some(({ controller }) => hasExposure(controller.session))) { this.closing = false; return false }
+    try { for (const { controller } of workspaces) await controller.checkpointForRestart() }
+    catch (error) { for (const { controller } of workspaces) controller.resumeAfterAbortedRestart(); this.closing = false; throw error }
     for (const workspace of workspaces) { workspace.feed.close(); workspace.store.close() }
     return true
   }

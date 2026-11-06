@@ -117,7 +117,7 @@ export function createApp(
   app.get('/api/setup/network', async (_req, res) => res.json(await setup.read()));
   app.post('/api/setup/network', (req, res) => res.json(setup.save(req.body)));
   app.get('/api/strategy/settings', (_req, res) => res.json({ saved: controller.strategySettings(), effective: controller.session?.settings ?? DEFAULT_SETTINGS, defaults: DEFAULT_SETTINGS }));
-  app.post('/api/strategy/settings', (req, res) => { const saved = controller.saveStrategySettings(req.body); repository.put('strategy:settings', saved); res.json({ saved, appliesTo: 'next session; current session rules remain locked' }); });
+  app.post('/api/strategy/settings', (req, res) => { const saved = controller.saveStrategySettings(req.body); repository.put('strategy:settings', saved); res.json({ saved, appliesTo: 'next trading day; today retains the same saved day-session' }); });
   app.get('/api/audit', async (_req, res) => res.json(await audit.read()));
   app.get('/api/audit/export', async (_req, res) => res.set('Content-Disposition', 'attachment; filename="009-account-audit.json"').json(await audit.read()));
   app.get('/api/broker/diagnostics', async (_req, res) => {

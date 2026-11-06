@@ -11,6 +11,7 @@ const rules = (settings: StrategySettings) => [
     "Reference",
     "Each option’s completed 09:15–09:20 close, locked for the day.",
   ],
+  ['Day continuity', 'Stop/Start, engine restarts and settings changes retain the same day-session, reference, trades and entry/reset state. Setting changes apply next trading day. A process restart checkpoints the running session; Stop & square off explicitly closes positions.'],
   [
     "Entry",
     `From 09:25: a new completed 5m close ≥ reference × ${(1 + settings.breakoutPercent / 100).toFixed(6)}. Buy ${settings.entryLots} lots when that enabled leg is flat.`,

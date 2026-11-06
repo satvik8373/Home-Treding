@@ -10,7 +10,7 @@ import {
 import { Store } from "./store.ts";
 import { MStock } from "./broker.ts";
 import { MarketFeed } from "./feed.ts";
-import { Controller, hasExposure } from "./controller.ts";
+import { Controller } from "./controller.ts";
 import { createApp } from "./http.ts";
 import { Workspaces } from './workspaces.ts';
 
@@ -63,31 +63,21 @@ server.on("error", (error) => {
   process.exit(1);
 });
 if (workspaces) await workspaces.restore(); else await controller!.restore();
-const timer = setInterval(() => void (workspaces ? workspaces.pump() : controller!.pump()), 1000);
+let timer = setInterval(() => void (workspaces ? workspaces.pump() : controller!.pump()), 1000);
 let shuttingDown = false;
 async function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
-  if (workspaces && !await workspaces.close()) { shuttingDown = false; return; }
-  if (controller && hasExposure(controller.session)) {
-    console.log(
-      "Stopping entries and closing strategy exposure before shutdown. Uncertain orders remain saved for reconciliation.",
-    );
-    await controller.stop();
-    const deadline = Date.now() + 30_000;
-    while (hasExposure(controller.session) && Date.now() < deadline) {
-      await controller.pump();
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-    if (hasExposure(controller.session)) {
-      console.error(
-        "Unresolved broker exposure remains. The engine will stay running; verify mStock and reconcile in the app.",
-      );
-      shuttingDown = false;
-      return;
-    }
-  }
   clearInterval(timer);
+  try {
+    if (workspaces) await workspaces.close();
+    else await controller!.checkpointForRestart();
+  } catch {
+    console.error('Restart checkpoint failed. Engine remains running; resolve storage before restarting.');
+    timer = setInterval(() => void (workspaces ? workspaces.pump() : controller!.pump()), 1000);
+    shuttingDown = false;
+    return;
+  }
   feed?.close();
   store?.close();
   server.close();

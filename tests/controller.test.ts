@@ -5,6 +5,10 @@ import { Controller } from '../server/controller.ts'
 import { BrokerError } from '../server/broker.ts'
 import { istTime } from '../server/time.ts'
 import { bar, contract, DAY, fixture } from './helpers.ts'
+import { Store } from '../server/store.ts'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 async function candle(f: Awaited<ReturnType<typeof fixture>>, time: string, ce = 101, pe = 99) {
   f.setTime(istTime(DAY, time) + 300_000 + 3000)
@@ -14,6 +18,96 @@ async function candle(f: Awaited<ReturnType<typeof fixture>>, time: string, ce =
   await f.controller.pump()
   for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve))
 }
+
+test('closing and reopening the SQLite store restores the exact running paper day-session', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'n009-resume-'))
+  const f = await fixture()
+  let disk = new Store(directory)
+  t.after(async () => { disk.close(); await rm(directory, { recursive: true, force: true }) })
+  disk.saveBroker(f.broker.credentials)
+  const controller = new Controller(f.broker, disk, f.feed, f.now)
+  await controller.restore(); await controller.start('paper')
+  for (let i = 0; i < 20; i++) await new Promise(resolve => setImmediate(resolve))
+  await candle({ ...f, controller }, '09:20')
+  const original = structuredClone(controller.session!)
+  await controller.checkpointForRestart(); disk.close()
+  disk = new Store(directory)
+  const restored = new Controller(f.broker, disk, f.feed, f.now)
+  await restored.restore()
+  assert.equal(restored.session!.id, original.id)
+  assert.deepEqual(restored.session!.legs, original.legs)
+  assert.deepEqual(restored.session!.trades, original.trades)
+  assert.deepEqual(restored.session!.settings, original.settings)
+  assert.equal(restored.session!.status, 'running')
+  assert.equal(f.broker.submitted.length, 0)
+  assert.equal(f.broker.cancellations.length, 0)
+})
+
+test('engine checkpoint and restart retain the running live position and original day state without forced orders', async () => {
+  const f = await fixture(); await f.start('live'); await candle(f, '09:20')
+  const before = structuredClone(f.controller.session!)
+  f.setTime(istTime(DAY, '09:36'))
+  const submitted = f.broker.submitted.length
+  await f.controller.checkpointForRestart()
+  await f.controller.pump()
+  assert.equal(f.store.saved!.status, 'running')
+  assert.equal(f.store.saved!.legs.CE!.position!.quantity, 195)
+  assert.equal(f.broker.submitted.length, submitted)
+  assert.equal(f.broker.cancellations.length, 0)
+  const restarted = new Controller(f.broker, f.store, f.feed, f.now)
+  await restarted.restore()
+  assert.equal(restarted.session!.id, before.id)
+  assert.equal(restarted.session!.status, 'running')
+  assert.deepEqual(restarted.session!.legs.CE, before.legs.CE)
+  assert.deepEqual(restarted.session!.trades, before.trades)
+  assert.deepEqual(restarted.session!.settings, before.settings)
+  assert.equal(f.broker.submitted.length, submitted)
+})
+
+test('a late first start consumes historical breakouts and requires a new below-then-above crossing', async () => {
+  const f = await fixture(); f.setTime(istTime(DAY, '10:40'))
+  f.broker.candles.set('101', [bar('09:15'), bar('09:20', 101), bar('10:35', 200)])
+  await f.start('paper')
+  const id = f.controller.session!.id, reference = structuredClone(f.controller.session!.legs.CE!.reference)
+  assert.equal(f.controller.session!.legs.CE!.firstSignalConsumed, true)
+  await candle(f, '10:40', 200)
+  assert.equal(f.controller.session!.trades.length, 0)
+  await candle(f, '10:45', 99)
+  await candle(f, '10:50', 101)
+  assert.equal(f.controller.session!.trades.filter(trade => trade.side === 'CE' && trade.transaction === 'BUY').length, 1)
+  assert.deepEqual(f.controller.session!.legs.CE!.reference, reference)
+  assert.equal(f.controller.session!.id, id)
+})
+
+test('missing fresh price at a breakout cannot turn the next above-level candle into a new first entry', async () => {
+  const f = await fixture(); await f.start('paper')
+  f.setTime(istTime(DAY, '09:25') + 3000)
+  f.broker.candles.set('101', [bar('09:15'), bar('09:20', 150)])
+  f.broker.candles.set('102', [bar('09:15'), bar('09:20', 99)])
+  await f.controller.pump()
+  for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve))
+  assert.equal(f.controller.session!.trades.length, 0)
+  assert.equal(f.controller.session!.legs.CE!.firstSignalConsumed, true)
+  await candle(f, '09:25', 160)
+  assert.equal(f.controller.session!.trades.length, 0)
+  await candle(f, '09:30', 99)
+  await candle(f, '09:35', 101)
+  assert.equal(f.controller.session!.trades.filter(trade => trade.transaction === 'BUY').length, 1)
+})
+
+test('saved preference changes first apply when explicitly starting the next trading day', async () => {
+  const f = await fixture(); await f.start('paper')
+  const id = f.controller.session!.id
+  f.controller.saveStrategySettings({ ...DEFAULT_SETTINGS, entryLots: 4, target1Lots: 2 })
+  await f.controller.stop(); await f.controller.pump()
+  f.setTime(istTime(DAY, '09:20') + 86400000 + 1000)
+  f.broker.credentials!.expiresAt = f.now() + 86400000
+  f.broker.history = async () => [{ ...bar('09:15'), start: bar('09:15').start + 86400000, end: bar('09:15').end + 86400000 }]
+  await f.start('paper')
+  assert.notEqual(f.controller.session!.id, id)
+  assert.equal(f.controller.session!.settings!.entryLots, 4)
+  assert.equal(f.controller.session!.legs.CE!.entries, 0)
+})
 
 test('25-point stop exits Paper and Live positions on a fresh price without another candle close', async () => {
   for (const mode of ['paper', 'live'] as const) {
@@ -222,7 +316,7 @@ test('external closure pauses entries and never opens a short with an extra SELL
   assert.equal(f.controller.session!.legs.CE!.position, null)
   assert.equal(f.broker.submitted.length, 1)
 })
-test('restart reconciles a durable pending fill and exits recovered exposure without another BUY', async () => {
+test('restart reconciles a durable pending fill and resumes the same position without another BUY or forced SELL', async () => {
   const f = await fixture(); await f.start()
   f.broker.plans.push({ pending: true }); await candle(f, '09:20')
   const pending = f.store.saved!.pending!
@@ -231,7 +325,10 @@ test('restart reconciles a durable pending fill and exits recovered exposure wit
   await restarted.restore()
   for (let i = 0; i < 5; i++) { await new Promise(resolve => setImmediate(resolve)); await restarted.pump() }
   assert.equal(f.broker.submitted.filter(o => o.transaction === 'BUY').length, 1)
-  assert.equal(restarted.session!.legs.CE!.position, null)
+  assert.equal(restarted.session!.legs.CE!.position!.quantity, 195)
+  assert.equal(restarted.session!.pending, null)
+  assert.equal(restarted.session!.id, f.store.saved!.id)
+  assert.equal(f.broker.submitted.filter(o => o.transaction === 'SELL').length, 0)
 })
 
 test('a slow chart endpoint cannot hold the order queue or prevent Stop', async () => {
