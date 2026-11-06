@@ -1,6 +1,6 @@
 import { Download } from "lucide-react";
 import type { Trade } from "../../shared/model";
-import { clock, money, price } from "../lib/format";
+import { dateTime, money, price } from "../lib/format";
 
 export function TradesPanel({ trades }: { trades: Trade[] }) {
   return (
@@ -11,8 +11,9 @@ export function TradesPanel({ trades }: { trades: Trade[] }) {
         </h2>
         <a className="text-button" href="/api/trades.csv">
           <Download size={14} />
-          Export
+          Trades CSV
         </a>
+        <a className="text-button" href="/api/orders.csv"><Download size={14} />Orders CSV</a>
       </div>
       {trades.length ? (
         <div className="trade-scroll">
@@ -20,7 +21,7 @@ export function TradesPanel({ trades }: { trades: Trade[] }) {
             <thead>
               <tr>
                 {[
-                  "Time IST",
+                  "Date / time IST",
                   "Contract",
                   "Action",
                   "Qty",
@@ -37,7 +38,7 @@ export function TradesPanel({ trades }: { trades: Trade[] }) {
             <tbody>
               {[...trades].reverse().map((t) => (
                 <tr key={t.id}>
-                  <td>{clock(t.at, true)}</td>
+                  <td>{dateTime(t.at)}</td>
                   <td className="contract-cell">{t.symbol}</td>
                   <td>
                     <span

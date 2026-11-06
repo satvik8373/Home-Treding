@@ -1,4 +1,5 @@
 import express from "express";
+import { tradesReport, ordersReport, backtestTradesReport, backtestDaysReport } from "./reports.ts";
 import type { ErrorRequestHandler } from "express";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -178,56 +179,14 @@ export function createApp(
       )
       .json(saved);
   });
-  app.get("/api/backtest/jobs/:id/trades.csv", (req, res) => {
-    const job = backtests.job(String(req.params.id));
-    if (!job.result)
-      return res
-        .status(409)
-        .json({ error: "Wait for the backtest to complete." });
-    const cell = (value: unknown) =>
-      `"${String(value ?? "")
-        .replaceAll('"', '""')
-        .replace(/^[=+@-]/, "'$&")}"`;
-    const columns = [
-      "time_utc",
-      "side",
-      "symbol",
-      "transaction",
-      "quantity",
-      "price",
-      "reason",
-      "fee",
-      "gross_pnl",
-      "cycle_id",
-      "timing",
-    ];
-    const rows = job.result.days
-      .flatMap((day) => day.fills)
-      .sort((a, b) => a.at - b.at)
-      .map((fill) =>
-        [
-          new Date(fill.at).toISOString(),
-          fill.side,
-          fill.symbol,
-          fill.transaction,
-          fill.quantity,
-          fill.price,
-          fill.reason,
-          fill.fee,
-          fill.grossPnl,
-          fill.cycleId,
-          fill.timing,
-        ]
-          .map(cell)
-          .join(","),
-      );
-    res
-      .set({
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": 'attachment; filename="009-backtest-trades.csv"',
-      })
-      .send([columns.join(","), ...rows].join("\r\n"));
-  });
+  for (const kind of ['trades', 'daily'] as const) {
+    app.get(`/api/backtest/jobs/:id/${kind}.csv`, (req, res) => {
+      const job = backtests.job(String(req.params.id));
+      if (!job.result) return res.status(409).json({ error: 'Wait for the backtest to complete.' });
+      const report = kind === 'trades' ? backtestTradesReport(job.result, job.id) : backtestDaysReport(job.result);
+      res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${report.filename}"` }).send(report.body);
+    });
+  }
   app.get("/api/backtest/archive/:date", (req, res) => {
     const saved = backtests.archive(String(req.params.date));
     if (!saved)
@@ -329,32 +288,12 @@ export function createApp(
     await controller.reconcile();
     res.json({ ok: true });
   });
-  app.get("/api/trades.csv", (_req, res) => {
-    const cell = (value: unknown) =>
-      `"${String(value ?? "")
-        .replaceAll('"', '""')
-        .replace(/^[=+@-]/, "'$&")}"`;
-    const columns = [
-      "at",
-      "side",
-      "symbol",
-      "transaction",
-      "quantity",
-      "price",
-      "reason",
-      "orderId",
-      "mode",
-      "pnl",
-    ] as const;
-    const rows = (controller.session?.trades ?? []).map((t) =>
-      columns.map((key) => cell(t[key])).join(","),
-    );
-    res.set({
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="009-trades.csv"',
+  for (const kind of ['trades', 'orders'] as const) {
+    app.get(`/api/${kind}.csv`, (_req, res) => {
+      const report = kind === 'trades' ? tradesReport(controller.session) : ordersReport(controller.session);
+      res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${report.filename}"` }).send(report.body);
     });
-    res.send([columns.join(","), ...rows].join("\r\n"));
-  });
+  }
   const dist = join(root, "dist");
   if (existsSync(dist)) {
     app.use(express.static(dist));

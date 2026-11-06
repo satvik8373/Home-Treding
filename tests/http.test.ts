@@ -156,6 +156,9 @@ test("backtest HTTP imports full sessions, exports pinned data and fills, and le
   const csv = await fetch(`${root}/api/backtest/jobs/${job.id}/trades.csv`);
   assert.equal(csv.status, 200);
   assert.match(await csv.text(), /BREAKOUT/);
+  const daily = await fetch(`${root}/api/backtest/jobs/${job.id}/daily.csv`);
+  assert.equal(daily.status, 200);
+  assert.match(await daily.text(), /gross_realized_pnl_inr/);
   assert.equal(
     (await post("import", { ...data, spotReferenceClose: 26000 })).status,
     200,
