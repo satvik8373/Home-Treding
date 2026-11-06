@@ -36,7 +36,7 @@ export function targetSignal(leg: Leg, price: number, settings: StrategySettings
 }
 export function stopLossSignal(leg: Leg, price: number, settings: StrategySettings = DEFAULT_SETTINGS): 'STOP_LOSS' | null {
   return leg.position && Number.isFinite(price) && price > 0 && (settings.stopLossPoints ?? 0) > 0
-    && price <= money(leg.position.average - settings.stopLossPoints!) ? 'STOP_LOSS' : null
+    && price <= money(leg.reference.close - settings.stopLossPoints!) ? 'STOP_LOSS' : null
 }
 export function priceExitSignal(leg: Leg, price: number, settings: StrategySettings = DEFAULT_SETTINGS): 'STOP_LOSS' | 'TARGET_1' | 'TARGET_2' | null {
   return stopLossSignal(leg, price, settings) ?? targetSignal(leg, price, settings)

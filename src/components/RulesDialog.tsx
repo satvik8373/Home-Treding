@@ -23,7 +23,7 @@ const rules = (settings: StrategySettings) => [
     "Lower exit",
     `A completed 5m close < reference × ${(1 - settings.exitPercent / 100).toFixed(6)} exits the remaining quantity.`,
   ],
-  ['Immediate stop', (settings.stopLossPoints ?? 0) > 0 ? `A fresh option price at or below actual entry average − ₹${settings.stopLossPoints} triggers a MARKET exit of all remaining units without waiting for candle close. It remains based on the same entry average after target 1. The candle-close lower exit also remains active. Actual fills can differ from the trigger price.` : 'Disabled for this rule snapshot. The existing candle-close lower exit remains active.'],
+  ['Reference stop', (settings.stopLossPoints ?? 0) > 0 ? `A fresh option price at or below the fixed 09:15–09:20 option reference close − ₹${settings.stopLossPoints} triggers a MARKET exit of all remaining units without waiting for candle close. The stop stays fixed through targets and re-entries; entry prices do not change it. The candle-close lower exit also remains active. Actual fills can differ from the trigger price.` : 'Disabled for this rule snapshot. The existing candle-close lower exit remains active.'],
   [
     "Re-entry",
     `After a full exit, a completed 5m candle must close below the original buy level. A later candle must close strictly above that same level before another BUY. The morning reference never changes. ${settings.maxEntriesPerLeg ? `Maximum ${settings.maxEntriesPerLeg} entries per leg.` : 'No configured entry-count cap.'}`,

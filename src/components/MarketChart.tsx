@@ -235,7 +235,7 @@ export function MarketChart({
         { value: average, label: "Avg fill", color: "#6c7489" },
         ...(settings.target1Lots ? [{ value: average + settings.target1Points, label: target1Remaining ? "T1" : "T1 filled", color: "#598269" }] : []),
         { value: average + settings.target2Points, label: "T2", color: "#598269" },
-        ...((settings.stopLossPoints ?? 0) > 0 && average > settings.stopLossPoints! ? [{ value: average - settings.stopLossPoints!, label: 'Price stop', color: '#ad6b63' }] : []),
+        ...((settings.stopLossPoints ?? 0) > 0 && referenceClose > settings.stopLossPoints! ? [{ value: referenceClose - settings.stopLossPoints!, label: 'Reference stop', color: '#ad6b63' }] : []),
       );
     levels.current = lines.map((line) =>
       s.createPriceLine({

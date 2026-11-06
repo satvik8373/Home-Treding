@@ -20,10 +20,10 @@ test('25-point stop exits Paper and Live positions on a fresh price without anot
     const f = await fixture()
     f.controller.saveStrategySettings({ ...DEFAULT_SETTINGS, enabledSides: ['CE'] })
     await f.start(mode); await candle(f, '09:20')
-    const leg = f.controller.session!.legs.CE!, average = leg.position!.average
-    f.setTime(f.now() + 1000); f.mark('CE', average - 24.95); await f.controller.pump()
+    const leg = f.controller.session!.legs.CE!, stop = leg.reference.close - 25
+    f.setTime(f.now() + 1000); f.mark('CE', stop + 0.05); await f.controller.pump()
     assert.equal(leg.position!.quantity, 260)
-    f.mark('CE', average - 25); await f.controller.pump()
+    f.mark('CE', stop); await f.controller.pump()
     assert.equal(leg.position, null)
     assert.equal(f.controller.session!.trades.at(-1)!.reason, 'STOP_LOSS')
     assert.equal(f.controller.session!.trades.at(-1)!.quantity, 260)
@@ -38,7 +38,7 @@ test('stale prices cannot trigger the immediate stop and a fresh touch remains l
   const f = await fixture()
   f.controller.saveStrategySettings({ ...DEFAULT_SETTINGS, enabledSides: ['CE'] })
   await f.start('paper'); await candle(f, '09:20')
-  const leg = f.controller.session!.legs.CE!, stop = leg.position!.average - 25
+  const leg = f.controller.session!.legs.CE!, stop = leg.reference.close - 25
   f.controller.marks['101'] = { token: '101', price: stop, source: 'websocket', receivedAt: f.now() - 6000 }
   await f.controller.pump(); assert.notEqual(leg.position, null)
   f.controller.busy = true
@@ -59,7 +59,7 @@ test('a stop during a pending target waits for confirmation and then sells only 
   f.mark('CE', average + 20); await f.controller.pump()
   const pending = f.controller.session!.pending!
   assert.equal(pending.reason, 'TARGET_1')
-  f.feed.onMark({ token: '101', price: average - 25, source: 'websocket', receivedAt: f.now() })
+  f.feed.onMark({ token: '101', price: leg.reference.close - 25, source: 'websocket', receivedAt: f.now() })
   assert.equal(leg.exitReason, 'STOP_LOSS')
   assert.equal(f.broker.submitted.length, 2, 'no overlapping stop order while target acknowledgement is unresolved')
   f.broker.rows.get(pending.orderId!)!.fill = { orderId: pending.orderId!, quantity: 130, average: average + 20, status: 'COMPLETE' }

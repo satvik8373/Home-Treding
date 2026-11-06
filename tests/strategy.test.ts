@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { applyFill, candleSignal, levels, observeReentry, orderQuantity, targetSignal } from '../server/strategy.ts'
+import { applyFill, candleSignal, levels, observeReentry, orderQuantity, stopLossSignal, targetSignal } from '../server/strategy.ts'
 import { bar, contract, DAY } from './helpers.ts'
 import type { Leg, OrderIntent, TradingSession } from '../shared/model.ts'
 import { istTime } from '../server/time.ts'
@@ -10,6 +10,18 @@ const leg = (): Leg => ({ contract: contract('CE'), reference: bar('09:15'), ...
 const session = (): TradingSession => ({ id: 'test', date: DAY, mode: 'live', account: 'test', status: 'running', message: '',
   atm: 25000, expiry: '2026-10-27', legs: { CE: leg() }, pending: null, pnlVerified: true, trades: [], activity: [] })
 const intent = (transaction: 'BUY' | 'SELL', quantity = 195, reason: OrderIntent['reason'] = 'BREAKOUT'): OrderIntent => ({ id: crypto.randomUUID(), tag: 'test', side: 'CE', symbol: 'NIFTY-TEST-CE', transaction, quantity, reason, submittedAt: 0 })
+
+test('25-point stop is always opening reference minus 25, independent of entry average and target fills', () => {
+  const l = leg()
+  l.reference = { ...bar('09:15', 163.55), high: 163.55 }
+  l.position = { quantity: 260, entryQuantity: 260, target1Remaining: 130, average: 233.80 }
+  assert.equal(stopLossSignal(l, 208.80), null, 'entry minus 25 must not trigger the reference stop')
+  assert.equal(stopLossSignal(l, 138.60), null)
+  assert.equal(stopLossSignal(l, 138.55), 'STOP_LOSS')
+  l.position.quantity = 130; l.position.target1Remaining = 0; l.position.average = 300
+  assert.equal(stopLossSignal(l, 138.60), null)
+  assert.equal(stopLossSignal(l, 138.55), 'STOP_LOSS', 'target or changed re-entry average cannot move the fixed stop')
+})
 
 test('09:50 regression: staying above the original 163.70 level cannot buy again after full target exit', () => {
   const l = leg()

@@ -40,6 +40,11 @@ function input(ce: number[][], pe?: number[][]): BacktestDataset {
 const reference = [100, 110, 90, 100],
   signal = [100, 110, 99, 101];
 const next = [100, 110, 99, 105];
+test('backtest premium stop uses the original reference rather than a higher execution price', () => {
+  const result = replay(input([reference, signal, [200, 210, 180, 201], [180, 185, 160, 180], [90, 95, 70, 80]]), { slippagePoints: 0, feePerOrder: 0 })
+  assert.deepEqual(result.fills.map(fill => [fill.reason, fill.price]), [['BREAKOUT', 200], ['STOP_LOSS', 75]])
+  assert.equal(result.reference.CE.close, 100)
+})
 test('premium stop uses gap-open prices and assumes stop first for ambiguous intrabar stop/target touches', () => {
   const config = { slippagePoints: 0, feePerOrder: 0 }
   const gap = replay(input([reference, signal, next, [60, 65, 55, 62]]), config)

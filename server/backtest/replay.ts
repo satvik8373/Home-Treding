@@ -4,7 +4,7 @@ import { RULES } from '../../shared/model.ts'
 import { istTime } from '../time.ts'
 import { DEFAULT_SETTINGS } from '../../shared/settings.ts'
 
-export const ENGINE = 'nifty-009-ohlc-v4'
+export const ENGINE = 'nifty-009-ohlc-v5'
 const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
 const sides: Side[] = ['CE', 'PE']
 export const ASSUMPTIONS = [
@@ -15,7 +15,7 @@ export const ASSUMPTIONS = [
   'Costs are a fixed estimate per simulated order. Zero costs exclude brokerage and taxes. Drawdown uses synchronized candle-close marks, not the unknown intrabar path.',
   'Imported contracts are user-supplied. Missing option data is never replaced by NIFTY spot prices or current expiry contracts.',
   'References stay fixed all day. After a full exit, re-entry requires a completed close below the original upper level followed by a later close strictly above it. An intrabar-unknown exit cannot use that same bar as its reset.',
-  'When enabled, the premium stop exits at entry average minus the configured points. Gaps fill at the observed open with slippage. After open-price targets, ambiguous intrabar stop/target touches assume stop first; OHLC cannot establish tick order.',
+  'When enabled, the premium stop exits at the fixed 09:15–09:20 option reference close minus the configured points. Gaps fill at the observed open with slippage. After open-price targets, ambiguous intrabar stop/target touches assume stop first; OHLC cannot establish tick order.',
 ]
 type Position = { average: number; quantity: number; firstTarget: boolean; cycle: BacktestCycle }
 
@@ -78,7 +78,7 @@ export function replay(data: BacktestDataset, config: BacktestOptions): Backtest
       const bar = bars[side]
       if (pending[side]) { execute(side, pending[side]!, bar.open, bar.start, 'next-open'); delete pending[side] }
       const openingPosition = positions[side]
-      if (openingPosition && (settings.stopLossPoints ?? 0) > 0 && bar.open <= round(openingPosition.average - settings.stopLossPoints!)) execute(side, 'STOP_LOSS', bar.open, bar.start, 'gap-open')
+      if (openingPosition && (settings.stopLossPoints ?? 0) > 0 && bar.open <= round(reference[side].close - settings.stopLossPoints!)) execute(side, 'STOP_LOSS', bar.open, bar.start, 'gap-open')
       // Known open-price target fills precede unknown intrabar movement.
       for (const target of ['TARGET_1', 'TARGET_2'] as const) {
         const p = positions[side]
@@ -88,7 +88,7 @@ export function replay(data: BacktestDataset, config: BacktestOptions): Backtest
       }
       const remaining = positions[side]
       if (remaining && (settings.stopLossPoints ?? 0) > 0) {
-        const stop = round(remaining.average - settings.stopLossPoints!)
+        const stop = round(reference[side].close - settings.stopLossPoints!)
         if (bar.low <= stop) execute(side, 'STOP_LOSS', stop, bar.end, 'intrabar-unknown')
       }
       for (const target of ['TARGET_1', 'TARGET_2'] as const) {
