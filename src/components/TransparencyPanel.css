@@ -24,3 +24,8 @@
 .settings-legs label { display: inline-flex; align-items: center; gap: 7px; margin: 8px 16px 0 0; }
 @media(max-width:850px) { .audit-leg-grid { grid-template-columns: 1fr; } .audit-metrics { grid-template-columns: 1fr 1fr; } }
 @media(max-width:500px) { .settings-fields { grid-template-columns: 1fr; } .audit-facts > div { flex-direction: column; gap: 6px; } .audit-facts dd { text-align: left; } }
+
+.target-settings { min-width: 0; border: 1px solid #e2e8f0; border-radius: 5px; padding: 12px; background: #fff; }
+.target-settings legend { font-size: 12px; font-weight: 600; color: #334155; }
+.target-settings .field + .field { margin-top: 12px; }
+.target-settings select { width: 100%; min-height: 38px; margin-top: 8px; padding: 8px; border: 1px solid #e2e8f0; border-radius: 4px; background: #fff; color: #0f172a; font: inherit; }

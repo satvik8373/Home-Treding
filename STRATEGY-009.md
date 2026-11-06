@@ -12,3 +12,11 @@
 - **Cutoff:** **15:10 IST** par new entries stop aur dono legs square off karo.
 
 CE/PE independently run karenge; dono open ho sakte hain. Entry/Lower exit completed candle CLOSE par, targets fresh live prices par evaluate honge. Actual broker lot size aur confirmed fills use karo; duplicate orders mat bhejo.
+
+## Selectable target rules
+
+Default T1/T2 remain entry +20/+40 premium points, selling 2+2 of the 4 bought lots. Settings let each target independently select points above actual entry, percentage above actual entry, fixed option premium, whole minutes after original entry, or a fixed IST clock. T1 sells its configured lots (0 skips T1); T2 sells all remaining units after T1 completes. Mixed types are supported; T2 never bypasses a pending T1. For matching types, T2 must be above/later than T1.
+
+Time exits are scheduled exits regardless of profit or loss. Both minute deadlines count from the original confirmed entry timestamp, including after partial exits and process recovery. A clock deadline already passed becomes due after entry. Fresh market data is still required; broker confirmation, latency and outages can delay execution. The reference stop, completed-candle lower exit, explicit Stop and square-off remain active. Changes apply next trading day, while new backtests use saved preferences.
+
+OHLC backtests execute time targets at the first available five-minute candle open at/after the deadline (timing `scheduled-open`), not an invented exact-minute price. Intrabar price targets remain proxies. Reports and chart levels follow the selected target type; time rules do not draw fake horizontal price targets.

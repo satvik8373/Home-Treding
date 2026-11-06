@@ -1,3 +1,4 @@
+import { targetPrice, targetDeadline, targetLabel } from '../shared/targets.ts'
 import type { TradingSession } from '../shared/model.ts'
 import type { BacktestReport } from '../shared/backtest.ts'
 import { settingsFor } from '../shared/settings.ts'
@@ -22,7 +23,7 @@ export function csvRows(columns: string[], rows: Row[]): string {
   return '\ufeff' + [columns.map(csvCell).join(','), ...rows.map(row => columns.map(key => csvCell(row[key])).join(','))].join('\r\n') + '\r\n'
 }
 const timeColumns = (prefix: string) => ['date_ist', 'time_ist', 'datetime_ist', 'time_utc'].map(key => `${prefix}_${key}`)
-const commonColumns = [...timeColumns('fill'), 'timezone', 'timestamp_basis', 'session_date', 'mode', 'side', 'symbol', 'transaction', 'quantity_units', 'lot_size_units', 'lots', 'fill_price_inr', 'premium_value_inr', 'premium_cash_flow_inr', 'reason', 'order_id', 'trade_id', 'cycle_id', 'entry_datetime_ist', 'entry_price_inr', 'remaining_cycle_units', 'cycle_match', 'reference_close_inr', 'breakout_level_inr', 'lower_exit_level_inr', 'reference_stop_inr', 'target1_price_inr', 'target2_price_inr', 'realized_gross_pnl_inr', 'cumulative_realized_gross_pnl_inr', 'actual_broker_charges_inr', 'estimated_fee_inr', 'cumulative_pnl_after_estimated_fees_inr', 'pnl_verified', 'session_id', 'exported_datetime_ist', 'report_scope', 'cost_note', 'strategy_settings_json']
+const commonColumns = [...timeColumns('fill'), 'timezone', 'timestamp_basis', 'session_date', 'mode', 'side', 'symbol', 'transaction', 'quantity_units', 'lot_size_units', 'lots', 'fill_price_inr', 'premium_value_inr', 'premium_cash_flow_inr', 'reason', 'order_id', 'trade_id', 'cycle_id', 'entry_datetime_ist', 'entry_price_inr', 'remaining_cycle_units', 'cycle_match', 'reference_close_inr', 'breakout_level_inr', 'lower_exit_level_inr', 'reference_stop_inr', 'target1_price_inr', 'target2_price_inr', 'target1_rule', 'target2_rule', 'target1_deadline_ist', 'target2_deadline_ist', 'realized_gross_pnl_inr', 'cumulative_realized_gross_pnl_inr', 'actual_broker_charges_inr', 'estimated_fee_inr', 'cumulative_pnl_after_estimated_fees_inr', 'pnl_verified', 'session_id', 'exported_datetime_ist', 'report_scope', 'cost_note', 'strategy_settings_json']
 
 export function tradesReport(session: TradingSession | null, exportedAt = Date.now()) {
   const settings = settingsFor(session), rows: Row[] = []
@@ -48,7 +49,10 @@ export function tradesReport(session: TradingSession | null, exportedAt = Date.n
       entry_datetime_ist: cycle?.valid ? istFields(cycle.at).fill_datetime_ist : null, entry_price_inr: cycle?.valid ? cycle.price : null, remaining_cycle_units: cycle?.remaining,
       cycle_match: matched && cycle?.valid ? 'MATCHED' : 'UNMATCHED_OR_OVERLAPPING_HISTORY', reference_close_inr: leg?.reference.close, breakout_level_inr: leg?.upper, lower_exit_level_inr: leg?.lower,
       reference_stop_inr: leg && (settings.stopLossPoints ?? 0) > 0 ? rounded(leg.reference.close - settings.stopLossPoints!) : null,
-      target1_price_inr: cycle && settings.target1Lots > 0 ? rounded(cycle.price + settings.target1Points) : null, target2_price_inr: cycle ? rounded(cycle.price + settings.target2Points) : null,
+      target1_price_inr: cycle && settings.target1Lots > 0 ? targetPrice(settings, 1, cycle.price) : null, target2_price_inr: cycle ? targetPrice(settings, 2, cycle.price) : null,
+      target1_rule: targetLabel(settings, 1), target2_rule: targetLabel(settings, 2),
+      target1_deadline_ist: cycle && session && settings.target1Lots ? istFields(targetDeadline(settings, 1, cycle.at, session.date)).fill_datetime_ist : null,
+      target2_deadline_ist: cycle && session ? istFields(targetDeadline(settings, 2, cycle.at, session.date)).fill_datetime_ist : null,
       realized_gross_pnl_inr: trade.pnl, cumulative_realized_gross_pnl_inr: realized, actual_broker_charges_inr: null,
       estimated_fee_inr: settings.feePerOrderEstimate, cumulative_pnl_after_estimated_fees_inr: rounded(realized - estimated),
       pnl_verified: session?.pnlVerified, session_id: session?.id, exported_datetime_ist: istFields(exportedAt).fill_datetime_ist,
@@ -89,7 +93,10 @@ export function backtestTradesReport(report: BacktestReport, jobId: string, expo
         entry_datetime_ist: cycle ? istFields(cycle.entryAt).fill_datetime_ist : null, entry_price_inr: cycle?.entryPrice, remaining_cycle_units: remaining,
         cycle_match: cycle && remaining >= 0 ? 'MATCHED' : 'UNMATCHED_HISTORY', reference_close_inr: reference.close, breakout_level_inr: reference.upper, lower_exit_level_inr: reference.lower,
         reference_stop_inr: (settings.stopLossPoints ?? 0) > 0 ? rounded(reference.close - settings.stopLossPoints!) : null,
-        target1_price_inr: cycle && settings.target1Lots > 0 ? rounded(cycle.entryPrice + settings.target1Points) : null, target2_price_inr: cycle ? rounded(cycle.entryPrice + settings.target2Points) : null,
+        target1_price_inr: cycle && settings.target1Lots > 0 ? targetPrice(settings, 1, cycle.entryPrice) : null, target2_price_inr: cycle ? targetPrice(settings, 2, cycle.entryPrice) : null,
+        target1_rule: targetLabel(settings, 1), target2_rule: targetLabel(settings, 2),
+        target1_deadline_ist: cycle && settings.target1Lots ? istFields(targetDeadline(settings, 1, cycle.entryAt, day.date)).fill_datetime_ist : null,
+        target2_deadline_ist: cycle ? istFields(targetDeadline(settings, 2, cycle.entryAt, day.date)).fill_datetime_ist : null,
         realized_gross_pnl_inr: fill.grossPnl, cumulative_realized_gross_pnl_inr: realized, actual_broker_charges_inr: null, estimated_fee_inr: fill.fee,
         cumulative_pnl_after_estimated_fees_inr: rounded(realized - fees), exported_datetime_ist: istFields(exportedAt).fill_datetime_ist,
         report_scope: 'Simulated OHLC backtest fills only', cost_note: 'Assumed fees only; actual brokerage/taxes not verified.', strategy_settings_json: JSON.stringify(settings), timing_model: fill.timing,

@@ -28,7 +28,7 @@ export interface BacktestFill {
   reason: Reason;
   fee: number;
   grossPnl: number | null;
-  timing?: 'next-open' | 'gap-open' | 'intrabar-unknown' | 'cutoff-open';
+  timing?: 'next-open' | 'gap-open' | 'intrabar-unknown' | 'cutoff-open' | 'scheduled-open';
 }
 export interface BacktestCycle {
   id: string;

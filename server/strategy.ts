@@ -1,3 +1,5 @@
+import { targetPrice, targetDeadline } from '../shared/targets.ts'
+import { istDate } from './time.ts'
 import type { Candle, Fill, Leg, OrderIntent, Reason, TradingSession } from '../shared/model.ts'
 import { RULES } from '../shared/model.ts'
 import { FIVE_MINUTES, istTime } from './time.ts'
@@ -30,18 +32,20 @@ export function candleSignal(leg: Leg, candle: Candle, now: number, day: string,
     && now - candle.end <= 90_000 && (leg.entries === 0 && !leg.firstSignalConsumed ? candle.close >= leg.upper : leg.reentryReady === true && candle.close > leg.upper)) return 'BREAKOUT'
   return null
 }
-export function targetSignal(leg: Leg, price: number, settings: StrategySettings = DEFAULT_SETTINGS): 'TARGET_1' | 'TARGET_2' | null {
+export function targetSignal(leg: Leg, price: number, settings: StrategySettings = DEFAULT_SETTINGS, now = Date.now()): 'TARGET_1' | 'TARGET_2' | null {
   if (!leg.position || !Number.isFinite(price) || price <= 0) return null
-  if (leg.position.target1Remaining > 0 && price >= money(leg.position.average + settings.target1Points)) return 'TARGET_1'
-  if (leg.position.target1Remaining === 0 && price >= money(leg.position.average + settings.target2Points)) return 'TARGET_2'
+  const target = leg.position.target1Remaining > 0 ? 1 : 2
+  const level = targetPrice(settings, target, leg.position.average)
+  const deadline = targetDeadline(settings, target, leg.position.entryAt, istDate(now))
+  if (level != null ? price >= level : deadline != null && now >= deadline) return target === 1 ? 'TARGET_1' : 'TARGET_2'
   return null
 }
 export function stopLossSignal(leg: Leg, price: number, settings: StrategySettings = DEFAULT_SETTINGS): 'STOP_LOSS' | null {
   return leg.position && Number.isFinite(price) && price > 0 && (settings.stopLossPoints ?? 0) > 0
     && price <= money(leg.reference.close - settings.stopLossPoints!) ? 'STOP_LOSS' : null
 }
-export function priceExitSignal(leg: Leg, price: number, settings: StrategySettings = DEFAULT_SETTINGS): 'STOP_LOSS' | 'TARGET_1' | 'TARGET_2' | null {
-  return stopLossSignal(leg, price, settings) ?? targetSignal(leg, price, settings)
+export function priceExitSignal(leg: Leg, price: number, settings: StrategySettings = DEFAULT_SETTINGS, now = Date.now()): 'STOP_LOSS' | 'TARGET_1' | 'TARGET_2' | null {
+  return stopLossSignal(leg, price, settings) ?? targetSignal(leg, price, settings, now)
 }
 export function orderQuantity(leg: Leg, reason: Reason, settings: StrategySettings = DEFAULT_SETTINGS): number {
   if (reason === 'BREAKOUT') return settings.entryLots * leg.contract.lotSize
@@ -56,7 +60,7 @@ export function applyFill(session: TradingSession, intent: OrderIntent, fill: Fi
   let pnl: number | null = null
   if (fill.quantity > 0 && intent.transaction === 'BUY') {
     if (leg.position) throw new Error('A confirmed BUY would overlap an existing strategy position.')
-    leg.position = { quantity: fill.quantity, average: fill.average, entryQuantity: fill.quantity,
+    leg.position = { entryAt: now, quantity: fill.quantity, average: fill.average, entryQuantity: fill.quantity,
       target1Remaining: Math.min(settingsFor(session).target1Lots * leg.contract.lotSize, fill.quantity) }
     leg.entries++
     leg.reentryReady = false

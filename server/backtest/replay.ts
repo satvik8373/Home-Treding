@@ -1,14 +1,16 @@
+import { targetPrice, targetDeadline } from '../../shared/targets.ts'
 import type { BacktestCycle, BacktestDataset, BacktestDay, BacktestOptions, BacktestReport, EquityPoint } from '../../shared/backtest.ts'
 import type { Reason, Side } from '../../shared/model.ts'
 import { RULES } from '../../shared/model.ts'
 import { istTime } from '../time.ts'
 import { DEFAULT_SETTINGS } from '../../shared/settings.ts'
 
-export const ENGINE = 'nifty-009-ohlc-v5'
+export const ENGINE = 'nifty-009-ohlc-v6'
 const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100
 const sides: Side[] = ['CE', 'PE']
 export const ASSUMPTIONS = [
   'Closed-candle entry and lower-close exit signals execute at the next available candle open. Signal-candle highs never fill a new position.',
+  'Time targets are sequential (T1 before T2), measured from the original entry or fixed IST clock. They execute at the first available five-minute candle open at/after the deadline, regardless of P&L; exact minute/tick execution is not modelled.',
   'Targets use observed opens for gaps and target-price proxies for intrabar touches, with adverse slippage. Intrabar timestamps are unknown and marked explicitly.',
   'The 15:10 square-off uses the 15:10 candle open. If that candle is unavailable, the session remains partial; no closing price is invented.',
   'CALL and PUT use independent positions, original session contracts and historical lot sizes. All simulated orders fill in full; liquidity, latency, margin and partial fills are not modelled.',
@@ -83,8 +85,10 @@ export function replay(data: BacktestDataset, config: BacktestOptions): Backtest
       for (const target of ['TARGET_1', 'TARGET_2'] as const) {
         const p = positions[side]
         if (!p || target === 'TARGET_1' && p.firstTarget || target === 'TARGET_2' && !p.firstTarget) continue
-        const level = round(p.average + (target === 'TARGET_1' ? settings.target1Points : settings.target2Points))
-        if (bar.open >= level) execute(side, target, bar.open, bar.start, 'gap-open')
+        const level = targetPrice(settings, target === 'TARGET_1' ? 1 : 2, p.average)
+        const deadline = targetDeadline(settings, target === 'TARGET_1' ? 1 : 2, p.cycle.entryAt, data.date)
+        if (deadline != null && bar.start >= deadline) execute(side, target, bar.open, bar.start, 'scheduled-open')
+        else if (level != null && bar.open >= level) execute(side, target, bar.open, bar.start, 'gap-open')
       }
       const remaining = positions[side]
       if (remaining && (settings.stopLossPoints ?? 0) > 0) {
@@ -94,8 +98,8 @@ export function replay(data: BacktestDataset, config: BacktestOptions): Backtest
       for (const target of ['TARGET_1', 'TARGET_2'] as const) {
         const p = positions[side]
         if (!p || target === 'TARGET_1' && p.firstTarget || target === 'TARGET_2' && !p.firstTarget) continue
-        const level = round(p.average + (target === 'TARGET_1' ? settings.target1Points : settings.target2Points))
-        if (bar.high >= level) execute(side, target, Math.max(bar.open, level), bar.open >= level ? bar.start : bar.end, bar.open >= level ? 'gap-open' : 'intrabar-unknown')
+        const level = targetPrice(settings, target === 'TARGET_1' ? 1 : 2, p.average)
+        if (level != null && bar.high >= level) execute(side, target, Math.max(bar.open, level), bar.open >= level ? bar.start : bar.end, bar.open >= level ? 'gap-open' : 'intrabar-unknown')
       }
       if (bar.end < cutoff && bar.end >= istTime(data.date, RULES.firstSignal)) {
         if (!positions[side] && entries[side] > 0 && lastExitAt[side] != null && bar.end > lastExitAt[side]! && bar.close < reference[side].upper) reentryReady[side] = true

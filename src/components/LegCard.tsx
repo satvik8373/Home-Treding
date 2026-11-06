@@ -1,3 +1,5 @@
+import { targetPrice, targetDeadline, targetLabel } from '../../shared/targets';
+import { clock } from '../lib/format';
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import type { Leg, Mark, Side } from "../../shared/model";
 import { freshMark } from "../../shared/market";
@@ -20,6 +22,13 @@ export function LegCard({
 }) {
   const fresh = freshMark(mark, now),
     position = leg?.position;
+  const targetDisplay = (target: 1 | 2) => {
+    if (!position || target === 1 && !settings.target1Lots) return '—'
+    const level = targetPrice(settings, target, position.average)
+    const day = new Date(now + 330 * 60_000).toISOString().slice(0, 10)
+    const deadline = targetDeadline(settings, target, position.entryAt, day)
+    return level != null ? price(level) : deadline != null ? `${clock(deadline, true)} IST` : targetLabel(settings, target)
+  }
   const pnl =
     position && fresh
       ? (mark.price - position.average) * position.quantity
@@ -74,11 +83,11 @@ export function LegCard({
         <div><dt>Reference stop</dt><dd>{position && (settings.stopLossPoints ?? 0) > 0 && leg!.reference.close > settings.stopLossPoints! ? price(leg!.reference.close - settings.stopLossPoints!) : '—'}</dd></div>
         <div>
           <dt>Target 1</dt>
-          <dd>{position && settings.target1Lots > 0 ? price(position.average + settings.target1Points) : "—"}</dd>
+          <dd>{targetDisplay(1)}</dd>
         </div>
         <div>
           <dt>Target 2</dt>
-          <dd>{position ? price(position.average + settings.target2Points) : "—"}</dd>
+          <dd>{targetDisplay(2)}</dd>
         </div>
       </dl>
       <div className="leg-footer">

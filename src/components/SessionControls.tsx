@@ -1,3 +1,4 @@
+import { targetLabel } from '../../shared/targets';
 import { BookOpen, Play, Square } from "lucide-react";
 import type { Mode, TradingSession } from "../../shared/model";
 import type { useDashboard } from "../hooks/useDashboard";
@@ -102,8 +103,8 @@ export function SessionControls({
             <dd>{settings.entryLots} lots · {settings.enabledSides.join(' + ')}</dd>
           </div>
           <div>
-            <dt>Profit targets</dt>
-            <dd>+₹{settings.target1Points} / +₹{settings.target2Points}</dd>
+            <dt>Target exits</dt>
+            <dd>{settings.target1Lots ? targetLabel(settings, 1) : 'T1 skipped'} / {targetLabel(settings, 2)}</dd>
           </div>
           <div>
             <dt>Square off</dt>

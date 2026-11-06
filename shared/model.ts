@@ -41,6 +41,7 @@ export interface Mark {
   source: "websocket" | "rest";
 }
 export interface Position {
+  entryAt?: number;
   quantity: number;
   average: number;
   target1Remaining: number;

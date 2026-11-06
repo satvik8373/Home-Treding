@@ -1,3 +1,4 @@
+import { targetLabel } from '../../shared/targets';
 import { Dialog } from "./Dialog";
 import { DEFAULT_SETTINGS } from '../../shared/settings';
 import type { StrategySettings } from '../../shared/settings';
@@ -18,7 +19,7 @@ const rules = (settings: StrategySettings) => [
   ],
   [
     "Targets",
-    `Fresh option prices trigger ${settings.target1Lots} lots at actual fill + ₹${settings.target1Points} (${settings.target1Lots ? 'first target enabled' : 'first target skipped'}), then all remaining units at fill + ₹${settings.target2Points}.`,
+    `T1: ${settings.target1Lots ? `${settings.target1Lots} lots at ${targetLabel(settings, 1)}` : 'skipped'}. T2: all remaining units at ${targetLabel(settings, 2)}, after T1 completes. Minutes count from the original entry, not from T1. Time exits run regardless of P&L; clock deadlines already passed become due after entry. Fresh market data and confirmed broker fills are required. Stop/lower exit and square-off retain priority.`,
   ],
   [
     "Lower exit",

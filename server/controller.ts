@@ -59,7 +59,7 @@ export class Controller {
         for (const side of SIDES) {
           const leg = this.session.legs[side]
           if (leg?.contract.token === mark.token) {
-            const exit = priceExitSignal(leg, mark.price, settingsFor(this.session))
+            const exit = priceExitSignal(leg, mark.price, settingsFor(this.session), this.now())
             if (exit && (!leg.exitReason || exit === 'STOP_LOSS' && ['TARGET_1', 'TARGET_2'].includes(leg.exitReason))) {
               leg.exitReason = exit; this.save()
             }
@@ -418,7 +418,7 @@ export class Controller {
         // Targets act on fresh prices. Never infer an executable fill from a past candle high.
         for (const side of SIDES) {
           const leg = session.legs[side]!, mark = this.fresh(side)
-          const priceReason = mark ? priceExitSignal(leg, mark.price, settingsFor(session)) : null
+          const priceReason = mark ? priceExitSignal(leg, mark.price, settingsFor(session), this.now()) : null
           const reason = priceReason === 'STOP_LOSS' && (!leg.exitReason || ['TARGET_1', 'TARGET_2'].includes(leg.exitReason)) ? priceReason : leg.exitReason || priceReason
           if (reason) {
             leg.exitReason = reason; this.save(); await this.submit(side, reason)
