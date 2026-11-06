@@ -71,6 +71,7 @@ export function LegCard({
           <dt>Avg fill</dt>
           <dd>{price(position?.average)}</dd>
         </div>
+        <div><dt>Immediate stop</dt><dd>{position && (settings.stopLossPoints ?? 0) > 0 && position.average > settings.stopLossPoints! ? price(position.average - settings.stopLossPoints!) : '—'}</dd></div>
         <div>
           <dt>Target 1</dt>
           <dd>{position && settings.target1Lots > 0 ? price(position.average + settings.target1Points) : "—"}</dd>

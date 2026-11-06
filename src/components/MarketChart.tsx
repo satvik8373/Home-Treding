@@ -235,6 +235,7 @@ export function MarketChart({
         { value: average, label: "Avg fill", color: "#6c7489" },
         ...(settings.target1Lots ? [{ value: average + settings.target1Points, label: target1Remaining ? "T1" : "T1 filled", color: "#598269" }] : []),
         { value: average + settings.target2Points, label: "T2", color: "#598269" },
+        ...((settings.stopLossPoints ?? 0) > 0 && average > settings.stopLossPoints! ? [{ value: average - settings.stopLossPoints!, label: 'Price stop', color: '#ad6b63' }] : []),
       );
     levels.current = lines.map((line) =>
       s.createPriceLine({
@@ -247,7 +248,7 @@ export function MarketChart({
       }),
     );
   }, [
-    referenceClose, upper, lower, average, target1Remaining, settings.target1Lots, settings.target1Points, settings.target2Points,
+    referenceClose, upper, lower, average, target1Remaining, settings.target1Lots, settings.target1Points, settings.target2Points, settings.stopLossPoints,
     symbol,
     identity,
   ]);

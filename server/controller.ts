@@ -3,7 +3,7 @@ import type { Activity, AppState, Candle, Mark, Mode, OrderAudit, OrderIntent, R
 import { RULES } from '../shared/model.ts'
 import { freshMark } from '../shared/market.ts'
 import { BrokerError, INDEX_TOKEN, type TradingBroker, type MStock } from './broker.ts'
-import { applyFill, candleSignal, levels, observeReentry, orderQuantity, targetSignal } from './strategy.ts'
+import { applyFill, candleSignal, levels, observeReentry, orderQuantity, priceExitSignal } from './strategy.ts'
 import { completedBoundary, isTradingDay, istDate, istTime } from './time.ts'
 import type { Store } from './store.ts'
 import type { MarketFeed } from './feed.ts'
@@ -51,14 +51,16 @@ export class Controller {
       if (previous && (mark.receivedAt < previous.receivedAt
         || mark.exchangeAt != null && previous.exchangeAt != null && mark.exchangeAt < previous.exchangeAt)) return
       this.marks[mark.token] = mark
-      // Preserve a target touch even if the next price arrives while another
+      // Preserve a protective stop or target touch even if the next price arrives while another
       // broker request is in flight. Entry decisions still require candles.
-      if (this.session?.status === 'running') {
+      if (this.session?.status === 'running' || this.session?.status === 'blocked' && hasExposure(this.session)) {
         for (const side of SIDES) {
           const leg = this.session.legs[side]
-          if (leg?.contract.token === mark.token && !leg.exitReason && this.session.pending?.side !== side) {
-            const target = targetSignal(leg, mark.price, settingsFor(this.session))
-            if (target) { leg.exitReason = target; this.save() }
+          if (leg?.contract.token === mark.token) {
+            const exit = priceExitSignal(leg, mark.price, settingsFor(this.session))
+            if (exit && (!leg.exitReason || exit === 'STOP_LOSS' && ['TARGET_1', 'TARGET_2'].includes(leg.exitReason))) {
+              leg.exitReason = exit; this.save()
+            }
           }
         }
       }
@@ -403,11 +405,12 @@ export class Controller {
         // Targets act on fresh prices. Never infer an executable fill from a past candle high.
         for (const side of SIDES) {
           const leg = session.legs[side]!, mark = this.fresh(side)
-          const reason = leg.exitReason || (mark ? targetSignal(leg, mark.price, settingsFor(session)) : null)
+          const priceReason = mark ? priceExitSignal(leg, mark.price, settingsFor(session)) : null
+          const reason = priceReason === 'STOP_LOSS' && (!leg.exitReason || ['TARGET_1', 'TARGET_2'].includes(leg.exitReason)) ? priceReason : leg.exitReason || priceReason
           if (reason) {
             leg.exitReason = reason; this.save(); await this.submit(side, reason)
             if (session.pending) return
-            if (leg.position && reason === 'TARGET_1' && leg.position.target1Remaining === 0) leg.exitReason = null
+            if (leg.position && reason === 'TARGET_1' && leg.position.target1Remaining === 0 && leg.exitReason === reason) leg.exitReason = null
           }
         }
         this.evaluateCandles()

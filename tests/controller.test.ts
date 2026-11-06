@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { DEFAULT_SETTINGS } from '../shared/settings.ts'
 import { Controller } from '../server/controller.ts'
 import { BrokerError } from '../server/broker.ts'
 import { istTime } from '../server/time.ts'
@@ -13,6 +14,81 @@ async function candle(f: Awaited<ReturnType<typeof fixture>>, time: string, ce =
   await f.controller.pump()
   for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve))
 }
+
+test('25-point stop exits Paper and Live positions on a fresh price without another candle close', async () => {
+  for (const mode of ['paper', 'live'] as const) {
+    const f = await fixture()
+    f.controller.saveStrategySettings({ ...DEFAULT_SETTINGS, enabledSides: ['CE'] })
+    await f.start(mode); await candle(f, '09:20')
+    const leg = f.controller.session!.legs.CE!, average = leg.position!.average
+    f.setTime(f.now() + 1000); f.mark('CE', average - 24.95); await f.controller.pump()
+    assert.equal(leg.position!.quantity, 260)
+    f.mark('CE', average - 25); await f.controller.pump()
+    assert.equal(leg.position, null)
+    assert.equal(f.controller.session!.trades.at(-1)!.reason, 'STOP_LOSS')
+    assert.equal(f.controller.session!.trades.at(-1)!.quantity, 260)
+    assert.equal(leg.lastCandleEnd, istTime(DAY, '09:25'))
+    assert.equal(leg.reentryReady, false)
+    await f.controller.pump()
+    assert.equal(f.controller.session!.trades.filter(trade => trade.reason === 'STOP_LOSS').length, 1)
+  }
+})
+
+test('stale prices cannot trigger the immediate stop and a fresh touch remains latched after recovery', async () => {
+  const f = await fixture()
+  f.controller.saveStrategySettings({ ...DEFAULT_SETTINGS, enabledSides: ['CE'] })
+  await f.start('paper'); await candle(f, '09:20')
+  const leg = f.controller.session!.legs.CE!, stop = leg.position!.average - 25
+  f.controller.marks['101'] = { token: '101', price: stop, source: 'websocket', receivedAt: f.now() - 6000 }
+  await f.controller.pump(); assert.notEqual(leg.position, null)
+  f.controller.busy = true
+  f.feed.onMark({ token: '101', price: stop, source: 'websocket', receivedAt: f.now() })
+  f.feed.onMark({ token: '101', price: stop + 30, source: 'websocket', receivedAt: f.now() })
+  assert.equal(leg.exitReason, 'STOP_LOSS')
+  f.controller.busy = false; await f.controller.pump()
+  assert.equal(leg.position, null)
+  assert.equal(f.controller.session!.trades.at(-1)!.reason, 'STOP_LOSS')
+})
+
+test('a stop during a pending target waits for confirmation and then sells only the remaining units', async () => {
+  const f = await fixture()
+  f.controller.saveStrategySettings({ ...DEFAULT_SETTINGS, enabledSides: ['CE'] })
+  await f.start('live'); await candle(f, '09:20')
+  const leg = f.controller.session!.legs.CE!, average = leg.position!.average
+  f.broker.plans.push({ pending: true })
+  f.mark('CE', average + 20); await f.controller.pump()
+  const pending = f.controller.session!.pending!
+  assert.equal(pending.reason, 'TARGET_1')
+  f.feed.onMark({ token: '101', price: average - 25, source: 'websocket', receivedAt: f.now() })
+  assert.equal(leg.exitReason, 'STOP_LOSS')
+  assert.equal(f.broker.submitted.length, 2, 'no overlapping stop order while target acknowledgement is unresolved')
+  f.broker.rows.get(pending.orderId!)!.fill = { orderId: pending.orderId!, quantity: 130, average: average + 20, status: 'COMPLETE' }
+  f.setTime(f.now() + 1600); await f.controller.pump()
+  assert.equal(leg.position!.quantity, 130)
+  f.mark('CE', average); await f.controller.pump()
+  assert.equal(leg.position, null)
+  assert.deepEqual(f.broker.submitted.map(order => [order.reason, order.quantity]), [['BREAKOUT', 260], ['TARGET_1', 130], ['STOP_LOSS', 130]])
+})
+
+test('partial stop fills retry only remaining exposure; lower-close exit and disabled-stop snapshots retain their behavior', async () => {
+  const f = await fixture()
+  f.controller.saveStrategySettings({ ...DEFAULT_SETTINGS, enabledSides: ['CE'] })
+  await f.start('live'); await candle(f, '09:20')
+  f.broker.plans.push({ quantity: 100, average: 75, status: 'CANCELLED' })
+  f.mark('CE', 75); await f.controller.pump()
+  assert.equal(f.controller.session!.legs.CE!.position!.quantity, 160)
+  await f.controller.pump()
+  assert.equal(f.controller.session!.legs.CE!.position, null)
+  assert.deepEqual(f.broker.submitted.filter(order => order.reason === 'STOP_LOSS').map(order => order.quantity), [260, 160])
+  const lower = await fixture()
+  lower.controller.saveStrategySettings({ ...DEFAULT_SETTINGS, enabledSides: ['CE'] })
+  await lower.start('paper'); await candle(lower, '09:20'); await candle(lower, '09:25', 99)
+  assert.equal(lower.controller.session!.trades.at(-1)!.reason, 'LOWER_CLOSE')
+  const disabled = await fixture()
+  await disabled.start('paper'); await candle(disabled, '09:20')
+  disabled.mark('CE', 50); await disabled.controller.pump()
+  assert.notEqual(disabled.controller.session!.legs.CE!.position, null)
+})
 test('CE and PE independently buy confirmed 3-lot fills from the same completed candle', async () => {
   const f = await fixture(); await f.start()
   await candle(f, '09:20', 101, 102)

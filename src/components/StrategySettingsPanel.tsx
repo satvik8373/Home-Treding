@@ -7,9 +7,10 @@ const numeric = [
   ['breakoutPercent', 'Breakout above reference · %', 0.01, 10, 0.01], ['exitPercent', 'Lower exit below reference · %', 0.01, 10, 0.01],
   ['entryLots', 'Entry lots', 1, 20, 1], ['target1Lots', 'Lots sold at target 1 · 0 skips T1', 0, 19, 1],
   ['target1Points', 'Target 1 · premium points', 0.05, 1000, 0.05], ['target2Points', 'Target 2 · premium points', 0.1, 2000, 0.05],
+  ['stopLossPoints', 'Immediate stop · premium points · 0 disables', 0, 2000, 0.05],
   ['maxEntriesPerLeg', 'Max entries per leg/session · 0 unlimited', 0, 100, 1], ['feePerOrderEstimate', 'Estimated charges · ₹ / filled order', 0, 1000, 0.01],
 ] as const
-const formOf = (s: StrategySettings) => Object.fromEntries(numeric.map(([key]) => [key, String(s[key])])) as Record<typeof numeric[number][0], string>
+const formOf = (s: StrategySettings) => Object.fromEntries(numeric.map(([key]) => [key, String(s[key] ?? 0)])) as Record<typeof numeric[number][0], string>
 
 export function StrategySettingsPanel({ saved, effective, active, online, working, action }: {
   saved: StrategySettings; effective: StrategySettings; active: boolean; online: boolean; working: string; action: ReturnType<typeof useDashboard>['action'];

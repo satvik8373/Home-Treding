@@ -14,6 +14,7 @@ export type Reason =
   | "TARGET_1"
   | "TARGET_2"
   | "LOWER_CLOSE"
+  | "STOP_LOSS"
   | "MANUAL_STOP"
   | "SESSION_END";
 export interface Candle {

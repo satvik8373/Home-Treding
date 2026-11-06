@@ -3,12 +3,13 @@ import type { Side } from './model.ts'
 export interface StrategySettings {
   breakoutPercent: number; exitPercent: number; entryLots: number; target1Lots: number;
   target1Points: number; target2Points: number; cutoff: string; maxEntriesPerLeg: number;
+  stopLossPoints?: number;
   enabledSides: Side[]; feePerOrderEstimate: number;
 }
 export const DEFAULT_SETTINGS: StrategySettings = { breakoutPercent: 0.09, exitPercent: 0.09, entryLots: 4, target1Lots: 2,
-  target1Points: 20, target2Points: 40, cutoff: '15:10', maxEntriesPerLeg: 0, enabledSides: ['CE', 'PE'], feePerOrderEstimate: 0 }
+  target1Points: 20, target2Points: 40, stopLossPoints: 25, cutoff: '15:10', maxEntriesPerLeg: 0, enabledSides: ['CE', 'PE'], feePerOrderEstimate: 0 }
 // Sessions saved before rule snapshots existed used 3 lots and a 1+2 split.
-export const LEGACY_SETTINGS: StrategySettings = { ...DEFAULT_SETTINGS, entryLots: 3, target1Lots: 1 }
+export const LEGACY_SETTINGS: StrategySettings = { ...DEFAULT_SETTINGS, entryLots: 3, target1Lots: 1, stopLossPoints: 0 }
 export function validateSettings(input: unknown): StrategySettings {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Strategy settings must be an object.')
   const body = input as Record<string, unknown>
@@ -25,7 +26,7 @@ export function validateSettings(input: unknown): StrategySettings {
   const [h, m] = body.cutoff.split(':').map(Number), minutes = h * 60 + m
   if (m >= 60 || minutes < 570 || minutes > 925 || m % 5 !== 0) throw new Error('Cutoff must be on a five-minute boundary from 09:30 to 15:25 IST.')
   if (!Array.isArray(body.enabledSides) || !body.enabledSides.length || body.enabledSides.length > 2 || new Set(body.enabledSides).size !== body.enabledSides.length || body.enabledSides.some(side => !['CE', 'PE'].includes(String(side)))) throw new Error('Enable CALL, PUT, or both without duplicate legs.')
-  return { breakoutPercent: number('breakoutPercent', 0.01, 10), exitPercent: number('exitPercent', 0.01, 10), entryLots, target1Lots, target1Points, target2Points,
+  return { breakoutPercent: number('breakoutPercent', 0.01, 10), exitPercent: number('exitPercent', 0.01, 10), entryLots, target1Lots, target1Points, target2Points, stopLossPoints: body.stopLossPoints === undefined ? 0 : number('stopLossPoints', 0, 2000),
     cutoff: body.cutoff, maxEntriesPerLeg: number('maxEntriesPerLeg', 0, 100, true), enabledSides: [...body.enabledSides].sort() as Side[], feePerOrderEstimate: number('feePerOrderEstimate', 0, 1000) }
 }
 export function settingsFor(session?: { settings?: StrategySettings } | null): StrategySettings { return session ? session.settings ?? LEGACY_SETTINGS : DEFAULT_SETTINGS }

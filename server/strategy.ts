@@ -34,6 +34,13 @@ export function targetSignal(leg: Leg, price: number, settings: StrategySettings
   if (leg.position.target1Remaining === 0 && price >= money(leg.position.average + settings.target2Points)) return 'TARGET_2'
   return null
 }
+export function stopLossSignal(leg: Leg, price: number, settings: StrategySettings = DEFAULT_SETTINGS): 'STOP_LOSS' | null {
+  return leg.position && Number.isFinite(price) && price > 0 && (settings.stopLossPoints ?? 0) > 0
+    && price <= money(leg.position.average - settings.stopLossPoints!) ? 'STOP_LOSS' : null
+}
+export function priceExitSignal(leg: Leg, price: number, settings: StrategySettings = DEFAULT_SETTINGS): 'STOP_LOSS' | 'TARGET_1' | 'TARGET_2' | null {
+  return stopLossSignal(leg, price, settings) ?? targetSignal(leg, price, settings)
+}
 export function orderQuantity(leg: Leg, reason: Reason, settings: StrategySettings = DEFAULT_SETTINGS): number {
   if (reason === 'BREAKOUT') return settings.entryLots * leg.contract.lotSize
   if (!leg.position) return 0

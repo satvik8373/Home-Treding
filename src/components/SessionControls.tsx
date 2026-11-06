@@ -108,6 +108,7 @@ export function SessionControls({
             <dt>Square off</dt>
             <dd>{settings.cutoff} IST</dd>
           </div>
+          <div><dt>Immediate stop</dt><dd>{(settings.stopLossPoints ?? 0) > 0 ? `−${settings.stopLossPoints} premium pts` : 'Disabled'}</dd></div>
         </dl>
         {shownMode === "live" && !locked && (
           <label className="live-check">

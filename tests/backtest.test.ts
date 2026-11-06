@@ -40,6 +40,16 @@ function input(ce: number[][], pe?: number[][]): BacktestDataset {
 const reference = [100, 110, 90, 100],
   signal = [100, 110, 99, 101];
 const next = [100, 110, 99, 105];
+test('premium stop uses gap-open prices and assumes stop first for ambiguous intrabar stop/target touches', () => {
+  const config = { slippagePoints: 0, feePerOrder: 0 }
+  const gap = replay(input([reference, signal, next, [60, 65, 55, 62]]), config)
+  assert.deepEqual(gap.fills.map(fill => [fill.reason, fill.price]), [['BREAKOUT', 100], ['STOP_LOSS', 60]])
+  assert.equal(gap.fills.at(-1)!.timing, 'gap-open')
+  const ambiguous = replay(input([reference, signal, [100, 150, 70, 110]]), config)
+  assert.deepEqual(ambiguous.fills.map(fill => [fill.reason, fill.quantity, fill.price]), [['BREAKOUT', 260, 100], ['STOP_LOSS', 260, 75]])
+  const afterTarget = replay(input([reference, signal, next, [125, 135, 70, 90]]), config)
+  assert.deepEqual(afterTarget.fills.map(fill => [fill.reason, fill.quantity, fill.price]), [['BREAKOUT', 260, 100], ['TARGET_1', 130, 125], ['STOP_LOSS', 130, 75]])
+})
 test('new default backtest buys 4 lots and exits 2 lots at each target', () => {
   const result = replay(input([reference, signal, [100, 150, 95, 101]]), { slippagePoints: 0, feePerOrder: 0 })
   assert.deepEqual(result.fills.map(fill => [fill.reason, fill.quantity]), [['BREAKOUT', 260], ['TARGET_1', 130], ['TARGET_2', 130]])
