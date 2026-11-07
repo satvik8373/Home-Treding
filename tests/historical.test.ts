@@ -163,7 +163,7 @@ test('rebuilt backtesting uses one fetch-and-replay job and reports spot-only ra
   let job = service.job(started.id)
   for (let i = 0; i < 100 && job.status === 'running'; i++) { await new Promise(resolve => setImmediate(resolve)); job = service.job(started.id) }
   assert.equal(job.status, 'blocked')
-  assert.equal(job.result!.engine, 'nifty-009-ohlc-v6')
+  assert.equal(job.result!.engine, 'nifty-009-ohlc-v7')
   assert.equal(job.result!.summary.sessions, 0)
   assert.equal(f.service.spot(DAY)!.candles.length, 75)
   assert.deepEqual(f.calls, [`${DAY}:26000`])

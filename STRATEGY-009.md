@@ -1,4 +1,4 @@
-# NIFTY 009 — Strategy Logic
+# 009 Breakout – Buy — Strategy Logic
 
 - **Reference:** 09:15–09:20 IST NIFTY CLOSE se nearest ATM aur nearest valid expiry ka CE/PE pair select karke session ke liye lock karo.
 - **Day continuity:** Har account aur Paper/Live mode ka ek saved day-session rahega. Same day engine restart, Stop/Start ya settings save karne par session ID, opening reference, contracts, trade history, entry count aur reset state fresh nahi honge. Settings changes next trading day par apply honge. Process shutdown sirf durable checkpoint karta hai; explicit “Stop & square off” positions close karta hai. Valid broker login aur quantity checks ke baad interrupted running session resume hota hai; unknown orders reconcile hone tak fresh order nahi bheja jata. Stopped session apne aap start nahi hota.
@@ -20,3 +20,5 @@ Default T1/T2 remain entry +20/+40 premium points, selling 2+2 of the 4 bought l
 Time exits are scheduled exits regardless of profit or loss. Both minute deadlines count from the original confirmed entry timestamp, including after partial exits and process recovery. A clock deadline already passed becomes due after entry. Fresh market data is still required; broker confirmation, latency and outages can delay execution. The reference stop, completed-candle lower exit, explicit Stop and square-off remain active. Changes apply next trading day, while new backtests use saved preferences.
 
 OHLC backtests execute time targets at the first available five-minute candle open at/after the deadline (timing `scheduled-open`), not an invented exact-minute price. Intrabar price targets remain proxies. Reports and chart levels follow the selected target type; time rules do not draw fake horizontal price targets.
+
+The current long strategy is named **009 Breakout – Buy**. Its reverse short strategy is documented in [STRATEGY-009-SELL.md](STRATEGY-009-SELL.md). They have independent settings/day-session archives and share one active execution slot per account/workspace.

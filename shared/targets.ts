@@ -1,3 +1,4 @@
+import { signFor } from './strategy.ts'
 import type { StrategySettings } from './settings.ts'
 
 export type TargetRule = { kind: 'points' | 'percent' | 'price' | 'minutes'; value: number } | { kind: 'clock'; time: string }
@@ -8,7 +9,7 @@ export function targetRule(settings: StrategySettings, target: TargetNumber): Ta
 export function targetPrice(settings: StrategySettings, target: TargetNumber, entry: number): number | null {
   const rule = targetRule(settings, target)
   if (rule.kind === 'minutes' || rule.kind === 'clock') return null
-  const value = rule.kind === 'price' ? rule.value : rule.kind === 'percent' ? entry * (1 + rule.value / 100) : entry + rule.value
+  const value = rule.kind === 'price' ? rule.value : rule.kind === 'percent' ? entry * (1 + signFor(settings) * rule.value / 100) : entry + signFor(settings) * rule.value
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
 export function targetDeadline(settings: StrategySettings, target: TargetNumber, entryAt: number | undefined, day: string): number | null {
@@ -19,5 +20,5 @@ export function targetDeadline(settings: StrategySettings, target: TargetNumber,
 }
 export function targetLabel(settings: StrategySettings, target: TargetNumber): string {
   const rule = targetRule(settings, target)
-  return rule.kind === 'clock' ? `${rule.time} IST` : rule.kind === 'minutes' ? `${rule.value} min after entry` : rule.kind === 'price' ? `₹${rule.value} premium` : rule.kind === 'percent' ? `Entry +${rule.value}%` : `Entry +₹${rule.value}`
+  return rule.kind === 'clock' ? `${rule.time} IST` : rule.kind === 'minutes' ? `${rule.value} min after entry` : rule.kind === 'price' ? `₹${rule.value} premium` : rule.kind === 'percent' ? `Entry ${signFor(settings) > 0 ? '+' : '−'}${rule.value}%` : `Entry ${signFor(settings) > 0 ? '+' : '−'}₹${rule.value}`
 }

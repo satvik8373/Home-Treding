@@ -1,3 +1,5 @@
+import { directionOf, signFor, entryTransaction, exitTransaction, isBeyondEntry } from '../shared/strategy.ts'
+import type { StrategyDirection } from '../shared/strategy.ts'
 import { randomUUID } from 'node:crypto'
 import type { Activity, AppState, BrokerConnection, Candle, Mark, Mode, OrderAudit, OrderIntent, Reason, Side, TradingSession } from '../shared/model.ts'
 import { RULES } from '../shared/model.ts'
@@ -7,7 +9,7 @@ import { applyFill, candleSignal, levels, observeReentry, orderQuantity, priceEx
 import { completedBoundary, isTradingDay, istDate, istTime } from './time.ts'
 import type { Store } from './store.ts'
 import type { MarketFeed } from './feed.ts'
-import { DEFAULT_SETTINGS, sameSettings, settingsFor, validateSettings } from '../shared/settings.ts'
+import { DEFAULT_SETTINGS, SELL_DEFAULT_SETTINGS, sameSettings, settingsFor, validateSettings } from '../shared/settings.ts'
 import type { StrategySettings } from '../shared/settings.ts'
 import { rejectionSummary } from './orderIdentity.ts'
 
@@ -44,6 +46,7 @@ export class Controller {
   private pumpTask: Promise<void> | null = null
   private savedSession = ''
   private suspended = false
+  private sellPreferences: StrategySettings = structuredClone(SELL_DEFAULT_SETTINGS)
   private preferences: StrategySettings = structuredClone(DEFAULT_SETTINGS)
   constructor(public broker: TradingBroker & Partial<Pick<MStock, 'login' | 'verify' | 'verifyAccount' | 'logout' | 'onAuthFailure'>>,
     private store: Repository, public feed: Feed, private now = Date.now) {
@@ -55,6 +58,9 @@ export class Controller {
     this.session = store.session()
     const savedSettings = store.get?.('strategy:settings')
     if (savedSettings) this.preferences = validateSettings(savedSettings)
+    const savedSell = store.get?.('strategy:settings:sell')
+    if (savedSell) this.sellPreferences = validateSettings({ ...(savedSell as object), direction: 'sell' })
+    else { this.sellPreferences = { ...structuredClone(this.preferences), direction: 'sell' }; store.put?.('strategy:settings:sell', this.sellPreferences) }
     feed.onMark = mark => {
       if (this.suspended) return
       if (!freshMark(mark, this.now())) return
@@ -80,12 +86,13 @@ export class Controller {
     feed.onChange = () => this.onChange()
   }
   connected(): boolean { return this.verified && !!this.broker.credentials && this.broker.credentials.expiresAt > this.now() }
-  strategySettings(): StrategySettings { return structuredClone(this.preferences) }
+  strategySettings(direction: StrategyDirection = 'buy'): StrategySettings { return structuredClone(direction === 'sell' ? this.sellPreferences : this.preferences) }
   saveStrategySettings(input: unknown): StrategySettings {
     const settings = validateSettings(input)
     if (!this.store.put) throw new Error('Persistent settings storage is unavailable.')
-    this.store.put('strategy:settings', settings); this.preferences = settings; this.onChange()
-    return this.strategySettings()
+    this.store.put(directionOf(settings) === 'sell' ? 'strategy:settings:sell' : 'strategy:settings', settings)
+    if (directionOf(settings) === 'sell') this.sellPreferences = settings; else this.preferences = settings
+    this.onChange(); return structuredClone(settings)
   }
   private connectionSnapshot(): BrokerConnection {
     if (this.broker.credentials && this.broker.credentials.expiresAt <= this.now()) return { phase: 'expired', message: 'Your mStock session has expired. Sign in again with a fresh OTP or authenticator code.', checkedAt: this.connection.checkedAt, nextRetryAt: null }
@@ -99,7 +106,7 @@ export class Controller {
   }
   snapshot(csrf = ''): AppState {
     const credentials = this.broker.credentials
-    return { csrf, runtime: this.execution, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { connection: this.connectionSnapshot(), connected: this.connected(),
+    return { csrf, runtime: this.execution, strategyProfiles: { buy: this.strategySettings('buy'), sell: this.strategySettings('sell') }, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { connection: this.connectionSnapshot(), connected: this.connected(),
       account: this.connected() ? credentials!.account : null, name: this.connected() ? credentials!.name : null,
       expiresAt: credentials?.expiresAt ?? null, feed: this.feed.status, lastTickAt: this.feed.lastTickAt },
       session: this.session, marks: this.marks }
@@ -255,7 +262,7 @@ export class Controller {
       this.feed.close(); this.verified = false; this.broker.credentials = null; this.store.saveBroker(null); this.marks = {}; this.connection = { phase: 'idle', message: 'Connect your mStock account.', checkedAt: null, nextRetryAt: null }; this.onChange()
     })
   }
-  async start(mode: Mode): Promise<void> {
+  async start(mode: Mode, direction: StrategyDirection = 'buy'): Promise<void> {
     await this.exclusive(async () => {
       if (mode === 'live' && this.execution?.liveExecution === false) throw new Error(this.execution.reason)
       const now = this.now(), date = istDate(now)
@@ -267,13 +274,14 @@ export class Controller {
       }
       if (active(this.session)) throw new Error('The strategy is already running.')
       if (hasExposure(this.session)) throw new Error('Reconcile the saved position or order before starting.')
-      const preferences = this.strategySettings()
+      const preferences = this.strategySettings(direction)
       if (!isTradingDay(now) || now < istTime(date, '09:00') || now >= istTime(date, preferences.cutoff)) throw new Error(`Start on a trading weekday between 09:00 and ${preferences.cutoff} IST.`)
       const previous = this.session
-      if (!previous || previous.date !== date || previous.account !== this.broker.credentials!.account || previous.mode !== mode) {
-        this.session = this.store.loadSession(this.broker.credentials!.account, date, mode) ?? { id: randomUUID(), date, mode, account: this.broker.credentials!.account, status: 'armed',
+      if (!previous || previous.date !== date || previous.account !== this.broker.credentials!.account || previous.mode !== mode || directionOf(previous.settings) !== direction) {
+        this.session = this.store.loadSession(this.broker.credentials!.account, date, mode, direction) ?? { id: randomUUID(), date, mode, account: this.broker.credentials!.account, status: 'armed',
           message: '', atm: null, expiry: null, legs: {}, pending: null, pnlVerified: true, trades: [], activity: [], settings: structuredClone(preferences) }
       }
+      if (directionOf(this.session?.settings) !== direction) throw new Error('Saved strategy direction mismatch. Reconcile before starting.')
       if (hasExposure(this.session)) throw new Error('This mode has saved exposure that needs reconciliation before starting.')
       this.session!.settings ??= structuredClone(settingsFor(this.session))
       this.stopRequested = false
@@ -331,8 +339,8 @@ export class Controller {
         entries: 0, lastCandleEnd: completedBoundary(this.now()), exitReason: null }
       const leg = legs[contract.side]!
       const past = bars.filter(bar => validCandle(bar) && bar.start >= istTime(session.date, RULES.referenceEnd) && bar.end <= leg.lastCandleEnd).sort((a, b) => a.end - b.end)
-      leg.firstSignalConsumed = past.some(bar => bar.close >= leg.upper)
-      leg.reentryReady = leg.firstSignalConsumed && !!past.length && past.at(-1)!.close < leg.upper
+      leg.firstSignalConsumed = past.some(bar => isBeyondEntry(bar.close, leg, settingsFor(session), true))
+      leg.reentryReady = leg.firstSignalConsumed && !!past.length && signFor(settingsFor(session)) * (past.at(-1)!.close - (directionOf(settingsFor(session)) === 'sell' ? leg.lower : leg.upper)) < 0
     }
     if (session.mode === 'live') await this.requireNoExistingNifty()
     session.legs = legs; session.atm = contracts[0].strike; session.expiry = contracts[0].expiry
@@ -358,7 +366,7 @@ export class Controller {
       const leg = this.session.legs[side]
       if (!leg) continue
       const relevant = positions.filter(p => p.symbol === leg.contract.symbol && p.exchange === 'NFO' && ['MIS', 'INTRADAY', 'INTRA'].includes(p.product))
-      const actual = relevant.reduce((total, p) => total + p.quantity, 0), expected = leg.position?.quantity ?? 0
+      const actual = signFor(settingsFor(this.session)) * relevant.reduce((total, p) => total + p.quantity, 0), expected = leg.position?.quantity ?? 0
       if (actual < 0 || actual > expected) throw new Error(`Unexpected ${side} broker exposure. Automatic orders are blocked until reconciled.`)
       if (actual !== expected) {
         this.session.pnlVerified = false
@@ -391,7 +399,7 @@ export class Controller {
       this.note(`${side} entry skipped: the live price became stale during broker verification.`); return
     }
     const intent: OrderIntent = { id: randomUUID(), tag: `n009${randomUUID().replaceAll('-', '').slice(0, 14)}`,
-      side, symbol: leg.contract.symbol, instrumentToken: leg.contract.token, expiry: leg.contract.expiry, transaction: buy ? 'BUY' : 'SELL', quantity, reason, submittedAt: this.now() }
+      side, symbol: leg.contract.symbol, instrumentToken: leg.contract.token, expiry: leg.contract.expiry, transaction: buy ? entryTransaction(settingsFor(session)) : exitTransaction(settingsFor(session)), quantity, reason, submittedAt: this.now() }
     if (session.mode === 'paper') {
       if (!mark) { this.note(`${side} paper exit is waiting for a verified market price.`); return }
       applyFill(session, intent, { orderId: `PAPER-${intent.id}`, quantity, average: mark.price, status: 'COMPLETE' }, this.now())
@@ -541,24 +549,24 @@ export class Controller {
           const unseen = bars.filter(c => c.end <= boundary && c.end > leg.lastCandleEnd).sort((a, b) => a.end - b.end)
           if (!leg.position && (leg.entries > 0 || leg.firstSignalConsumed)) {
             // Older saved sessions have no gate metadata: infer the last full exit while flat and fail closed without one.
-            if (leg.entries > 0) leg.lastExitAt ??= session.trades.findLast(trade => trade.side === side && trade.transaction === 'SELL')?.at ?? this.now()
+            if (leg.entries > 0) leg.lastExitAt ??= session.trades.findLast(trade => trade.side === side && trade.transaction === exitTransaction(settingsFor(session)))?.at ?? this.now()
             for (const bar of unseen) {
-              observeReentry(leg, bar, this.now())
-              if (bar !== unseen.at(-1) && validCandle(bar) && bar.close > leg.upper) leg.reentryReady = false
+              observeReentry(leg, bar, this.now(), settingsFor(session))
+              if (bar !== unseen.at(-1) && validCandle(bar) && isBeyondEntry(bar.close, leg, settingsFor(session))) leg.reentryReady = false
             }
           }
           // A delayed history response may contain several closes. Preserve the
           // first protective exit even if a later candle recovered above lower.
           // Flat legs still consider only the latest close, never replay entries.
-          const candle = (leg.position ? unseen.find(c => candleSignal(leg, c, this.now(), session.date, settingsFor(session)) === 'LOWER_CLOSE') : null) ?? unseen.at(-1)
+          const candle = (leg.position ? unseen.find(c => ['LOWER_CLOSE', 'UPPER_CLOSE'].includes(candleSignal(leg, c, this.now(), session.date, settingsFor(session)) ?? '')) : null) ?? unseen.at(-1)
           if (!candle) return
           const signal = candleSignal(leg, candle, this.now(), session.date, settingsFor(session))
-          if (!leg.position && validCandle(candle) && candle.close > leg.upper) { leg.firstSignalConsumed = true; leg.reentryReady = false }
-          leg.lastDecision = { candle, evaluatedAt: this.now(), signal, explanation: signal === 'BREAKOUT' ? leg.entries > 0 ? 'A post-exit close below the fixed breakout level was followed by a later close above it.' : 'Completed close reached the breakout level while flat.' : signal === 'LOWER_CLOSE' ? 'Completed close fell below the lower exit while holding units.' : leg.position ? 'No completed-candle lower exit. Fresh-price targets remain monitored.' : !settingsFor(session).enabledSides.includes(side) ? 'Leg disabled in this session settings.' : settingsFor(session).maxEntriesPerLeg && leg.entries >= settingsFor(session).maxEntriesPerLeg ? 'Configured entry limit reached.' : (leg.entries > 0 || leg.firstSignalConsumed) && !leg.reentryReady ? 'Fresh-cross gate locked: waiting for a completed close below the original breakout level, then a later close above it.' : this.now() - candle.end > 90_000 ? 'Candle too old for a new entry.' : 'Completed close did not meet the entry rule.' }
+          if (!leg.position && validCandle(candle) && isBeyondEntry(candle.close, leg, settingsFor(session))) { leg.firstSignalConsumed = true; leg.reentryReady = false }
+          leg.lastDecision = { candle, evaluatedAt: this.now(), signal, explanation: signal === 'BREAKOUT' ? leg.entries > 0 ? directionOf(settingsFor(session)) === 'sell' ? 'A post-exit close above the fixed lower breakout was followed by a later close below it.' : 'A post-exit close below the fixed breakout level was followed by a later close above it.' : 'Completed close reached the breakout level while flat.' : signal === 'UPPER_CLOSE' ? 'Completed close rose above the upper exit while short.' : signal === 'LOWER_CLOSE' ? 'Completed close fell below the lower exit while holding units.' : leg.position ? 'No completed-candle lower exit. Fresh-price targets remain monitored.' : !settingsFor(session).enabledSides.includes(side) ? 'Leg disabled in this session settings.' : settingsFor(session).maxEntriesPerLeg && leg.entries >= settingsFor(session).maxEntriesPerLeg ? 'Configured entry limit reached.' : (leg.entries > 0 || leg.firstSignalConsumed) && !leg.reentryReady ? directionOf(settingsFor(session)) === 'sell' ? 'Fresh-cross gate locked: waiting for a completed close above the original lower breakout, then a later close below it.' : 'Fresh-cross gate locked: waiting for a completed close below the original breakout level, then a later close above it.' : this.now() - candle.end > 90_000 ? 'Candle too old for a new entry.' : 'Completed close did not meet the entry rule.' }
           session.decisionAudit ??= []
           session.decisionAudit.push({ side, ...leg.lastDecision })
           leg.lastCandleEnd = candle.end; this.save()
-          if (signal === 'LOWER_CLOSE') leg.exitReason = signal
+          if (signal === 'LOWER_CLOSE' || signal === 'UPPER_CLOSE') leg.exitReason = signal
           if (signal) await this.submit(side, signal)
         })
       }

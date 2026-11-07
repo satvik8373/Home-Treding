@@ -14,6 +14,7 @@ export type Reason =
   | "TARGET_1"
   | "TARGET_2"
   | "LOWER_CLOSE"
+  | "UPPER_CLOSE"
   | "STOP_LOSS"
   | "MANUAL_STOP"
   | "SESSION_END";
@@ -48,7 +49,7 @@ export interface Position {
   entryQuantity: number;
 }
 export interface Leg {
-  lastDecision?: { candle: Candle; evaluatedAt: number; signal: 'BREAKOUT' | 'LOWER_CLOSE' | null; explanation: string };
+  lastDecision?: { candle: Candle; evaluatedAt: number; signal: 'BREAKOUT' | 'LOWER_CLOSE' | 'UPPER_CLOSE' | null; explanation: string };
   contract: Contract;
   reference: Candle;
   upper: number;
@@ -109,7 +110,7 @@ export interface OrderAudit {
   filled: number | null; average: number | null; detail: string;
 }
 export interface TradingSession {
-  decisionAudit?: { side: Side; candle: Candle; evaluatedAt: number; signal: 'BREAKOUT' | 'LOWER_CLOSE' | null; explanation: string }[];
+  decisionAudit?: { side: Side; candle: Candle; evaluatedAt: number; signal: 'BREAKOUT' | 'LOWER_CLOSE' | 'UPPER_CLOSE' | null; explanation: string }[];
   settings?: StrategySettings;
   orderAudit?: OrderAudit[];
   id: string;
@@ -143,6 +144,7 @@ export interface BrokerStatus {
 }
 export interface AppState {
   runtime?: { kind: 'hosted-paper'; liveExecution: false; reason: string };
+  strategyProfiles?: { buy: StrategySettings; sell: StrategySettings };
   savedSettings?: StrategySettings;
   csrf: string;
   serverTime: number;

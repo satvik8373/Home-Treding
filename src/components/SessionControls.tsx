@@ -1,3 +1,4 @@
+import { directionOf, strategyName } from '../../shared/strategy';
 import { targetLabel } from '../../shared/targets';
 import { BookOpen, Play, Square } from "lucide-react";
 import type { Mode, TradingSession } from "../../shared/model";
@@ -51,7 +52,7 @@ export function SessionControls({
   return (
     <section className="panel session-panel">
       <div className="panel-title">
-        <h2>009 Strategy</h2>
+        <h2>{strategyName(settings)}</h2>
         <div className="session-rule-actions">{onSettings && <button className="text-button" onClick={onSettings}>Settings</button>}<button className="text-button" onClick={onRules}>
           <BookOpen size={13} />
           Rules
@@ -96,7 +97,7 @@ export function SessionControls({
           </div>
           <div>
             <dt>Breakout / exit</dt>
-            <dd>+{settings.breakoutPercent}% / −{settings.exitPercent}%</dd>
+            <dd>{directionOf(settings) === 'sell' ? '−' : '+'}{settings.breakoutPercent}% / {directionOf(settings) === 'sell' ? '+' : '−'}{settings.exitPercent}%</dd>
           </div>
           <div>
             <dt>Entry size</dt>
@@ -110,7 +111,7 @@ export function SessionControls({
             <dt>Square off</dt>
             <dd>{settings.cutoff} IST</dd>
           </div>
-          <div><dt>Reference stop</dt><dd>{(settings.stopLossPoints ?? 0) > 0 ? `Reference −${settings.stopLossPoints} pts` : 'Disabled'}</dd></div>
+          <div><dt>Reference stop</dt><dd>{(settings.stopLossPoints ?? 0) > 0 ? `Reference ${directionOf(settings) === 'sell' ? '+' : '−'}${settings.stopLossPoints} pts` : 'Disabled'}</dd></div>
         </dl>
         {shownMode === "live" && !locked && (
           <label className="live-check">
@@ -146,7 +147,7 @@ export function SessionControls({
             onClick={() =>
               void action(
                 "/api/strategy/start",
-                { mode, liveAcknowledged: liveAck },
+                { mode, strategy: directionOf(settings), liveAcknowledged: liveAck },
                 "start",
               )
             }

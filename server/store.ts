@@ -1,3 +1,5 @@
+import { directionOf } from '../shared/strategy.ts'
+import type { StrategyDirection } from '../shared/strategy.ts'
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -55,15 +57,16 @@ export class Store {
     account: string,
     date: string,
     mode: Mode,
+    direction: StrategyDirection = 'buy',
   ): TradingSession | null {
-    return this.get(`session:${date}:${account}:${mode}`);
+    return this.get(`session:${date}:${account}:${mode}${direction === 'sell' ? ':sell' : ''}`);
   }
   saveSession(value: TradingSession): void {
     this.db.exec("BEGIN IMMEDIATE");
     try {
       this.put("session", value);
       this.put(`session:history:${value.id}`, value);
-      this.put(`session:${value.date}:${value.account}:${value.mode}`, value);
+      this.put(`session:${value.date}:${value.account}:${value.mode}${directionOf(value.settings) === 'sell' ? ':sell' : ''}`, value);
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");

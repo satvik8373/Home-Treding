@@ -1,3 +1,4 @@
+import { directionOf } from '../shared/strategy.ts'
 import type { Candle, Contract, Fill, OrderIntent, TradingSession } from '../shared/model.ts'
 import type { PositionRow, TradingBroker } from '../server/broker.ts'
 import type { SavedBroker } from '../server/store.ts'
@@ -21,9 +22,9 @@ export class MemoryStore {
   session() { return this.saved ? structuredClone(this.saved) : null }
   saveSession(value: TradingSession) {
     this.saved = structuredClone(value); this.writes.push(structuredClone(value))
-    this.archives.set(`${value.date}:${value.account}:${value.mode}`, structuredClone(value))
+    this.archives.set(`${value.date}:${value.account}:${value.mode}${directionOf(value.settings) === 'sell' ? ':sell' : ''}`, structuredClone(value))
   }
-  loadSession(account: string, date: string, mode: string) { return structuredClone(this.archives.get(`${date}:${account}:${mode}`) ?? null) }
+  loadSession(account: string, date: string, mode: string, direction = 'buy') { return structuredClone(this.archives.get(`${date}:${account}:${mode}${direction === 'sell' ? ':sell' : ''}`) ?? null) }
   broker() { return this.savedBroker }
   saveBroker(value: SavedBroker | null) { this.savedBroker = value }
 }

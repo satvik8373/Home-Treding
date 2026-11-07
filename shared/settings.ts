@@ -1,8 +1,10 @@
+import type { StrategyDirection } from './strategy.ts'
 import { targetRule } from './targets.ts'
 import type { TargetRule } from './targets.ts'
 import type { Side } from './model.ts'
 
 export interface StrategySettings {
+  direction?: StrategyDirection;
   breakoutPercent: number; exitPercent: number; entryLots: number; target1Lots: number;
   target1Points: number; target2Points: number; cutoff: string; maxEntriesPerLeg: number;
   target1Rule?: TargetRule; target2Rule?: TargetRule;
@@ -11,11 +13,13 @@ export interface StrategySettings {
 }
 export const DEFAULT_SETTINGS: StrategySettings = { breakoutPercent: 0.09, exitPercent: 0.09, entryLots: 4, target1Lots: 2,
   target1Points: 20, target2Points: 40, stopLossPoints: 25, cutoff: '15:10', maxEntriesPerLeg: 0, enabledSides: ['CE', 'PE'], feePerOrderEstimate: 0 }
+export const SELL_DEFAULT_SETTINGS: StrategySettings = { ...DEFAULT_SETTINGS, direction: 'sell' }
 // Sessions saved before rule snapshots existed used 3 lots and a 1+2 split.
 export const LEGACY_SETTINGS: StrategySettings = { ...DEFAULT_SETTINGS, entryLots: 3, target1Lots: 1, stopLossPoints: 0 }
 export function validateSettings(input: unknown): StrategySettings {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Strategy settings must be an object.')
   const body = input as Record<string, unknown>
+  if (body.direction !== undefined && !['buy', 'sell'].includes(String(body.direction))) throw new Error('Choose the Buy or Sell strategy.')
   const number = (key: keyof StrategySettings, min: number, max: number, integer = false) => {
     const value = body[key]
     if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max || integer && !Number.isInteger(value)) throw new Error(`${key} must be ${integer ? 'an integer ' : ''}from ${min} to ${max}.`)
@@ -45,7 +49,7 @@ export function validateSettings(input: unknown): StrategySettings {
   const target1Rule = rule('target1Rule'), target2Rule = rule('target2Rule')
   const one = target1Rule ?? { kind: 'points', value: target1Points }, two = target2Rule ?? { kind: 'points', value: target2Points }
   if (target1Lots > 0 && one.kind === two.kind && ('time' in one && 'time' in two ? two.time <= one.time : 'value' in one && 'value' in two && two.value <= one.value)) throw new Error('For the same target type, target 2 must be above/later than target 1.')
-  return { ...(target1Rule ? { target1Rule } : {}), ...(target2Rule ? { target2Rule } : {}), breakoutPercent: number('breakoutPercent', 0.01, 10), exitPercent: number('exitPercent', 0.01, 10), entryLots, target1Lots, target1Points, target2Points, stopLossPoints: body.stopLossPoints === undefined ? 0 : number('stopLossPoints', 0, 2000),
+  return { ...(body.direction === 'sell' ? { direction: 'sell' as const } : {}), ...(target1Rule ? { target1Rule } : {}), ...(target2Rule ? { target2Rule } : {}), breakoutPercent: number('breakoutPercent', 0.01, 10), exitPercent: number('exitPercent', 0.01, 10), entryLots, target1Lots, target1Points, target2Points, stopLossPoints: body.stopLossPoints === undefined ? 0 : number('stopLossPoints', 0, 2000),
     cutoff: body.cutoff, maxEntriesPerLeg: number('maxEntriesPerLeg', 0, 100, true), enabledSides: [...body.enabledSides].sort() as Side[], feePerOrderEstimate: number('feePerOrderEstimate', 0, 1000) }
 }
 export function settingsFor(session?: { settings?: StrategySettings } | null): StrategySettings { return session ? session.settings ?? LEGACY_SETTINGS : DEFAULT_SETTINGS }

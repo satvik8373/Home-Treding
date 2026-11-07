@@ -1,3 +1,5 @@
+import { directionOf, signFor, strategyName } from '../shared/strategy'
+import type { StrategyDirection } from '../shared/strategy'
 import './components/StrategySettingsPanel.css'
 import { StrategySettingsPanel } from './components/StrategySettingsPanel'
 import { useEffect, useState } from 'react'
@@ -13,7 +15,7 @@ import { SessionControls } from './components/SessionControls'
 import { TradesPanel } from './components/TradesPanel'
 import { BacktestPanel } from './components/BacktestPanel'
 import { TransparencyPanel } from './components/TransparencyPanel'
-import { DEFAULT_SETTINGS, settingsFor } from '../shared/settings'
+import { DEFAULT_SETTINGS, SELL_DEFAULT_SETTINGS, settingsFor } from '../shared/settings'
 import { useDashboard } from './hooks/useDashboard'
 import { clock, date, money } from './lib/format'
 import { useDeployment } from './lib/deployment'
@@ -31,6 +33,7 @@ export default function App() {
   const { data, online, now, error, setError, working, action } = useDashboard()
   const [brokerDialog, setBrokerDialog] = useState(false)
   const [rulesDialog, setRulesDialog] = useState(false)
+  const [selectedDirection, setSelectedDirection] = useState<StrategyDirection | null>(null)
   const [mode, setMode] = useState<Mode>('paper')
   const [liveAck, setLiveAck] = useState(false)
   const [view, setView] = useState<'market' | 'backtest' | 'audit' | 'settings'>(currentView)
@@ -46,11 +49,15 @@ export default function App() {
     window.history.replaceState(null, '', `#${next}`)
   }
 
-  const session = data?.session, broker = data?.broker, connected = !!broker?.connected
+  const engineSession = data?.session, broker = data?.broker, connected = !!broker?.connected
+  const engineLocked = !!engineSession && (['armed', 'preparing', 'running', 'stopping'].includes(engineSession.status) || !!engineSession.pending || Object.values(engineSession.legs).some(leg => !!leg?.position))
+  const chosenDirection = engineLocked ? directionOf(engineSession?.settings) : selectedDirection ?? directionOf(engineSession?.settings)
+  const selectedSettings = data?.strategyProfiles?.[chosenDirection] ?? (chosenDirection === 'sell' ? SELL_DEFAULT_SETTINGS : data?.savedSettings ?? DEFAULT_SETTINGS)
+  const session = engineSession && directionOf(engineSession.settings) === chosenDirection ? engineSession : undefined
   const running = !!session && ['armed', 'preparing', 'running', 'stopping'].includes(session.status)
   const sides: Side[] = ['CE', 'PE']
   const positions = sides.filter(side => !!session?.legs[side]?.position)
-  const locked = running || positions.length > 0 || !!session?.pending
+  const locked = engineLocked
   const dayLocked = !!session && session.date === new Date(now + 330 * 60_000).toISOString().slice(0, 10) && session.mode === mode
     && (!broker?.account || session.account === broker.account)
   const realized = session?.pnlVerified
@@ -60,7 +67,7 @@ export default function App() {
   for (const side of positions) {
     const leg = session!.legs[side]!, mark = data?.marks[leg.contract.token]
     if (!freshMark(mark, now)) { openPnl = null; break }
-    openPnl! += (mark.price - leg.position!.average) * leg.position!.quantity
+    openPnl! += signFor(settingsFor(session)) * (mark.price - leg.position!.average) * leg.position!.quantity
   }
   const total = realized == null || openPnl == null ? null : realized + openPnl
   const identity = `${broker?.account ?? 'disconnected'}:${session?.id ?? 'no-session'}`
@@ -89,7 +96,7 @@ export default function App() {
 
       <main>
         <div className="page-heading">
-          <div><h1>009 Breakout</h1><p>NIFTY 50 <span>·</span> Independent CALL & PUT</p></div>
+          <div><h1>{strategyName(chosenDirection)}</h1><p>NIFTY 50 <span>·</span> Independent CALL & PUT</p></div>
           <span className={`tag ${session?.mode === 'live' ? 'live-tag' : ''}`}>
             {!session ? 'NO SESSION' : session.mode === 'live' ? 'LIVE SESSION' : 'PAPER SESSION'}
           </span>
@@ -101,6 +108,7 @@ export default function App() {
             <span>{error}</span><button aria-label="Dismiss error" onClick={() => setError('')}><X size={16} /></button>
           </div>
         )}
+        <label className="strategy-picker">Strategy<select value={chosenDirection} disabled={locked || !!working} onChange={event => { setSelectedDirection(event.target.value as StrategyDirection); setLiveAck(false) }}><option value="buy">009 Breakout – Buy</option><option value="sell">009 Breakout – Sell</option></select><small>{locked ? 'Stop and flatten before switching.' : 'Switching does not start trading.'}</small></label>
         <nav className="workspace-nav" aria-label="Workspace">
           <button className={view === 'market' ? 'active' : ''} aria-current={view === 'market' ? 'page' : undefined} onClick={() => navigate('market')}>Live market</button>
           <button className={view === 'backtest' ? 'active' : ''} aria-current={view === 'backtest' ? 'page' : undefined} onClick={() => navigate('backtest')}>Backtest</button>
@@ -139,12 +147,12 @@ export default function App() {
             </div>
           )}
           <div className="workspace">
-            <MarketChart connected={connected} identity={identity} now={now} marks={data?.marks ?? {}} legs={session?.legs ?? {}} trades={session?.trades ?? []} settings={settingsFor(session)} />
-            <SessionControls session={session} locked={locked} connected={connected} online={online} working={working} now={now} mode={mode} setMode={setMode} liveAck={liveAck} setLiveAck={setLiveAck} action={action} onRules={() => setRulesDialog(true)} settings={locked || dayLocked ? settingsFor(session) : data?.savedSettings ?? DEFAULT_SETTINGS} onSettings={() => navigate('settings')} liveAvailable={data?.runtime?.liveExecution !== false} liveReason={data?.runtime?.reason} />
+            <MarketChart connected={connected} identity={identity} now={now} marks={data?.marks ?? {}} legs={session?.legs ?? {}} trades={session?.trades ?? []} settings={session ? settingsFor(session) : selectedSettings} />
+            <SessionControls session={session} locked={locked} connected={connected} online={online} working={working} now={now} mode={mode} setMode={setMode} liveAck={liveAck} setLiveAck={setLiveAck} action={action} onRules={() => setRulesDialog(true)} settings={locked || dayLocked ? settingsFor(session) : selectedSettings} onSettings={() => navigate('settings')} liveAvailable={data?.runtime?.liveExecution !== false} liveReason={data?.runtime?.reason} />
           </div>
           <div className="section-heading"><h2>Strategy positions</h2><span>References stay fixed for the session</span></div>
-          <div className="legs-grid">{sides.map(side => <LegCard key={side} side={side} leg={session?.legs[side]} mark={markFor(side)} now={now} settings={settingsFor(session)} />)}</div>
-          <TradesPanel trades={session?.trades ?? []} />
+          <div className="legs-grid">{sides.map(side => <LegCard key={side} side={side} leg={session?.legs[side]} mark={markFor(side)} now={now} settings={session ? settingsFor(session) : selectedSettings} />)}</div>
+          <TradesPanel exportAvailable={!!session} trades={session?.trades ?? []} />
           <details className="panel activity-panel">
             <summary>Session activity <span>{session?.activity.length ?? 0} events</span></summary>
             {session?.activity.length ? (
@@ -156,9 +164,9 @@ export default function App() {
         </div>
 
         <div hidden={view !== 'backtest'}>
-          <BacktestPanel visible={view === 'backtest'} now={now} connected={connected} online={online} working={working} action={action} settings={data?.savedSettings ?? DEFAULT_SETTINGS} />
+          <BacktestPanel visible={view === 'backtest'} now={now} connected={connected} online={online} working={working} action={action} settings={selectedSettings} />
         </div>
-        <div hidden={view !== 'settings'}><StrategySettingsPanel saved={data?.savedSettings ?? DEFAULT_SETTINGS} effective={session ? settingsFor(session) : data?.savedSettings ?? DEFAULT_SETTINGS} active={running} hasSession={!!session} online={online} working={working} action={action} /></div>
+        <div hidden={view !== 'settings'}><StrategySettingsPanel key={chosenDirection} saved={selectedSettings} effective={session ? settingsFor(session) : selectedSettings} active={running} hasSession={!!session} online={online} working={working} action={action} /></div>
         <div hidden={view !== 'audit'}><TransparencyPanel data={data} visible={view === 'audit'} now={now} online={online} /></div>
         <footer className="page-footer">
           <span>MAVRIX / 009 · {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' }).format(now)}</span>
@@ -166,7 +174,7 @@ export default function App() {
         </footer>
       </main>
       {brokerDialog && <BrokerDialog broker={broker} locked={locked} online={online} working={working} error={error} action={action} onClose={() => setBrokerDialog(false)} />}
-      {rulesDialog && <RulesDialog settings={locked || dayLocked ? settingsFor(session) : data?.savedSettings ?? DEFAULT_SETTINGS} onClose={() => setRulesDialog(false)} />}
+      {rulesDialog && <RulesDialog settings={locked || dayLocked ? settingsFor(session) : selectedSettings} onClose={() => setRulesDialog(false)} />}
     </div>
   )
 }

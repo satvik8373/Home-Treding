@@ -59,7 +59,7 @@ test('pending intent appears only in order report and exports are read-only', as
   for (const kind of ['trades', 'orders']) {
     const response = await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/${kind}.csv`)
     assert.equal(response.status, 200); assert.match(response.headers.get('content-type')!, /text\/csv/)
-    assert.match(response.headers.get('content-disposition')!, new RegExp(`009-paper-${kind}-2026-10-26.csv`))
+    assert.match(response.headers.get('content-disposition')!, new RegExp(`009-buy-paper-${kind}-2026-10-26.csv`))
   }
   assert.equal(JSON.stringify(s), before); assert.equal(f.broker.submitted.length, 0); assert.equal(f.broker.cancellations.length, 0)
 })

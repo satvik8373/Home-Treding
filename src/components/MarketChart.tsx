@@ -1,3 +1,4 @@
+import { directionOf, referenceStop } from '../../shared/strategy';
 import { targetPrice } from '../../shared/targets';
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -91,6 +92,8 @@ export function MarketChart({
   );
   const referenceClose = leg?.reference.close, upper = leg?.upper, lower = leg?.lower;
   const average = leg?.position?.average, target1Remaining = leg?.position?.target1Remaining;
+  const short = directionOf(settings) === 'sell';
+  const stopLevel = referenceClose != null && (settings.stopLossPoints ?? 0) > 0 ? referenceStop(referenceClose, settings) : null;
   const target1Level = average != null ? targetPrice(settings, 1, average) : null;
   const target2Level = average != null ? targetPrice(settings, 2, average) : null;
   const markerSpec = JSON.stringify(payload ? tradeMarkers(trades, payload.candles, payload.title) : []);
@@ -230,15 +233,15 @@ export function MarketChart({
     if (referenceClose == null || upper == null || lower == null) return;
     const lines = [
       { value: referenceClose, label: "Reference", color: "#8c98a8" },
-      { value: upper, label: "Breakout", color: "#4d7298" },
-      { value: lower, label: "Lower exit", color: "#ad6b63" },
+      { value: upper, label: short ? "Upper exit" : "Breakout", color: "#4d7298" },
+      { value: lower, label: short ? "Breakout" : "Lower exit", color: "#ad6b63" },
     ];
     if (average != null)
       lines.push(
         { value: average, label: "Avg fill", color: "#6c7489" },
         ...(settings.target1Lots && target1Level != null ? [{ value: target1Level!, label: target1Remaining ? "T1" : "T1 filled", color: "#598269" }] : []),
         ...(target2Level != null ? [{ value: target2Level!, label: "T2", color: "#598269" }] : []),
-        ...((settings.stopLossPoints ?? 0) > 0 && referenceClose > settings.stopLossPoints! ? [{ value: referenceClose - settings.stopLossPoints!, label: 'Reference stop', color: '#ad6b63' }] : []),
+        ...(stopLevel != null && stopLevel > 0 ? [{ value: stopLevel, label: 'Reference stop', color: '#ad6b63' }] : []),
       );
     levels.current = lines.map((line) =>
       s.createPriceLine({
@@ -251,7 +254,7 @@ export function MarketChart({
       }),
     );
   }, [
-    referenceClose, upper, lower, average, target1Remaining, settings.target1Lots, target1Level, target2Level, settings.stopLossPoints,
+    referenceClose, upper, lower, average, target1Remaining, settings.target1Lots, target1Level, target2Level, stopLevel, short,
     symbol,
     identity,
   ]);

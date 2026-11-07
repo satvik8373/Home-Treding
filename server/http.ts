@@ -1,3 +1,4 @@
+import { directionOf } from '../shared/strategy.ts'
 import express from "express";
 import { tradesReport, ordersReport, backtestTradesReport, backtestDaysReport } from "./reports.ts";
 import type { ErrorRequestHandler } from "express";
@@ -117,8 +118,8 @@ export function createApp(
   app.get("/api/state", (_req, res) => res.json(controller.snapshot(csrf)));
   app.get('/api/setup/network', async (_req, res) => res.json(await setup.read()));
   app.post('/api/setup/network', (req, res) => res.json(setup.save(req.body)));
-  app.get('/api/strategy/settings', (_req, res) => res.json({ saved: controller.strategySettings(), effective: controller.session?.settings ?? DEFAULT_SETTINGS, defaults: DEFAULT_SETTINGS }));
-  app.post('/api/strategy/settings', (req, res) => { const saved = controller.saveStrategySettings(req.body); repository.put('strategy:settings', saved); res.json({ saved, appliesTo: 'next trading day; today retains the same saved day-session' }); });
+  app.get('/api/strategy/settings', (req, res) => res.json({ saved: controller.strategySettings(req.query.strategy === 'sell' ? 'sell' : 'buy'), profiles: { buy: controller.strategySettings('buy'), sell: controller.strategySettings('sell') }, effective: controller.session?.settings ?? DEFAULT_SETTINGS, defaults: DEFAULT_SETTINGS }));
+  app.post('/api/strategy/settings', (req, res) => { const saved = controller.saveStrategySettings(req.body); repository.put(directionOf(saved) === 'sell' ? 'strategy:settings:sell' : 'strategy:settings', saved); res.json({ saved, appliesTo: 'next trading day; today retains the same saved day-session' }); });
   app.get('/api/audit', async (_req, res) => res.json(await audit.read()));
   app.get('/api/audit/export', async (_req, res) => res.set('Content-Disposition', 'attachment; filename="009-account-audit.json"').json(await audit.read()));
   app.get('/api/broker/diagnostics', async (_req, res) => {
@@ -278,7 +279,9 @@ export function createApp(
       throw new Error("Choose Paper or Live mode.");
     if (mode === "live" && req.body.liveAcknowledged !== true)
       throw new Error("Confirm live orders before starting.");
-    await controller.start(mode as "paper" | "live");
+    const direction = req.body.strategy ?? 'buy';
+    if (!['buy', 'sell'].includes(direction)) throw new Error('Choose the Buy or Sell strategy.');
+    await controller.start(mode as "paper" | "live", direction);
     res.status(202).json({ ok: true });
   });
   app.post("/api/strategy/stop", async (_req, res) => {

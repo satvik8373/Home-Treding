@@ -9,7 +9,7 @@ import { dateRange, dataset, options, tradingDate } from './validation.ts'
 import { ENGINE, replay, report } from './replay.ts'
 import { nonSessionReason } from './calendar.ts'
 import type { HistoricalData } from './historical.ts'
-import { DEFAULT_SETTINGS, validateSettings } from '../../shared/settings.ts'
+import { DEFAULT_SETTINGS, SELL_DEFAULT_SETTINGS, validateSettings } from '../../shared/settings.ts'
 import type { StrategySettings } from '../../shared/settings.ts'
 
 export interface BacktestRepository { get<T>(key: string): T | null; put(key: string, value: unknown): void; keys(prefix: string): string[] }
@@ -59,7 +59,8 @@ export class Backtests {
     if (this.running) throw new Error('A backtest is already running. Wait for it to finish.')
     const body = input as Record<string, unknown> | null
     const dates = dateRange(body?.startDate, body?.endDate, this.now()), config = options(body?.options ?? {})
-    config.strategySettings ??= validateSettings(this.repository.get('strategy:settings') ?? DEFAULT_SETTINGS)
+    if (body?.strategy !== undefined && !['buy', 'sell'].includes(String(body.strategy))) throw new Error('Choose the Buy or Sell strategy.')
+    config.strategySettings ??= validateSettings(this.repository.get(body?.strategy === 'sell' ? 'strategy:settings:sell' : 'strategy:settings') ?? (body?.strategy === 'sell' ? SELL_DEFAULT_SETTINGS : DEFAULT_SETTINGS))
     const id = randomUUID(), job: BacktestJob = { id, startDate: dates[0], endDate: dates.at(-1), status: 'running', completed: 0, total: dates.length, message: 'Checking original option data…', result: null }
     this.records.set(id, { job, datasets: [] }); this.running = true
     while (this.records.size > 10) this.records.delete(this.records.keys().next().value!)

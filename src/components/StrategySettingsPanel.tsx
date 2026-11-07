@@ -1,3 +1,4 @@
+import { directionOf, strategyName } from '../../shared/strategy'
 import { SlidersHorizontal, ArrowUpRight, Crosshair, ShieldCheck, RotateCcw, LockKeyhole, Check, Save } from 'lucide-react'
 import { targetLabel, targetRule } from '../../shared/targets'
 import type { TargetRule } from '../../shared/targets'
@@ -33,7 +34,7 @@ export function StrategySettingsPanel({ saved, effective, active, hasSession = a
     try {
       if (numeric.some(([key]) => !shownForm[key].trim())) throw new Error('Complete every numeric field. Use 0 only where explicitly allowed.')
       if (!target2Lots.trim() || !Number.isInteger(Number(target2Lots)) || Number(target2Lots) < 1 || Number(shownForm.target1Lots) + Number(target2Lots) !== Number(shownForm.entryLots)) throw new Error('Target 1 lots + target 2 lots must equal entry lots, with at least 1 lot remaining for target 2.')
-      const settings = validateSettings({ target1Points: saved.target1Points, target2Points: saved.target2Points, target1Rule: shownRules[0], target2Rule: shownRules[1], ...Object.fromEntries(numeric.map(([key]) => [key, Number(shownForm[key])])), cutoff: shownCutoff, enabledSides: shownSides })
+      const settings = validateSettings({ direction: saved.direction, target1Points: saved.target1Points, target2Points: saved.target2Points, target1Rule: shownRules[0], target2Rule: shownRules[1], ...Object.fromEntries(numeric.map(([key]) => [key, Number(shownForm[key])])), cutoff: shownCutoff, enabledSides: shownSides })
       const result = await action('/api/strategy/settings', settings, 'save-settings')
       if (result) setNote('Saved. Current session rules are unchanged; new backtests use these settings; the saved day-session keeps its original rules until the next trading day.')
     } catch (error) { setError(error instanceof Error ? error.message : 'Could not save settings.') }
@@ -49,14 +50,14 @@ export function StrategySettingsPanel({ saved, effective, active, hasSession = a
   const allocationValid = Number(shownForm.target1Lots) >= 0 && Number(target2Lots) >= 1 && Number(shownForm.target1Lots) + Number(target2Lots) === Number(shownForm.entryLots)
   const previewSettings = { ...saved, target1Rule: shownRules[0], target2Rule: shownRules[1] }
   return <section className="strategy-settings" aria-labelledby="strategy-settings-title">
-    <header className="settings-heading"><div><span className="settings-kicker">NIFTY 009 / CONFIGURATION</span><h2 id="strategy-settings-title">Strategy settings</h2><p>Set your entries, target exits and protection in one place.</p></div><span className="settings-status"><LockKeyhole size={13} />Applies next trading day</span></header>
+    <header className="settings-heading"><div><span className="settings-kicker">{strategyName(saved).toUpperCase()} / CONFIGURATION</span><h2 id="strategy-settings-title">Strategy settings</h2><p>Set your entries, target exits and protection in one place.</p></div><span className="settings-status"><LockKeyhole size={13} />Applies next trading day</span></header>
     <form onSubmit={event => { event.preventDefault(); void save() }}>
       <div className="settings-layout"><div className="settings-main">
         <section className="settings-section" aria-labelledby="entry-settings-title">
           <div className="settings-section-heading"><span className="settings-section-icon"><ArrowUpRight size={18} /></span><div><h3 id="entry-settings-title">Entry setup</h3><p>Size and conditions for each new position.</p></div><span className="settings-section-number">01</span></div>
           <div className="settings-field-grid">
-            {numberField('entryLots', 'Entry size', 'Lots bought per enabled leg.', 'lots')}
-            {numberField('breakoutPercent', 'Breakout above reference', 'Uses the fixed opening option close.', '%')}
+            {numberField('entryLots', 'Entry size', directionOf(saved) === 'sell' ? 'Lots sold short per enabled leg.' : 'Lots bought per enabled leg.', 'lots')}
+            {numberField('breakoutPercent', directionOf(saved) === 'sell' ? 'Breakout below reference' : 'Breakout above reference', 'Uses the fixed opening option close.', '%')}
             <fieldset className="setting-legs"><legend>Trade legs</legend><div>{(['CE', 'PE'] as const).map(side => <label key={side}><input type="checkbox" checked={shownSides.includes(side)} disabled={disabled} onChange={event => edit({ sides: event.target.checked ? [...shownSides, side] : shownSides.filter(value => value !== side) })} /><span>{side === 'CE' ? 'Call' : 'Put'}<small>{side}</small></span></label>)}</div><small>Both legs use their own reference and position.</small></fieldset>
           </div>
         </section>
@@ -67,8 +68,8 @@ export function StrategySettingsPanel({ saved, effective, active, hasSession = a
               const kind = event.target.value === 'time' ? 'minutes' : 'points'
               changeRule(index, { kind, value: kind === 'minutes' ? (index ? 20 : 10) : (index ? 40 : 20) })
             }}><option value="price">Price</option><option value="time">Time</option></select></label>
-            <label className="setting-field"><span>{rule.kind === 'clock' ? 'Exit time · IST' : rule.kind === 'minutes' ? 'Minutes after original entry' : rule.kind === 'percent' ? 'Gain from entry · %' : rule.kind === 'price' ? 'Option premium · ₹' : 'Premium points above entry'}</span><div className="setting-input">{rule.kind === 'clock' ? <input type="time" min="09:20" max={shownCutoff} value={rule.time} disabled={disabled} onChange={event => changeRule(index, { kind: 'clock', time: event.target.value })} required /> : <input type="number" min={rule.kind === 'minutes' ? 1 : 0.01} max={rule.kind === 'minutes' ? 360 : rule.kind === 'percent' ? 1000 : 100000} step={rule.kind === 'minutes' ? 1 : 0.01} value={Number.isFinite(rule.value) ? rule.value : ''} disabled={disabled} onChange={event => changeRule(index, { ...rule, value: event.target.value === '' ? NaN : Number(event.target.value) })} required />}{rule.kind !== 'clock' && <span>{rule.kind === 'minutes' ? 'min' : rule.kind === 'percent' ? '%' : rule.kind === 'price' ? '₹' : 'pts'}</span>}</div></label>
-            {index === 0 ? numberField('target1Lots', 'Sell quantity', 'Use 0 to skip the first target.', 'lots') : <label className="setting-field"><span>Sell quantity</span><div className="setting-input"><input type="number" min="1" max="20" step="1" value={target2Lots} disabled={disabled} onChange={event => {
+            <label className="setting-field"><span>{rule.kind === 'clock' ? 'Exit time · IST' : rule.kind === 'minutes' ? 'Minutes after original entry' : rule.kind === 'percent' ? directionOf(saved) === 'sell' ? 'Fall from entry · %' : 'Gain from entry · %' : rule.kind === 'price' ? 'Option premium · ₹' : directionOf(saved) === 'sell' ? 'Premium points below entry' : 'Premium points above entry'}</span><div className="setting-input">{rule.kind === 'clock' ? <input type="time" min="09:20" max={shownCutoff} value={rule.time} disabled={disabled} onChange={event => changeRule(index, { kind: 'clock', time: event.target.value })} required /> : <input type="number" min={rule.kind === 'minutes' ? 1 : 0.01} max={rule.kind === 'minutes' ? 360 : rule.kind === 'percent' ? 1000 : 100000} step={rule.kind === 'minutes' ? 1 : 0.01} value={Number.isFinite(rule.value) ? rule.value : ''} disabled={disabled} onChange={event => changeRule(index, { ...rule, value: event.target.value === '' ? NaN : Number(event.target.value) })} required />}{rule.kind !== 'clock' && <span>{rule.kind === 'minutes' ? 'min' : rule.kind === 'percent' ? '%' : rule.kind === 'price' ? '₹' : 'pts'}</span>}</div></label>
+            {index === 0 ? numberField('target1Lots', directionOf(saved) === 'sell' ? 'Buy back quantity' : 'Sell quantity', 'Use 0 to skip the first target.', 'lots') : <label className="setting-field"><span>{directionOf(saved) === 'sell' ? 'Buy back quantity' : 'Sell quantity'}</span><div className="setting-input"><input type="number" min="1" max="20" step="1" value={target2Lots} disabled={disabled} onChange={event => {
               const value = event.target.value, remaining = Number(value), entry = Number(shownForm.entryLots)
               edit({ form: value.trim() && Number.isInteger(remaining) ? { ...shownForm, target1Lots: String(entry - remaining) } : shownForm }); setTarget2Draft(value)
             }} required /><span>lots</span></div><small>Adjusts T1 to keep your total allocation.</small></label>}
@@ -78,8 +79,8 @@ export function StrategySettingsPanel({ saved, effective, active, hasSession = a
         <section className="settings-section" aria-labelledby="protection-settings-title">
           <div className="settings-section-heading"><span className="settings-section-icon"><ShieldCheck size={18} /></span><div><h3 id="protection-settings-title">Protection & session</h3><p>Keep exits and the trading window under control.</p></div><span className="settings-section-number">03</span></div>
           <div className="settings-field-grid">
-            {numberField('stopLossPoints', 'Reference stop', 'Points below opening close. 0 disables this stop.', 'pts')}
-            {numberField('exitPercent', 'Lower candle-close exit', 'Exit below reference after a completed 5-minute candle.', '%')}
+            {numberField('stopLossPoints', 'Reference stop', directionOf(saved) === 'sell' ? 'Points above opening close. 0 disables this stop.' : 'Points below opening close. 0 disables this stop.', 'pts')}
+            {numberField('exitPercent', directionOf(saved) === 'sell' ? 'Upper candle-close exit' : 'Lower candle-close exit', directionOf(saved) === 'sell' ? 'Cover above reference after a completed 5-minute candle.' : 'Exit below reference after a completed 5-minute candle.', '%')}
             <label className="setting-field"><span>Square-off time</span><div className="setting-input"><input type="time" min="09:30" max="15:25" step="300" value={shownCutoff} disabled={disabled} onChange={event => edit({ cutoff: event.target.value })} required /><span>IST</span></div><small>Close remaining positions and stop new entries.</small></label>
           </div>
         </section>

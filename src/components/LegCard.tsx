@@ -1,3 +1,4 @@
+import { directionOf, signFor, referenceStop, entryLevel } from '../../shared/strategy';
 import { targetPrice, targetDeadline, targetLabel } from '../../shared/targets';
 import { clock } from '../lib/format';
 import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
@@ -31,7 +32,7 @@ export function LegCard({
   }
   const pnl =
     position && fresh
-      ? (mark.price - position.average) * position.quantity
+      ? signFor(settings) * (mark.price - position.average) * position.quantity
       : null;
   return (
     <section
@@ -56,7 +57,7 @@ export function LegCard({
           <p>{leg?.contract.symbol ?? "Waiting for reference candle"}</p>
         </div>
         <span className={`tag ${position ? "positive" : ""}`}>
-          {position ? "Open" : leg ? "Watching" : "Waiting"}
+          {position ? directionOf(settings) === 'sell' ? 'Short' : 'Long' : leg ? "Watching" : "Waiting"}
         </span>
       </div>
       <div className="leg-price-row">
@@ -70,17 +71,17 @@ export function LegCard({
         </div>
         <div>
           <dt>Breakout</dt>
-          <dd>{price(leg?.upper)}</dd>
+          <dd>{price(leg ? entryLevel(leg, settings) : null)}</dd>
         </div>
         <div>
-          <dt>Lower exit</dt>
-          <dd>{price(leg?.lower)}</dd>
+          <dt>{directionOf(settings) === 'sell' ? 'Upper exit' : 'Lower exit'}</dt>
+          <dd>{price(leg ? directionOf(settings) === 'sell' ? leg.upper : leg.lower : null)}</dd>
         </div>
         <div>
           <dt>Avg fill</dt>
           <dd>{price(position?.average)}</dd>
         </div>
-        <div><dt>Reference stop</dt><dd>{position && (settings.stopLossPoints ?? 0) > 0 && leg!.reference.close > settings.stopLossPoints! ? price(leg!.reference.close - settings.stopLossPoints!) : '—'}</dd></div>
+        <div><dt>Reference stop</dt><dd>{position && (settings.stopLossPoints ?? 0) > 0 && referenceStop(leg!.reference.close, settings) > 0 ? price(referenceStop(leg!.reference.close, settings)) : '—'}</dd></div>
         <div>
           <dt>Target 1</dt>
           <dd>{targetDisplay(1)}</dd>
