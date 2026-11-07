@@ -267,6 +267,7 @@ export function createApp(
     );
     res.json({ ok: true });
   });
+  app.post('/api/broker/recheck', async (_req, res) => { await controller.recheckConnection(); res.json({ ok: true }); });
   app.post("/api/broker/disconnect", async (_req, res) => {
     await controller.disconnect();
     res.json({ ok: true });

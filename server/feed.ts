@@ -1,3 +1,4 @@
+import { isTradingDay, istDate, istTime } from './time.ts'
 import WebSocket from 'ws'
 import type { Mark } from '../shared/model.ts'
 import { freshMark } from '../shared/market.ts'
@@ -31,6 +32,7 @@ export function parsePackets(buffer: Buffer, receivedAt = Date.now()): Mark[] {
   }
   return ticks
 }
+export const normalMarketSession = (now: number) => isTradingDay(now) && now >= istTime(istDate(now), '09:15') && now < istTime(istDate(now), '15:30')
 export class MarketFeed {
   status: 'disconnected' | 'connecting' | 'connected' = 'disconnected'
   lastTickAt: number | null = null
@@ -42,7 +44,7 @@ export class MarketFeed {
   private tokens: string[] = []
   private attempt = 0
   private generation = 0
-  constructor(private socketFactory = (url: URL) => new WebSocket(url, { handshakeTimeout: 10_000, maxPayload: 1024 * 1024 })) {}
+  constructor(private socketFactory = (url: URL) => new WebSocket(url, { handshakeTimeout: 10_000, maxPayload: 1024 * 1024 }), private ticksExpected = normalMarketSession) {}
   onMark: (mark: Mark) => void = () => {}
   onChange: () => void = () => {}
   connect(credentials: SavedBroker, tokens: string[]): void {
@@ -94,14 +96,15 @@ export class MarketFeed {
       this.diagnostics.closeCode = code
       if (this.watchdog) clearInterval(this.watchdog)
       this.watchdog = null; this.ws = null
-      this.status = 'disconnected'; this.onChange()
+      this.status = this.credentials && this.credentials.expiresAt > Date.now() ? 'connecting' : 'disconnected'; this.onChange()
       this.retry = setTimeout(() => this.open(generation), Math.min(30_000, 1000 * 2 ** Math.min(this.attempt++, 5)))
     })
     this.watchdog = setInterval(() => {
       if (generation !== this.generation) return
       const now = Date.now()
-      // Heartbeats alone do not prove that subscribed instruments are flowing.
-      if (now - lastMessageAt > 20_000 || this.tokens.some(token => now - (tokenTicks.get(token) ?? openedAt) > 20_000)) ws.terminate()
+      // No tick is expected outside normal weekday market hours. A quiet option
+      // must not tear down an otherwise flowing stream; REST covers stale legs.
+      if (now - lastMessageAt > 20_000 || this.ticksExpected(now) && now - (this.lastTickAt ?? openedAt) > 20_000) ws.terminate()
     }, 5000)
   }
   close(): void {

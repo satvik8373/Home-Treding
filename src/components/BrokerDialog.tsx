@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import type { BrokerStatus } from "../../shared/model";
 import type { useDashboard } from "../hooks/useDashboard";
-import { clock } from "../lib/format";
+import { clock, dateTime } from "../lib/format";
 import { Dialog } from "./Dialog";
 import { BrokerDiagnostics } from './BrokerDiagnostics';
 import { BrokerSetup } from './BrokerSetup';
@@ -33,7 +33,9 @@ export function BrokerDialog({
   onClose,
 }: Props) {
   const [flowId, setFlowId] = useState(""),
-    [method, setMethod] = useState<"otp" | "totp">("totp");
+    [method, setMethod] = useState<"otp" | "totp">("otp");
+  const [awaitingConnection, setAwaitingConnection] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
   const [refreshLogin, setRefreshLogin] = useState(false);
   const [connectionRevision, setConnectionRevision] = useState(0);
   const showConnection = broker?.connected && !refreshLogin;
@@ -43,6 +45,11 @@ export function BrokerDialog({
     apiKey: "",
     code: "",
   });
+  const phase = broker?.connection?.phase;
+  const showRecovery = !showConnection && !flowId && !refreshLogin && (phase === 'checking' || phase === 'retrying' || awaitingConnection && phase !== 'expired' && phase !== 'rejected');
+  function verificationMethod() {
+    return <label className="field">Verification method<select className="broker-method-select" value={method} disabled={!online || !!working} onChange={event => { setMethod(event.target.value as 'otp' | 'totp'); setForm({ ...form, code: '' }) }}><option value="otp">SMS OTP</option><option value="totp">Authenticator (TOTP enabled)</option></select><small className="form-hint">{method === 'otp' ? 'Use SMS OTP if TOTP is not enabled for your mStock API.' : 'Use your authenticator app. mStock does not send SMS OTP when TOTP is enabled.'}</small></label>
+  }
   async function login(event: FormEvent) {
     event.preventDefault();
     const result = await action(
@@ -51,6 +58,7 @@ export function BrokerDialog({
       "login",
     );
     if (result) {
+      setAwaitingConnection(false);
       setFlowId(result.flowId);
       setForm({ username: "", password: "", apiKey: "", code: "" });
     }
@@ -65,6 +73,7 @@ export function BrokerDialog({
       )
     ) {
       setFlowId('');
+      setAwaitingConnection(true);
       setRefreshLogin(false);
       setConnectionRevision(value => value + 1);
       setForm({ username: '', password: '', apiKey: '', code: '' });
@@ -79,15 +88,15 @@ export function BrokerDialog({
       <h2 id="broker-title">
         {showConnection
           ? "mStock connected"
-          : flowId
+          : showRecovery ? "Checking broker connection" : flowId
             ? "Verify your connection"
             : refreshLogin ? 'Refresh mStock login' : "Connect mStock"}
       </h2>
       <p className="dialog-description">
         {showConnection
           ? `Connected as ${broker.name}.`
-          : flowId
-            ? "Enter your current six-digit verification code."
+          : showRecovery ? "Your saved token is retained while the read-only account check retries." : flowId
+            ? (method === 'otp' ? "Enter the six-digit code sent by mStock." : "Enter the current six-digit code from your authenticator app.")
             : refreshLogin ? 'Sign in again to capture the exchange, product and order-type permissions supplied by mStock.' : "Use your mStock account and official API key."}
       </p>
       {error && (
@@ -95,7 +104,8 @@ export function BrokerDialog({
           {error}
         </div>
       )}
-      <BrokerSetup key={`${broker?.connected ? broker.account : 'disconnected'}:${connectionRevision}`} account={broker?.connected ? broker.account : null} action={action} working={working} />
+      {!showConnection && !showRecovery && !flowId && broker?.connection && ['expired', 'rejected'].includes(broker.connection.phase) && <p className="form-hint" role="status">{broker.connection.message}</p>}
+
       {showConnection ? (
         <>
           <dl className="connection-details">
@@ -104,13 +114,13 @@ export function BrokerDialog({
               <dd>{broker.account}</dd>
             </div>
             <div>
-              <dt>WebSocket</dt>
-              <dd>{broker.feed}</dd>
+              <dt>Market stream</dt>
+              <dd>{broker.feed === 'connecting' ? 'Reconnecting automatically' : broker.feed}</dd>
             </div>
             <div>
               <dt>Session expires</dt>
               <dd>
-                {broker.expiresAt ? `${clock(broker.expiresAt)} IST` : "—"}
+                {broker.expiresAt ? `${dateTime(broker.expiresAt)} IST` : "—"}
               </dd>
             </div>
           </dl>
@@ -119,7 +129,7 @@ export function BrokerDialog({
           <p className="form-hint">Requires a fresh login and OTP/TOTP. Stop and flatten the strategy before refreshing.</p>
           <button
             className="button secondary full-width"
-            disabled={locked || !!working}
+            disabled={locked || !online || !!working}
             onClick={() =>
               void action("/api/broker/disconnect", {}, "disconnect")
             }
@@ -133,24 +143,9 @@ export function BrokerDialog({
             </p>
           )}
         </>
-      ) : flowId ? (
+      ) : showRecovery ? <div className="broker-recovery" role="status"><p>{broker?.connection?.message || 'Verification code accepted. Checking your broker session.'}</p>{broker?.connection?.nextRetryAt && <p>Next check: {clock(broker.connection.nextRetryAt, true)} IST</p>}<button className="button secondary full-width" disabled={!online || !!working || phase === 'checking'} onClick={() => void action('/api/broker/recheck', {}, 'recheck-broker')}>{working === 'recheck-broker' ? 'Checking…' : 'Retry account check'}</button><button type="button" className="text-button restart-auth" disabled={!!working} onClick={() => { setRefreshLogin(true); setAwaitingConnection(false) }}>Sign in again</button></div> : flowId ? (
         <form onSubmit={verify}>
-          <div className="auth-method">
-            <button
-              type="button"
-              className={method === "totp" ? "active" : ""}
-              onClick={() => setMethod("totp")}
-            >
-              Authenticator
-            </button>
-            <button
-              type="button"
-              className={method === "otp" ? "active" : ""}
-              onClick={() => setMethod("otp")}
-            >
-              SMS OTP
-            </button>
-          </div>
+          {verificationMethod()}
           <label className="field">
             {method === "totp" ? "Authenticator code" : "SMS OTP"}
             <input
@@ -168,7 +163,7 @@ export function BrokerDialog({
           </label>
           <button
             className="button primary full-width"
-            disabled={!!working || form.code.length !== 6}
+            disabled={!online || !!working || form.code.length !== 6}
           >
             {working === "verify" ? "Verifying…" : "Verify & connect"}
             <ArrowRight size={15} />
@@ -184,6 +179,7 @@ export function BrokerDialog({
         </form>
       ) : (
         <form onSubmit={login}>
+          {verificationMethod()}
           {(["username", "apiKey", "password"] as const).map((key) => (
             <label className="field" key={key}>
               {key === "username"
@@ -216,6 +212,8 @@ export function BrokerDialog({
         </form>
       )}
       {refreshLogin && broker?.connected && <button className="text-button restart-auth" disabled={!!working} onClick={() => { setRefreshLogin(false); setFlowId(''); setForm({ username: '', password: '', apiKey: '', code: '' }) }}>Return to current connection</button>}
+      <details className="broker-setup-details" onToggle={event => setSetupOpen(event.currentTarget.open)}><summary>API key & execution IP setup</summary>{setupOpen && <BrokerSetup key={`${broker?.connected ? broker.account : 'disconnected'}:${connectionRevision}`} account={broker?.connected ? broker.account : null} action={action} working={working} />}</details>
+      <p className="form-hint">Sessions expire within 12 hours or at midnight IST, whichever comes first. A stream reconnect does not require a new OTP.</p>
       <div className="dialog-security">
         <ShieldCheck size={15} />
         <span>

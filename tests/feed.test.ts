@@ -19,12 +19,12 @@ function packet(token: number, size = 64, at = Date.now()) {
   buffer.writeUInt32BE(Math.floor((at - Date.parse('1980-01-01T00:00:00+05:30')) / 1000), 4 + (size === 48 ? 28 : 60))
   return buffer
 }
-function setup() {
+function setup(ticksExpected = () => true) {
   const sockets: Socket[] = []
   const feed = new MarketFeed(() => {
     const socket = new Socket(); sockets.push(socket)
     return socket as unknown as WebSocket
-  })
+  }, ticksExpected)
   feed.connect(credentials(), ['101', '102'])
   sockets[0].emit('open')
   return { feed, sockets }
@@ -76,14 +76,14 @@ test('heartbeat-only connections reconnect and repeat authentication and subscri
   assert.deepEqual(JSON.parse(sockets[1].sent[1]), { a: 'subscribe', v: [101, 102] })
 })
 
-test('one stalled subscribed token reconnects even while another has fresh ticks', t => {
+test('one quiet subscribed token does not interrupt other flowing instruments', t => {
   t.mock.timers.enable({ apis: ['Date', 'setInterval', 'setTimeout'], now: 1_800_000_000_000 })
   const { feed, sockets } = setup(); t.after(() => feed.close())
   for (let i = 0; i < 5; i++) {
     sockets[0].emit('message', packet(101), true)
     t.mock.timers.tick(5000)
   }
-  assert.equal(sockets[0].terminated, true)
+  assert.equal(sockets[0].terminated, false)
 })
 
 test('fresh ticks keep the feed alive; stale exchange ticks are not delivered', t => {
@@ -101,4 +101,12 @@ test('fresh ticks keep the feed alive; stale exchange ticks are not delivered', 
   assert.equal(prices.length, 16)
   feed.close(); t.mock.timers.tick(60_000)
   assert.equal(sockets.length, 1)
+})
+
+test('quiet market hours keep a heartbeat-only stream stable without inventing fresh ticks', t => {
+  t.mock.timers.enable({ apis: ['Date', 'setInterval', 'setTimeout'], now: Date.parse('2026-11-07T11:00:00+05:30') })
+  const { feed, sockets } = setup(() => false); t.after(() => feed.close())
+  for (let i = 0; i < 30; i++) { sockets[0].emit('message', Buffer.from([0]), true); t.mock.timers.tick(5000) }
+  assert.equal(sockets[0].terminated, false)
+  assert.equal(feed.lastTickAt, null)
 })

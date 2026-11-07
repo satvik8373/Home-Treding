@@ -126,7 +126,14 @@ export interface TradingSession {
   trades: Trade[];
   activity: Activity[];
 }
+export interface BrokerConnection {
+  phase: 'idle' | 'checking' | 'retrying' | 'expired' | 'rejected' | 'connected';
+  message: string;
+  checkedAt: number | null;
+  nextRetryAt: number | null;
+}
 export interface BrokerStatus {
+  connection?: BrokerConnection;
   connected: boolean;
   account: string | null;
   name: string | null;

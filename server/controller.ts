@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { Activity, AppState, Candle, Mark, Mode, OrderAudit, OrderIntent, Reason, Side, TradingSession } from '../shared/model.ts'
+import type { Activity, AppState, BrokerConnection, Candle, Mark, Mode, OrderAudit, OrderIntent, Reason, Side, TradingSession } from '../shared/model.ts'
 import { RULES } from '../shared/model.ts'
 import { freshMark } from '../shared/market.ts'
 import { BrokerError, INDEX_TOKEN, type TradingBroker, type MStock } from './broker.ts'
@@ -25,10 +25,14 @@ export class Controller {
   marks: Record<string, Mark> = {}
   busy = false
   onChange: () => void = () => {}
+  private connection: BrokerConnection = { phase: 'idle', message: 'Connect your mStock account.', checkedAt: null, nextRetryAt: null }
+  private connectionAttempt = 0
+  private connectionGeneration = 0
+  private restoring = false
   private verified = false
   private stopRequested = false
   private queue: Promise<unknown> = Promise.resolve()
-  private auth: { id: string; apiKey: string; username: string; expires: number } | null = null
+  private auth: { id: string; apiKey: string; username: string; expires: number; attempts: number } | null = null
   private lastQuotes = 0
   private quotesInFlight = false
   private lastPositionCheck = 0
@@ -41,8 +45,13 @@ export class Controller {
   private savedSession = ''
   private suspended = false
   private preferences: StrategySettings = structuredClone(DEFAULT_SETTINGS)
-  constructor(public broker: TradingBroker & Partial<Pick<MStock, 'login' | 'verify' | 'verifyAccount' | 'logout'>>,
+  constructor(public broker: TradingBroker & Partial<Pick<MStock, 'login' | 'verify' | 'verifyAccount' | 'logout' | 'onAuthFailure'>>,
     private store: Repository, public feed: Feed, private now = Date.now) {
+    broker.onAuthFailure = () => {
+      this.verified = false; this.feed.close()
+      this.connection = { phase: 'rejected', message: 'mStock rejected the saved session or API key. Sign in again.', checkedAt: this.now(), nextRetryAt: null }
+      this.onChange()
+    }
     this.session = store.session()
     const savedSettings = store.get?.('strategy:settings')
     if (savedSettings) this.preferences = validateSettings(savedSettings)
@@ -78,9 +87,19 @@ export class Controller {
     this.store.put('strategy:settings', settings); this.preferences = settings; this.onChange()
     return this.strategySettings()
   }
+  private connectionSnapshot(): BrokerConnection {
+    if (this.broker.credentials && this.broker.credentials.expiresAt <= this.now()) return { phase: 'expired', message: 'Your mStock session has expired. Sign in again with a fresh OTP or authenticator code.', checkedAt: this.connection.checkedAt, nextRetryAt: null }
+    return { ...this.connection }
+  }
+  private retryBrokerCheck() {
+    this.verified = false
+    const delay = Math.min(60_000, 5000 * 2 ** Math.min(this.connectionAttempt++, 4))
+    this.connection = { phase: 'retrying', message: 'Broker verification is temporarily unavailable. Your saved token is retained; retrying automatically.', checkedAt: this.now(), nextRetryAt: this.now() + delay }
+    this.onChange()
+  }
   snapshot(csrf = ''): AppState {
     const credentials = this.broker.credentials
-    return { csrf, runtime: this.execution, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { connected: this.connected(),
+    return { csrf, runtime: this.execution, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { connection: this.connectionSnapshot(), connected: this.connected(),
       account: this.connected() ? credentials!.account : null, name: this.connected() ? credentials!.name : null,
       expiresAt: credentials?.expiresAt ?? null, feed: this.feed.status, lastTickAt: this.feed.lastTickAt },
       session: this.session, marks: this.marks }
@@ -129,15 +148,32 @@ export class Controller {
     return result
   }
   async restore(): Promise<void> {
-    const saved = this.store.broker()
+    if (this.restoring) return
+    const saved = this.broker.credentials ?? this.store.broker(), generation = this.connectionGeneration
+    if (saved) this.broker.credentials = saved
     if (!saved || saved.expiresAt <= this.now()) {
+      this.verified = false
+      this.connection = saved ? { phase: 'expired', message: 'Your mStock session has expired. Sign in again.', checkedAt: null, nextRetryAt: null } : { phase: 'idle', message: 'Connect your mStock account.', checkedAt: null, nextRetryAt: null }
       if (hasExposure(this.session)) { this.session!.status = 'blocked'; this.note('Reconnect the same mStock account to reconcile the saved position or order.', 'error') }
-      return
+      this.onChange(); return
     }
-    this.broker.credentials = saved
+    this.restoring = true
+    this.connection = { phase: 'checking', message: 'Checking the saved mStock session.', checkedAt: this.connection.checkedAt, nextRetryAt: null }; this.onChange()
     try {
       this.authorizeBroker?.(saved.account)
-      await this.broker.verifyAccount?.(); this.verified = true
+      try { await this.broker.verifyAccount?.() }
+      catch (error) {
+        if (generation !== this.connectionGeneration || this.broker.credentials !== saved) return
+        if (error instanceof BrokerError && error.definitive) {
+          this.verified = false; this.feed.close()
+          this.connection = { phase: 'rejected', message: `mStock account check failed: ${error.message}`, checkedAt: this.now(), nextRetryAt: null }
+          this.onChange()
+        } else this.retryBrokerCheck()
+        return
+      }
+      if (generation !== this.connectionGeneration || this.broker.credentials !== saved) return
+      this.verified = true; this.connectionAttempt = 0
+      this.connection = { phase: 'connected', message: 'Broker session verified. Market stream status is separate.', checkedAt: this.now(), nextRetryAt: null }
       this.subscribe()
       if (this.session && ['armed', 'preparing', 'running'].includes(this.session.status) && this.session.date === istDate(this.now())
         && this.now() < istTime(this.session.date, settingsFor(this.session).cutoff)) {
@@ -151,7 +187,22 @@ export class Controller {
       }
       if (hasExposure(this.session)) await this.reconcile()
       else if (active(this.session)) { this.session!.status = 'stopped'; this.note('Previous flat session restored. Start when ready.') }
-    } catch { this.verified = false; this.onChange() }
+    } catch (error) {
+      // A position-read/ownership failure is not a broker logout.
+      if (this.verified && this.session) {
+        if (!(error instanceof PositionReadError)) this.session.status = 'blocked'
+        this.note(error instanceof Error ? error.message : 'Session recovery needs reconciliation.', 'error')
+      } else {
+        this.connection = { phase: 'rejected', message: 'This broker account cannot be restored in this workspace. Use the workspace where it was connected.', checkedAt: this.now(), nextRetryAt: null }
+        this.onChange()
+      }
+    } finally { this.restoring = false; this.onChange() }
+  }
+  async recheckConnection(): Promise<void> {
+    if (this.connected()) return
+    if (!this.broker.credentials || this.broker.credentials.expiresAt <= this.now()) throw new Error('Sign in with a fresh verification code to reconnect mStock.')
+    if (this.busy || this.auth) throw new Error('Complete the current login or wait for the broker request to finish.')
+    await this.restore()
   }
   private subscribe(): void {
     if (!this.broker.credentials) return
@@ -162,10 +213,11 @@ export class Controller {
     return this.exclusive(async () => {
       if (active(this.session) && this.connected()) throw new Error('Stop the strategy before changing the broker connection.')
       if (!this.broker.login) throw new Error('Broker login is unavailable.')
+      this.connectionGeneration++
       this.auth = null
       await this.broker.login(username, password)
       const id = randomUUID()
-      this.auth = { id, username, apiKey, expires: this.now() + 600_000 }
+      this.auth = { id, username, apiKey, expires: this.now() + 600_000, attempts: 0 }
       return id
     })
   }
@@ -173,20 +225,34 @@ export class Controller {
     return this.exclusive(async () => {
       const auth = this.auth
       if (!auth || auth.id !== id || auth.expires < this.now()) throw new Error('Login expired. Start the connection again.')
+      if (auth.attempts++ >= 5) { this.auth = null; throw new Error('Too many verification attempts. Start login again.') }
       if (!this.broker.verify) throw new Error('Broker verification is unavailable.')
       const credentials = await this.broker.verify(auth.apiKey, code, method, auth.username)
       if (hasExposure(this.session) && this.session!.account !== credentials.account) throw new Error('Reconnect the same account that owns the saved strategy position.')
       const previous = this.broker.credentials
-      this.broker.credentials = credentials
-      try { await this.broker.verifyAccount?.(); this.authorizeBroker?.(credentials.account) } catch (error) { this.broker.credentials = previous; throw error }
-      this.store.saveBroker(credentials); this.verified = true; this.auth = null; this.subscribe(); this.onChange()
+      this.authorizeBroker?.(credentials.account)
+      // The code has already created a token. Retain it securely if the read-only
+      // funds check encounters a transient outage instead of consuming the code again.
+      try { this.store.saveBroker(credentials) } catch (error) { this.broker.credentials = previous; throw error }
+      this.connectionGeneration++; this.feed.close(); this.marks = {}; this.broker.credentials = credentials; this.verified = false; this.auth = null
+      try { await this.broker.verifyAccount?.() }
+      catch (error) {
+        if (error instanceof BrokerError && error.definitive) {
+          this.connection = { phase: 'rejected', message: `mStock account check failed: ${error.message}`, checkedAt: this.now(), nextRetryAt: null }; this.onChange(); throw error
+        }
+        this.retryBrokerCheck(); return
+      }
+      this.verified = true; this.connectionAttempt = 0
+      this.connection = { phase: 'connected', message: 'Broker session verified. Market stream status is separate.', checkedAt: this.now(), nextRetryAt: null }
+      this.subscribe(); this.onChange()
     })
   }
   async disconnect(): Promise<void> {
     return this.exclusive(async () => {
       if (active(this.session) || hasExposure(this.session)) throw new Error('Stop and flatten the strategy before disconnecting.')
+      this.connectionGeneration++
       if (this.connected()) await this.broker.logout?.()
-      this.feed.close(); this.verified = false; this.broker.credentials = null; this.store.saveBroker(null); this.marks = {}; this.onChange()
+      this.feed.close(); this.verified = false; this.broker.credentials = null; this.store.saveBroker(null); this.marks = {}; this.connection = { phase: 'idle', message: 'Connect your mStock account.', checkedAt: null, nextRetryAt: null }; this.onChange()
     })
   }
   async start(mode: Mode): Promise<void> {
@@ -376,6 +442,9 @@ export class Controller {
   }
   async pump(): Promise<void> {
     if (this.suspended) return
+    if (this.auth && this.auth.expires <= this.now()) this.auth = null
+    if (!this.verified && this.connection.phase === 'retrying' && !this.auth && !this.busy && this.now() >= (this.connection.nextRetryAt ?? Infinity)) { await this.restore(); return }
+    if (this.broker.credentials && this.broker.credentials.expiresAt <= this.now() && this.verified) { this.verified = false; this.feed.close(); this.onChange() }
     if (this.pumpTask) return this.pumpTask
     if (this.busy || !this.session || !active(this.session) && !hasExposure(this.session) || this.now() < this.retryAt) return
     this.pumpTask = this.exclusive(async () => {

@@ -24,8 +24,8 @@ export function useDashboard() {
       latestServerTime = 0;
     const accept = (value: AppState) => {
       if (!alive) return;
-      if (value.csrf) csrf.current = value.csrf;
       if (value.serverTime < latestServerTime) return;
+      if (value.csrf) csrf.current = value.csrf;
       latestServerTime = value.serverTime;
       lastAccepted = Date.now();
       offset.current = value.serverTime - Date.now();

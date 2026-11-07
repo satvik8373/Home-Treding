@@ -11,7 +11,7 @@ type Row = Record<string, unknown>
 const record = (v: unknown): Row => v && typeof v === 'object' && !Array.isArray(v) ? v as Row : {}
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 export class BrokerError extends Error {
-  constructor(message: string, public definitive = false) { super(message) }
+  constructor(message: string, public definitive = false, public authentication = false) { super(message) }
 }
 export interface PositionRow { symbol: string; exchange: string; product: string; quantity: number }
 export interface TradingBroker {
@@ -29,6 +29,7 @@ export interface TradingBroker {
 /** Direct Type A endpoints. Trading POSTs are never retried. */
 export class MStock implements TradingBroker {
   credentials: SavedBroker | null = null
+  onAuthFailure: (error: BrokerError) => void = () => {}
   private fetcher: typeof fetch
   private dataQueue: Promise<unknown> = Promise.resolve()
   private lastDataAt = 0
@@ -37,9 +38,10 @@ export class MStock implements TradingBroker {
   constructor(fetcher: typeof fetch = fetch) { this.fetcher = fetcher }
 
   async request(path: string, method = 'GET', form?: Record<string, string>, authenticated = true, text = false): Promise<unknown> {
-    if (authenticated && (!this.credentials || this.credentials.expiresAt <= Date.now())) throw new BrokerError('mStock session expired. Reconnect your broker.', true)
+    if (authenticated && (!this.credentials || this.credentials.expiresAt <= Date.now())) throw new BrokerError('mStock session expired. Reconnect your broker.', true, true)
+    const credentials = this.credentials
     const headers: Record<string, string> = { 'X-Mirae-Version': '1' }
-    if (authenticated && this.credentials) headers.Authorization = `token ${this.credentials.apiKey}:${this.credentials.accessToken}`
+    if (authenticated && credentials) headers.Authorization = `token ${credentials.apiKey}:${credentials.accessToken}`
     if (form) headers['Content-Type'] = 'application/x-www-form-urlencoded'
     const response = await this.fetcher(`${ROOT}${path}`, { method, headers,
       body: form ? new URLSearchParams(form) : undefined, signal: AbortSignal.timeout(12_000), redirect: 'error' })
@@ -49,9 +51,12 @@ export class MStock implements TradingBroker {
     if (!response.ok || body.status === 'error') {
       // Never include requests, headers, credentials, or full response bodies in errors.
       let message = typeof body.message === 'string' ? body.message.slice(0, 240) : `mStock request failed (HTTP ${response.status}).`
-      for (const secret of [this.credentials?.apiKey, this.credentials?.accessToken, ...Object.values(form ?? {})])
+      for (const secret of [credentials?.apiKey, credentials?.accessToken, ...Object.values(form ?? {})])
         if (secret && secret.length >= 4) message = message.split(secret).join('[redacted]')
-      throw new BrokerError(message, response.status < 500 && response.status !== 408)
+      const error = new BrokerError(message, response.status < 500 && response.status !== 408 && response.status !== 429 && body.error_type !== 'GeneralException',
+        authenticated && (response.status === 401 || ['TokenException', 'APIKeyException'].includes(String(body.error_type))))
+      if (error.authentication && this.credentials === credentials) this.onAuthFailure(error)
+      throw error
     }
     if (text) return raw
     if (body.status !== 'success') throw new BrokerError('mStock returned an unexpected response.')
