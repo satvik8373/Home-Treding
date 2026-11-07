@@ -21,7 +21,7 @@ export const hasExposure = (s: TradingSession | null) => !!s && (!!s.pending || 
 class PositionReadError extends Error {}
 
 export class Controller {
-  authorizeBroker?: (account: string) => void
+  authorizeBroker?: (account: string, freshlyVerified?: boolean) => void
   execution?: { kind: 'hosted-paper'; liveExecution: false; reason: string }
   session: TradingSession | null
   marks: Record<string, Mark> = {}
@@ -34,7 +34,7 @@ export class Controller {
   private verified = false
   private stopRequested = false
   private queue: Promise<unknown> = Promise.resolve()
-  private auth: { id: string; apiKey: string; username: string; expires: number; attempts: number } | null = null
+  private auth: { id: string; apiKey: string; username: string; expires: number; attempts: number; verifiedCredentials?: import('./store.ts').SavedBroker } | null = null
   private lastQuotes = 0
   private quotesInFlight = false
   private lastPositionCheck = 0
@@ -106,7 +106,7 @@ export class Controller {
   }
   snapshot(csrf = ''): AppState {
     const credentials = this.broker.credentials
-    return { csrf, runtime: this.execution, strategyProfiles: { buy: this.strategySettings('buy'), sell: this.strategySettings('sell') }, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { connection: this.connectionSnapshot(), connected: this.connected(),
+    return { csrf, runtime: this.execution, strategyProfiles: { buy: this.strategySettings('buy'), sell: this.strategySettings('sell') }, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { verificationMethod: credentials?.authMethod ?? null, connection: this.connectionSnapshot(), connected: this.connected(),
       account: this.connected() ? credentials!.account : null, name: this.connected() ? credentials!.name : null,
       expiresAt: credentials?.expiresAt ?? null, feed: this.feed.status, lastTickAt: this.feed.lastTickAt },
       session: this.session, marks: this.marks }
@@ -234,10 +234,11 @@ export class Controller {
       if (!auth || auth.id !== id || auth.expires < this.now()) throw new Error('Login expired. Start the connection again.')
       if (auth.attempts++ >= 5) { this.auth = null; throw new Error('Too many verification attempts. Start login again.') }
       if (!this.broker.verify) throw new Error('Broker verification is unavailable.')
-      const credentials = await this.broker.verify(auth.apiKey, code, method, auth.username)
+      const credentials = auth.verifiedCredentials ?? { ...await this.broker.verify(auth.apiKey, code, method, auth.username), authMethod: method }
+      auth.verifiedCredentials = credentials
       if (hasExposure(this.session) && this.session!.account !== credentials.account) throw new Error('Reconnect the same account that owns the saved strategy position.')
       const previous = this.broker.credentials
-      this.authorizeBroker?.(credentials.account)
+      this.authorizeBroker?.(credentials.account, true)
       // The code has already created a token. Retain it securely if the read-only
       // funds check encounters a transient outage instead of consuming the code again.
       try { this.store.saveBroker(credentials) } catch (error) { this.broker.credentials = previous; throw error }
@@ -253,6 +254,14 @@ export class Controller {
       this.connection = { phase: 'connected', message: 'Broker session verified. Market stream status is separate.', checkedAt: this.now(), nextRetryAt: null }
       this.subscribe(); this.onChange()
     })
+  }
+  releaseBrokerForTransfer(account: string): void {
+    if (active(this.session) || hasExposure(this.session) || this.busy) throw new Error('The original workspace is running or has a position/pending order. Stop and flatten it before moving the broker connection.')
+    if (this.broker.credentials && this.broker.credentials.account !== account) return
+    this.connectionGeneration++; this.auth = null; this.verified = false
+    this.feed.close(); this.marks = {}; this.broker.credentials = null; this.store.saveBroker(null)
+    this.connection = { phase: 'idle', message: 'Broker connection moved after verification in another workspace. Trading history remains here.', checkedAt: this.now(), nextRetryAt: null }
+    this.onChange()
   }
   async disconnect(): Promise<void> {
     return this.exclusive(async () => {

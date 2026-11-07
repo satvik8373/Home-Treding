@@ -7,6 +7,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import type { Mode, TradingSession } from "../shared/model.ts";
 
 export interface SavedBroker {
+  authMethod?: 'otp' | 'totp';
   apiKey: string;
   accessToken: string;
   account: string;

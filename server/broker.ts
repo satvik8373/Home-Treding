@@ -72,7 +72,7 @@ export class MStock implements TradingBroker {
     const account = String(data.user_id)
     // user_id can be an internal numeric ID, different from the login code.
     const now = Date.now(), midnight = istTime(istDate(now + 86_400_000), '00:00')
-    return { apiKey, accessToken: data.access_token, account,
+    return { apiKey, accessToken: data.access_token, account, authMethod: method,
       ...(Array.isArray(data.exchanges) && Array.isArray(data.products) && Array.isArray(data.order_types)
         ? { permissions: { exchanges: data.exchanges.map(value => String(value).trim().toUpperCase()), products: data.products.map(value => String(value).trim().toUpperCase()), orderTypes: data.order_types.map(value => String(value).trim().toUpperCase()) } } : {}),
       name: String(data.user_name || expectedAccount), expiresAt: Math.min(now + 12 * 3_600_000, midnight) }

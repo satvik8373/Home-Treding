@@ -33,7 +33,7 @@ export function BrokerDialog({
   onClose,
 }: Props) {
   const [flowId, setFlowId] = useState(""),
-    [method, setMethod] = useState<"otp" | "totp">("otp");
+    [methodChoice, setMethod] = useState<"otp" | "totp" | null>(null);
   const [awaitingConnection, setAwaitingConnection] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [refreshLogin, setRefreshLogin] = useState(false);
@@ -45,6 +45,7 @@ export function BrokerDialog({
     apiKey: "",
     code: "",
   });
+  const method = methodChoice ?? broker?.verificationMethod ?? 'totp';
   const phase = broker?.connection?.phase;
   const showRecovery = !showConnection && !flowId && !refreshLogin && (phase === 'checking' || phase === 'retrying' || awaitingConnection && phase !== 'expired' && phase !== 'rejected');
   function verificationMethod() {
@@ -213,6 +214,7 @@ export function BrokerDialog({
       )}
       {refreshLogin && broker?.connected && <button className="text-button restart-auth" disabled={!!working} onClick={() => { setRefreshLogin(false); setFlowId(''); setForm({ username: '', password: '', apiKey: '', code: '' }) }}>Return to current connection</button>}
       <details className="broker-setup-details" onToggle={event => setSetupOpen(event.currentTarget.open)}><summary>API key & execution IP setup</summary>{setupOpen && <BrokerSetup key={`${broker?.connected ? broker.account : 'disconnected'}:${connectionRevision}`} account={broker?.connected ? broker.account : null} action={action} working={working} />}</details>
+      {!showConnection && <p className="form-hint">A verified connection can move from another stopped, flat workspace. Its history stays in that workspace.</p>}
       <p className="form-hint">Sessions expire within 12 hours or at midnight IST, whichever comes first. A stream reconnect does not require a new OTP.</p>
       <div className="dialog-security">
         <ShieldCheck size={15} />

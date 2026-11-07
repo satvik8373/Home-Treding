@@ -115,3 +115,87 @@ test('two workspaces isolate settings, CSRF, encrypted broker files, archives, a
   assert.deepEqual((await read(a, '/api/strategy/settings')).saved, next)
   assert.deepEqual((await read(b, '/api/strategy/settings')).saved, settings)
 })
+
+test('remembered Google session renews only with a valid same-user grant and logout clears both cookies', async t => {
+  const modes: boolean[] = []
+  const root = await serve(t, createGateway(() => env, undefined, undefined, async (uid, _project, renewing) => {
+    modes.push(renewing === true)
+    return { uid, expires: Date.now() + 3600_000 }
+  }))
+  const post = (body: object, cookie = '') => fetch(root + '/api/access', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify(body) })
+  const login = await post({ idToken: 'alice' })
+  assert.equal(login.status, 200)
+  const cookies = login.headers.getSetCookie()
+  assert.equal(cookies.length, 2)
+  const grant = cookies.find(cookie => cookie.startsWith('__Host-n009-refresh='))!
+  assert.match(grant, /HttpOnly; Secure; SameSite=Strict; Path=\/; Max-Age=604800/)
+  const grantCookie = grant.split(';')[0]
+  const refresh = await post({ idToken: 'alice', resume: true }, grantCookie)
+  assert.equal(refresh.status, 200)
+  assert.equal(refresh.headers.getSetCookie().length, 1, 'renewal never extends the seven-day grant')
+  assert.deepEqual(modes, [false, true])
+  assert.equal((await post({ idToken: 'bob', resume: true }, grantCookie)).status, 401)
+  const count = modes.length
+  assert.equal((await post({ idToken: 'alice', resume: true })).status, 401)
+  assert.equal(modes.length, count, 'a client resume flag alone cannot bypass recent authentication')
+  assert.equal((await post({ idToken: 'alice', resume: true }, grantCookie + 'forged')).status, 401)
+  const expired = sealIdentity({ tenant: tenantId('test-project:alice'), expires: Date.now() - 1 }, secret, 'refresh:test-project')
+  assert.equal((await post({ idToken: 'alice', resume: true }, `__Host-n009-refresh=${expired}`)).status, 401)
+  const logout = await fetch(root + '/api/access', { method: 'DELETE', headers: { 'content-type': 'application/json', cookie: grantCookie }, body: '{}' })
+  assert.equal(logout.headers.getSetCookie().length, 2)
+  assert.ok(logout.headers.getSetCookie().every(cookie => cookie.includes('Max-Age=0')))
+})
+
+test('silent renewal accepts refreshed Google tokens but retains fresh issuance and cryptographic checks', async () => {
+  const keys = await generateKeyPair('RS256'), now = Math.floor(Date.now() / 1000)
+  const verify = createGoogleVerifier(async () => keys.publicKey)
+  const mint = (changes = {}) => new SignJWT({ firebase: { sign_in_provider: 'google.com' }, email_verified: true, auth_time: now - 86400, sub: 'alice', iat: now, exp: now + 3600, aud: 'test-project', iss: 'https://securetoken.google.com/test-project', ...changes }).setProtectedHeader({ alg: 'RS256', kid: 'test' }).sign(keys.privateKey)
+  await assert.rejects(verify(await mint(), 'test-project'))
+  assert.equal((await verify(await mint(), 'test-project', true)).uid, 'alice')
+  await assert.rejects(verify(await mint({ iat: now - 301 }), 'test-project', true))
+  await assert.rejects(verify(await mint({ auth_time: now + 10 }), 'test-project', true))
+  await assert.rejects(verify(await mint({ email_verified: false }), 'test-project', true))
+})
+
+test('fresh broker verification moves only a stopped flat connection and preserves private workspace history', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'n009-transfer-')), created: Workspace[] = []
+  const factory = (path: string): Workspace => {
+    const store = new Store(path), broker = new FakeBroker()
+    broker.credentials = null
+    const feed = { status: 'disconnected' as 'disconnected' | 'connected', lastTickAt: null, onMark: (_mark: import('../shared/model.ts').Mark) => {}, onChange: () => {}, connect() { this.status = 'connected' }, close() { this.status = 'disconnected' } }
+    const controller = new Controller(broker, store, feed)
+    const workspace = { controller, store, feed, app: createApp(controller, process.cwd(), 4310, store, secret) }
+    created.push(workspace); return workspace
+  }
+  const host = new Workspaces(directory, secret, 2, factory)
+  await host.restore()
+  t.after(async () => { await host.close(); await rm(directory, { recursive: true, force: true }) })
+  const root = await serve(t, (req, res) => host.app(req, res))
+  await fetch(root + '/api/state', { headers: assertion(tenantId('alice')) })
+  const [source, destination] = created
+  const credentials = { apiKey: 'private-key', accessToken: 'private-token', name: 'Test', account: 'broker-1', expiresAt: Date.now() + 3600_000 }
+  source.store.saveBroker(credentials); source.controller.broker.credentials = credentials
+  source.controller.authorizeBroker!(credentials.account)
+  source.store.put('private-history', { ownerOnly: true })
+  assert.throws(() => destination.controller.authorizeBroker!(credentials.account), /another workspace/)
+  source.controller.session = { id: 'original-session', date: '2026-11-06', mode: 'paper', account: credentials.account, status: 'running', message: '', atm: null, expiry: null, legs: {}, pending: null, trades: [], activity: [], pnlVerified: true }
+  let verifications = 0
+  destination.controller.broker.login = async () => {}
+  destination.controller.broker.verify = async () => { verifications++; return credentials }
+  const flow = await destination.controller.beginLogin('CLIENT', 'password', 'private-key')
+  await assert.rejects(destination.controller.verifyLogin(flow, '123456', 'totp'), /Stop and flatten/)
+  assert.ok(source.store.broker(), 'blocked transfer cannot erase the source credentials')
+  source.controller.session.status = 'stopped'
+  await destination.controller.verifyLogin(flow, '123456', 'totp')
+  assert.equal(verifications, 1, 'reuse the verified token rather than consuming the OTP twice')
+  assert.equal(source.store.broker(), null)
+  assert.equal(source.controller.connected(), false)
+  assert.equal(destination.store.broker()!.authMethod, 'totp')
+  assert.equal(destination.controller.connected(), true)
+  assert.equal(source.controller.session.id, 'original-session')
+  assert.equal(destination.store.get('private-history'), null)
+  assert.deepEqual(source.store.get('private-history'), { ownerOnly: true })
+  assert.throws(() => source.controller.authorizeBroker!(credentials.account), /another workspace/)
+  assert.equal((source.controller.broker as FakeBroker).submitted.length, 0)
+  assert.equal((destination.controller.broker as FakeBroker).submitted.length, 0)
+})

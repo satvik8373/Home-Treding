@@ -28,14 +28,14 @@ const googleKey: JWTVerifyGetKey = async header => {
 }
 /** Firebase's documented verification rules, using Google's fixed certificate endpoint and jose signature validation. */
 export function createGoogleVerifier(resolveKey: JWTVerifyGetKey = googleKey) {
-  return async (token: string, projectId: string): Promise<VerifiedUser> => {
+  return async (token: string, projectId: string, allowSessionRenewal = false): Promise<VerifiedUser> => {
     if (!/^[a-z0-9-]{3,64}$/.test(projectId) || token.length > 12_000) throw new Error('Invalid sign-in.')
     const { payload: user } = await jwtVerify(token, resolveKey, { algorithms: ['RS256'], audience: projectId, issuer: `https://securetoken.google.com/${projectId}`, requiredClaims: ['sub', 'iat', 'exp', 'auth_time'], maxTokenAge: '1h' })
     const firebase = user.firebase as { sign_in_provider?: string } | undefined
     const now = Date.now() / 1000
     if (firebase?.sign_in_provider !== 'google.com' || user.email_verified !== true || !user.sub || user.sub.length > 128
-      || typeof user.auth_time !== 'number' || !Number.isFinite(user.auth_time) || now - user.auth_time > 300 || user.auth_time > now
-      || typeof user.iat !== 'number' || user.iat > now || typeof user.exp !== 'number') throw new Error('Sign in with Google again.')
+      || typeof user.auth_time !== 'number' || !Number.isFinite(user.auth_time) || (!allowSessionRenewal && now - user.auth_time > 300) || user.auth_time > now
+      || typeof user.iat !== 'number' || user.iat > now || allowSessionRenewal && now - user.iat > 300 || typeof user.exp !== 'number') throw new Error('Sign in with Google again.')
     return { uid: user.sub, expires: user.exp * 1000, name: typeof user.name === 'string' ? user.name.slice(0, 100) : undefined, email: typeof user.email === 'string' ? user.email.slice(0, 254) : undefined }
   }
 }

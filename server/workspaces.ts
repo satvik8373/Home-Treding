@@ -53,10 +53,15 @@ export class Workspaces {
     })
   }
   private bind(id: string, workspace: Workspace) {
-    workspace.controller.authorizeBroker = account => {
+    workspace.controller.authorizeBroker = (account, freshlyVerified = false) => {
       const key = `auth:broker-owner:${createHash('sha256').update(account).digest('hex')}`
       const owner = this.owner.store.get<string>(key)
-      if (owner && owner !== id) throw new Error('This broker account is already linked to another workspace.')
+      if (owner && owner !== id) {
+        if (!freshlyVerified) throw new Error('This broker account is already linked to another workspace.')
+        const previous = this.values.get(owner)
+        if (!previous) throw new Error('The original workspace is not ready. Retry the verified connection shortly.')
+        previous.controller.releaseBrokerForTransfer(account)
+      }
       this.owner.store.put(key, id)
     }
     const saved = workspace.store.broker()

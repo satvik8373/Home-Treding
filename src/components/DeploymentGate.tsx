@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ArrowRight, ShieldCheck } from 'lucide-react'
 import { accessStatus } from '../../shared/deployment'
@@ -8,37 +8,86 @@ import { AccountContext } from '../lib/account'
 import type { AccountUser } from '../lib/account'
 import './Account.css'
 
+function notifyAccountTabs() {
+  if (typeof BroadcastChannel === 'undefined') return
+  const channel = new BroadcastChannel('n009-account')
+  channel.postMessage('account-changed'); channel.close()
+}
 export function DeploymentGate({ children }: { children: ReactNode }) {
   const deployed = import.meta.env.VITE_DEPLOY_TARGET === 'vercel'
   const [status, setStatus] = useState<DeploymentStatus>(deployed ? 'checking' : 'open')
   const [password, setPassword] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false), [revision, setRevision] = useState(0)
   const [googleEnabled, setGoogleEnabled] = useState(false), [user, setUser] = useState<AccountUser | null>(null)
+  const workspaceRef = useRef<string | null>(null)
   useEffect(() => {
     if (!deployed) return
     const controller = new AbortController()
-    void fetch('/api/access', { cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]) })
-      .then(async response => { const body = await response.json(); if (!controller.signal.aborted) { setGoogleEnabled(body.googleEnabled === true); setUser(body.authenticated === true ? body.user ?? null : null) }; return accessStatus(response.status, body) })
-      .then(next => { if (!controller.signal.aborted) { setStatus(next); setError(next === 'unavailable' ? 'Could not verify your session. Please try again.' : '') } })
-      .catch(() => { if (!controller.signal.aborted) { setStatus('unavailable'); setError('Connection unavailable. Please try again.') } })
-      .finally(() => { if (!controller.signal.aborted) setBusy(false) })
+    async function check() {
+      try {
+        const read = async () => {
+          const response = await fetch('/api/access', { cache: 'no-store', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]) })
+          return { status: response.status, body: await response.json() }
+        }
+        let result = await read()
+        if (result.body.authenticated !== true && result.body.googleEnabled === true) {
+          const { resumeGoogleSession } = await import('../lib/firebase')
+          if (await resumeGoogleSession()) result = await read()
+        }
+        if (controller.signal.aborted) return
+        const nextWorkspace = result.body.authenticated ? result.body.user?.workspace ?? result.body.user?.kind ?? null : null
+        if (workspaceRef.current && nextWorkspace && workspaceRef.current !== nextWorkspace) { window.location.assign('/'); return }
+        workspaceRef.current = nextWorkspace
+        setGoogleEnabled(result.body.googleEnabled === true)
+        setUser(result.body.authenticated === true ? result.body.user ?? null : null)
+        const next = accessStatus(result.status, result.body)
+        setStatus(next); setError(next === 'unavailable' ? 'Could not verify your session. Please try again.' : '')
+      } catch { if (!controller.signal.aborted) { setStatus('unavailable'); setError('Connection unavailable. Your saved sign-in is retained; try again shortly.') } }
+      finally { if (!controller.signal.aborted) setBusy(false) }
+    }
+    void check()
     return () => controller.abort()
   }, [deployed, revision])
   useEffect(() => {
     if (!deployed) return
     if (status === 'locked') window.history.replaceState(null, '', '/login')
     if (status === 'open' && window.location.pathname === '/login') window.history.replaceState(null, '', '/')
-    const expired = () => { setStatus('checking'); setUser(null); setRevision(value => value + 1) }
+    let alive = true, renewing = false, retryTimer: ReturnType<typeof setTimeout> | undefined
+    const renew = async () => {
+      if (renewing || !alive) return
+      if (user?.kind !== 'google') { setStatus('checking'); setUser(null); setRevision(value => value + 1); return }
+      renewing = true
+      try {
+        const { resumeGoogleSession } = await import('../lib/firebase')
+        const restored = await resumeGoogleSession()
+        if (!alive) return
+        if (restored) { setError(''); setRevision(value => value + 1) }
+        else { setUser(null); setStatus('locked') }
+      } catch {
+        if (alive) { setError('Sign-in renewal is temporarily delayed. Retrying; the engine continues independently.'); retryTimer = setTimeout(() => void renew(), 30_000) }
+      } finally { renewing = false }
+    }
+    const expired = () => { void renew() }
+    const visible = () => { if (document.visibilityState === 'visible' && user?.expiresAt && Date.now() >= user.expiresAt - 300_000) void renew() }
     window.addEventListener('n009:session-expired', expired)
-    const timer = status === 'open' && user?.expiresAt ? setTimeout(expired, Math.max(0, user.expiresAt - Date.now()) + 100) : undefined
-    return () => { window.removeEventListener('n009:session-expired', expired); if (timer) clearTimeout(timer) }
-  }, [deployed, status, user?.expiresAt])
+    document.addEventListener('visibilitychange', visible)
+    const timer = status === 'open' && user?.expiresAt ? setTimeout(expired, Math.max(0, user.expiresAt - Date.now() - (user.kind === 'google' ? 300_000 : 0))) : undefined
+    return () => { alive = false; window.removeEventListener('n009:session-expired', expired); document.removeEventListener('visibilitychange', visible); if (timer) clearTimeout(timer); if (retryTimer) clearTimeout(retryTimer) }
+  }, [deployed, status, user?.expiresAt, user?.kind])
+  useEffect(() => {
+    if (!deployed || typeof BroadcastChannel === 'undefined') return
+    const channel = new BroadcastChannel('n009-account')
+    channel.onmessage = event => { if (event.data === 'account-changed') window.location.assign('/') }
+    return () => channel.close()
+  }, [deployed])
   const retry = () => { setBusy(true); setRevision(value => value + 1) }
-  const signedIn = () => { setPassword(''); setStatus('checking'); setRevision(value => value + 1) }
+  const signedIn = () => { notifyAccountTabs(); setPassword(''); setStatus('checking'); setRevision(value => value + 1) }
   const logout = async () => {
     setBusy(true)
     try {
       const response = await fetch('/api/access', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(8000) })
       if (!response.ok) throw new Error('Logout failed')
+      const { googleSignOut } = await import('../lib/firebase')
+      await googleSignOut(); notifyAccountTabs()
       // Full navigation clears every cached broker response, chart and workspace component.
       window.location.assign('/login')
     } catch (error) { setBusy(false); throw error }
@@ -65,7 +114,7 @@ export function DeploymentGate({ children }: { children: ReactNode }) {
             setBusy(false)
           }
         }}><span className="google-letter" aria-hidden="true">G</span>{busy ? 'Signing in…' : 'Continue with Google'}<ArrowRight size={17} /></button>}
-        <p className="auth-privacy"><ShieldCheck size={16} />Your broker connection and trading data stay in your own workspace.</p>
+        <p className="auth-privacy"><ShieldCheck size={16} />Your workspace stays separate. Google sign-in is remembered on this browser for up to 7 days; Log out clears it.</p>
         <details className="auth-owner" open={!googleEnabled}><summary>Owner sign-in</summary><form onSubmit={async event => {
           event.preventDefault(); setBusy(true); setError('')
           try {
