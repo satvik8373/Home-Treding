@@ -242,13 +242,20 @@ export function createApp(
       throw new Error(`Enter a valid ${key}.`);
     return value;
   };
-  app.post("/api/broker/login", async (req, res) => {
+  const reserveLoginAttempt = () => {
     loginAttempts = loginAttempts.filter((at) => Date.now() - at < 60_000);
-    if (loginAttempts.length >= 5)
-      return res
-        .status(429)
-        .json({ error: "Wait one minute before another login attempt." });
+    if (loginAttempts.length >= 5) return false;
     loginAttempts.push(Date.now());
+    return true;
+  };
+  app.post('/api/broker/totp', async (req, res) => {
+    if (!reserveLoginAttempt()) return res.status(429).json({ error: 'Wait one minute before another login attempt.' });
+    if (typeof req.body.useSaved !== 'boolean') throw new Error('Choose saved connection or new API key.');
+    const flowId = await controller.beginTotp(req.body.useSaved ? undefined : field(req.body, 'apiKey', 1024).trim());
+    res.json({ flowId });
+  });
+  app.post("/api/broker/login", async (req, res) => {
+    if (!reserveLoginAttempt()) return res.status(429).json({ error: 'Wait one minute before another login attempt.' });
     const flowId = await controller.beginLogin(
       field(req.body, "username", 64).trim(),
       field(req.body, "password"),

@@ -134,6 +134,7 @@ export interface BrokerConnection {
   nextRetryAt: number | null;
 }
 export interface BrokerStatus {
+  linked?: { account: string; name: string; totpRenewal: boolean } | null;
   verificationMethod?: 'otp' | 'totp' | null;
   connection?: BrokerConnection;
   connected: boolean;

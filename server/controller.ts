@@ -34,7 +34,7 @@ export class Controller {
   private verified = false
   private stopRequested = false
   private queue: Promise<unknown> = Promise.resolve()
-  private auth: { id: string; apiKey: string; username: string; expires: number; attempts: number; verifiedCredentials?: import('./store.ts').SavedBroker } | null = null
+  private auth: { id: string; apiKey: string; username: string; expires: number; attempts: number; method?: 'totp'; expectedAccount?: string; verifiedCredentials?: import('./store.ts').SavedBroker } | null = null
   private lastQuotes = 0
   private quotesInFlight = false
   private lastPositionCheck = 0
@@ -106,7 +106,7 @@ export class Controller {
   }
   snapshot(csrf = ''): AppState {
     const credentials = this.broker.credentials
-    return { csrf, runtime: this.execution, strategyProfiles: { buy: this.strategySettings('buy'), sell: this.strategySettings('sell') }, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { verificationMethod: credentials?.authMethod ?? null, connection: this.connectionSnapshot(), connected: this.connected(),
+    return { csrf, runtime: this.execution, strategyProfiles: { buy: this.strategySettings('buy'), sell: this.strategySettings('sell') }, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { linked: credentials ? { account: credentials.account, name: credentials.name, totpRenewal: credentials.authMethod === 'totp' } : null, verificationMethod: credentials?.authMethod ?? null, connection: this.connectionSnapshot(), connected: this.connected(),
       account: this.connected() ? credentials!.account : null, name: this.connected() ? credentials!.name : null,
       expiresAt: credentials?.expiresAt ?? null, feed: this.feed.status, lastTickAt: this.feed.lastTickAt },
       session: this.session, marks: this.marks }
@@ -228,14 +228,31 @@ export class Controller {
       return id
     })
   }
+  async beginTotp(apiKey?: string): Promise<string> {
+    return this.exclusive(async () => {
+      if (active(this.session) && this.connected()) throw new Error('Stop the strategy before changing the broker connection.')
+      const saved = this.broker.credentials ?? this.store.broker(), reuse = apiKey === undefined
+      if (reuse && (!saved || saved.authMethod !== 'totp')) throw new Error('No saved Authenticator connection is available. Connect mStock first.')
+      if (reuse && this.connected()) throw new Error('Your saved mStock connection is already active.')
+      const key = reuse ? saved!.apiKey : apiKey.trim()
+      if (!key || key.length > 1024) throw new Error('Enter a valid mStock Type A API key.')
+      if (!this.broker.verify) throw new Error('Broker verification is unavailable.')
+      this.connectionGeneration++
+      const id = randomUUID()
+      this.auth = { id, apiKey: key, username: reuse ? saved!.account : '', expires: this.now() + 600_000, attempts: 0, method: 'totp', ...(reuse ? { expectedAccount: saved!.account } : {}) }
+      return id
+    })
+  }
   async verifyLogin(id: string, code: string, method: 'otp' | 'totp'): Promise<void> {
     return this.exclusive(async () => {
       const auth = this.auth
       if (!auth || auth.id !== id || auth.expires < this.now()) throw new Error('Login expired. Start the connection again.')
       if (auth.attempts++ >= 5) { this.auth = null; throw new Error('Too many verification attempts. Start login again.') }
+      if (auth.method && method !== auth.method) throw new Error('Use the Authenticator code for this connection.')
       if (!this.broker.verify) throw new Error('Broker verification is unavailable.')
       const credentials = auth.verifiedCredentials ?? { ...await this.broker.verify(auth.apiKey, code, method, auth.username), authMethod: method }
       auth.verifiedCredentials = credentials
+      if (auth.expectedAccount && credentials.account !== auth.expectedAccount) { this.auth = null; throw new Error('The verified broker account does not match your saved connection. Use connection setup to change accounts.') }
       if (hasExposure(this.session) && this.session!.account !== credentials.account) throw new Error('Reconnect the same account that owns the saved strategy position.')
       const previous = this.broker.credentials
       this.authorizeBroker?.(credentials.account, true)

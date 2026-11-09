@@ -75,7 +75,7 @@ export class MStock implements TradingBroker {
     return { apiKey, accessToken: data.access_token, account, authMethod: method,
       ...(Array.isArray(data.exchanges) && Array.isArray(data.products) && Array.isArray(data.order_types)
         ? { permissions: { exchanges: data.exchanges.map(value => String(value).trim().toUpperCase()), products: data.products.map(value => String(value).trim().toUpperCase()), orderTypes: data.order_types.map(value => String(value).trim().toUpperCase()) } } : {}),
-      name: String(data.user_name || expectedAccount), expiresAt: Math.min(now + 12 * 3_600_000, midnight) }
+      name: String(data.user_name || expectedAccount || account), expiresAt: Math.min(now + 12 * 3_600_000, midnight) }
   }
   async verifyAccount(): Promise<void> { await this.request('/user/fundsummary') }
   async logout(): Promise<void> { await this.request('/logout') }

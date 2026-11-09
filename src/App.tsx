@@ -87,7 +87,7 @@ export default function App() {
           </span>
           <span className="clock"><Clock3 size={14} />{clock(now, true)} <small>IST</small></span>
           <button className="broker-button" disabled={!deployment.available} title={!deployment.available ? 'Connect the hosted execution engine first.' : undefined} onClick={() => setBrokerDialog(true)}>
-            <Link2 size={15} />{connected ? 'mStock connected' : 'Connect mStock'}
+            <Link2 size={15} />{connected ? 'mStock connected' : broker?.connection?.phase === 'checking' || broker?.connection?.phase === 'retrying' ? 'Restoring mStock' : broker?.linked ? 'Verify mStock' : 'Connect mStock'}
             {connected && <Check size={14} />}
           </button>
           <AccountProfile broker={broker} onBroker={() => setBrokerDialog(true)} onSettings={() => navigate('settings')} />
