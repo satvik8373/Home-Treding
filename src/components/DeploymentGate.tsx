@@ -102,7 +102,7 @@ export function DeploymentGate({ children }: { children: ReactNode }) {
     <a className="auth-brand" href="/login" aria-label="Mavrix Trading sign in"><img src="/mavrix-icon.jpg" alt="" width="38" height="38" /><span>MAVRIX <small>TRADING</small></span></a>
     <section className="auth-card" aria-labelledby="login-title">
       <span className="auth-eyebrow">YOUR TRADING WORKSPACE</span><h1 id="login-title">{status === 'checking' ? 'Checking your session' : 'Welcome to Mavrix'}</h1>
-      <p className="auth-description">Sign in to connect your broker, manage strategies and review your trading activity.</p>
+      <p className="auth-description">Sign in to restore your saved broker connection, settings and trading activity.</p>
       {status === 'locked' && <>
         {googleEnabled && <button className="google-signin" disabled={busy} onClick={async () => {
           setBusy(true); setError('')
@@ -134,6 +134,6 @@ export function DeploymentGate({ children }: { children: ReactNode }) {
       {status === 'checking' && <p className="auth-status" role="status">Verifying secure dashboard access…</p>}
       {error && <p className="inline-error" role="alert">{error}</p>}
     </section>
-    <p className="auth-footer">MAVRIX / 009 <span>·</span> Google sign-in connects your profile. Connect mStock after signing in.</p>
+    <p className="auth-footer">MAVRIX / 009 <span>·</span> Your Google account opens the same trading workspace on every device.</p>
   </main>
 }

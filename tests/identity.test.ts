@@ -14,7 +14,8 @@ import { Store } from '../server/store.ts'
 import { Controller } from '../server/controller.ts'
 import { MarketFeed } from '../server/feed.ts'
 import { createApp } from '../server/http.ts'
-import { FakeBroker } from './helpers.ts'
+import { DAY, FakeBroker } from './helpers.ts'
+import { istTime } from '../server/time.ts'
 import { generateKeyPair, SignJWT } from 'jose'
 import { createGoogleVerifier, SignInServiceUnavailable } from '../server/auth/firebase.ts'
 
@@ -73,6 +74,78 @@ test('Google access fails closed when the transport, project or engine isolation
   assert.equal((await fetch(`${root}/api/state`, { headers: { cookie } })).status, 401)
   settings = { ...env, N009_FIREBASE_PROJECT_ID: 'other-project' }
   assert.equal((await fetch(`${root}/api/state`, { headers: { cookie } })).status, 401)
+})
+
+test('independent devices signed into the same Google UID share the running workspace without another broker login', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'n009-cross-device-'))
+  let logins = 0, verifications = 0
+  const brokers: FakeBroker[] = []
+  const factory = (path: string): Workspace => {
+    const store = new Store(path), broker = new FakeBroker()
+    broker.credentials = null; brokers.push(broker)
+    const feed = { status: 'disconnected' as const, lastTickAt: null, connect() {}, close() {}, onMark() {}, onChange() {} }
+    const controller = new Controller(broker, store, feed, () => istTime(DAY, '09:21'))
+    controller.broker.login = async () => { logins++ }
+    controller.broker.verify = async () => { verifications++; return { apiKey: 'private-test-key', accessToken: 'private-test-token', account: 'broker-shared', name: 'Test account', expiresAt: Date.now() + 3600_000, authMethod: 'totp' as const } }
+    return { controller, store, feed, app: createApp(controller, process.cwd(), 4310, store, secret) }
+  }
+  let host = new Workspaces(directory, secret, 2, factory)
+  await host.restore()
+  t.after(async () => { await host.close(); await rm(directory, { recursive: true, force: true }) })
+  const engineRoot = await serve(t, (req, res) => host.app(req, res))
+  const root = await serve(t, createGateway(() => env, async (input, options) => {
+    const url = new URL(String(input))
+    return fetch(engineRoot + url.pathname + url.search, options)
+  }, undefined, async token => ({ uid: token === 'other-person' ? 'bob' : 'alice', name: token, email: token + '@example.test', expires: Date.now() + 3600_000 })))
+  const login = async (idToken: string) => {
+    const response = await fetch(root + '/api/access', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ idToken }) })
+    assert.equal(response.status, 200)
+    return response.headers.getSetCookie().map(value => value.split(';')[0]).join('; ')
+  }
+  const read = async (cookie: string) => {
+    const response = await fetch(root + '/api/state', { headers: { cookie } })
+    assert.equal(response.status, 200)
+    const text = await response.text()
+    assert.equal(text.includes('private-test-key'), false); assert.equal(text.includes('private-test-token'), false)
+    return JSON.parse(text)
+  }
+  const laptop = await login('laptop-token')
+  let state = await read(laptop)
+  const post = async (path: string, body: object, status = 200) => {
+    const response = await fetch(root + path, { method: 'POST', headers: { cookie: laptop, 'content-type': 'application/json', 'x-009-csrf': state.csrf }, body: JSON.stringify(body) })
+    assert.equal(response.status, status, await response.clone().text())
+    return response.json()
+  }
+  const flow = await post('/api/broker/login', { username: 'TEST-CLIENT', password: 'not-a-real-password', apiKey: 'private-test-key' })
+  await post('/api/broker/verify', { flowId: flow.flowId, code: '123456', method: 'totp' })
+  state = await read(laptop)
+  await post('/api/strategy/settings', { ...state.savedSettings, target1Points: 21 })
+  await post('/api/strategy/start', { mode: 'paper', strategy: 'buy' }, 202)
+  for (let i = 0; i < 30; i++) await new Promise(resolve => setImmediate(resolve))
+  const before = await read(laptop), phone = await login('phone-token')
+  const onPhone = await read(phone)
+  assert.equal(before.broker.connected, true)
+  assert.equal(onPhone.broker.account, before.broker.account)
+  assert.equal(onPhone.session.id, before.session.id)
+  assert.equal(onPhone.session.status, 'running')
+  assert.deepEqual(onPhone.session.legs, before.session.legs)
+  assert.equal(onPhone.savedSettings.target1Points, 21)
+  const other = await read(await login('other-person'))
+  assert.equal(other.broker.connected, false); assert.equal(other.session, null)
+  assert.notEqual(other.savedSettings.target1Points, 21)
+  const logout = await fetch(root + '/api/access', { method: 'DELETE', headers: { cookie: laptop, 'content-type': 'application/json' }, body: '{}' })
+  assert.equal(logout.status, 200)
+  assert.equal((await fetch(root + '/api/state')).status, 401)
+  assert.equal((await read(phone)).session.id, before.session.id, 'logging out of one browser cannot stop the account engine')
+  await host.close(); host = new Workspaces(directory, secret, 2, factory); await host.restore()
+  const restored = await read(phone)
+  assert.equal(restored.broker.connected, true)
+  assert.equal(restored.session.id, before.session.id)
+  assert.deepEqual(restored.session.legs, before.session.legs)
+  assert.deepEqual(restored.session.trades, before.session.trades)
+  assert.equal(restored.savedSettings.target1Points, 21)
+  assert.equal(logins, 1); assert.equal(verifications, 1)
+  assert.ok(brokers.every(broker => broker.submitted.length === 0))
 })
 
 test('workspace signatures reject expired, traversal, wrong-purpose and altered claims', () => {
