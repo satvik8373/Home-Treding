@@ -16,7 +16,7 @@ import { MarketFeed } from '../server/feed.ts'
 import { createApp } from '../server/http.ts'
 import { FakeBroker } from './helpers.ts'
 import { generateKeyPair, SignJWT } from 'jose'
-import { createGoogleVerifier } from '../server/auth/firebase.ts'
+import { createGoogleVerifier, SignInServiceUnavailable } from '../server/auth/firebase.ts'
 
 const secret = 'test-gateway-secret-'.repeat(3)
 const env = { N009_ENGINE_ORIGIN: 'https://engine.example.test', N009_GATEWAY_SECRET: secret, N009_DASHBOARD_PASSWORD: 'owner-only-password'.repeat(2), N009_MULTIUSER: 'true', N009_FIREBASE_PROJECT_ID: 'test-project' }
@@ -128,11 +128,11 @@ test('remembered Google session renews only with a valid same-user grant and log
   const cookies = login.headers.getSetCookie()
   assert.equal(cookies.length, 2)
   const grant = cookies.find(cookie => cookie.startsWith('__Host-n009-refresh='))!
-  assert.match(grant, /HttpOnly; Secure; SameSite=Strict; Path=\/; Max-Age=604800/)
+  assert.match(grant, /HttpOnly; Secure; SameSite=Strict; Path=\/; Max-Age=2592000/)
   const grantCookie = grant.split(';')[0]
   const refresh = await post({ idToken: 'alice', resume: true }, grantCookie)
   assert.equal(refresh.status, 200)
-  assert.equal(refresh.headers.getSetCookie().length, 1, 'renewal never extends the seven-day grant')
+  assert.equal(refresh.headers.getSetCookie().length, 1, 'renewal never extends the 30-day grant')
   assert.deepEqual(modes, [false, true])
   assert.equal((await post({ idToken: 'bob', resume: true }, grantCookie)).status, 401)
   const count = modes.length
@@ -144,6 +144,30 @@ test('remembered Google session renews only with a valid same-user grant and log
   const logout = await fetch(root + '/api/access', { method: 'DELETE', headers: { 'content-type': 'application/json', cookie: grantCookie }, body: '{}' })
   assert.equal(logout.headers.getSetCookie().length, 2)
   assert.ok(logout.headers.getSetCookie().every(cookie => cookie.includes('Max-Age=0')))
+})
+
+test('temporary Google verification outage retains remembered cookies and later resumes the same workspace', async t => {
+  let unavailable = false
+  const root = await serve(t, createGateway(() => env, undefined, undefined, async uid => {
+    if (unavailable) throw new SignInServiceUnavailable()
+    return { uid, expires: Date.now() + 3600_000 }
+  }))
+  const post = (cookie = '') => fetch(root + '/api/access', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ idToken: 'alice', ...(cookie ? { resume: true } : {}) }) })
+  const login = await post()
+  const cookies = login.headers.getSetCookie().map(value => value.split(';')[0]).join('; ')
+  const profile = await (await fetch(root + '/api/access', { headers: { cookie: cookies } })).json()
+  assert.ok(profile.user.rememberedUntil > Date.now() + 29 * 86400_000)
+  assert.ok(profile.user.expiresAt < profile.user.rememberedUntil)
+  unavailable = true
+  const failed = await post(cookies)
+  assert.equal(failed.status, 503)
+  assert.equal(failed.headers.getSetCookie().length, 0, 'a transient outage must not clear or replace identity cookies')
+  unavailable = false
+  assert.equal((await post(cookies)).status, 200)
+  const otherGrant = sealIdentity({ tenant: tenantId('test-project:bob'), expires: Date.now() + 86400_000 }, secret, 'refresh:test-project')
+  const access = cookies.split('; ')[0]
+  const mismatch = await (await fetch(root + '/api/access', { headers: { cookie: access + '; __Host-n009-refresh=' + otherGrant } })).json()
+  assert.equal(mismatch.user.rememberedUntil, null)
 })
 
 test('silent renewal accepts refreshed Google tokens but retains fresh issuance and cryptographic checks', async () => {

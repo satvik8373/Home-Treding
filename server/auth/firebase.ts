@@ -2,19 +2,25 @@ import { importX509, jwtVerify } from 'jose'
 import type { JWTVerifyGetKey } from 'jose'
 
 export interface VerifiedUser { uid: string; expires: number; name?: string; email?: string }
+export class SignInServiceUnavailable extends Error {
+  constructor() { super('Sign-in verification temporarily unavailable.'); this.name = 'SignInServiceUnavailable' }
+}
 const CERTIFICATES = 'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com'
 let certificates: Record<string, string> = {}, expires = 0, pending: Promise<void> | null = null
 async function refresh() {
   if (Date.now() < expires) return
   pending ??= (async () => {
-    const response = await fetch(CERTIFICATES, { redirect: 'error', signal: AbortSignal.timeout(5000) })
-    if (!response.ok) throw new Error('Sign-in verification unavailable.')
-    const text = await response.text()
+    let text: string, cacheControl: string | null
+    try {
+      const response = await fetch(CERTIFICATES, { redirect: 'error', signal: AbortSignal.timeout(5000) })
+      if (!response.ok) throw new SignInServiceUnavailable()
+      text = await response.text(); cacheControl = response.headers.get('cache-control')
+    } catch { throw new SignInServiceUnavailable() }
     if (text.length > 64_000) throw new Error('Invalid signing certificates.')
     const body: unknown = JSON.parse(text)
     if (!body || typeof body !== 'object' || Array.isArray(body) || Object.values(body).some(value => typeof value !== 'string')) throw new Error('Invalid signing certificates.')
     certificates = body as Record<string, string>
-    const ttl = Number(/max-age=(\d+)/.exec(response.headers.get('cache-control') ?? '')?.[1] ?? 300)
+    const ttl = Number(/max-age=(\d+)/.exec(cacheControl ?? '')?.[1] ?? 300)
     expires = Date.now() + Math.min(Math.max(ttl, 30), 21600) * 1000
   })()
   try { await pending } finally { pending = null }

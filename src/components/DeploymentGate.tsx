@@ -22,6 +22,7 @@ export function DeploymentGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!deployed) return
     const controller = new AbortController()
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
     async function check() {
       try {
         const read = async () => {
@@ -41,11 +42,15 @@ export function DeploymentGate({ children }: { children: ReactNode }) {
         setUser(result.body.authenticated === true ? result.body.user ?? null : null)
         const next = accessStatus(result.status, result.body)
         setStatus(next); setError(next === 'unavailable' ? 'Could not verify your session. Please try again.' : '')
-      } catch { if (!controller.signal.aborted) { setStatus('unavailable'); setError('Connection unavailable. Your saved sign-in is retained; try again shortly.') } }
+      } catch { if (!controller.signal.aborted) {
+        setStatus(current => current === 'open' ? 'open' : 'unavailable')
+        setError('Connection unavailable. Your saved sign-in is retained; retrying automatically.')
+        retryTimer = setTimeout(() => setRevision(value => value + 1), 30_000)
+      } }
       finally { if (!controller.signal.aborted) setBusy(false) }
     }
     void check()
-    return () => controller.abort()
+    return () => { controller.abort(); if (retryTimer) clearTimeout(retryTimer) }
   }, [deployed, revision])
   useEffect(() => {
     if (!deployed) return
@@ -114,7 +119,7 @@ export function DeploymentGate({ children }: { children: ReactNode }) {
             setBusy(false)
           }
         }}><span className="google-letter" aria-hidden="true">G</span>{busy ? 'Signing in…' : 'Continue with Google'}<ArrowRight size={17} /></button>}
-        <p className="auth-privacy"><ShieldCheck size={16} />Your workspace stays separate. Google sign-in is remembered on this browser for up to 7 days; Log out clears it.</p>
+        <p className="auth-privacy"><ShieldCheck size={16} />Your workspace stays separate. Google sign-in is remembered on this browser for up to 30 days; Log out clears it.</p>
         <details className="auth-owner" open={!googleEnabled}><summary>Owner sign-in</summary><form onSubmit={async event => {
           event.preventDefault(); setBusy(true); setError('')
           try {

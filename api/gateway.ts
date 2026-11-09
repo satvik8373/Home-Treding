@@ -4,10 +4,10 @@ import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { cloudDispatch } from '../cloud-runtime/dispatch.mjs'
 import type { CloudRequest, CloudResponse } from '../server/cloud/database.ts'
-import { openIdentity, sealIdentity, tenantId, verifyGoogleUser } from '../cloud-runtime/identity.mjs'
+import { openIdentity, sealIdentity, tenantId, verifyGoogleUser, SignInServiceUnavailable } from '../cloud-runtime/identity.mjs'
 import type { VerifiedUser } from '../cloud-runtime/identity.mjs'
 
-const COOKIE = '__Host-n009', REFRESH_COOKIE = '__Host-n009-refresh', REMEMBER_TTL = 7 * 24 * 60 * 60_000, TTL = 12 * 60 * 60_000
+const COOKIE = '__Host-n009', REFRESH_COOKIE = '__Host-n009-refresh', REMEMBER_TTL = 30 * 24 * 60 * 60_000, TTL = 12 * 60 * 60_000
 const equal = (a: string, b: string) => timingSafeEqual(createHash('sha256').update(a).digest(), createHash('sha256').update(b).digest())
 const sign = (value: string, secret: string) => createHmac('sha256', secret).update(value).digest('hex')
 const reply = (res: ServerResponse, status: number, body: object) => { res.statusCode = status; res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(body)) }
@@ -56,7 +56,11 @@ export function createGateway(environment: () => NodeJS.ProcessEnv = () => proce
     const workspace = identity?.expires && identity.expires <= Date.now() + TTL ? identity.tenant : legacyAuthenticated ? 'owner' : null
     const authenticated = workspace !== null
     if (route === 'access') {
-      if (req.method === 'GET') return reply(res, 200, { configured: true, authenticated, googleEnabled, user: !authenticated ? null : workspace === 'owner' ? { kind: 'owner', name: 'Workspace owner', email: null, expiresAt: Number(expiry) } : { kind: 'google', name: identity?.profile?.name || 'Google account', email: identity?.profile?.email || null, workspace: identity?.tenant, expiresAt: identity?.expires } })
+      if (req.method === 'GET') {
+        const grant = authenticated && workspace !== 'owner' ? openIdentity(readCookie(REFRESH_COOKIE), secret, `refresh:${env.N009_FIREBASE_PROJECT_ID}`) : null
+        const rememberedUntil = grant?.tenant === workspace && grant.expires <= Date.now() + REMEMBER_TTL ? grant.expires : null
+        return reply(res, 200, { configured: true, authenticated, googleEnabled, user: !authenticated ? null : workspace === 'owner' ? { kind: 'owner', name: 'Workspace owner', email: null, expiresAt: Number(expiry) } : { kind: 'google', name: identity?.profile?.name || 'Google account', email: identity?.profile?.email || null, workspace: identity?.tenant, expiresAt: identity?.expires, rememberedUntil } })
+      }
       if (req.method === 'DELETE') { res.setHeader('Set-Cookie', [COOKIE, REFRESH_COOKIE].map(name => `${name}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`)); return reply(res, 200, { authenticated: false }) }
       if (req.method !== 'POST') return reply(res, 405, { error: 'Method not allowed.' })
       try {
@@ -80,7 +84,10 @@ export function createGateway(environment: () => NodeJS.ProcessEnv = () => proce
             }
             res.setHeader('Set-Cookie', cookies)
             return reply(res, 200, { authenticated: true })
-          } catch { return reply(res, 401, { error: 'Google sign-in could not be verified. Sign in again.' }) }
+          } catch (error) {
+            if (error instanceof SignInServiceUnavailable || error instanceof Error && error.name === 'SignInServiceUnavailable') return reply(res, 503, { error: 'Google verification is temporarily unavailable. Your saved sign-in is retained; retry shortly.' })
+            return reply(res, 401, { error: 'Google sign-in could not be verified. Sign in again.' })
+          }
         }
         if (typeof body.password !== 'string' || !equal(body.password, password)) return reply(res, 401, { error: 'Incorrect dashboard password.' })
         const expires = String(Date.now() + TTL)
