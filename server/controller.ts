@@ -21,6 +21,7 @@ export const hasExposure = (s: TradingSession | null) => !!s && (!!s.pending || 
 class PositionReadError extends Error {}
 
 export class Controller {
+  persistence?: () => AppState['persistence']
   authorizeBroker?: (account: string, freshlyVerified?: boolean) => void
   execution?: { kind: 'hosted-paper'; liveExecution: false; reason: string }
   session: TradingSession | null
@@ -106,7 +107,7 @@ export class Controller {
   }
   snapshot(csrf = ''): AppState {
     const credentials = this.broker.credentials
-    return { csrf, runtime: this.execution, strategyProfiles: { buy: this.strategySettings('buy'), sell: this.strategySettings('sell') }, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { linked: credentials ? { account: credentials.account, name: credentials.name, totpRenewal: credentials.authMethod === 'totp' } : null, verificationMethod: credentials?.authMethod ?? null, connection: this.connectionSnapshot(), connected: this.connected(),
+    return { csrf, persistence: this.persistence?.(), runtime: this.execution, strategyProfiles: { buy: this.strategySettings('buy'), sell: this.strategySettings('sell') }, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { linked: credentials ? { account: credentials.account, name: credentials.name, totpRenewal: credentials.authMethod === 'totp' } : null, verificationMethod: credentials?.authMethod ?? null, connection: this.connectionSnapshot(), connected: this.connected(),
       account: this.connected() ? credentials!.account : null, name: this.connected() ? credentials!.name : null,
       expiresAt: credentials?.expiresAt ?? null, feed: this.feed.status, lastTickAt: this.feed.lastTickAt },
       session: this.session, marks: this.marks }

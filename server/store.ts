@@ -16,6 +16,7 @@ export interface SavedBroker {
   permissions?: { exchanges: string[]; products: string[]; orderTypes: string[] };
 }
 export class Store {
+  onDurableChange?: () => void;
   private db: DatabaseSync;
   private key: Buffer;
   constructor(directory: string, encryptionKey?: Buffer) {
@@ -38,11 +39,12 @@ export class Store {
     return row ? (JSON.parse(row.value) as T) : null;
   }
   put(key: string, value: unknown): void {
-    this.db
+    const changed = this.db
       .prepare(
-        "INSERT INTO records(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        "INSERT INTO records(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value WHERE value<>excluded.value",
       )
       .run(key, JSON.stringify(value));
+    if (changed.changes > 0) this.onDurableChange?.();
   }
   keys(prefix: string): string[] {
     return (
@@ -50,6 +52,11 @@ export class Store {
         .prepare("SELECT key FROM records WHERE substr(key,1,?)=? ORDER BY key")
         .all(prefix.length, prefix) as { key: string }[]
     ).map((row) => row.key);
+  }
+  transaction(work: () => void): void {
+    this.db.exec('BEGIN IMMEDIATE');
+    try { work(); this.db.exec('COMMIT'); }
+    catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
   session(): TradingSession | null {
     return this.get<TradingSession>("session");
@@ -77,6 +84,7 @@ export class Store {
   saveBroker(value: SavedBroker | null): void {
     if (!value) {
       this.db.prepare("DELETE FROM records WHERE key=?").run("broker");
+      this.onDurableChange?.();
       return;
     }
     const iv = randomBytes(12),

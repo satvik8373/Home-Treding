@@ -90,7 +90,7 @@ export default function App() {
             <Link2 size={15} />{connected ? 'mStock connected' : broker?.connection?.phase === 'checking' || broker?.connection?.phase === 'retrying' ? 'Restoring mStock' : broker?.linked ? 'Verify mStock' : 'Connect mStock'}
             {connected && <Check size={14} />}
           </button>
-          <AccountProfile broker={broker} onBroker={() => setBrokerDialog(true)} onSettings={() => navigate('settings')} />
+          <AccountProfile broker={broker} persistence={data?.persistence} onBroker={() => setBrokerDialog(true)} onSettings={() => navigate('settings')} />
         </div>
       </header>
 

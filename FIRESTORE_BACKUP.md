@@ -4,6 +4,8 @@ The AWS execution engine remains authoritative. Settings, broker credentials, re
 
 Firestore adds an encrypted off-host recovery copy. It is not an execution engine and does not keep an expired mStock token alive. The separate backup worker runs every 15 minutes, reads a consistent SQLite snapshot, and encrypts the complete records and the workspace encryption key with AES-256-GCM before uploading. The outer backup key stays outside Firestore. Project, workspace and revision are authenticated as encryption context. No password, OTP or TOTP secret is collected for this feature. Google/Firebase credentials, session cookies and the private backup key are never shipped to the browser.
 
+The account engine also schedules encrypted checkpoints after durable mutations: normally after three seconds, with a ten-second minimum between attempts and a thirty-second retry after failure. Quote ticks and identical stored values do not trigger uploads. Profile reports whether the current replica is saved, pending or retrying. This supplements the independent worker; browser views and Start/Stop/Resume use the single AWS controller directly. See [account engine](ACCOUNT_ENGINE.md).
+
 Two bounded slots per workspace retain the latest and previous ciphertext. Each upload atomically publishes its chunks and manifest. Failed writes cannot publish a partial backup. Unchanged state is verified and skipped. Firestore failures cannot block or roll back the trading loop. A backup can lag local state by at least one interval, or longer during outages; it is not a zero-loss recovery guarantee.
 
 ## One-time Firebase setup
@@ -30,6 +32,8 @@ The worker writes private status to `/var/lib/nifty009/firestore-backup-status.j
 ## Free-tier bounds
 
 Firestore's documented free quota is 1 GiB stored, 50,000 reads/day, and 20,000 writes/day. This worker is capped at four Google workspaces plus the owner, a 15-minute interval, and 4 MiB encrypted per workspace. Eight 512 KiB chunks plus one manifest means at most 4,320 document writes/day for five continuously changing workspaces at 96 runs/day, excluding manual runs or other applications. Reads for unchanged verification are also bounded. Other Firebase activity consumes the same project quota. Oversized backups fail visibly without truncating engine records or purchasing capacity. Do not add per-tick Firestore writes or reduce the interval without reviewing quotas. See [Firestore limits](https://firebase.google.com/docs/firestore/quotas).
+
+The mutation-triggered checkpoints consume additional quota and are not included in the worker-only bound above. Coalescing limits request frequency, not total daily project usage. On Spark, exhausted quota makes synchronization retry while the AWS store retains newer state; it must not be presented as unlimited free storage or a zero-loss cloud guarantee. No automatic paid-plan upgrade is configured.
 
 ## Recovery is staged and explicit
 

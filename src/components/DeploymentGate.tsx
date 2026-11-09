@@ -14,7 +14,7 @@ function notifyAccountTabs() {
   channel.postMessage('account-changed'); channel.close()
 }
 export function DeploymentGate({ children }: { children: ReactNode }) {
-  const deployed = import.meta.env.VITE_DEPLOY_TARGET === 'vercel'
+  const deployed = import.meta.env.VITE_DEPLOY_TARGET === 'vercel' || import.meta.env.VITE_ENGINE_MODE !== 'isolated'
   const [status, setStatus] = useState<DeploymentStatus>(deployed ? 'checking' : 'open')
   const [password, setPassword] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false), [revision, setRevision] = useState(0)
   const [googleEnabled, setGoogleEnabled] = useState(false), [user, setUser] = useState<AccountUser | null>(null)

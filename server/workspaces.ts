@@ -8,8 +8,11 @@ import { MStock } from './broker.ts'
 import { MarketFeed } from './feed.ts'
 import { Controller } from './controller.ts'
 import { createApp } from './http.ts'
+import { createAccountSync } from './backup/accountSync.ts'
+import type { AccountSync } from './backup/accountSync.ts'
 
 export interface Workspace {
+  sync?: AccountSync
   controller: Controller
   store: Store
   feed: Pick<MarketFeed, 'close'>
@@ -18,8 +21,12 @@ export interface Workspace {
 export type WorkspaceFactory = (directory: string) => Workspace
 export const createWorkspace: WorkspaceFactory = directory => {
   const store = new Store(directory), feed = new MarketFeed()
+  const sync = createAccountSync(directory)
+  if (sync) store.onDurableChange = sync.request
   const controller = new Controller(new MStock(), store, feed)
-  return { controller, store, feed, app: createApp(controller, process.cwd(), 4310, store) }
+  const app = createApp(controller, process.cwd(), 4310, store)
+  if (sync) { controller.persistence = () => sync.state; sync.onStatus = () => controller.onChange(); sync.request() }
+  return { controller, store, feed, app, sync }
 }
 
 /** Only gateway-signed identities select a workspace. Request bodies, paths and browser headers cannot select one. */
@@ -101,7 +108,7 @@ export class Workspaces {
     const workspaces = [...this.values.values()]
     try { for (const { controller } of workspaces) await controller.checkpointForRestart() }
     catch (error) { for (const { controller } of workspaces) controller.resumeAfterAbortedRestart(); this.closing = false; throw error }
-    for (const workspace of workspaces) { workspace.feed.close(); workspace.store.close() }
+    for (const workspace of workspaces) { workspace.sync?.close(); workspace.feed.close(); workspace.store.close() }
     return true
   }
 }

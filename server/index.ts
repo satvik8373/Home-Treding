@@ -50,10 +50,13 @@ const host = process.env.N009_HOST || '127.0.0.1';
 if (process.env.N009_GATEWAY_SECRET && process.env.N009_GATEWAY_SECRET.length < 32) throw new Error('N009_GATEWAY_SECRET requires at least 32 characters.');
 if (host !== '127.0.0.1' && (!process.env.N009_GATEWAY_SECRET || process.env.N009_GATEWAY_SECRET.length < 32)) throw new Error('A remote engine requires N009_GATEWAY_SECRET with at least 32 characters.');
 const multiuser = process.env.N009_MULTIUSER === 'true';
+if (!multiuser && process.env.N009_ISOLATED_ENGINE !== 'true') throw new Error('Use npm run dev for the shared account dashboard. A separate Paper development engine requires npm run dev:isolated.');
+if (!multiuser && existsSync(join(data, 'execution-owner.json'))) throw new Error('This data was handed off to the hosted account engine. Use the account dashboard; do not restart a second executor on the same state.');
 const workspaces = multiuser ? new Workspaces(data, process.env.N009_GATEWAY_SECRET ?? '', Number(process.env.N009_MAX_WORKSPACES || 4)) : null;
 const store = workspaces ? null : new Store(data);
 const feed = workspaces ? null : new MarketFeed();
 const controller = store && feed ? new Controller(new MStock(), store, feed) : null;
+if (controller && process.env.N009_ISOLATED_ENGINE === 'true') controller.execution = { kind: 'hosted-paper', liveExecution: false, reason: 'This is an isolated development engine. Use the Google account workspace for shared production execution.' };
 const app = workspaces?.app ?? createApp(controller!, root, port, store!);
 const server = app.listen(port, host, () =>
   console.log(`NIFTY 009: http://127.0.0.1:${port}`),
