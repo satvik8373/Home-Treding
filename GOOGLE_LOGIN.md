@@ -1,6 +1,6 @@
 # Google sign-in and separate trading workspaces
 
-The public dashboard uses Firebase Authentication's Google popup. The Firebase web configuration identifies the project and is public by design; it is not a broker credential. Analytics, Firestore and Storage are not enabled by this integration. No Firebase service-account private key is needed or shipped.
+The public dashboard uses Firebase Authentication's Google popup. The Firebase web configuration identifies the project and is public by design; it is not a broker credential. Analytics, Firestore and Storage are not enabled by the login integration. Google login does not need or ship a service-account private key. The independent optional [encrypted Firestore backup worker](FIRESTORE_BACKUP.md) requires separate private server credentials and does not change the execution store or broker authentication lifetime.
 
 Enable Google in Firebase Console → Authentication → Sign-in method and authorize the actual dashboard domain in Authentication → Settings → Authorized domains. The production client uses project `mavrix-trading` and auth domain `mavrix-trading.firebaseapp.com`. Preview domains must be authorized separately before testing Google there. The code uses the Firebase modular app/auth packages only.
 

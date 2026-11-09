@@ -1,0 +1,11 @@
+[Unit]
+Description=Back up changed N009 workspaces every 15 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=15min
+RandomizedDelaySec=30
+Unit=n009-firestore-backup.service
+
+[Install]
+WantedBy=timers.target

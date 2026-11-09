@@ -6,5 +6,5 @@
     "allowImportingTsExtensions": true, "esModuleInterop": true,
     "types": ["node", "vite/client"], "verbatimModuleSyntax": true
   },
-  "include": ["src", "server", "shared", "tests", "api", "vite.config.ts"]
+  "include": ["src", "server", "shared", "tests", "api", "vite.config.ts", "scripts/firestore-backup.ts"]
 }

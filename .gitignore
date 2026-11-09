@@ -24,6 +24,9 @@ dist
 dist-ssr
 cloud-runtime/*.mjs
 *.local
+*service-account*.json
+*firebase-adminsdk*.json
+firestore-backup.key
 
 # Editor directories and files
 .vscode/*

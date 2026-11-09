@@ -1,0 +1,26 @@
+[Unit]
+Description=Encrypted N009 Firestore recovery backup
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/nifty009/firestore-service-account.json
+ConditionPathExists=/etc/nifty009/firestore-backup.key
+
+[Service]
+Type=oneshot
+User=nifty009
+Group=nifty009
+EnvironmentFile=/etc/nifty009/firestore-backup.env
+LoadCredential=firestore-service-account.json:/etc/nifty009/firestore-service-account.json
+LoadCredential=firestore-backup.key:/etc/nifty009/firestore-backup.key
+Environment=GOOGLE_APPLICATION_CREDENTIALS=%d/firestore-service-account.json
+Environment=N009_BACKUP_KEY_FILE=%d/firestore-backup.key
+ExecStart=/opt/n009-runtime/node/bin/node /opt/n009-backup/firestore-backup.mjs backup
+WorkingDirectory=/opt/n009-backup
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/nifty009
+TimeoutStartSec=240
+MemoryMax=192M
