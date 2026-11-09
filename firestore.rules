@@ -1,12 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // User profile access
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    
+
     // Strategies
     match /strategies/{strategyId} {
       allow read: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid);
@@ -14,7 +14,7 @@ service cloud.firestore {
       allow update: if request.auth != null && resource.data.userId == request.auth.uid && request.resource.data.userId == resource.data.userId;
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
-    
+
     // Trades
     match /trades/{tradeId} {
       allow read: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid);
@@ -22,7 +22,7 @@ service cloud.firestore {
       allow update: if request.auth != null && resource.data.userId == request.auth.uid && request.resource.data.userId == resource.data.userId;
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
-    
+
     // Brokerages / Broker connections
     match /brokerages/{brokerageId} {
       allow read: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid);
@@ -30,7 +30,7 @@ service cloud.firestore {
       allow update: if request.auth != null && resource.data.userId == request.auth.uid && request.resource.data.userId == resource.data.userId;
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
-    
+
     // Orders
     match /orders/{orderId} {
       allow read: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid);
@@ -38,7 +38,7 @@ service cloud.firestore {
       allow update: if request.auth != null && resource.data.userId == request.auth.uid && request.resource.data.userId == resource.data.userId;
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
-    
+
     // Notifications
     match /notifications/{notificationId} {
       allow read: if request.auth != null && (resource == null || resource.data.userId == request.auth.uid);
