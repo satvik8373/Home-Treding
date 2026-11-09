@@ -31,8 +31,9 @@ export function DeploymentGate({ children }: { children: ReactNode }) {
         }
         let result = await read()
         if (result.body.authenticated !== true && result.body.googleEnabled === true) {
-          const { resumeGoogleSession } = await import('../lib/firebase')
-          if (await resumeGoogleSession()) result = await read()
+          const { resumeGoogleSession, completeGoogleRedirect } = await import('../lib/firebase')
+          if (await completeGoogleRedirect()) result = await read()
+          if (result.body.authenticated !== true && await resumeGoogleSession()) result = await read()
         }
         if (controller.signal.aborted) return
         const nextWorkspace = result.body.authenticated ? result.body.user?.workspace ?? result.body.user?.kind ?? null : null
@@ -109,6 +110,7 @@ export function DeploymentGate({ children }: { children: ReactNode }) {
           try {
             const { googleSignIn } = await import('../lib/firebase')
             const idToken = await googleSignIn()
+            if (idToken === null) return // Full-page mobile/PWA navigation completes after redirect.
             const response = await fetch('/api/access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }), signal: AbortSignal.timeout(15000) })
             const body = await response.json()
             if (!response.ok || body.authenticated !== true) throw new Error()

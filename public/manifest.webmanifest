@@ -1,0 +1,11 @@
+{
+  "id": "/",
+  "name": "Mavrix Trading",
+  "short_name": "Mavrix",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#ffffff",
+  "icons": [{ "src": "/mavrix-icon.jpg", "sizes": "1024x1024", "type": "image/jpeg", "purpose": "any" }]
+}

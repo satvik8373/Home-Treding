@@ -4,14 +4,16 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build:vercel",
   "outputDirectory": "dist",
-  "functions": { "api/gateway.ts": { "maxDuration": 30, "includeFiles": "cloud-runtime/**" } },
+  "functions": { "api/gateway.ts": { "maxDuration": 30, "includeFiles": "cloud-runtime/**" }, "api/firebase-auth.ts": { "maxDuration": 15 } },
   "rewrites": [
+    { "source": "/__/auth/:resource", "destination": "/api/firebase-auth?resource=:resource" },
+    { "source": "/__/firebase/init.json", "destination": "/api/firebase-auth?resource=init.json" },
     { "source": "/api/:path*", "destination": "/api/gateway?route=:path*" },
     { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
   ],
   "headers": [{ "source": "/(.*)", "headers": [
     { "key": "X-Content-Type-Options", "value": "nosniff" },
     { "key": "Referrer-Policy", "value": "no-referrer" },
-    { "key": "X-Frame-Options", "value": "DENY" }
-  ] }]
+    { "key": "X-Frame-Options", "value": "SAMEORIGIN" }
+  ] }, { "source": "/", "headers": [{ "key": "Cache-Control", "value": "no-store" }] }, { "source": "/login", "headers": [{ "key": "Cache-Control", "value": "no-store" }] }, { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }, { "key": "Service-Worker-Allowed", "value": "/" }] }]
 }
