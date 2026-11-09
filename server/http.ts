@@ -118,6 +118,22 @@ export function createApp(
   app.get("/api/state", (_req, res) => res.json(controller.snapshot(csrf)));
   app.get('/api/setup/network', async (_req, res) => res.json(await setup.read()));
   app.post('/api/setup/network', (req, res) => res.json(setup.save(req.body)));
+  app.post('/api/setup/proxy', async (req, res) => {
+    try {
+      const result = await setup.saveProxy(req.body?.proxyUrl);
+      if (req.body?.proxyUrl) {
+        const { createProxyFetcher } = await import('./proxy.ts');
+        if (typeof (controller.broker as MStock).setFetcher === 'function') {
+          (controller.broker as MStock).setFetcher(createProxyFetcher(req.body.proxyUrl));
+        }
+      } else if (typeof (controller.broker as MStock).setFetcher === 'function') {
+        (controller.broker as MStock).setFetcher(fetch);
+      }
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid proxy configuration.' });
+    }
+  });
   app.get('/api/strategy/settings', (req, res) => res.json({ saved: controller.strategySettings(req.query.strategy === 'sell' ? 'sell' : 'buy'), profiles: { buy: controller.strategySettings('buy'), sell: controller.strategySettings('sell') }, effective: controller.session?.settings ?? DEFAULT_SETTINGS, defaults: DEFAULT_SETTINGS }));
   app.post('/api/strategy/settings', (req, res) => { const saved = controller.saveStrategySettings(req.body); repository.put(directionOf(saved) === 'sell' ? 'strategy:settings:sell' : 'strategy:settings', saved); res.json({ saved, appliesTo: 'next trading day; today retains the same saved day-session' }); });
   app.get('/api/audit', async (_req, res) => res.json(await audit.read()));

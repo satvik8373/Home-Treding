@@ -10,6 +10,8 @@ import { Controller } from './controller.ts'
 import { createApp } from './http.ts'
 import { createAccountSync } from './backup/accountSync.ts'
 import type { AccountSync } from './backup/accountSync.ts'
+import { observeExecutionIPv4 } from './setup.ts'
+import { createProxyFetcher } from './proxy.ts'
 
 export interface Workspace {
   sync?: AccountSync
@@ -18,13 +20,40 @@ export interface Workspace {
   feed: Pick<MarketFeed, 'close'>
   app: ReturnType<typeof createApp>
 }
+let sharedIpCache: { ip: string; expiresAt: number } | null = null
+let sharedIpTask: Promise<string> | null = null
+
+export async function sharedNetworkObserver(): Promise<string> {
+  const now = Date.now()
+  if (sharedIpCache && now < sharedIpCache.expiresAt) return sharedIpCache.ip
+  if (!sharedIpTask) {
+    sharedIpTask = observeExecutionIPv4().then(ip => {
+      sharedIpCache = { ip, expiresAt: Date.now() + 30_000 }
+      return ip
+    }).finally(() => { sharedIpTask = null })
+  }
+  return sharedIpTask
+}
+
 export type WorkspaceFactory = (directory: string) => Workspace
 export const createWorkspace: WorkspaceFactory = directory => {
   const store = new Store(directory), feed = new MarketFeed()
   const sync = createAccountSync(directory)
   if (sync) store.onDurableChange = sync.request
-  const controller = new Controller(new MStock(), store, feed)
-  const app = createApp(controller, process.cwd(), 4310, store)
+  const savedProxy = store.get<{ url: string; ipv4?: string }>('setup:workspace-proxy')
+  let fetcher: typeof fetch = fetch
+  let observer: (() => Promise<string>) | undefined = sharedNetworkObserver
+  if (savedProxy?.url) {
+    try {
+      fetcher = createProxyFetcher(savedProxy.url)
+      observer = () => observeExecutionIPv4(fetcher)
+    } catch {
+      // fallback
+    }
+  }
+  const broker = new MStock(fetcher)
+  const controller = new Controller(broker, store, feed)
+  const app = createApp(controller, process.cwd(), 4310, store, undefined, observer)
   if (sync) { controller.persistence = () => sync.state; sync.onStatus = () => controller.onChange(); sync.request() }
   return { controller, store, feed, app, sync }
 }
@@ -84,6 +113,24 @@ export class Workspaces {
     this.values.set(id, workspace)
     const task = (async () => {
       this.bind(id, workspace)
+      const envProxies = (process.env.N009_WORKSPACE_PROXIES ?? '').split(',').map(s => s.trim()).filter(Boolean)
+      const tenantIndex = this.values.size - 2
+      if (tenantIndex >= 0 && tenantIndex < envProxies.length) {
+        const assigned = envProxies[tenantIndex]
+        const currentProxy = workspace.store.get<{ url: string }>('setup:workspace-proxy')
+        if (!currentProxy?.url && assigned) {
+          try {
+            const fetcher = createProxyFetcher(assigned)
+            const ipv4 = await observeExecutionIPv4(fetcher)
+            workspace.store.put('setup:workspace-proxy', { url: assigned, ipv4, savedAt: Date.now() })
+            if (typeof workspace.controller.broker.setFetcher === 'function') {
+              workspace.controller.broker.setFetcher(fetcher)
+            }
+          } catch {
+            // fallback if proxy test fails
+          }
+        }
+      }
       await workspace.controller.restore()
       return workspace
     })()

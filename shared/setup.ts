@@ -12,4 +12,6 @@ export interface ExecutionSetup {
   registeredMatch: boolean | null;
   registrationSource: 'user-entered';
   brokerRegistrationVerified: false;
+  proxyConfigured?: boolean;
+  proxyLabel?: string | null;
 }

@@ -36,6 +36,7 @@ export class MStock implements TradingBroker {
   private master: Row[] = []
   private masterDate = ''
   constructor(fetcher: typeof fetch = fetch) { this.fetcher = fetcher }
+  setFetcher(fetcher: typeof fetch) { this.fetcher = fetcher }
 
   async request(path: string, method = 'GET', form?: Record<string, string>, authenticated = true, text = false): Promise<unknown> {
     if (authenticated && (!this.credentials || this.credentials.expiresAt <= Date.now())) throw new BrokerError('mStock session expired. Reconnect your broker.', true, true)

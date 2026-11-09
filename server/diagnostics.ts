@@ -40,7 +40,16 @@ export class AccountDiagnostics {
     const check = async (name: string, work: () => Promise<string>): Promise<BrokerCheck> => {
       const start = this.now()
       try { return { name, status: 'pass', detail: await work(), durationMs: this.now() - start } }
-      catch { return { name, status: 'failed', detail: 'Broker read failed or returned an unsupported response. Reconnect or retry; no order was sent.', durationMs: this.now() - start } }
+      catch (error) {
+        let detail = 'Broker read failed or returned an unsupported response. Reconnect or retry; no order was sent.'
+        if (error instanceof Error && error.message) {
+          const msg = error.message
+          if (/ip/i.test(msg) || /not registered/i.test(msg) || /unauthorized/i.test(msg)) {
+            detail = 'mStock rejected request: Execution IP is not authorized in your mStock API key settings. Open trade.mstock.com, add the engine outbound IP to your API key, then refresh login.'
+          }
+        }
+        return { name, status: 'failed', detail, durationMs: this.now() - start }
+      }
     }
     report.checks = await Promise.all([
       check('Authentication & funds', async () => {

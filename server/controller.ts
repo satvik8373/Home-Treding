@@ -49,7 +49,7 @@ export class Controller {
   private suspended = false
   private sellPreferences: StrategySettings = structuredClone(SELL_DEFAULT_SETTINGS)
   private preferences: StrategySettings = structuredClone(DEFAULT_SETTINGS)
-  constructor(public broker: TradingBroker & Partial<Pick<MStock, 'login' | 'verify' | 'verifyAccount' | 'logout' | 'onAuthFailure'>>,
+  constructor(public broker: TradingBroker & Partial<Pick<MStock, 'login' | 'verify' | 'verifyAccount' | 'logout' | 'onAuthFailure' | 'setFetcher'>>,
     private store: Repository, public feed: Feed, private now = Date.now) {
     broker.onAuthFailure = () => {
       this.verified = false; this.feed.close()

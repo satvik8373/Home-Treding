@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
   ArrowRight,
+  Copy,
   ExternalLink,
   Link2,
   ShieldCheck,
@@ -52,6 +53,39 @@ export function BrokerDialog({
   const directTotp = savedTotp || method === 'totp' && !passwordLogin;
   const phase = broker?.connection?.phase;
   const showRecovery = !showConnection && !flowId && !refreshLogin && (phase === 'checking' || phase === 'retrying' || awaitingConnection && phase !== 'expired' && phase !== 'rejected');
+  const [executionIp, setExecutionIp] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (showConnection) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    fetch('/api/setup/network', {
+      cache: 'no-store',
+      signal: typeof AbortSignal.any === 'function' ? AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]) : controller.signal,
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        clearTimeout(timer);
+        if (data && !controller.signal.aborted) {
+          setExecutionIp(data.observed?.ipv4 ?? data.expectedIPv4 ?? null);
+        }
+      })
+      .catch(() => { clearTimeout(timer); });
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [showConnection]);
+
+  async function copyExecutionIp() {
+    if (!executionIp) return;
+    try {
+      await navigator.clipboard.writeText(executionIp);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // ignore
+    }
+  }
+
   function verificationMethod() {
     return <label className="field">Verification method<select className="broker-method-select" value={method} disabled={!online || !!working} onChange={event => { setMethod(event.target.value as 'otp' | 'totp'); setFlowId(''); setForm({ ...form, code: '' }) }}><option value="otp">SMS OTP</option><option value="totp">Authenticator (TOTP enabled)</option></select><small className="form-hint">{method === 'otp' ? 'Use SMS OTP if TOTP is not enabled for your mStock API.' : 'Use your authenticator app. mStock does not send SMS OTP when TOTP is enabled.'}</small></label>
   }
@@ -161,81 +195,103 @@ export function BrokerDialog({
             </p>
           )}
         </>
-      ) : showRecovery ? <div className="broker-recovery" role="status"><p>{broker?.connection?.message || 'Verification code accepted. Checking your broker session.'}</p>{broker?.connection?.nextRetryAt && <p>Next check: {clock(broker.connection.nextRetryAt, true)} IST</p>}<button className="button secondary full-width" disabled={!online || !!working || phase === 'checking'} onClick={() => void action('/api/broker/recheck', {}, 'recheck-broker')}>{working === 'recheck-broker' ? 'Checking…' : 'Retry account check'}</button><button type="button" className="text-button restart-auth" disabled={!!working} onClick={() => { setRefreshLogin(true); setAwaitingConnection(false) }}>Connection setup</button></div> : directTotp ? (
-        <form onSubmit={totp}>
-          {!savedTotp && <>{verificationMethod()}<label className="field">Type A API key<input required type="password" autoComplete="off" value={form.apiKey} onChange={event => { setFlowId(''); setForm({ ...form, apiKey: event.target.value }) }} /></label></>}
-          <label className="field">Authenticator code<input required autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={form.code} onChange={event => setForm({ ...form, code: event.target.value.replace(/\D/g, '') })} /></label>
-          <button className="button primary full-width" disabled={!online || !!working || form.code.length !== 6}>{working ? 'Verifying…' : savedTotp ? 'Verify & reconnect' : 'Verify & connect'}<ArrowRight size={15} /></button>
-          {flowId && error && <button type="button" className="text-button restart-auth" disabled={!!working} onClick={() => { setFlowId(''); setForm({ ...form, code: '' }) }}>Restart verification</button>}
-          {savedTotp ? <button type="button" className="text-button restart-auth" disabled={!!working} onClick={() => { setNewConnection(true); setPasswordLogin(false); setFlowId(''); setForm({ username: '', password: '', apiKey: '', code: '' }) }}>Change connection setup</button> : <button type="button" className="text-button restart-auth" disabled={!!working} onClick={() => { setPasswordLogin(true); setFlowId(''); setForm({ ...form, code: '' }) }}>Use client code and password login</button>}
-        </form>
-      ) : flowId ? (
-        <form onSubmit={verify}>
-          {verificationMethod()}
-          <label className="field">
-            {method === "totp" ? "Authenticator code" : "SMS OTP"}
-            <input
-              required
-              autoComplete="one-time-code"
-              inputMode="numeric"
-              pattern="[0-9]{6}"
-              maxLength={6}
-              value={form.code}
-              onChange={(e) =>
-                setForm({ ...form, code: e.target.value.replace(/\D/g, "") })
-              }
-              placeholder="6-digit code"
-            />
-          </label>
-          <button
-            className="button primary full-width"
-            disabled={!online || !!working || form.code.length !== 6}
-          >
-            {working === "verify" ? "Verifying…" : "Verify & connect"}
-            <ArrowRight size={15} />
-          </button>
-          <button
-            type="button"
-            className="text-button restart-auth"
-            disabled={!!working}
-            onClick={() => setFlowId("")}
-          >
-            Start login again
-          </button>
-        </form>
-      ) : (
-        <form onSubmit={login}>
-          {verificationMethod()}
-          {(["username", "apiKey", "password"] as const).map((key) => (
-            <label className="field" key={key}>
-              {key === "username"
-                ? "Client code"
-                : key === "apiKey"
-                  ? "API key"
-                  : "Password"}
-              <input
-                required
-                type={key === "username" ? "text" : "password"}
-                autoComplete={
-                  key === "username"
-                    ? "username"
-                    : key === "password"
-                      ? "current-password"
-                      : "off"
-                }
-                value={form[key]}
-                onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-              />
-            </label>
-          ))}
-          <button
-            className="button primary full-width"
-            disabled={!online || !!working}
-          >
-            {working === "login" ? "Connecting…" : "Continue"}
-            <ArrowRight size={15} />
-          </button>
-        </form>
+      ) : showRecovery ? <div className="broker-recovery" role="status"><p>{broker?.connection?.message || 'Verification code accepted. Checking your broker session.'}</p>{broker?.connection?.nextRetryAt && <p>Next check: {clock(broker.connection.nextRetryAt, true)} IST</p>}<button className="button secondary full-width" disabled={!online || !!working || phase === 'checking'} onClick={() => void action('/api/broker/recheck', {}, 'recheck-broker')}>{working === 'recheck-broker' ? 'Checking…' : 'Retry account check'}</button><button type="button" className="text-button restart-auth" disabled={!!working} onClick={() => { setRefreshLogin(true); setAwaitingConnection(false) }}>Connection setup</button></div> : (
+        <>
+          <div className="broker-ip-card">
+            <div className="broker-ip-info">
+              <span className="broker-ip-label">mStock Execution IP</span>
+              <code className="broker-ip-code">{executionIp ?? 'Checking…'}</code>
+            </div>
+            <button
+              type="button"
+              className="button secondary"
+              disabled={!executionIp}
+              onClick={() => void copyExecutionIp()}
+            >
+              <Copy size={13} />
+              {copied ? '✓ Copied' : 'Copy IP'}
+            </button>
+          </div>
+          <p className="broker-ip-tip">
+            trade.mstock.com me API Key settings me ye IP <strong>Primary IP</strong> me daalein, fir niche connect karein.
+          </p>
+          {directTotp ? (
+            <form onSubmit={totp}>
+              {!savedTotp && <>{verificationMethod()}<label className="field">Type A API key<input required type="password" autoComplete="off" value={form.apiKey} onChange={event => { setFlowId(''); setForm({ ...form, apiKey: event.target.value }) }} /></label></>}
+              <label className="field">Authenticator code<input required autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={form.code} onChange={event => setForm({ ...form, code: event.target.value.replace(/\D/g, '') })} /></label>
+              <button className="button primary full-width" disabled={!online || !!working || form.code.length !== 6}>{working ? 'Verifying…' : savedTotp ? 'Verify & reconnect' : 'Verify & connect'}<ArrowRight size={15} /></button>
+              {flowId && error && <button type="button" className="text-button restart-auth" disabled={!!working} onClick={() => { setFlowId(''); setForm({ ...form, code: '' }) }}>Restart verification</button>}
+              {savedTotp ? <button type="button" className="text-button restart-auth" disabled={!!working} onClick={() => { setNewConnection(true); setPasswordLogin(false); setFlowId(''); setForm({ username: '', password: '', apiKey: '', code: '' }) }}>Change connection setup</button> : <button type="button" className="text-button restart-auth" disabled={!!working} onClick={() => { setPasswordLogin(true); setFlowId(''); setForm({ ...form, code: '' }) }}>Use client code and password login</button>}
+            </form>
+          ) : flowId ? (
+            <form onSubmit={verify}>
+              {verificationMethod()}
+              <label className="field">
+                {method === "totp" ? "Authenticator code" : "SMS OTP"}
+                <input
+                  required
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  value={form.code}
+                  onChange={(e) =>
+                    setForm({ ...form, code: e.target.value.replace(/\D/g, "") })
+                  }
+                  placeholder="6-digit code"
+                />
+              </label>
+              <button
+                className="button primary full-width"
+                disabled={!online || !!working || form.code.length !== 6}
+              >
+                {working === "verify" ? "Verifying…" : "Verify & connect"}
+                <ArrowRight size={15} />
+              </button>
+              <button
+                type="button"
+                className="text-button restart-auth"
+                disabled={!!working}
+                onClick={() => setFlowId("")}
+              >
+                Start login again
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={login}>
+              {verificationMethod()}
+              {(["username", "apiKey", "password"] as const).map((key) => (
+                <label className="field" key={key}>
+                  {key === "username"
+                    ? "Client code"
+                    : key === "apiKey"
+                      ? "API key"
+                      : "Password"}
+                  <input
+                    required
+                    type={key === "username" ? "text" : "password"}
+                    autoComplete={
+                      key === "username"
+                        ? "username"
+                        : key === "password"
+                          ? "current-password"
+                          : "off"
+                    }
+                    value={form[key]}
+                    onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+                  />
+                </label>
+              ))}
+              <button
+                className="button primary full-width"
+                disabled={!online || !!working}
+              >
+                {working === "login" ? "Connecting…" : "Continue"}
+                <ArrowRight size={15} />
+              </button>
+            </form>
+          )}
+        </>
       )}
       {refreshLogin && broker?.connected && <button className="text-button restart-auth" disabled={!!working} onClick={() => { setRefreshLogin(false); setFlowId(''); setForm({ username: '', password: '', apiKey: '', code: '' }) }}>Return to current connection</button>}
       <details className="broker-setup-details" onToggle={event => setSetupOpen(event.currentTarget.open)}><summary>API key & execution IP setup</summary>{setupOpen && <BrokerSetup key={`${broker?.connected ? broker.account : 'disconnected'}:${connectionRevision}`} account={broker?.connected ? broker.account : null} action={action} working={working} />}</details>

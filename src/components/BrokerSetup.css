@@ -12,4 +12,5 @@
 .setup-compare > summary { padding-left: 0; }
 .setup-compare input { min-width: 0; }
 .broker-setup .setup-attention { color: #92400e; }
+.broker-setup .setup-success { color: #166534; font-weight: 500; }
 .broker-setup .setup-note { padding: 0 13px 12px; }

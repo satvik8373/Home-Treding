@@ -11,21 +11,43 @@ export function publicIPv4(value: unknown): value is string {
     || a === 198 && (b === 18 || b === 19 || b === 51 && c === 100) || a === 203 && b === 0 && c === 113)
 }
 
+const IP_PROVIDERS = [
+  'https://api.ipify.org',
+  'https://api4.ipify.org',
+  'https://ifconfig.me/ip',
+  'https://icanhazip.com',
+  'https://checkip.amazonaws.com',
+]
+
 /** Fixed, credential-free request from the execution process, never the browser or Vercel gateway. */
 export async function observeExecutionIPv4(fetcher: typeof fetch = fetch): Promise<string> {
-  const response = await fetcher('https://api.ipify.org', { redirect: 'error', signal: AbortSignal.timeout(5000), headers: { accept: 'text/plain' } })
-  if (!response.ok || !response.body) throw new Error('IP lookup unavailable')
-  const reader = response.body.getReader(); let body = ''
-  try {
-    for (;;) {
-      const chunk = await reader.read(); if (chunk.done) break
-      body += Buffer.from(chunk.value).toString('utf8')
+  let lastError: Error | null = null
+  for (const url of IP_PROVIDERS) {
+    try {
+      const response = await fetcher(url, { redirect: 'error', signal: AbortSignal.timeout(5000), headers: { accept: 'text/plain' } })
+      if (!response.ok || !response.body) throw new Error('IP lookup unavailable')
+      let body = ''
+      if (response.body && typeof (response.body as ReadableStream<Uint8Array>).getReader === 'function') {
+        const reader = (response.body as ReadableStream<Uint8Array>).getReader()
+        try {
+          for (;;) {
+            const chunk = await reader.read(); if (chunk.done) break
+            body += Buffer.from(chunk.value).toString('utf8')
+            if (body.length > 64) throw new Error('Invalid IP lookup')
+          }
+        } finally { await reader.cancel().catch(() => {}) }
+      } else if (typeof response.text === 'function') {
+        body = await response.text()
+      }
       if (body.length > 64) throw new Error('Invalid IP lookup')
+      const ip = body.trim()
+      if (!publicIPv4(ip)) throw new Error('Invalid IP lookup')
+      return ip
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error('IP lookup failed')
     }
-  } finally { await reader.cancel().catch(() => {}) }
-  const ip = body.trim()
-  if (!publicIPv4(ip)) throw new Error('Invalid IP lookup')
-  return ip
+  }
+  throw lastError ?? new Error('IP lookup unavailable')
 }
 
 type Context = { account: string; apiKey: string } | null
@@ -36,7 +58,12 @@ export class ExecutionNetwork {
   private error: string | null = null
   private task: Promise<void> | null = null
   constructor(private repository: BacktestRepository, private context: () => Context,
-    private environment: () => NodeJS.ProcessEnv = () => process.env, private observe = observeExecutionIPv4, private now = Date.now) {}
+    private environment: () => NodeJS.ProcessEnv = () => process.env, private observe = observeExecutionIPv4, private now = Date.now) {
+    const previous = this.repository.get<{ ipv4: string; checkedAt: number; changed: boolean }>('setup:last-observed-ip')
+    if (previous && publicIPv4(previous.ipv4)) {
+      this.observation = { ipv4: previous.ipv4, checkedAt: previous.checkedAt ?? 0, changed: !!previous.changed }
+    }
+  }
   private scope(context: NonNullable<Context>) {
     return createHash('sha256').update(JSON.stringify([context.account, context.apiKey])).digest('hex')
   }
@@ -77,10 +104,51 @@ export class ExecutionNetwork {
     const context = this.context(), env = this.environment(), expected = env.N009_EXECUTION_IPV4 ?? ''
     const profile = context ? this.repository.get<NetworkProfile>(this.profileKey(context)) : null
     const validExpected = publicIPv4(expected) ? expected : null
+    const savedProxy = this.repository.get<{ url: string; ipv4?: string; savedAt: number }>('setup:workspace-proxy')
+    let proxyLabel: string | null = null
+    if (savedProxy?.url) {
+      try {
+        const u = new URL(savedProxy.url)
+        proxyLabel = `${u.protocol}//${u.host}`
+      } catch {
+        proxyLabel = 'Custom Proxy'
+      }
+    }
     return { location: env.N009_EXECUTION_LOCATION === 'hosted' ? 'hosted' : env.N009_EXECUTION_LOCATION === 'local' ? 'local' : 'unspecified',
       observed: this.observation ? { ...this.observation } : null, current: this.current, error: expected && !validExpected ? 'The host execution IPv4 configuration is invalid. Ask the operator to correct it.' : this.error,
       expectedIPv4: validExpected, expectedMatch: validExpected && this.current ? validExpected === this.observation?.ipv4 : null,
       account: context?.account ?? null, connectionScope: context ? this.scope(context) : null, profile, registeredMatch: profile && this.current ? [profile.primary, profile.secondary].includes(this.observation!.ipv4) : null,
-      registrationSource: 'user-entered', brokerRegistrationVerified: false }
+      registrationSource: 'user-entered', brokerRegistrationVerified: false,
+      proxyConfigured: !!savedProxy?.url, proxyLabel }
+  }
+  async saveProxy(proxyUrlInput: unknown): Promise<{ saved: boolean; ipv4: string | null }> {
+    const raw = typeof proxyUrlInput === 'string' ? proxyUrlInput.trim() : null
+    if (!raw) {
+      this.repository.put('setup:workspace-proxy', null)
+      this.current = false
+      this.attemptedAt = -Infinity
+      await this.read()
+      return { saved: true, ipv4: this.observation?.ipv4 ?? null }
+    }
+    let parsed: URL
+    try {
+      parsed = new URL(raw)
+      if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error()
+    } catch {
+      throw new Error('Enter a valid HTTP or HTTPS proxy URL, e.g. http://username:password@host:port or http://host:port')
+    }
+    const { createProxyFetcher } = await import('./proxy.ts')
+    const proxyFetcher = createProxyFetcher(raw)
+    let ipv4: string
+    try {
+      ipv4 = await observeExecutionIPv4(proxyFetcher)
+    } catch (err) {
+      throw new Error(`Proxy connection test failed: ${err instanceof Error ? err.message : 'Could not observe IP through proxy'}`)
+    }
+    this.repository.put('setup:workspace-proxy', { url: raw, ipv4, savedAt: this.now() })
+    this.observation = { ipv4, checkedAt: this.now(), changed: false }
+    this.current = true
+    this.error = null
+    return { saved: true, ipv4 }
   }
 }
