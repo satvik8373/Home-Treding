@@ -38,7 +38,7 @@ export function BrokerDialog({
   const [flowId, setFlowId] = useState(""),
     [methodChoice, setMethod] = useState<"otp" | "totp" | null>(null);
   const [awaitingConnection, setAwaitingConnection] = useState(false);
-  const [setupOpen, setSetupOpen] = useState(false);
+  const [tab, setTab] = useState<'connect' | 'network'>('connect');
   const [refreshLogin, setRefreshLogin] = useState(false);
   const [newConnection, setNewConnection] = useState(false);
   const [passwordLogin, setPasswordLogin] = useState(false);
@@ -163,7 +163,36 @@ export function BrokerDialog({
       )}
       {!showConnection && !showRecovery && !flowId && broker?.connection && ['expired', 'rejected'].includes(broker.connection.phase) && <p className="form-hint" role="status">{broker.connection.message}</p>}
 
-      {showConnection ? (
+      <div className="mode-switch broker-tabs" role="tablist" aria-label="Broker dialog sections">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'connect'}
+          className={tab === 'connect' ? 'active' : ''}
+          onClick={() => setTab('connect')}
+        >
+          {showConnection ? 'Account' : 'Connect'}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'network'}
+          className={tab === 'network' ? 'active' : ''}
+          onClick={() => setTab('network')}
+        >
+          {network?.sharedIpConflict ? 'IP & Route · Conflict' : 'IP & Route'}
+        </button>
+      </div>
+
+      {tab === 'network' ? (
+        <BrokerSetup
+          key={`${broker?.connected ? broker.account : 'disconnected'}:${connectionRevision}`}
+          account={broker?.connected ? broker.account : null}
+          action={action}
+          working={working}
+          onNetworkChange={() => setSetupRevision(value => value + 1)}
+        />
+      ) : showConnection ? (
         <>
           <dl className="connection-details">
             <div>
@@ -202,8 +231,14 @@ export function BrokerDialog({
         </>
       ) : showRecovery ? <div className="broker-recovery" role="status"><p>{broker?.connection?.message || 'Verification code accepted. Checking your broker session.'}</p>{broker?.connection?.nextRetryAt && <p>Next check: {clock(broker.connection.nextRetryAt, true)} IST</p>}<button className="button secondary full-width" disabled={!online || !!working || phase === 'checking'} onClick={() => void action('/api/broker/recheck', {}, 'recheck-broker')}>{working === 'recheck-broker' ? 'Checking…' : 'Retry account check'}</button><button type="button" className="text-button restart-auth" disabled={!!working} onClick={() => { setRefreshLogin(true); setAwaitingConnection(false) }}>Connection setup</button></div> : (
         <>
-          <div className="broker-ip-card">
-            <div className="broker-ip-info">
+          <button
+            type="button"
+            className="broker-ip-card"
+            disabled={!executionIp}
+            onClick={() => void copyExecutionIp()}
+            title="Tap to copy execution IPv4"
+          >
+            <span className="broker-ip-info">
               <span className={`broker-ip-label${network?.sharedIpConflict ? ' conflict' : ''}`}>
                 {network?.sharedIpConflict
                   ? 'Shared Host IPv4 · Claimed by another account'
@@ -211,24 +246,30 @@ export function BrokerDialog({
                     ? 'Dedicated Proxy IPv4'
                     : network?.egressMode === 'interface'
                       ? 'Dedicated Interface IPv4'
-                      : 'mStock Execution IPv4'}
+                      : 'Execution IPv4'}
               </span>
               <code className="broker-ip-code">{executionIp ?? 'Checking…'}</code>
-            </div>
-            <button
-              type="button"
-              className="button secondary"
-              disabled={!executionIp}
-              onClick={() => void copyExecutionIp()}
-            >
+            </span>
+            <span className={`broker-ip-copy${copied ? ' copied' : ''}`}>
               {copied ? <Check size={13} /> : <Copy size={13} />}
-              {copied ? 'Copied' : 'Copy IP'}
-            </button>
-          </div>
+              {copied ? 'Copied' : 'Copy'}
+            </span>
+          </button>
           <p className={`broker-ip-tip${network?.sharedIpConflict ? ' conflict' : ''}`}>
-            {network?.sharedIpConflict
-              ? `Host IP ${executionIp} is already used by another workspace. mStock rejects duplicate IPs across Client IDs ("IP already used"). Set a dedicated workspace outbound route below, or run the local engine on your own device.`
-              : <>Register this outbound IPv4 as the <strong>Primary IP</strong> in your trade.mstock.com API key settings before connecting.</>}
+            {network?.sharedIpConflict ? (
+              <>
+                IP {executionIp} is already used by another workspace.{' '}
+                <button type="button" className="text-button" onClick={() => setTab('network')}>
+                  Configure route &rarr;
+                </button>
+              </>
+            ) : (
+              <>
+                Register as <strong>Primary IP</strong> on{' '}
+                <a href="https://trade.mstock.com" target="_blank" rel="noreferrer">trade.mstock.com</a>
+                {' '}· Tap box to copy.
+              </>
+            )}
           </p>
           {directTotp ? (
             <form onSubmit={totp}>
@@ -308,14 +349,23 @@ export function BrokerDialog({
           )}
         </>
       )}
-      {refreshLogin && broker?.connected && <button className="text-button restart-auth" disabled={!!working} onClick={() => { setRefreshLogin(false); setFlowId(''); setForm({ username: '', password: '', apiKey: '', code: '' }) }}>Return to current connection</button>}
-      <details className="broker-setup-details" open={setupOpen || Boolean(network?.sharedIpConflict)} onToggle={event => setSetupOpen(event.currentTarget.open)}><summary>API key & execution IP setup</summary>{(setupOpen || network?.sharedIpConflict) && <BrokerSetup key={`${broker?.connected ? broker.account : 'disconnected'}:${connectionRevision}`} account={broker?.connected ? broker.account : null} action={action} working={working} onNetworkChange={() => setSetupRevision(value => value + 1)} />}</details>
-      {!showConnection && !savedTotp && <p className="form-hint">A verified connection can move from another stopped, flat workspace. Its history stays in that workspace.</p>}
-      <p className="form-hint">Sessions expire within 12 hours or at midnight IST, whichever comes first. A stream reconnect does not require a new OTP.</p>
+      {tab === 'connect' && refreshLogin && broker?.connected && (
+        <button
+          className="text-button restart-auth"
+          disabled={!!working}
+          onClick={() => {
+            setRefreshLogin(false);
+            setFlowId('');
+            setForm({ username: '', password: '', apiKey: '', code: '' });
+          }}
+        >
+          Return to current connection
+        </button>
+      )}
       <div className="dialog-security">
         <ShieldCheck size={15} />
         <span>
-          Tokens stay on the backend. Passwords and OTPs are never saved.
+          Sessions expire in 12h or midnight IST. Tokens stay on the backend; passwords and OTPs are never saved.
         </span>
       </div>
       <a

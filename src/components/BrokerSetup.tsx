@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, Copy } from 'lucide-react'
+import { Check, Copy, ExternalLink, RefreshCw } from 'lucide-react'
 import type { ExecutionSetup } from '../../shared/setup'
 import type { useDashboard } from '../hooks/useDashboard'
 import { clock } from '../lib/format'
@@ -40,7 +40,7 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
       })
       .catch(() => {
         clearTimeout(timer)
-        if (!controller.signal.aborted) setError('Execution IP check unavailable. Retry; do not substitute your browser IP.')
+        if (!controller.signal.aborted) setError('Execution IP check unavailable. Retry; do not use your browser IP.')
       })
     return () => {
       clearTimeout(timer)
@@ -63,7 +63,7 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
       await navigator.clipboard.writeText(ipv4)
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
-      setNote('Execution IP copied. Register it in your mStock Type A API key settings.')
+      setNote('Execution IP copied. Register it in trade.mstock.com API settings.')
     } catch {
       setNote('Select and copy the execution IP shown above.')
     }
@@ -79,7 +79,7 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
         setRevision(value => value + 1)
         onNetworkChange?.()
         setNote(proxyUrl
-          ? (result.ipv4 ? `Dedicated route verified (${result.ipv4}). Register this IP in trade.mstock.com before connecting.` : 'Dedicated route saved.')
+          ? (result.ipv4 ? `Dedicated route verified (${result.ipv4}). Register this IP on trade.mstock.com.` : 'Dedicated route saved.')
           : (result.ipv4 ? `Restored default host route (${result.ipv4}).` : 'Restored default host route.'))
       }
     } finally {
@@ -87,90 +87,91 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
     }
   }
 
-  const routeBadge = egressMode === 'proxy'
-    ? `Workspace proxy route${report?.proxyLabel ? ` (${report.proxyLabel})` : ''}`
+  const routeLabel = egressMode === 'proxy'
+    ? `Workspace proxy${report?.proxyLabel ? ` (${report.proxyLabel})` : ''}`
     : egressMode === 'interface'
-      ? `Dedicated host interface${report?.proxyLabel ? ` (${report.proxyLabel})` : ''}`
-      : report?.location === 'hosted'
-        ? (report?.sharedIpConflict ? 'Shared host outbound IPv4 · Claimed by another account' : 'Hosted engine outbound IPv4')
-        : 'Execution engine outbound IPv4'
+      ? `Dedicated interface${report?.proxyLabel ? ` (${report.proxyLabel})` : ''}`
+      : report?.sharedIpConflict
+        ? 'Shared host IPv4 · Claimed'
+        : report?.location === 'hosted'
+          ? 'Hosted outbound IPv4'
+          : 'Execution outbound IPv4'
 
   return (
-    <details className="broker-setup" open={!account}>
-      <summary>Broker & execution IP setup</summary>
-      <ol className="setup-steps">
-        <li>
-          <strong>1. Execution IPv4 address for mStock</strong>
-          <p>
-            mStock binds each retail Type A API key to a fixed Client ID and IPv4 address. Register this workspace&apos;s exact outbound IP below on trade.mstock.com:
-          </p>
-          <div className="setup-address">
-            <div>
-              <small>{routeBadge}</small>
-              <code>{ipv4 ?? (error || report?.error ? 'Unavailable' : 'Checking…')}</code>
-            </div>
-            <button className="button secondary" type="button" disabled={!ipv4} onClick={() => void copy()}>
-              {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'Copied' : 'Copy IP'}
-            </button>
-          </div>
-          {report?.observed && (
-            <p className="setup-timestamp">
-              {isCurrent ? 'Observed' : 'Last observation; currently unverified'} {clock(report.observed.checkedAt, true)} IST
-              {!isCurrent ? ` · ${report.observed.ipv4}` : ''}
-            </p>
-          )}
-          {!report?.observed && report?.expectedIPv4 && (
-            <p className="setup-timestamp">Configured host execution IP · {report.expectedIPv4}</p>
-          )}
-          {(error || report?.error) && !ipv4 && <p className="inline-error" role="status">{error || report?.error}</p>}
-          {report?.sharedIpConflict && (
-            <p className="setup-attention" role="alert">
-              Another workspace on this host already uses {ipv4 ?? 'the host IPv4'} in mStock. Reusing it across separate mStock Client IDs causes &ldquo;IP already used&rdquo;. Configure a dedicated outbound route below or run the local engine (`run.bat` / `npm start`) on your own device/VPS.
-            </p>
-          )}
-          {report?.observed?.changed && (
-            <p className="setup-attention">The workspace outbound IP has changed in history. Recheck your mStock API key IP settings before Live execution.</p>
-          )}
-          {report?.expectedMatch === false && (
-            <p className="setup-attention">
-              Observed IP differs from the host&apos;s configured execution IP ({report.expectedIPv4}). Ask the host operator to check outbound routing.
-            </p>
-          )}
+    <div className="setup-stack">
+      <section className="setup-card" aria-label="Execution IP">
+        <div className="setup-card-head">
+          <strong>Outbound IPv4</strong>
           <div className="setup-links">
             <a href="https://trade.mstock.com" target="_blank" rel="noreferrer">
-              Open mStock
+              mStock <ExternalLink size={11} />
             </a>
             <button
               type="button"
               className="text-button"
               onClick={() => {
                 setRevision(value => value + 1)
-                setNote('Rechecking the execution IP; observations are cached for up to 30 seconds.')
+                setNote('Rechecking outbound IP…')
               }}
             >
-              Recheck execution IP
+              <RefreshCw size={11} />
+              Recheck
             </button>
           </div>
-        </li>
-        <li>
-          <strong>2. Connect your broker account (Type A flow)</strong>
-          <p>
-            Connect your own mStock account using your Type A API key and Authenticator TOTP or client code/password/SMS OTP. Ensure NSE F&amp;O is enabled on trade.mstock.com.
+        </div>
+
+        <button
+          type="button"
+          className="broker-ip-card"
+          disabled={!ipv4}
+          onClick={() => void copy()}
+          title="Tap to copy execution IPv4"
+        >
+          <span className="broker-ip-info">
+            <span className={`broker-ip-label${report?.sharedIpConflict ? ' conflict' : ''}`}>
+              {routeLabel}
+            </span>
+            <code className="broker-ip-code">{ipv4 ?? (error || report?.error ? 'Unavailable' : 'Checking…')}</code>
+          </span>
+          <span className={`broker-ip-copy${copied ? ' copied' : ''}`}>
+            {copied ? <Check size={13} /> : <Copy size={13} />}
+            {copied ? 'Copied' : 'Copy'}
+          </span>
+        </button>
+
+        {report?.observed && (
+          <p className="setup-meta">
+            {isCurrent ? 'Verified' : 'Cached'} {clock(report.observed.checkedAt, true)} IST
           </p>
-        </li>
-        <li>
-          <strong>3. Validate account permissions & IP</strong>
-          <p>
-            Run read-only account checks after connecting to confirm mStock accepts requests from this IPv4 and supplies funds, positions, order book, and market quotes.
+        )}
+        {!report?.observed && report?.expectedIPv4 && (
+          <p className="setup-meta">Configured host IP · {report.expectedIPv4}</p>
+        )}
+        {(error || report?.error) && !ipv4 && <p className="inline-error" role="status">{error || report?.error}</p>}
+        {report?.sharedIpConflict && (
+          <p className="setup-attention" role="alert">
+            Another workspace uses {ipv4 ?? 'this host IP'} in mStock. Reusing it causes &ldquo;IP already used&rdquo;. Add a dedicated route below or run <code>run.bat</code> locally.
           </p>
-        </li>
-      </ol>
-      <details className="setup-compare" open={!!report?.sharedIpConflict}>
-        <summary>Workspace outbound route (multi-user IP separation)</summary>
-        <p>
+        )}
+        {report?.observed?.changed && (
+          <p className="setup-attention">Outbound IP changed since the previous check. Verify mStock API settings before Live orders.</p>
+        )}
+        {report?.expectedMatch === false && (
+          <p className="setup-attention">Observed IP differs from host configuration ({report.expectedIPv4}).</p>
+        )}
+      </section>
+
+      <section className="setup-card" aria-label="Multi-user outbound route">
+        <div className="setup-card-head">
+          <strong>Multi-user route isolation</strong>
+          <span className="tag">
+            {egressMode === 'proxy' ? 'Proxy active' : egressMode === 'interface' ? 'Host interface' : 'Default host'}
+          </span>
+        </div>
+        <p className="setup-desc">
           {egressMode === 'interface'
-            ? 'This workspace uses a host-assigned outbound network interface configured by the deployment operator.'
-            : 'If this server\u2019s default IP is already used by another mStock account, supply your own free-tier micro-VM or static HTTP/HTTPS proxy URL so both REST orders and market streams exit from a distinct IPv4.'}
+            ? 'Orders and streams exit through a host-assigned network interface.'
+            : 'Route orders and live quotes through your own HTTP/HTTPS proxy URL so each mStock Client ID uses a unique IPv4.'}
         </p>
         {egressMode !== 'interface' && (
           <form
@@ -181,7 +182,7 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
             }}
           >
             <label className="field">
-              HTTP/HTTPS outbound proxy URL
+              HTTP/HTTPS proxy URL
               <input
                 type="url"
                 autoComplete="off"
@@ -192,8 +193,8 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
               />
             </label>
             <div className="setup-route-actions">
-              <button className="button secondary" type="submit" disabled={!!account || routeBusy || !!working || !proxyInput.trim()}>
-                {routeBusy ? 'Testing route…' : 'Verify & apply route'}
+              <button className="button primary" type="submit" disabled={!!account || routeBusy || !!working || !proxyInput.trim()}>
+                {routeBusy ? 'Testing route…' : 'Verify & apply'}
               </button>
               {report?.proxyConfigured && egressMode === 'proxy' && (
                 <button
@@ -202,19 +203,20 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
                   disabled={!!account || routeBusy || !!working}
                   onClick={() => void applyProxy('')}
                 >
-                  Use default host route
+                  Reset to host IP
                 </button>
               )}
             </div>
-            {account && <p className="form-hint">Disconnect mStock above before changing this workspace&apos;s outbound route.</p>}
+            {account && <p className="setup-meta">Disconnect mStock on the Account tab to edit route.</p>}
           </form>
         )}
-      </details>
+      </section>
+
       {account && (
         <details className="setup-compare">
-          <summary>Compare the IPs saved in your mStock API key</summary>
-          <p>
-            Enter the values saved in mStock. Saving here retains a comparison reference for your account and does not change mStock settings.
+          <summary>Saved mStock IP reference</summary>
+          <p className="setup-desc">
+            Local reference only; edit official IPs inside trade.mstock.com.
           </p>
           <form
             onSubmit={async event => {
@@ -230,52 +232,55 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
                 if (result) {
                   setDraft(null)
                   setRevision(value => value + 1)
-                  setNote('Reference saved. Ensure this IP matches trade.mstock.com API settings.')
+                  setNote('IP reference saved.')
                 }
               } finally {
                 setBusy(false)
               }
             }}
           >
-            <label className="field">
-              Primary IPv4
-              <input
-                type="text"
-                inputMode="decimal"
-                autoComplete="off"
-                value={form.primary}
-                required
-                onChange={event => setDraft({ ...form, primary: event.target.value.trim() })}
-              />
-            </label>
-            <label className="field">
-              Secondary IPv4 · optional
-              <input
-                type="text"
-                inputMode="decimal"
-                autoComplete="off"
-                value={form.secondary}
-                onChange={event => setDraft({ ...form, secondary: event.target.value.trim() })}
-              />
-            </label>
+            <div className="setup-ip-pair">
+              <label className="field">
+                Primary IPv4
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={form.primary}
+                  required
+                  onChange={event => setDraft({ ...form, primary: event.target.value.trim() })}
+                />
+              </label>
+              <label className="field">
+                Secondary (optional)
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  value={form.secondary}
+                  onChange={event => setDraft({ ...form, secondary: event.target.value.trim() })}
+                />
+              </label>
+            </div>
             <button className="button secondary" disabled={busy || !!working || !report?.connectionScope}>
-              {busy ? 'Saving…' : 'Save IP reference'}
+              {busy ? 'Saving…' : 'Save reference'}
             </button>
           </form>
           {registeredMatch != null && (
             <p className={registeredMatch ? 'setup-success' : 'setup-attention'}>
               {registeredMatch
-                ? 'Observed execution IP matches your saved reference.'
-                : 'Observed execution IP does not match either saved reference. Check trade.mstock.com API key settings before Live use.'}
+                ? 'Execution IP matches your saved reference.'
+                : 'Execution IP differs from saved reference.'}
             </p>
           )}
         </details>
       )}
+
       {note && (
         <p className="setup-note" role="status">
           {note}
         </p>
       )}
-    </details>
+    </div>
   )
 }
