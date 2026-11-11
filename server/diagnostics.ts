@@ -44,8 +44,8 @@ export class AccountDiagnostics {
         let detail = 'Broker read failed or returned an unsupported response. Reconnect or retry; no order was sent.'
         if (error instanceof Error && error.message) {
           const msg = error.message
-          if (/ip/i.test(msg) || /not registered/i.test(msg) || /unauthorized/i.test(msg)) {
-            detail = 'mStock rejected request: Execution IP is not authorized in your mStock API key settings. Open trade.mstock.com, add the engine outbound IP to your API key, then refresh login.'
+          if (/\bip\b|whitelist|not registered|unauthorized ip/i.test(msg)) {
+            detail = 'mStock rejected this request because the outbound execution IP is not authorized on your API key. Update your Primary IP on trade.mstock.com and reconnect.'
           }
         }
         return { name, status: 'failed', detail, durationMs: this.now() - start }

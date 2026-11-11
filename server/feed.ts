@@ -1,3 +1,4 @@
+import type { Agent } from 'node:http'
 import { isTradingDay, istDate, istTime } from './time.ts'
 import WebSocket from 'ws'
 import type { Mark } from '../shared/model.ts'
@@ -44,7 +45,17 @@ export class MarketFeed {
   private tokens: string[] = []
   private attempt = 0
   private generation = 0
-  constructor(private socketFactory = (url: URL) => new WebSocket(url, { handshakeTimeout: 10_000, maxPayload: 1024 * 1024 }), private ticksExpected = normalMarketSession) {}
+  private agent?: Agent
+  constructor(
+    private socketFactory: (url: URL, agent?: Agent) => WebSocket = (url, agent) => new WebSocket(url, { handshakeTimeout: 10_000, maxPayload: 1024 * 1024, ...(agent ? { agent } : {}) }),
+    private ticksExpected = normalMarketSession,
+  ) {}
+  setAgent(agent?: Agent): void {
+    this.agent = agent
+    if (this.credentials && this.tokens.length && this.status !== 'disconnected') {
+      this.connect(this.credentials, this.tokens)
+    }
+  }
   onMark: (mark: Mark) => void = () => {}
   onChange: () => void = () => {}
   connect(credentials: SavedBroker, tokens: string[]): void {
@@ -57,7 +68,7 @@ export class MarketFeed {
     if (!this.credentials || this.credentials.expiresAt <= Date.now() || generation !== this.generation) return
     this.status = 'connecting'; this.onChange()
     const url = marketSocketUrl(this.credentials)
-    const ws = this.socketFactory(url)
+    const ws = this.socketFactory(url, this.agent)
     this.ws = ws
     let lastMessageAt = Date.now()
     const openedAt = lastMessageAt, tokenTicks = new Map<string, number>()

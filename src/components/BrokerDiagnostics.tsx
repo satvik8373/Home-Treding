@@ -16,7 +16,7 @@ export function BrokerDiagnostics({ account }: { account: string }) {
     try {
       const response = await fetch('/api/broker/diagnostics', {
         cache: 'no-store',
-        signal: typeof AbortSignal.any === 'function' ? AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]) : controller.signal,
+        signal: controller.signal,
       })
       const body = await response.json()
       clearTimeout(timer)

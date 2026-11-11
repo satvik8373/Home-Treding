@@ -1,6 +1,7 @@
 import express from 'express'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { mkdirSync, readdirSync } from 'node:fs'
+import { isIPv4 } from 'node:net'
 import { join } from 'node:path'
 import { openIdentity } from '../shared/identity.ts'
 import { Store } from './store.ts'
@@ -11,15 +12,17 @@ import { createApp } from './http.ts'
 import { createAccountSync } from './backup/accountSync.ts'
 import type { AccountSync } from './backup/accountSync.ts'
 import { observeExecutionIPv4 } from './setup.ts'
-import { createProxyFetcher } from './proxy.ts'
+import { createEgressAgent, createProxyFetcher, validateEgressRoute } from './proxy.ts'
 
 export interface Workspace {
   sync?: AccountSync
   controller: Controller
   store: Store
-  feed: Pick<MarketFeed, 'close'>
+  feed: Pick<MarketFeed, 'close'> & Partial<Pick<MarketFeed, 'setAgent'>>
   app: ReturnType<typeof createApp>
+  setEgressRoute?: (routeUrl: string | null, ipv4?: string) => void
 }
+
 let sharedIpCache: { ip: string; expiresAt: number } | null = null
 let sharedIpTask: Promise<string> | null = null
 
@@ -35,27 +38,46 @@ export async function sharedNetworkObserver(): Promise<string> {
   return sharedIpTask
 }
 
-export type WorkspaceFactory = (directory: string) => Workspace
-export const createWorkspace: WorkspaceFactory = directory => {
+export interface WorkspaceContext {
+  conflictCheck?: (observedIp: string | null, routeUrl: string | null) => boolean
+}
+
+export type WorkspaceFactory = (directory: string, context?: WorkspaceContext) => Workspace
+
+export const createWorkspace: WorkspaceFactory = (directory, context) => {
   const store = new Store(directory), feed = new MarketFeed()
   const sync = createAccountSync(directory)
   if (sync) store.onDurableChange = sync.request
-  const savedProxy = store.get<{ url: string; ipv4?: string }>('setup:workspace-proxy')
-  let fetcher: typeof fetch = fetch
-  let observer: (() => Promise<string>) | undefined = sharedNetworkObserver
-  if (savedProxy?.url) {
-    try {
-      fetcher = createProxyFetcher(savedProxy.url)
-      observer = () => observeExecutionIPv4(fetcher)
-    } catch {
-      // fallback
-    }
-  }
-  const broker = new MStock(fetcher)
+  const broker = new MStock()
   const controller = new Controller(broker, store, feed)
-  const app = createApp(controller, process.cwd(), 4310, store, undefined, observer)
+  let controls: { setEgressRoute: (routeUrl: string | null, ipv4?: string) => void } | undefined
+  const app = createApp(controller, process.cwd(), 4310, store, undefined, sharedNetworkObserver, {
+    conflictCheck: context?.conflictCheck,
+    applyEgress: (routeUrl) => {
+      broker.setFetcher(routeUrl ? createProxyFetcher(routeUrl) : fetch)
+      feed.setAgent(routeUrl ? createEgressAgent(routeUrl) : undefined)
+    },
+    onSetupReady: (ready) => { controls = ready },
+  })
   if (sync) { controller.persistence = () => sync.state; sync.onStatus = () => controller.onChange(); sync.request() }
-  return { controller, store, feed, app, sync }
+  return {
+    controller,
+    store,
+    feed,
+    app,
+    sync,
+    setEgressRoute: (routeUrl, ipv4) => controls?.setEgressRoute(routeUrl, ipv4),
+  }
+}
+
+function configuredEgressPool(env: NodeJS.ProcessEnv = process.env): string[] {
+  const proxies = (env.N009_WORKSPACE_PROXIES ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  const interfaces = (env.N009_WORKSPACE_INTERFACES ?? '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(s => isIPv4(s))
+    .map(ip => `bind://${ip}`)
+  return [...proxies, ...interfaces]
 }
 
 /** Only gateway-signed identities select a workspace. Request bodies, paths and browser headers cannot select one. */
@@ -66,11 +88,11 @@ export class Workspaces {
   private owner: Workspace
   private directory: string
   private closing = false
-  constructor(private data: string, private secret: string, private capacity = 4, private factory = createWorkspace) {
+  constructor(private data: string, private secret: string, private capacity = 4, private factory: WorkspaceFactory = createWorkspace) {
     if (secret.length < 32 || !Number.isInteger(capacity) || capacity < 1 || capacity > 32) throw new Error('Invalid workspace configuration.')
     this.directory = join(data, 'tenants')
     mkdirSync(this.directory, { recursive: true, mode: 0o700 })
-    this.owner = this.factory(data)
+    this.owner = this.factory(data, { conflictCheck: (ip, route) => this.hasSharedIpConflict('owner', ip, route) })
     this.values.set('owner', this.owner)
     this.bind('owner', this.owner)
     this.app.disable('x-powered-by')
@@ -88,6 +110,63 @@ export class Workspaces {
       } catch { res.status(503).json({ error: 'Workspace unavailable or server capacity reached. Contact the deployment owner.' }) }
     })
   }
+
+  private hasSharedIpConflict(myId: string, observedIp: string | null, myRouteUrl: string | null): boolean {
+    for (const [otherId, other] of this.values) {
+      if (otherId === myId) continue
+      const otherBound = other.controller.connected() || Boolean(other.store.broker())
+      if (!otherBound) continue
+      const otherProxy = other.store.get<{ url?: string; ipv4?: string } | null>('setup:workspace-proxy')
+      if (!myRouteUrl && !otherProxy?.url) return true
+      if (observedIp) {
+        const otherIp = otherProxy?.url
+          ? (otherProxy.ipv4 ?? other.store.get<{ ipv4?: string } | null>('setup:last-observed-ip')?.ipv4 ?? null)
+          : (other.store.get<{ ipv4?: string } | null>('setup:last-observed-ip')?.ipv4 ?? sharedIpCache?.ip ?? null)
+        if (otherIp && otherIp === observedIp) return true
+      }
+    }
+    return false
+  }
+
+  private claimedPoolRoutes(): Set<string> {
+    const claimed = new Set<string>()
+    for (const workspace of this.values.values()) {
+      const saved = workspace.store.get<{ url?: string } | null>('setup:workspace-proxy')
+      if (saved?.url) claimed.add(saved.url)
+    }
+    return claimed
+  }
+
+  private async maybeAssignPoolEgress(id: string, workspace: Workspace): Promise<void> {
+    if (id === 'owner') return
+    const currentProxy = workspace.store.get<{ url?: string } | null>('setup:workspace-proxy')
+    if (currentProxy?.url) return
+    if (workspace.store.broker()) return
+    const pool = configuredEgressPool()
+    if (!pool.length) return
+    const claimed = this.claimedPoolRoutes()
+    for (const candidate of pool) {
+      let normalized: string
+      try {
+        normalized = await validateEgressRoute(candidate, { allowOperatorRoutes: true })
+      } catch {
+        continue
+      }
+      if (claimed.has(normalized)) continue
+      try {
+        const fetcher = createProxyFetcher(normalized)
+        const ipv4 = await observeExecutionIPv4(fetcher)
+        const now = Date.now()
+        workspace.store.put('setup:workspace-proxy', { url: normalized, ipv4, savedAt: now })
+        workspace.store.put('setup:last-observed-ip', { ipv4, checkedAt: now, changed: false })
+        workspace.setEgressRoute?.(normalized, ipv4)
+        return
+      } catch {
+        // Skip unreachable pool routes and try next candidate
+      }
+    }
+  }
+
   private bind(id: string, workspace: Workspace) {
     workspace.controller.authorizeBroker = (account, freshlyVerified = false) => {
       const key = `auth:broker-owner:${createHash('sha256').update(account).digest('hex')}`
@@ -103,34 +182,18 @@ export class Workspaces {
     const saved = workspace.store.broker()
     if (saved) workspace.controller.authorizeBroker(saved.account)
   }
-  private async get(id: string): Promise<Workspace> {
+
+  private async loadWorkspace(id: string, assignPool: boolean): Promise<Workspace> {
     const pending = this.tasks.get(id)
     if (pending) return pending
     const loaded = this.values.get(id)
     if (loaded) return loaded
     if (!/^[a-f0-9]{64}$/.test(id) || this.values.size - 1 >= this.capacity) throw new Error('Workspace capacity reached.')
-    const workspace = this.factory(join(this.directory, id))
+    const workspace = this.factory(join(this.directory, id), { conflictCheck: (ip, route) => this.hasSharedIpConflict(id, ip, route) })
     this.values.set(id, workspace)
     const task = (async () => {
       this.bind(id, workspace)
-      const envProxies = (process.env.N009_WORKSPACE_PROXIES ?? '').split(',').map(s => s.trim()).filter(Boolean)
-      const tenantIndex = this.values.size - 2
-      if (tenantIndex >= 0 && tenantIndex < envProxies.length) {
-        const assigned = envProxies[tenantIndex]
-        const currentProxy = workspace.store.get<{ url: string }>('setup:workspace-proxy')
-        if (!currentProxy?.url && assigned) {
-          try {
-            const fetcher = createProxyFetcher(assigned)
-            const ipv4 = await observeExecutionIPv4(fetcher)
-            workspace.store.put('setup:workspace-proxy', { url: assigned, ipv4, savedAt: Date.now() })
-            if (typeof workspace.controller.broker.setFetcher === 'function') {
-              workspace.controller.broker.setFetcher(fetcher)
-            }
-          } catch {
-            // fallback if proxy test fails
-          }
-        }
-      }
+      if (assignPool) await this.maybeAssignPoolEgress(id, workspace)
       await workspace.controller.restore()
       return workspace
     })()
@@ -139,16 +202,28 @@ export class Workspaces {
       workspace.feed.close(); workspace.store.close(); this.values.delete(id); throw error
     } finally { this.tasks.delete(id) }
   }
+
+  private async get(id: string): Promise<Workspace> {
+    return this.loadWorkspace(id, true)
+  }
+
   async restore() {
     await this.owner.controller.restore()
     // Restore saved workspaces even when no browser is open; active sessions keep their own controllers.
     const ids = readdirSync(this.directory, { withFileTypes: true }).filter(entry => entry.isDirectory() && /^[a-f0-9]{64}$/.test(entry.name))
     if (ids.length > this.capacity) throw new Error('Existing workspaces exceed configured capacity. Increase capacity before starting.')
-    for (const entry of ids) await this.get(entry.name)
+    // First load all persisted workspaces so existing pool claims are registered before assigning unused slots.
+    for (const entry of ids) await this.loadWorkspace(entry.name, false)
+    for (const entry of ids) {
+      const workspace = this.values.get(entry.name)
+      if (workspace) await this.maybeAssignPoolEgress(entry.name, workspace)
+    }
   }
+
   async pump() {
     await Promise.allSettled([...this.values.values()].map(workspace => workspace.controller.pump()))
   }
+
   async close(): Promise<boolean> {
     this.closing = true
     await Promise.allSettled([...this.tasks.values()])

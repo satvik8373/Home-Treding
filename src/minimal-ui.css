@@ -111,14 +111,16 @@ tbody tr:hover { background: var(--ui-subtle); }
 .market-data-status { display: flex; flex-wrap: wrap; gap: 5px 16px; padding: 0 20px 12px; min-height: 28px; color: #64748b; font-size: 10px; line-height: 1.6; }
 .pending-order { display: flex; flex-direction: column; gap: 6px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; margin-top: 12px; border-radius: 5px; color: #475569; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
 .pending-order strong { color: #0f172a; }
-.broker-ip-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px 14px; margin: 10px 0 6px; }
+.broker-ip-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px; margin: 10px 0 6px; }
 .broker-ip-info { display: flex; flex-direction: column; gap: 3px; text-align: left; }
-.broker-ip-label { font-size: 10px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; }
+.broker-ip-label { font-size: 10px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; }
+.broker-ip-label.conflict { color: #b91c1c; }
 .broker-ip-code { font-size: 14px; font-weight: 700; color: #0f172a; user-select: all; background: transparent; padding: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 .broker-ip-tip { margin: 0 0 14px; font-size: 11px; color: #64748b; line-height: 1.5; text-align: left; }
+.broker-ip-tip.conflict { color: #92400e; }
 .broker-diagnostics { border-top: 1px solid #e2e8f0; padding: 18px 0; margin-bottom: 10px; }
 .diagnostic-time { margin-top: 16px; color: #64748b; font-size: 11px; font-variant-numeric: tabular-nums; }
-.diagnostic-flow-banner { display: flex; align-items: center; gap: 6px; margin: 12px 0; padding: 8px 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; color: #166534; font-size: 11px; font-weight: 500; }
+.diagnostic-flow-banner { display: flex; align-items: center; gap: 6px; margin: 12px 0; padding: 8px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; color: #166534; font-size: 11px; font-weight: 500; }
 .diagnostic-checks { list-style: none; padding: 0; margin: 14px 0; }
 .diagnostic-checks li { padding: 12px 0; border-top: 1px solid #e2e8f0; }
 .diagnostic-checks li > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }

@@ -15,7 +15,15 @@ import { DATASET_SCHEMA } from "./backtest/schema.ts";
 import { AccountDiagnostics } from "./diagnostics.ts";
 import { AccountAudit } from './audit.ts';
 import { DEFAULT_SETTINGS } from '../shared/settings.ts';
-import { ExecutionNetwork } from './setup.ts';
+import { ExecutionNetwork, observeExecutionIPv4 } from './setup.ts';
+import { createEgressAgent, createProxyFetcher } from './proxy.ts';
+
+export interface AppNetworkOptions {
+  conflictCheck?: (observedIp: string | null, routeUrl: string | null) => boolean;
+  applyEgress?: (routeUrl: string | null) => void;
+  allowPrivateProxy?: boolean;
+  onSetupReady?: (controls: { setEgressRoute: (routeUrl: string | null, ipv4?: string) => void }) => void;
+}
 
 export function createApp(
   controller: Controller,
@@ -24,12 +32,37 @@ export function createApp(
   backtestRepository?: BacktestRepository,
   gatewaySecret = process.env.N009_GATEWAY_SECRET ?? '',
   networkObserver?: () => Promise<string>,
+  appNetwork?: AppNetworkOptions,
 ) {
   const app = express(),
     csrf = randomBytes(32).toString("hex");
   const subscribers = new Set<express.Response>();
   const repository = backtestRepository ?? new MemoryRepository();
-  const setup = new ExecutionNetwork(repository, () => controller.connected() && controller.broker.credentials ? { account: controller.broker.credentials.account, apiKey: controller.broker.credentials.apiKey } : null, undefined, networkObserver);
+  const baseObserve = networkObserver ?? observeExecutionIPv4;
+  const observeForRoute = (routeUrl: string | null) =>
+    routeUrl ? () => observeExecutionIPv4(createProxyFetcher(routeUrl)) : baseObserve;
+  const applyEgress = appNetwork?.applyEgress ?? ((routeUrl: string | null) => {
+    controller.broker.setFetcher?.(routeUrl ? createProxyFetcher(routeUrl) : fetch);
+    controller.feed.setAgent?.(routeUrl ? createEgressAgent(routeUrl) : undefined);
+  });
+  const initialProxy = repository.get<{ url: string; ipv4?: string } | null>('setup:workspace-proxy');
+  const setup = new ExecutionNetwork(
+    repository,
+    () => controller.connected() && controller.broker.credentials ? { account: controller.broker.credentials.account, apiKey: controller.broker.credentials.apiKey } : null,
+    undefined,
+    observeForRoute(initialProxy?.url ?? null),
+    Date.now,
+    appNetwork?.conflictCheck,
+  );
+  if (initialProxy?.url) {
+    try { applyEgress(initialProxy.url); } catch { /* retain default routing if saved proxy fails init */ }
+  }
+  appNetwork?.onSetupReady?.({
+    setEgressRoute: (routeUrl, ipv4) => {
+      applyEgress(routeUrl);
+      setup.setObserve(observeForRoute(routeUrl), ipv4);
+    },
+  });
   const historical = new HistoricalData(controller.broker as MStock, () => ({ connected: controller.connected(), account: controller.broker.credentials?.account ?? null, session: controller.session }), repository);
   const accountDiagnostics = new AccountDiagnostics(controller.broker as MStock, controller.feed, Date.now, () => controller.session);
   const audit = new AccountAudit(accountDiagnostics, () => controller.snapshot());
@@ -119,17 +152,21 @@ export function createApp(
   app.get('/api/setup/network', async (_req, res) => res.json(await setup.read()));
   app.post('/api/setup/network', (req, res) => res.json(setup.save(req.body)));
   app.post('/api/setup/proxy', async (req, res) => {
+    if (controller.session && ['armed', 'preparing', 'running', 'stopping', 'blocked'].includes(controller.session.status)) {
+      return res.status(409).json({ error: 'Stop and flatten the active strategy session before changing outbound IP routing.' });
+    }
+    if (controller.connected()) {
+      return res.status(409).json({ error: 'Disconnect mStock before changing outbound execution IP routing.' });
+    }
     try {
-      const result = await setup.saveProxy(req.body?.proxyUrl);
-      if (req.body?.proxyUrl) {
-        const { createProxyFetcher } = await import('./proxy.ts');
-        if (typeof (controller.broker as MStock).setFetcher === 'function') {
-          (controller.broker as MStock).setFetcher(createProxyFetcher(req.body.proxyUrl));
-        }
-      } else if (typeof (controller.broker as MStock).setFetcher === 'function') {
-        (controller.broker as MStock).setFetcher(fetch);
+      const result = await setup.saveProxy(req.body?.proxyUrl, { allowOperatorRoutes: appNetwork?.allowPrivateProxy });
+      applyEgress(result.routeUrl);
+      setup.setObserve(observeForRoute(result.routeUrl), result.ipv4 ?? undefined);
+      if (!result.routeUrl) {
+        const refreshed = await setup.read();
+        return res.json({ saved: true, ipv4: refreshed.observed?.ipv4 ?? null });
       }
-      res.json(result);
+      res.json({ saved: true, ipv4: result.ipv4 });
     } catch (error) {
       res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid proxy configuration.' });
     }

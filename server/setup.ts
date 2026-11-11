@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto'
 import { isIPv4 } from 'node:net'
 import type { ExecutionSetup, NetworkProfile } from '../shared/setup.ts'
 import type { BacktestRepository } from './backtest/service.ts'
+import { createProxyFetcher, egressModeOf, formatEgressLabel, validateEgressRoute } from './proxy.ts'
+import type { ValidateProxyOptions } from './proxy.ts'
 
 export function publicIPv4(value: unknown): value is string {
   if (typeof value !== 'string' || !isIPv4(value)) return false
@@ -57,11 +59,32 @@ export class ExecutionNetwork {
   private attemptedAt = -Infinity
   private error: string | null = null
   private task: Promise<void> | null = null
-  constructor(private repository: BacktestRepository, private context: () => Context,
-    private environment: () => NodeJS.ProcessEnv = () => process.env, private observe = observeExecutionIPv4, private now = Date.now) {
+  private observedRouteUrl: string | null | undefined = undefined
+  constructor(
+    private repository: BacktestRepository,
+    private context: () => Context,
+    private environment: () => NodeJS.ProcessEnv = () => process.env,
+    private observe: () => Promise<string> = observeExecutionIPv4,
+    private now = Date.now,
+    private conflictCheck: (observedIp: string | null, routeUrl: string | null) => boolean = () => false,
+  ) {
     const previous = this.repository.get<{ ipv4: string; checkedAt: number; changed: boolean }>('setup:last-observed-ip')
     if (previous && publicIPv4(previous.ipv4)) {
       this.observation = { ipv4: previous.ipv4, checkedAt: previous.checkedAt ?? 0, changed: !!previous.changed }
+    }
+  }
+  setObserve(nextObserve: () => Promise<string>, cachedIpv4?: string) {
+    this.observe = nextObserve
+    this.task = null
+    this.observedRouteUrl = this.repository.get<{ url: string } | null>('setup:workspace-proxy')?.url ?? null
+    if (cachedIpv4 && publicIPv4(cachedIpv4)) {
+      this.observation = { ipv4: cachedIpv4, checkedAt: this.now(), changed: false }
+      this.current = true
+      this.attemptedAt = this.now()
+      this.error = null
+    } else {
+      this.current = false
+      this.attemptedAt = -Infinity
     }
   }
   private scope(context: NonNullable<Context>) {
@@ -82,8 +105,9 @@ export class ExecutionNetwork {
     this.repository.put(this.profileKey(context), profile)
     return { saved: true }
   }
-  private async refresh() {
+  private async refresh(routeUrl: string | null) {
     this.attemptedAt = this.now()
+    this.observedRouteUrl = routeUrl
     try {
       const ipv4 = await this.observe()
       if (!publicIPv4(ipv4)) throw new Error('Invalid observer result')
@@ -96,59 +120,66 @@ export class ExecutionNetwork {
     }
   }
   async read(): Promise<ExecutionSetup> {
+    const savedProxy = this.repository.get<{ url: string; ipv4?: string; savedAt: number } | null>('setup:workspace-proxy')
+    const routeUrl = savedProxy?.url ?? null
+    if (this.observedRouteUrl !== undefined && this.observedRouteUrl !== routeUrl) {
+      this.attemptedAt = -Infinity
+      this.current = false
+    }
     if (!this.task && this.now() - this.attemptedAt >= (this.current ? 30_000 : 15_000)) {
-      const task = this.refresh(); this.task = task
+      const task = this.refresh(routeUrl); this.task = task
       void task.finally(() => { if (this.task === task) this.task = null })
     }
     if (this.task) await this.task
     const context = this.context(), env = this.environment(), expected = env.N009_EXECUTION_IPV4 ?? ''
     const profile = context ? this.repository.get<NetworkProfile>(this.profileKey(context)) : null
     const validExpected = publicIPv4(expected) ? expected : null
-    const savedProxy = this.repository.get<{ url: string; ipv4?: string; savedAt: number }>('setup:workspace-proxy')
-    let proxyLabel: string | null = null
-    if (savedProxy?.url) {
-      try {
-        const u = new URL(savedProxy.url)
-        proxyLabel = `${u.protocol}//${u.host}`
-      } catch {
-        proxyLabel = 'Custom Proxy'
-      }
+    return {
+      location: env.N009_EXECUTION_LOCATION === 'hosted' ? 'hosted' : env.N009_EXECUTION_LOCATION === 'local' ? 'local' : 'unspecified',
+      observed: this.observation ? { ...this.observation } : null,
+      current: this.current,
+      error: !routeUrl && expected && !validExpected ? 'The host execution IPv4 configuration is invalid. Ask the operator to correct it.' : this.error,
+      expectedIPv4: routeUrl ? null : validExpected,
+      expectedMatch: !routeUrl && validExpected && this.current ? validExpected === this.observation?.ipv4 : null,
+      account: context?.account ?? null,
+      connectionScope: context ? this.scope(context) : null,
+      profile,
+      registeredMatch: profile && this.current ? [profile.primary, profile.secondary].includes(this.observation!.ipv4) : null,
+      registrationSource: 'user-entered',
+      brokerRegistrationVerified: false,
+      egressMode: egressModeOf(routeUrl),
+      proxyConfigured: !!routeUrl,
+      proxyLabel: routeUrl ? formatEgressLabel(routeUrl) : null,
+      sharedIpConflict: this.conflictCheck(this.observation?.ipv4 ?? null, routeUrl),
     }
-    return { location: env.N009_EXECUTION_LOCATION === 'hosted' ? 'hosted' : env.N009_EXECUTION_LOCATION === 'local' ? 'local' : 'unspecified',
-      observed: this.observation ? { ...this.observation } : null, current: this.current, error: expected && !validExpected ? 'The host execution IPv4 configuration is invalid. Ask the operator to correct it.' : this.error,
-      expectedIPv4: validExpected, expectedMatch: validExpected && this.current ? validExpected === this.observation?.ipv4 : null,
-      account: context?.account ?? null, connectionScope: context ? this.scope(context) : null, profile, registeredMatch: profile && this.current ? [profile.primary, profile.secondary].includes(this.observation!.ipv4) : null,
-      registrationSource: 'user-entered', brokerRegistrationVerified: false,
-      proxyConfigured: !!savedProxy?.url, proxyLabel }
   }
-  async saveProxy(proxyUrlInput: unknown): Promise<{ saved: boolean; ipv4: string | null }> {
-    const raw = typeof proxyUrlInput === 'string' ? proxyUrlInput.trim() : null
+  async saveProxy(proxyUrlInput: unknown, options: ValidateProxyOptions = {}): Promise<{ saved: boolean; ipv4: string | null; routeUrl: string | null }> {
+    const raw = typeof proxyUrlInput === 'string' ? proxyUrlInput.trim() : ''
     if (!raw) {
       this.repository.put('setup:workspace-proxy', null)
+      this.repository.put('setup:last-observed-ip', null)
+      this.observation = null
       this.current = false
+      this.error = null
+      this.task = null
       this.attemptedAt = -Infinity
-      await this.read()
-      return { saved: true, ipv4: this.observation?.ipv4 ?? null }
+      return { saved: true, ipv4: null, routeUrl: null }
     }
-    let parsed: URL
-    try {
-      parsed = new URL(raw)
-      if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error()
-    } catch {
-      throw new Error('Enter a valid HTTP or HTTPS proxy URL, e.g. http://username:password@host:port or http://host:port')
-    }
-    const { createProxyFetcher } = await import('./proxy.ts')
-    const proxyFetcher = createProxyFetcher(raw)
+    const normalized = await validateEgressRoute(raw, options)
+    const proxyFetcher = createProxyFetcher(normalized)
     let ipv4: string
     try {
       ipv4 = await observeExecutionIPv4(proxyFetcher)
     } catch (err) {
       throw new Error(`Proxy connection test failed: ${err instanceof Error ? err.message : 'Could not observe IP through proxy'}`)
     }
-    this.repository.put('setup:workspace-proxy', { url: raw, ipv4, savedAt: this.now() })
-    this.observation = { ipv4, checkedAt: this.now(), changed: false }
+    const savedAt = this.now()
+    this.repository.put('setup:workspace-proxy', { url: normalized, ipv4, savedAt })
+    this.observation = { ipv4, checkedAt: savedAt, changed: false }
+    this.repository.put('setup:last-observed-ip', this.observation)
     this.current = true
     this.error = null
-    return { saved: true, ipv4 }
+    this.attemptedAt = savedAt
+    return { saved: true, ipv4, routeUrl: normalized }
   }
 }

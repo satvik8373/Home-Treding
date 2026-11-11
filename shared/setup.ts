@@ -1,3 +1,4 @@
+export type EgressMode = 'direct' | 'proxy' | 'interface'
 export interface NetworkProfile { primary: string; secondary: string | null; savedAt: number }
 export interface ExecutionSetup {
   location: 'hosted' | 'local' | 'unspecified';
@@ -12,6 +13,8 @@ export interface ExecutionSetup {
   registeredMatch: boolean | null;
   registrationSource: 'user-entered';
   brokerRegistrationVerified: false;
+  egressMode?: EgressMode;
   proxyConfigured?: boolean;
   proxyLabel?: string | null;
+  sharedIpConflict?: boolean;
 }

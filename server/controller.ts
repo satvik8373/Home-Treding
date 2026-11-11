@@ -13,7 +13,7 @@ import { DEFAULT_SETTINGS, SELL_DEFAULT_SETTINGS, sameSettings, settingsFor, val
 import type { StrategySettings } from '../shared/settings.ts'
 import { rejectionSummary } from './orderIdentity.ts'
 
-type Feed = Pick<MarketFeed, 'status' | 'lastTickAt' | 'connect' | 'close' | 'onMark' | 'onChange'>
+type Feed = Pick<MarketFeed, 'status' | 'lastTickAt' | 'connect' | 'close' | 'onMark' | 'onChange'> & Partial<Pick<MarketFeed, 'setAgent'>>
 type Repository = Pick<Store, 'session' | 'loadSession' | 'saveSession' | 'broker' | 'saveBroker'> & Partial<Pick<Store, 'get' | 'put' | 'persist'>>
 const SIDES: Side[] = ['CE', 'PE']
 const active = (s: TradingSession | null) => !!s && ['armed', 'preparing', 'running', 'stopping'].includes(s.status)

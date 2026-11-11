@@ -14,3 +14,4 @@
 .broker-setup .setup-attention { color: #92400e; }
 .broker-setup .setup-success { color: #166534; font-weight: 500; }
 .broker-setup .setup-note { padding: 0 13px 12px; }
+.setup-route-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }

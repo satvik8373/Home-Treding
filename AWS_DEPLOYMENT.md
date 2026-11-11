@@ -20,7 +20,7 @@ N009_DATA_DIR=/var/lib/nifty009
 N009_EXECUTION_LOCATION=hosted
 ```
 
-Also set `N009_GATEWAY_SECRET` to a private random value of at least 32 characters. Optionally set `N009_EXECUTION_IPV4` to the verified host outbound IPv4; this is an expected-value comparison, not proof of a static allocation or broker approval.
+Also set `N009_GATEWAY_SECRET` to a private random value of at least 32 characters. Optionally set `N009_EXECUTION_IPV4` to the verified host outbound IPv4; this is an expected-value comparison, not proof of a static allocation or broker approval. For multi-user deployments where separate users connect separate mStock accounts on the same engine, configure `N009_WORKSPACE_PROXIES` (comma-separated HTTP/HTTPS proxy URLs) or `N009_WORKSPACE_INTERFACES` (comma-separated local IPv4 interface addresses) so each workspace exits from a unique IPv4 address.
 
 ## Connect Vercel
 

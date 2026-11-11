@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
   ArrowRight,
+  Check,
   Copy,
   ExternalLink,
   Link2,
@@ -9,6 +10,7 @@ import {
   Unplug,
 } from "lucide-react";
 import type { BrokerStatus } from "../../shared/model";
+import type { ExecutionSetup } from "../../shared/setup";
 import type { useDashboard } from "../hooks/useDashboard";
 import { clock, dateTime } from "../lib/format";
 import { Dialog } from "./Dialog";
@@ -53,8 +55,11 @@ export function BrokerDialog({
   const directTotp = savedTotp || method === 'totp' && !passwordLogin;
   const phase = broker?.connection?.phase;
   const showRecovery = !showConnection && !flowId && !refreshLogin && (phase === 'checking' || phase === 'retrying' || awaitingConnection && phase !== 'expired' && phase !== 'rejected');
-  const [executionIp, setExecutionIp] = useState<string | null>(null);
+  const [network, setNetwork] = useState<ExecutionSetup | null>(null);
+  const [setupRevision, setSetupRevision] = useState(0);
   const [copied, setCopied] = useState(false);
+
+  const executionIp = network?.observed?.ipv4 ?? network?.expectedIPv4 ?? null;
 
   useEffect(() => {
     if (showConnection) return;
@@ -62,18 +67,18 @@ export function BrokerDialog({
     const timer = setTimeout(() => controller.abort(), 8000);
     fetch('/api/setup/network', {
       cache: 'no-store',
-      signal: typeof AbortSignal.any === 'function' ? AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]) : controller.signal,
+      signal: controller.signal,
     })
-      .then(res => res.ok ? res.json() : null)
+      .then(res => res.ok ? res.json() as Promise<ExecutionSetup> : null)
       .then(data => {
         clearTimeout(timer);
         if (data && !controller.signal.aborted) {
-          setExecutionIp(data.observed?.ipv4 ?? data.expectedIPv4 ?? null);
+          setNetwork(data);
         }
       })
       .catch(() => { clearTimeout(timer); });
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [showConnection]);
+  }, [showConnection, setupRevision]);
 
   async function copyExecutionIp() {
     if (!executionIp) return;
@@ -199,7 +204,15 @@ export function BrokerDialog({
         <>
           <div className="broker-ip-card">
             <div className="broker-ip-info">
-              <span className="broker-ip-label">mStock Execution IP</span>
+              <span className={`broker-ip-label${network?.sharedIpConflict ? ' conflict' : ''}`}>
+                {network?.sharedIpConflict
+                  ? 'Shared Host IPv4 · Claimed by another account'
+                  : network?.egressMode === 'proxy'
+                    ? 'Dedicated Proxy IPv4'
+                    : network?.egressMode === 'interface'
+                      ? 'Dedicated Interface IPv4'
+                      : 'mStock Execution IPv4'}
+              </span>
               <code className="broker-ip-code">{executionIp ?? 'Checking…'}</code>
             </div>
             <button
@@ -208,12 +221,14 @@ export function BrokerDialog({
               disabled={!executionIp}
               onClick={() => void copyExecutionIp()}
             >
-              <Copy size={13} />
-              {copied ? '✓ Copied' : 'Copy IP'}
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+              {copied ? 'Copied' : 'Copy IP'}
             </button>
           </div>
-          <p className="broker-ip-tip">
-            trade.mstock.com me API Key settings me ye IP <strong>Primary IP</strong> me daalein, fir niche connect karein.
+          <p className={`broker-ip-tip${network?.sharedIpConflict ? ' conflict' : ''}`}>
+            {network?.sharedIpConflict
+              ? `Host IP ${executionIp} is already used by another workspace. mStock rejects duplicate IPs across Client IDs ("IP already used"). Set a dedicated workspace outbound route below, or run the local engine on your own device.`
+              : <>Register this outbound IPv4 as the <strong>Primary IP</strong> in your trade.mstock.com API key settings before connecting.</>}
           </p>
           {directTotp ? (
             <form onSubmit={totp}>
@@ -294,7 +309,7 @@ export function BrokerDialog({
         </>
       )}
       {refreshLogin && broker?.connected && <button className="text-button restart-auth" disabled={!!working} onClick={() => { setRefreshLogin(false); setFlowId(''); setForm({ username: '', password: '', apiKey: '', code: '' }) }}>Return to current connection</button>}
-      <details className="broker-setup-details" onToggle={event => setSetupOpen(event.currentTarget.open)}><summary>API key & execution IP setup</summary>{setupOpen && <BrokerSetup key={`${broker?.connected ? broker.account : 'disconnected'}:${connectionRevision}`} account={broker?.connected ? broker.account : null} action={action} working={working} />}</details>
+      <details className="broker-setup-details" open={setupOpen || Boolean(network?.sharedIpConflict)} onToggle={event => setSetupOpen(event.currentTarget.open)}><summary>API key & execution IP setup</summary>{(setupOpen || network?.sharedIpConflict) && <BrokerSetup key={`${broker?.connected ? broker.account : 'disconnected'}:${connectionRevision}`} account={broker?.connected ? broker.account : null} action={action} working={working} onNetworkChange={() => setSetupRevision(value => value + 1)} />}</details>
       {!showConnection && !savedTotp && <p className="form-hint">A verified connection can move from another stopped, flat workspace. Its history stays in that workspace.</p>}
       <p className="form-hint">Sessions expire within 12 hours or at midnight IST, whichever comes first. A stream reconnect does not require a new OTP.</p>
       <div className="dialog-security">

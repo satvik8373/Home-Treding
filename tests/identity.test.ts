@@ -296,3 +296,59 @@ test('fresh broker verification moves only a stopped flat connection and preserv
   assert.equal((source.controller.broker as FakeBroker).submitted.length, 0)
   assert.equal((destination.controller.broker as FakeBroker).submitted.length, 0)
 })
+
+test('workspaces detect shared host IP conflicts across unconnected accounts without leaking broker identity', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'n009-ip-conflict-'))
+  const created: Workspace[] = []
+  const factory: ConstructorParameters<typeof Workspaces>[3] = (path, context) => {
+    const store = new Store(path), broker = new FakeBroker()
+    broker.credentials = null
+    const feed = { status: 'disconnected' as const, lastTickAt: null, connect() {}, close() {}, onMark() {}, onChange() {} }
+    const controller = new Controller(broker, store, feed)
+    let controls: { setEgressRoute: (routeUrl: string | null, ipv4?: string) => void } | undefined
+    const workspace: Workspace = {
+      controller,
+      store,
+      feed,
+      app: createApp(controller, process.cwd(), 4310, store, secret, async () => '98.93.220.83', {
+        conflictCheck: context?.conflictCheck,
+        onSetupReady: ready => { controls = ready },
+      }),
+      setEgressRoute: (routeUrl, ipv4) => controls?.setEgressRoute(routeUrl, ipv4),
+    }
+    created.push(workspace)
+    return workspace
+  }
+  const host = new Workspaces(directory, secret, 2, factory)
+  await host.restore()
+  t.after(async () => { await host.close(); await rm(directory, { recursive: true, force: true }) })
+  const root = await serve(t, (req, res) => host.app(req, res))
+
+  const alice = tenantId('alice-ip'), bob = tenantId('bob-ip')
+  await fetch(root + '/api/state', { headers: assertion(alice) })
+  await fetch(root + '/api/state', { headers: assertion(bob) })
+  const [, aliceWs, bobWs] = created
+
+  const credentials = { apiKey: 'secret-api-key', accessToken: 'secret-token', name: 'Alice', account: 'alice-secret-broker-id', expiresAt: Date.now() + 3600_000 }
+  aliceWs.store.saveBroker(credentials)
+  aliceWs.controller.broker.credentials = credentials
+  aliceWs.controller.authorizeBroker!(credentials.account)
+
+  const aliceSetup = await (await fetch(root + '/api/setup/network', { headers: assertion(alice) })).json()
+  const bobSetup = await (await fetch(root + '/api/setup/network', { headers: assertion(bob) })).json()
+  assert.equal(aliceSetup.sharedIpConflict, false)
+  assert.equal(bobSetup.sharedIpConflict, true)
+  assert.equal(JSON.stringify(bobSetup).includes('alice-secret-broker-id'), false)
+  assert.equal(JSON.stringify(bobSetup).includes('secret-api-key'), false)
+
+  // Dedicated workspace proxy resolves the shared-IP conflict cleanly and redacts credentials
+  bobWs.store.put('setup:workspace-proxy', { url: 'http://user:secretpass@1.1.1.1:3128', ipv4: '1.1.1.1', savedAt: Date.now() })
+  bobWs.setEgressRoute!('http://user:secretpass@1.1.1.1:3128', '1.1.1.1')
+  const bobProxied = await (await fetch(root + '/api/setup/network', { headers: assertion(bob) })).json()
+  assert.equal(bobProxied.egressMode, 'proxy')
+  assert.equal(bobProxied.proxyConfigured, true)
+  assert.equal(bobProxied.proxyLabel, 'http://1.1.1.1:3128')
+  assert.equal(bobProxied.sharedIpConflict, false)
+  assert.equal(JSON.stringify(bobProxied).includes('secretpass'), false)
+})
+
