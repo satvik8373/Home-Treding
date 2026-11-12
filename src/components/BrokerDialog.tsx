@@ -62,6 +62,7 @@ export function BrokerDialog({
   const executionIp = network?.observed?.ipv4 ?? network?.expectedIPv4 ?? null;
 
   useEffect(() => {
+    if (showConnection) return;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     fetch('/api/setup/network', {
@@ -77,7 +78,7 @@ export function BrokerDialog({
       })
       .catch(() => { clearTimeout(timer); });
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [showConnection, setupRevision, connectionRevision]);
+  }, [showConnection, setupRevision]);
 
   async function copyExecutionIp() {
     if (!executionIp) return;
@@ -207,10 +208,6 @@ export function BrokerDialog({
               <dd>
                 {broker.expiresAt ? `${dateTime(broker.expiresAt)} IST` : "—"}
               </dd>
-            </div>
-            <div>
-              <dt>Execution IP</dt>
-              <dd>{executionIp ?? "—"}</dd>
             </div>
           </dl>
           <BrokerDiagnostics key={broker.account} account={broker.account!} />

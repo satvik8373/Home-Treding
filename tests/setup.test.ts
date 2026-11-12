@@ -192,21 +192,3 @@ test('proxy configuration endpoint rejects SSRF and connected broker changes and
   assert.equal(network.proxyConfigured, false)
   assert.equal(network.observed.ipv4, '1.1.1.1')
 })
-
-test('proxy setup rejects saving a route whose exit IPv4 conflicts with another workspace', async () => {
-  const repo = new MemoryRepository()
-  const service = new ExecutionNetwork(
-    repo,
-    () => null,
-    () => ({}),
-    async () => '8.8.8.8',
-    Date.now,
-    ip => ip === '1.1.1.1',
-    async () => '1.1.1.1',
-  )
-  await assert.rejects(
-    service.saveProxy('http://127.0.0.1:3128', { allowOperatorRoutes: true }),
-    /already used by another workspace/,
-  )
-  assert.equal(repo.get('setup:workspace-proxy'), null)
-})

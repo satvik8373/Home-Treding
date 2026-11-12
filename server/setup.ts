@@ -67,7 +67,6 @@ export class ExecutionNetwork {
     private observe: () => Promise<string> = observeExecutionIPv4,
     private now = Date.now,
     private conflictCheck: (observedIp: string | null, routeUrl: string | null) => boolean = () => false,
-    private observeWithFetcher: (fetcher?: typeof fetch) => Promise<string> = observeExecutionIPv4,
   ) {
     const previous = this.repository.get<{ ipv4: string; checkedAt: number; changed: boolean }>('setup:last-observed-ip')
     if (previous && publicIPv4(previous.ipv4)) {
@@ -170,12 +169,9 @@ export class ExecutionNetwork {
     const proxyFetcher = createProxyFetcher(normalized)
     let ipv4: string
     try {
-      ipv4 = await this.observeWithFetcher(proxyFetcher)
+      ipv4 = await observeExecutionIPv4(proxyFetcher)
     } catch (err) {
       throw new Error(`Proxy connection test failed: ${err instanceof Error ? err.message : 'Could not observe IP through proxy'}`)
-    }
-    if (this.conflictCheck(ipv4, normalized)) {
-      throw new Error(`This route exits from ${ipv4}, which is already used by another workspace. Choose a proxy with a unique public IPv4.`)
     }
     const savedAt = this.now()
     this.repository.put('setup:workspace-proxy', { url: normalized, ipv4, savedAt })

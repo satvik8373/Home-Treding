@@ -88,14 +88,7 @@ export class Workspaces {
   private owner: Workspace
   private directory: string
   private closing = false
-  constructor(
-    private data: string,
-    private secret: string,
-    private capacity = 4,
-    private factory: WorkspaceFactory = createWorkspace,
-    private environment: () => NodeJS.ProcessEnv = () => process.env,
-    private observeRoute: (routeUrl: string) => Promise<string> = routeUrl => observeExecutionIPv4(createProxyFetcher(routeUrl)),
-  ) {
+  constructor(private data: string, private secret: string, private capacity = 4, private factory: WorkspaceFactory = createWorkspace) {
     if (secret.length < 32 || !Number.isInteger(capacity) || capacity < 1 || capacity > 32) throw new Error('Invalid workspace configuration.')
     this.directory = join(data, 'tenants')
     mkdirSync(this.directory, { recursive: true, mode: 0o700 })
@@ -144,33 +137,14 @@ export class Workspaces {
     return claimed
   }
 
-  private claimedObservedIps(excludeId: string): Set<string> {
-    const claimed = new Set<string>()
-    for (const [otherId, workspace] of this.values) {
-      if (otherId === excludeId) continue
-      const saved = workspace.store.get<{ url?: string; ipv4?: string } | null>('setup:workspace-proxy')
-      if (saved?.url) {
-        const routedIp = saved.ipv4 ?? workspace.store.get<{ ipv4?: string } | null>('setup:last-observed-ip')?.ipv4 ?? null
-        if (routedIp && isIPv4(routedIp)) claimed.add(routedIp)
-        continue
-      }
-      if (workspace.controller.connected() || Boolean(workspace.store.broker())) {
-        const directIp = workspace.store.get<{ ipv4?: string } | null>('setup:last-observed-ip')?.ipv4 ?? sharedIpCache?.ip ?? null
-        if (directIp && isIPv4(directIp)) claimed.add(directIp)
-      }
-    }
-    return claimed
-  }
-
   private async maybeAssignPoolEgress(id: string, workspace: Workspace): Promise<void> {
     if (id === 'owner') return
     const currentProxy = workspace.store.get<{ url?: string } | null>('setup:workspace-proxy')
     if (currentProxy?.url) return
     if (workspace.store.broker()) return
-    const pool = configuredEgressPool(this.environment())
+    const pool = configuredEgressPool()
     if (!pool.length) return
-    const claimedRoutes = this.claimedPoolRoutes()
-    const claimedIps = this.claimedObservedIps(id)
+    const claimed = this.claimedPoolRoutes()
     for (const candidate of pool) {
       let normalized: string
       try {
@@ -178,10 +152,10 @@ export class Workspaces {
       } catch {
         continue
       }
-      if (claimedRoutes.has(normalized)) continue
+      if (claimed.has(normalized)) continue
       try {
-        const ipv4 = await this.observeRoute(normalized)
-        if (claimedIps.has(ipv4)) continue
+        const fetcher = createProxyFetcher(normalized)
+        const ipv4 = await observeExecutionIPv4(fetcher)
         const now = Date.now()
         workspace.store.put('setup:workspace-proxy', { url: normalized, ipv4, savedAt: now })
         workspace.store.put('setup:last-observed-ip', { ipv4, checkedAt: now, changed: false })
