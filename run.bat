@@ -11,6 +11,7 @@ if not exist node_modules (
   call npm ci
   if errorlevel 1 goto failed
 )
+set "N009_EXECUTION_LOCATION=local"
 call npm run build
 if errorlevel 1 goto failed
 start "" "http://127.0.0.1:4310"
