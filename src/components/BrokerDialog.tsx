@@ -1,17 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
   ArrowRight,
+  Check,
+  Copy,
+  ExternalLink,
   Link2,
   ShieldCheck,
   Unplug,
-  ExternalLink,
 } from "lucide-react";
 import type { BrokerStatus } from "../../shared/model";
+import type { ExecutionSetup } from "../../shared/setup";
 import type { useDashboard } from "../hooks/useDashboard";
 import { clock, dateTime } from "../lib/format";
 import { Dialog } from "./Dialog";
 import { BrokerDiagnostics } from './BrokerDiagnostics';
+import { BrokerSetup } from './BrokerSetup';
 
 type Props = {
   broker?: BrokerStatus;
@@ -34,6 +38,7 @@ export function BrokerDialog({
   const [flowId, setFlowId] = useState(""),
     [methodChoice, setMethod] = useState<"otp" | "totp" | null>(null);
   const [awaitingConnection, setAwaitingConnection] = useState(false);
+  const [tab, setTab] = useState<'connect' | 'network'>('connect');
   const [refreshLogin, setRefreshLogin] = useState(false);
   const [newConnection, setNewConnection] = useState(false);
   const [passwordLogin, setPasswordLogin] = useState(false);
@@ -50,8 +55,40 @@ export function BrokerDialog({
   const directTotp = savedTotp || method === 'totp' && !passwordLogin;
   const phase = broker?.connection?.phase;
   const showRecovery = !showConnection && !flowId && !refreshLogin && (phase === 'checking' || phase === 'retrying' || awaitingConnection && phase !== 'expired' && phase !== 'rejected');
+  const [network, setNetwork] = useState<ExecutionSetup | null>(null);
+  const [setupRevision, setSetupRevision] = useState(0);
+  const [copied, setCopied] = useState(false);
 
-  void connectionRevision; // used by key on BrokerDiagnostics
+  const executionIp = network?.observed?.ipv4 ?? network?.expectedIPv4 ?? null;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    fetch('/api/setup/network', {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then(res => res.ok ? res.json() as Promise<ExecutionSetup> : null)
+      .then(data => {
+        clearTimeout(timer);
+        if (data && !controller.signal.aborted) {
+          setNetwork(data);
+        }
+      })
+      .catch(() => { clearTimeout(timer); });
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [showConnection, setupRevision, connectionRevision]);
+
+  async function copyExecutionIp() {
+    if (!executionIp) return;
+    try {
+      await navigator.clipboard.writeText(executionIp);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // ignore
+    }
+  }
 
   function verificationMethod() {
     return <label className="field">Verification method<select className="broker-method-select" value={method} disabled={!online || !!working} onChange={event => { setMethod(event.target.value as 'otp' | 'totp'); setFlowId(''); setForm({ ...form, code: '' }) }}><option value="otp">SMS OTP</option><option value="totp">Authenticator (TOTP enabled)</option></select><small className="form-hint">{method === 'otp' ? 'Use SMS OTP if TOTP is not enabled for your mStock API.' : 'Use your authenticator app. mStock does not send SMS OTP when TOTP is enabled.'}</small></label>
@@ -125,7 +162,36 @@ export function BrokerDialog({
       )}
       {!showConnection && !showRecovery && !flowId && broker?.connection && ['expired', 'rejected'].includes(broker.connection.phase) && <p className="form-hint" role="status">{broker.connection.message}</p>}
 
-      {showConnection ? (
+      <div className="mode-switch broker-tabs" role="tablist" aria-label="Broker dialog sections">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'connect'}
+          className={tab === 'connect' ? 'active' : ''}
+          onClick={() => setTab('connect')}
+        >
+          {showConnection ? 'Account' : 'Connect'}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'network'}
+          className={tab === 'network' ? 'active' : ''}
+          onClick={() => setTab('network')}
+        >
+          {network?.sharedIpConflict ? 'IP & Route · Conflict' : 'IP & Route'}
+        </button>
+      </div>
+
+      {tab === 'network' ? (
+        <BrokerSetup
+          key={`${broker?.connected ? broker.account : 'disconnected'}:${connectionRevision}`}
+          account={broker?.connected ? broker.account : null}
+          action={action}
+          working={working}
+          onNetworkChange={() => setSetupRevision(value => value + 1)}
+        />
+      ) : showConnection ? (
         <>
           <dl className="connection-details">
             <div>
@@ -141,6 +207,10 @@ export function BrokerDialog({
               <dd>
                 {broker.expiresAt ? `${dateTime(broker.expiresAt)} IST` : "—"}
               </dd>
+            </div>
+            <div>
+              <dt>Execution IP</dt>
+              <dd>{executionIp ?? "—"}</dd>
             </div>
           </dl>
           <BrokerDiagnostics key={broker.account} account={broker.account!} />
@@ -164,6 +234,46 @@ export function BrokerDialog({
         </>
       ) : showRecovery ? <div className="broker-recovery" role="status"><p>{broker?.connection?.message || 'Verification code accepted. Checking your broker session.'}</p>{broker?.connection?.nextRetryAt && <p>Next check: {clock(broker.connection.nextRetryAt, true)} IST</p>}<button className="button secondary full-width" disabled={!online || !!working || phase === 'checking'} onClick={() => void action('/api/broker/recheck', {}, 'recheck-broker')}>{working === 'recheck-broker' ? 'Checking…' : 'Retry account check'}</button><button type="button" className="text-button restart-auth" disabled={!!working} onClick={() => { setRefreshLogin(true); setAwaitingConnection(false) }}>Connection setup</button></div> : (
         <>
+          <button
+            type="button"
+            className="broker-ip-card"
+            disabled={!executionIp}
+            onClick={() => void copyExecutionIp()}
+            title="Tap to copy execution IPv4"
+          >
+            <span className="broker-ip-info">
+              <span className={`broker-ip-label${network?.sharedIpConflict ? ' conflict' : ''}`}>
+                {network?.sharedIpConflict
+                  ? 'Shared Host IPv4 · Claimed by another account'
+                  : network?.egressMode === 'proxy'
+                    ? 'Dedicated Proxy IPv4'
+                    : network?.egressMode === 'interface'
+                      ? 'Dedicated Interface IPv4'
+                      : 'Execution IPv4'}
+              </span>
+              <code className="broker-ip-code">{executionIp ?? 'Checking…'}</code>
+            </span>
+            <span className={`broker-ip-copy${copied ? ' copied' : ''}`}>
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+              {copied ? 'Copied' : 'Copy'}
+            </span>
+          </button>
+          <p className={`broker-ip-tip${network?.sharedIpConflict ? ' conflict' : ''}`}>
+            {network?.sharedIpConflict ? (
+              <>
+                IP {executionIp} is already used by another workspace.{' '}
+                <button type="button" className="text-button" onClick={() => setTab('network')}>
+                  Configure route &rarr;
+                </button>
+              </>
+            ) : (
+              <>
+                Register as <strong>Primary IP</strong> on{' '}
+                <a href="https://trade.mstock.com" target="_blank" rel="noreferrer">trade.mstock.com</a>
+                {' '}· Tap box to copy.
+              </>
+            )}
+          </p>
           {directTotp ? (
             <form onSubmit={totp}>
               {!savedTotp && <>{verificationMethod()}<label className="field">Type A API key<input required type="password" autoComplete="off" value={form.apiKey} onChange={event => { setFlowId(''); setForm({ ...form, apiKey: event.target.value }) }} /></label></>}
@@ -242,7 +352,7 @@ export function BrokerDialog({
           )}
         </>
       )}
-      {refreshLogin && broker?.connected && (
+      {tab === 'connect' && refreshLogin && broker?.connected && (
         <button
           className="text-button restart-auth"
           disabled={!!working}
