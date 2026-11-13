@@ -12,6 +12,7 @@ import { LegCard } from './components/LegCard'
 import { MarketChart } from './components/MarketChart'
 import { RulesDialog } from './components/RulesDialog'
 import { SessionControls } from './components/SessionControls'
+import { OrdersPanel } from './components/OrdersPanel'
 import { TradesPanel } from './components/TradesPanel'
 import { BacktestPanel } from './components/BacktestPanel'
 import { TransparencyPanel } from './components/TransparencyPanel'
@@ -135,12 +136,22 @@ export default function App() {
             <div>
               <span className="eyebrow">SESSION P&L</span>
               <strong className={total != null && total < 0 ? 'negative-text' : total != null && total > 0 ? 'positive-text' : ''}>{money(total)}</strong>
-              <small>Realized {money(realized)} · before charges</small>
+              <small>Realized + open · before charges</small>
+            </div>
+            <div>
+              <span className="eyebrow">OPEN P&L</span>
+              <strong className={openPnl != null && openPnl < 0 ? 'negative-text' : openPnl != null && openPnl > 0 ? 'positive-text' : ''}>{money(openPnl)}</strong>
+              <small>{!session ? 'No session started' : openPnl == null ? 'Waiting for fresh position prices' : positions.length ? 'Unrealized · fresh market prices' : 'No open strategy positions'}</small>
+            </div>
+            <div>
+              <span className="eyebrow">REALIZED P&L</span>
+              <strong className={realized != null && realized < 0 ? 'negative-text' : realized != null && realized > 0 ? 'positive-text' : ''}>{money(realized)}</strong>
+              <small>{session && !session.pnlVerified ? 'Awaiting broker verification' : 'Closed quantities · before charges'}</small>
             </div>
             <div>
               <span className="eyebrow">OPEN POSITIONS</span>
               <strong className="status-value">{!session ? '—' : positions.length ? positions.map(side => side === 'CE' ? 'CALL' : 'PUT').join(' + ') : 'Flat'}</strong>
-              <small>Open P&L {money(openPnl)}</small>
+              <small>{session ? `${session.trades.length} confirmed ${session.mode === 'paper' ? 'simulated ' : ''}fills` : 'CALL & PUT tracked separately'}</small>
             </div>
             <div>
               <span className="eyebrow">LOCKED ATM</span>
@@ -153,13 +164,10 @@ export default function App() {
             <MarketChart connected={connected} identity={identity} now={now} marks={data?.marks ?? {}} legs={session?.legs ?? {}} trades={session?.trades ?? []} settings={session ? settingsFor(session) : selectedSettings} />
             <SessionControls session={session} locked={locked} connected={connected} online={online} working={working} now={now} mode={mode} setMode={setMode} liveAck={liveAck} setLiveAck={setLiveAck} action={action} onRules={() => setRulesDialog(true)} settings={locked || dayLocked ? settingsFor(session) : selectedSettings} onSettings={() => navigate('settings')} liveAvailable={data?.runtime?.liveExecution !== false} liveReason={data?.runtime?.reason} />
           </div>
-          <div className="section-heading"><h2>Latest fills</h2><button className="text-button" onClick={() => navigate('positions')}>View positions & trades →</button></div>
-          <TradesPanel title="Recent trades" exportAvailable={false} trades={session?.trades.slice(-5) ?? []} />
-        </div>
-        <div hidden={view !== 'positions'}>
           <div className="section-heading"><h2>Strategy positions</h2><button className="text-button" onClick={() => navigate('audit')}>Order lifecycle →</button></div>
           <div className="legs-grid">{sides.map(side => <LegCard key={side} side={side} leg={session?.legs[side]} mark={markFor(side)} now={now} settings={session ? settingsFor(session) : selectedSettings} />)}</div>
-          <TradesPanel exportAvailable={!!session} trades={session?.trades ?? []} />
+          <OrdersPanel session={session} />
+          <TradesPanel title="Executed trades" exportAvailable={!!session} trades={session?.trades ?? []} />
           <details className="panel activity-panel">
             <summary>Session activity <span>{session?.activity.length ?? 0} events</span></summary>
             {session?.activity.length ? (

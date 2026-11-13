@@ -13,7 +13,7 @@ export function TradesPanel({ trades, exportAvailable = true, title = "Trades" }
           <Download size={14} />
           Trades CSV
         </a>
-        <a className="text-button" href="/api/orders.csv"><Download size={14} />Orders CSV</a></>}
+</>}
       </div>
       {trades.length ? (
         <div className="trade-scroll">

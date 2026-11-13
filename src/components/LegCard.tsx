@@ -64,6 +64,20 @@ export function LegCard({
         <strong>{fresh ? `₹${price(mark.price)}` : "—"}</strong>
         <span>{position ? `${position.quantity} units` : "No position"}</span>
       </div>
+      <div className="leg-open-pnl"><span>
+          Open P&L{" "}
+          <b
+            className={
+              pnl != null && pnl < 0
+                ? "negative-text"
+                : pnl != null && pnl > 0
+                  ? "positive-text"
+                  : ""
+            }
+          >
+            {money(pnl)}
+          </b>
+        </span></div>
       <dl className="leg-values">
         <div>
           <dt>Reference</dt>
@@ -93,20 +107,6 @@ export function LegCard({
       </dl>
       <div className="leg-footer">
         <span>{leg?.entries ?? 0} entries{leg ? ` · lot ${leg.contract.lotSize} · entry ${settings.entryLots * leg.contract.lotSize} units` : ''}</span>
-        <span>
-          Open P&L{" "}
-          <b
-            className={
-              pnl != null && pnl < 0
-                ? "negative-text"
-                : pnl != null && pnl > 0
-                  ? "positive-text"
-                  : ""
-            }
-          >
-            {money(pnl)}
-          </b>
-        </span>
       </div>
     </section>
   );

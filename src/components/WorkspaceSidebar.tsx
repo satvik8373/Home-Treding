@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { BookOpen, ChartNoAxesCombined, ChevronRight, FlaskConical, LayoutDashboard, Link2, ListOrdered, Settings2, ShieldCheck, UserRound, X } from 'lucide-react'
+import { BookOpen, ChartNoAxesCombined, ChevronRight, FlaskConical, LayoutDashboard, Link2, Settings2, ShieldCheck, UserRound, X } from 'lucide-react'
 
 import { workspacePages, type WorkspaceView } from '../lib/workspace'
-const icons = { market: LayoutDashboard, positions: ListOrdered, analytics: ChartNoAxesCombined, backtest: FlaskConical, settings: Settings2, audit: ShieldCheck }
+const icons = { market: LayoutDashboard, analytics: ChartNoAxesCombined, backtest: FlaskConical, settings: Settings2, audit: ShieldCheck }
 
 export function WorkspaceSidebar({ view, open, onClose, onNavigate, onBroker, onRules, onProfile, accountName }: {
   view: WorkspaceView; open: boolean; onClose: () => void; onNavigate: (view: WorkspaceView) => void;
