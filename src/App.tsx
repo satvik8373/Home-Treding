@@ -15,6 +15,7 @@ import { SessionControls } from './components/SessionControls'
 import { TradesPanel } from './components/TradesPanel'
 import { BacktestPanel } from './components/BacktestPanel'
 import { TransparencyPanel } from './components/TransparencyPanel'
+import { AnalyticsPanel } from './components/AnalyticsPanel'
 import { DEFAULT_SETTINGS, SELL_DEFAULT_SETTINGS, settingsFor } from '../shared/settings'
 import { useDashboard } from './hooks/useDashboard'
 import { clock, date, money } from './lib/format'
@@ -26,7 +27,7 @@ const statusLabels: Record<string, string> = {
   idle: 'Not started', armed: 'Armed', preparing: 'Loading reference',
   running: 'Running', stopping: 'Closing positions', stopped: 'Stopped', blocked: 'Needs attention',
 }
-const currentView = () => window.location.hash === '#settings' ? 'settings' as const : window.location.hash === '#backtest' ? 'backtest' as const : window.location.hash === '#audit' ? 'audit' as const : 'market' as const
+const currentView = () => window.location.hash === '#analytics' ? 'analytics' as const : window.location.hash === '#settings' ? 'settings' as const : window.location.hash === '#backtest' ? 'backtest' as const : window.location.hash === '#audit' ? 'audit' as const : 'market' as const
 
 export default function App() {
   const deployment = useDeployment()
@@ -36,7 +37,7 @@ export default function App() {
   const [selectedDirection, setSelectedDirection] = useState<StrategyDirection | null>(null)
   const [mode, setMode] = useState<Mode>('paper')
   const [liveAck, setLiveAck] = useState(false)
-  const [view, setView] = useState<'market' | 'backtest' | 'audit' | 'settings'>(currentView)
+  const [view, setView] = useState<'market' | 'backtest' | 'audit' | 'settings' | 'analytics'>(currentView)
 
   useEffect(() => {
     const update = () => setView(currentView())
@@ -44,7 +45,7 @@ export default function App() {
     return () => window.removeEventListener('hashchange', update)
   }, [])
 
-  function navigate(next: 'market' | 'backtest' | 'audit' | 'settings') {
+  function navigate(next: 'market' | 'backtest' | 'audit' | 'settings' | 'analytics') {
     setView(next)
     window.history.replaceState(null, '', `#${next}`)
   }
@@ -114,6 +115,7 @@ export default function App() {
           <button className={view === 'backtest' ? 'active' : ''} aria-current={view === 'backtest' ? 'page' : undefined} onClick={() => navigate('backtest')}>Backtest</button>
           <button className={view === 'settings' ? 'active' : ''} aria-current={view === 'settings' ? 'page' : undefined} onClick={() => navigate('settings')}>Settings</button>
           <button className={view === 'audit' ? 'active' : ''} aria-current={view === 'audit' ? 'page' : undefined} onClick={() => navigate('audit')}>Money & audit</button>
+          <button className={view === 'analytics' ? 'active' : ''} aria-current={view === 'analytics' ? 'page' : undefined} onClick={() => navigate('analytics')}>History & analytics</button>
         </nav>
 
         <div hidden={view !== 'market'}>
@@ -168,6 +170,7 @@ export default function App() {
         </div>
         <div hidden={view !== 'settings'}><StrategySettingsPanel key={chosenDirection} saved={selectedSettings} effective={session ? settingsFor(session) : selectedSettings} active={running} hasSession={!!session} online={online} working={working} action={action} /></div>
         <div hidden={view !== 'audit'}><TransparencyPanel data={data} visible={view === 'audit'} now={now} online={online} /></div>
+        {view === 'analytics' && <AnalyticsPanel initialMode={engineSession?.mode ?? mode} online={online} />}
         <footer className="page-footer">
           <span>MAVRIX / 009 · {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' }).format(now)}</span>
           <a href="https://tradingapi.mstock.com/docs/v1/Introduction/" target="_blank" rel="noreferrer">Official mStock API</a>

@@ -5,6 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import type { Mode, TradingSession } from "../shared/model.ts";
+import { SessionHistory } from './sessionHistory.ts';
 
 export interface SavedBroker {
   authMethod?: 'otp' | 'totp';
@@ -16,10 +17,11 @@ export interface SavedBroker {
   permissions?: { exchanges: string[]; products: string[]; orderTypes: string[] };
 }
 export class Store {
+  readonly history: SessionHistory;
   onDurableChange?: () => void;
   private db: DatabaseSync;
   private key: Buffer;
-  constructor(directory: string, encryptionKey?: Buffer) {
+  constructor(readonly directory: string, encryptionKey?: Buffer) {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     this.db = new DatabaseSync(join(directory, "009.sqlite"));
     this.db.exec(
@@ -31,6 +33,17 @@ export class Store {
     this.key = encryptionKey ?? readFileSync(keyPath);
     if (this.key.length !== 32)
       throw new Error("The local session encryption key is invalid.");
+    this.history = new SessionHistory(this.db);
+    if ((this.db.prepare("SELECT value FROM history_meta WHERE key='version'").get() as { value: string } | undefined)?.value !== '2' || !this.history.days().length && this.keys('session:history:').length > 0) {
+      this.db.exec('BEGIN IMMEDIATE');
+      try {
+        const sessions = new Map<string, TradingSession>();
+        for (const key of [...this.keys('session:history:'), 'session']) { const value = this.get<TradingSession>(key); if (value?.id) sessions.set(value.id, value); }
+        for (const value of sessions.values()) this.history.capture(value, true, true);
+        this.db.prepare('INSERT OR REPLACE INTO history_meta(key,value) VALUES(?,?)').run('version', '2');
+        this.db.exec('COMMIT');
+      } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+    }
   }
   get<T>(key: string): T | null {
     const row = this.db
@@ -72,6 +85,8 @@ export class Store {
   saveSession(value: TradingSession): void {
     this.db.exec("BEGIN IMMEDIATE");
     try {
+      const changed = JSON.stringify(this.get(`session:history:${value.id}`)) !== JSON.stringify(value);
+      this.history.capture(value, changed);
       this.put("session", value);
       this.put(`session:history:${value.id}`, value);
       this.put(`session:${value.date}:${value.account}:${value.mode}${directionOf(value.settings) === 'sell' ? ':sell' : ''}`, value);

@@ -4,7 +4,7 @@ import { tradesReport, ordersReport, backtestTradesReport, backtestDaysReport } 
 import type { ErrorRequestHandler } from "express";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import type { Controller } from "./controller.ts";
 import { MarketCharts } from "./charts.ts";
 import type { MStock } from "./broker.ts";
@@ -17,6 +17,10 @@ import { AccountAudit } from './audit.ts';
 import { DEFAULT_SETTINGS } from '../shared/settings.ts';
 import { ExecutionNetwork, observeExecutionIPv4 } from './setup.ts';
 import { createEgressAgent, createProxyFetcher } from './proxy.ts';
+import { Analytics } from './analytics.ts';
+import type { AnalyticsRepository } from './analytics.ts';
+import { dailyScope } from './backup/dailyArchives.ts';
+import { firestoreClient } from './backup/accountSync.ts';
 
 export interface AppNetworkOptions {
   conflictCheck?: (observedIp: string | null, routeUrl: string | null) => boolean;
@@ -66,6 +70,10 @@ export function createApp(
   const historical = new HistoricalData(controller.broker as MStock, () => ({ connected: controller.connected(), account: controller.broker.credentials?.account ?? null, session: controller.session }), repository);
   const accountDiagnostics = new AccountDiagnostics(controller.broker as MStock, controller.feed, Date.now, () => controller.session, () => controller.strategySettings());
   const audit = new AccountAudit(accountDiagnostics, () => controller.snapshot());
+  const historyDirectory = 'directory' in repository && typeof repository.directory === 'string' ? repository.directory : null;
+  const historyWorkspace = historyDirectory && /^[a-f0-9]{64}$/.test(basename(historyDirectory)) ? basename(historyDirectory) : 'owner';
+  const analytics = new Analytics(repository as AnalyticsRepository, () => controller.session, () => controller.persistence?.(), Date.now,
+    historyDirectory && process.env.N009_FIREBASE_PROJECT_ID ? session => firestoreClient(historyWorkspace).load(dailyScope(historyWorkspace, session.date)) : undefined);
   const charts = new MarketCharts(controller.broker as MStock, () => ({
     connected: controller.connected(),
     account: controller.broker.credentials?.account ?? null,
@@ -174,6 +182,12 @@ export function createApp(
   app.get('/api/strategy/settings', (req, res) => res.json({ saved: controller.strategySettings(req.query.strategy === 'sell' ? 'sell' : 'buy'), profiles: { buy: controller.strategySettings('buy'), sell: controller.strategySettings('sell') }, effective: controller.session?.settings ?? DEFAULT_SETTINGS, defaults: DEFAULT_SETTINGS }));
   app.post('/api/strategy/settings', (req, res) => { const saved = controller.saveStrategySettings(req.body); repository.put(directionOf(saved) === 'sell' ? 'strategy:settings:sell' : 'strategy:settings', saved); res.json({ saved, appliesTo: 'next trading day; today retains the same saved day-session' }); });
   app.get('/api/audit', async (_req, res) => res.json(await audit.read()));
+  app.get('/api/analytics', (req, res) => res.json(analytics.read(req.query)));
+  app.get('/api/analytics/session/:id', async (req, res) => res.json(await analytics.detail(String(req.params.id), req.query)));
+  app.get('/api/analytics/export', async (req, res) => {
+    const report = req.query.format === 'events' && typeof req.query.sessionId === 'string' ? await analytics.eventPage(req.query.sessionId, req.query) : analytics.export(req.query);
+    res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="${report.filename}"` }).send(report.body);
+  });
   app.get('/api/audit/export', async (_req, res) => res.set('Content-Disposition', 'attachment; filename="009-account-audit.json"').json(await audit.read()));
   app.get('/api/broker/diagnostics', async (_req, res) => {
     if (!controller.connected()) return res.status(409).json({ error: 'Connect mStock before running account checks.' });

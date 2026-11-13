@@ -146,7 +146,7 @@ export interface BrokerStatus {
   lastTickAt: number | null;
 }
 export interface AppState {
-  persistence?: { firestore: 'unconfigured' | 'pending' | 'synced' | 'unavailable'; lastSyncedAt: number | null };
+  persistence?: { firestore: 'unconfigured' | 'pending' | 'synced' | 'unavailable'; lastSyncedAt: number | null; historyFirestore?: 'unconfigured' | 'pending' | 'synced' | 'unavailable'; historyLastSyncedAt?: number | null };
   runtime?: { kind: 'hosted-paper'; liveExecution: false; reason: string };
   strategyProfiles?: { buy: StrategySettings; sell: StrategySettings };
   savedSettings?: StrategySettings;

@@ -1,0 +1,19 @@
+# Account history and analytics
+
+Open **History & analytics** on the dashboard. Reports support dates, daily/week/month grouping, Paper or Live, Buy/Sell, broker product and saved broker account. Weeks start on Monday; months are calendar months. Results are grouped by the original saved session date in IST. Fill exports retain both actual engine timestamps in IST and UTC.
+
+The summary counts completed entry/exit cycles, combining partial exits before classifying a win/loss. Realized gross P&L excludes broker charges. Estimated costs are explicitly separate. A session with an unverified or inconsistent ledger is excluded from verified totals; its missing profit is never filled with zero. Open positions and pending orders stay visible. Drawdown uses gross completed-cycle equity, not account equity or deposits. Reports cover engine-captured activity, not manual broker trades or contract-note taxes. Backtests remain separate from Paper and Live history.
+
+SQLite retains an append-only journal for engine activity, completed-candle decisions, order-lifecycle changes and confirmed/simulated fills. Locked settings, original references, contract identities and saved session state are retained with each session. The live dashboard may trim its recent activity list; the journal does not delete those recorded events. Existing history is seeded only from actual saved snapshots and marked **legacy/partial**. Logs already trimmed before this feature cannot be recreated. Quotes/ticks and raw authentication requests are not journalled; credentials and secret request headers do not enter report records.
+
+Indexed per-session summaries allow period reports without reparsing years of candle/order data on the execution loop. Session details and events are paginated. CSV options include period summary, detailed fills, order audit and engine events. Large downloads fail visibly and ask for a narrower selection; individual event pages can also be downloaded. Reports and exports never start/stop a strategy or call an order endpoint.
+
+## Private Firestore daily archives
+
+Daily history is encrypted with the existing server-only AES-GCM backup key and stored under `n009EngineBackups/<workspace>/dailyArchives/<opaque-day-scope>`. Account and date are bound into the scope; browser Firebase rules deny the entire namespace. Service-account JSON and encryption keys stay on AWS. The dashboard uses its authenticated account gateway to read reports, not client-readable broker documents.
+
+Changed days are coalesced, normally starting after three seconds and at most once per minute per workspace, two dirty days per batch. Errors retry without stopping execution or discarding local data. A per-day saved revision records whether its cloud copy caught up. Cloud merges retain older journal entries and use fingerprint and update-time preconditions to prevent stale writers replacing newer history. Legacy/partial detail pages can read/decrypt a fuller existing cloud journal without changing execution state. Full engine recovery backups remain independent of daily archives.
+
+Each day is bounded by the existing archive limits (64 MiB uncompressed; 4 MiB compressed, chunked into 512 KiB documents; two slots). Firestore storage/read/write quotas still apply; no paid-plan upgrade is enabled and free storage is not unlimited. A failed/oversized archive remains pending with its local journal intact. Operational full-store backups also retain their existing bounds. Keep the private backup key securely: losing it prevents archive recovery.
+
+`scripts/history-archive.ts` is an operator-only catch-up/read-back utility using existing private server credentials. It imports no broker/order/control APIs. Daily archive documents are read-back verified, and no live data is overwritten. Normal ongoing synchronization runs on AWS without keeping the browser open.

@@ -11,10 +11,12 @@ import { Controller } from './controller.ts'
 import { createApp } from './http.ts'
 import { createAccountSync } from './backup/accountSync.ts'
 import type { AccountSync } from './backup/accountSync.ts'
+import { createHistorySync } from './backup/dailyArchives.ts'
 import { observeExecutionIPv4 } from './setup.ts'
 import { createEgressAgent, createProxyFetcher, validateEgressRoute } from './proxy.ts'
 
 export interface Workspace {
+  historySync?: ReturnType<typeof createHistorySync>
   sync?: AccountSync
   controller: Controller
   store: Store
@@ -47,7 +49,8 @@ export type WorkspaceFactory = (directory: string, context?: WorkspaceContext) =
 export const createWorkspace: WorkspaceFactory = (directory, context) => {
   const store = new Store(directory), feed = new MarketFeed()
   const sync = createAccountSync(directory)
-  if (sync) store.onDurableChange = sync.request
+  const historySync = createHistorySync(directory)
+  store.onDurableChange = () => { sync?.request(); historySync?.request() }
   const broker = new MStock()
   const controller = new Controller(broker, store, feed)
   let controls: { setEgressRoute: (routeUrl: string | null, ipv4?: string) => void } | undefined
@@ -59,13 +62,17 @@ export const createWorkspace: WorkspaceFactory = (directory, context) => {
     },
     onSetupReady: (ready) => { controls = ready },
   })
-  if (sync) { controller.persistence = () => sync.state; sync.onStatus = () => controller.onChange(); sync.request() }
+  if (sync || historySync) {
+    controller.persistence = () => ({ ...(sync?.state ?? { firestore: 'unconfigured' as const, lastSyncedAt: null }), historyFirestore: historySync?.state.firestore ?? 'unconfigured', historyLastSyncedAt: historySync?.state.lastSyncedAt ?? null })
+    for (const writer of [sync, historySync]) if (writer) { writer.onStatus = () => controller.onChange(); writer.request() }
+  }
   return {
     controller,
     store,
     feed,
     app,
     sync,
+    historySync,
     setEgressRoute: (routeUrl, ipv4) => controls?.setEgressRoute(routeUrl, ipv4),
   }
 }
@@ -230,7 +237,7 @@ export class Workspaces {
     const workspaces = [...this.values.values()]
     try { for (const { controller } of workspaces) await controller.checkpointForRestart() }
     catch (error) { for (const { controller } of workspaces) controller.resumeAfterAbortedRestart(); this.closing = false; throw error }
-    for (const workspace of workspaces) { workspace.sync?.close(); workspace.feed.close(); workspace.store.close() }
+    for (const workspace of workspaces) { workspace.sync?.close(); workspace.historySync?.close(); workspace.feed.close(); workspace.store.close() }
     return true
   }
 }

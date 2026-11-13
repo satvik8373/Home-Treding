@@ -58,12 +58,13 @@ export function decryptSnapshot(envelope: Envelope, backupKey: Buffer, project: 
 /** A separate worker, never on the trading loop. Server OAuth/IAM only; browsers cannot read backups. */
 export class FirestoreBackups {
   private root: string
-  constructor(private project: string, private backupKey: Buffer, private accessToken: () => Promise<string>, private fetcher: typeof fetch = fetch) {
+  constructor(private project: string, private backupKey: Buffer, private accessToken: () => Promise<string>, private fetcher: typeof fetch = fetch, private parentWorkspace?: string) {
     validateScope(project, 'owner')
+    if (parentWorkspace) validateScope(project, parentWorkspace)
     if (backupKey.length !== 32) throw new Error('Invalid backup key.')
     this.root = `projects/${project}/databases/(default)/documents`
   }
-  private name(workspace: string) { validateScope(this.project, workspace); return `${this.root}/${collection}/${workspace}` }
+  private name(workspace: string) { validateScope(this.project, workspace); return this.parentWorkspace ? `${this.root}/${collection}/${this.parentWorkspace}/dailyArchives/${workspace}` : `${this.root}/${collection}/${workspace}` }
   private async request(path: string, method = 'GET', body?: object): Promise<Document | { writeResults: { updateTime: string }[] } | null> {
     const token = await this.accessToken()
     const response = await this.fetcher(`https://firestore.googleapis.com/v1/${path}`, { method, redirect: 'error', signal: AbortSignal.timeout(20_000),
@@ -72,8 +73,9 @@ export class FirestoreBackups {
     if (!response.ok) throw new Error(`Firestore backup request failed (HTTP ${response.status}).`)
     return await response.json()
   }
-  async save(snapshot: Snapshot): Promise<'saved' | 'unchanged'> {
+  async save(snapshot: Snapshot, expectedFingerprint?: string | null): Promise<'saved' | 'unchanged'> {
     const name = this.name(snapshot.workspace), previous = await this.request(name) as Document | null
+    if (expectedFingerprint !== undefined && (previous?.fields.fingerprint?.stringValue ?? null) !== expectedFingerprint) throw new Error('Archive changed during merge. Retry without overwriting the newer history.')
     const digest = fingerprint(snapshot)
     // Authenticate the remote fingerprint so altered metadata cannot suppress a needed backup.
     if (previous?.fields.fingerprint?.stringValue === digest) {
@@ -94,8 +96,13 @@ export class FirestoreBackups {
     return 'saved'
   }
   async restore(workspace: string): Promise<Snapshot> {
+    const snapshot = await this.load(workspace)
+    if (!snapshot) throw new Error('No Firestore backup exists for this workspace.')
+    return snapshot
+  }
+  async load(workspace: string): Promise<Snapshot | null> {
     const name = this.name(workspace), doc = await this.request(name) as Document | null
-    if (!doc) throw new Error('No Firestore backup exists for this workspace.')
+    if (!doc) return null
     const f = doc.fields, count = Number(f.count?.integerValue), slot = f.slot?.integerValue, revision = f.revision?.stringValue ?? ''
     if (f.version?.integerValue !== '1' || !Number.isInteger(count) || count < 1 || count > 8 || !['0', '1'].includes(slot ?? '') || !/^[a-f0-9]{32}$/.test(revision)) throw new Error('Invalid backup manifest.')
     const parts: Buffer[] = []
