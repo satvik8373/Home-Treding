@@ -2,12 +2,12 @@ import { Download } from "lucide-react";
 import type { Trade } from "../../shared/model";
 import { dateTime, money, price } from "../lib/format";
 
-export function TradesPanel({ trades, exportAvailable = true }: { trades: Trade[]; exportAvailable?: boolean }) {
+export function TradesPanel({ trades, exportAvailable = true, title = "Trades" }: { trades: Trade[]; exportAvailable?: boolean; title?: string }) {
   return (
     <section className="panel trades-panel">
       <div className="panel-title">
         <h2>
-          Trades <span className="count">{trades.length}</span>
+          {title} <span className="count">{trades.length}</span>
         </h2>
         {exportAvailable && <><a className="text-button" href="/api/trades.csv">
           <Download size={14} />

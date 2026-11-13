@@ -1,9 +1,9 @@
-import { directionOf, signFor, strategyName } from '../shared/strategy'
+import { directionOf, signFor } from '../shared/strategy'
 import type { StrategyDirection } from '../shared/strategy'
 import './components/StrategySettingsPanel.css'
 import { StrategySettingsPanel } from './components/StrategySettingsPanel'
-import { useEffect, useState } from 'react'
-import { Check, Clock3, Link2, Radio, RefreshCw, X } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Check, Clock3, Link2, Menu, Radio, RefreshCw, X } from 'lucide-react'
 import type { Mode, Side } from '../shared/model'
 import { freshMark } from '../shared/market'
 import { BrokerDialog } from './components/BrokerDialog'
@@ -20,6 +20,9 @@ import { DEFAULT_SETTINGS, SELL_DEFAULT_SETTINGS, settingsFor } from '../shared/
 import { useDashboard } from './hooks/useDashboard'
 import { clock, date, money } from './lib/format'
 import { useDeployment } from './lib/deployment'
+import { WorkspaceSidebar } from './components/WorkspaceSidebar'
+import { currentView, workspacePages, type WorkspaceView } from './lib/workspace'
+import { useAccount } from './lib/account'
 import './App.css'
 import './minimal-ui.css'
 
@@ -27,7 +30,7 @@ const statusLabels: Record<string, string> = {
   idle: 'Not started', armed: 'Armed', preparing: 'Loading reference',
   running: 'Running', stopping: 'Closing positions', stopped: 'Stopped', blocked: 'Needs attention',
 }
-const currentView = () => window.location.hash === '#analytics' ? 'analytics' as const : window.location.hash === '#settings' ? 'settings' as const : window.location.hash === '#backtest' ? 'backtest' as const : window.location.hash === '#audit' ? 'audit' as const : 'market' as const
+
 
 export default function App() {
   const deployment = useDeployment()
@@ -37,16 +40,22 @@ export default function App() {
   const [selectedDirection, setSelectedDirection] = useState<StrategyDirection | null>(null)
   const [mode, setMode] = useState<Mode>('paper')
   const [liveAck, setLiveAck] = useState(false)
-  const [view, setView] = useState<'market' | 'backtest' | 'audit' | 'settings' | 'analytics'>(currentView)
+  const [view, setView] = useState<WorkspaceView>(currentView)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const closeSidebar = useCallback(() => setSidebarOpen(false), [])
+  const account = useAccount()
 
   useEffect(() => {
-    const update = () => setView(currentView())
+    const update = () => { setView(currentView()); setSidebarOpen(false) }
     window.addEventListener('hashchange', update)
     return () => window.removeEventListener('hashchange', update)
   }, [])
 
-  function navigate(next: 'market' | 'backtest' | 'audit' | 'settings' | 'analytics') {
+  function navigate(next: WorkspaceView) {
     setView(next)
+    setSidebarOpen(false)
+    window.scrollTo({ top: 0, behavior: 'instant' })
     window.history.replaceState(null, '', `#${next}`)
   }
 
@@ -75,12 +84,11 @@ export default function App() {
   const markFor = (side: Side) => session?.legs[side] ? data?.marks[session.legs[side]!.contract.token] : undefined
 
   return (
-    <div className="app-shell">
+    <div className="app-shell workspace-shell">
+      <a className="skip-link" href="#workspace-content" onClick={event => { event.preventDefault(); document.getElementById('workspace-content')?.focus() }}>Skip to content</a>
+      <WorkspaceSidebar view={view} open={sidebarOpen} onClose={closeSidebar} onNavigate={navigate} onBroker={() => setBrokerDialog(true)} onRules={() => setRulesDialog(true)} onProfile={account ? () => setProfileOpen(true) : undefined} accountName={account?.user?.name} />
       <header className="topbar">
-        <a className="wordmark" href="#market" aria-label="Mavrix 009 live market">
-          <img className="brand-image" src="/mavrix-icon.jpg" alt="" width="28" height="28" />
-          MAVRIX <small>009</small>
-        </a>
+        <div className="topbar-context"><button className="icon-button mobile-menu" aria-label="Open navigation" aria-expanded={sidebarOpen} aria-controls="workspace-sidebar" onClick={() => setSidebarOpen(true)}><Menu size={21} /></button><span>Workspace <span className="breadcrumb-separator">/</span> <strong>{workspacePages[view].title}</strong></span></div>
         <div className="topbar-right">
           <span className="engine-link">
             <i className={`status-dot ${online ? 'green' : ''}`} />
@@ -91,13 +99,12 @@ export default function App() {
             <Link2 size={15} />{connected ? 'mStock connected' : broker?.connection?.phase === 'checking' || broker?.connection?.phase === 'retrying' ? 'Restoring mStock' : broker?.linked ? 'Verify mStock' : 'Connect mStock'}
             {connected && <Check size={14} />}
           </button>
-          <AccountProfile broker={broker} persistence={data?.persistence} onBroker={() => setBrokerDialog(true)} onSettings={() => navigate('settings')} />
         </div>
       </header>
 
-      <main>
+      <main id="workspace-content" tabIndex={-1}>
         <div className="page-heading">
-          <div><h1>{strategyName(chosenDirection)}</h1><p>NIFTY 50 <span>·</span> Independent CALL & PUT</p></div>
+          <div><span className="page-eyebrow">NIFTY 50 / STRATEGY WORKSPACE</span><h1>{workspacePages[view].title}</h1><p>{workspacePages[view].description}</p></div>
           <span className={`tag ${session?.mode === 'live' ? 'live-tag' : ''}`}>
             {!session ? 'NO SESSION' : session.mode === 'live' ? 'LIVE SESSION' : 'PAPER SESSION'}
           </span>
@@ -110,13 +117,13 @@ export default function App() {
           </div>
         )}
         <label className="strategy-picker">Strategy<select value={chosenDirection} disabled={locked || !!working} onChange={event => { setSelectedDirection(event.target.value as StrategyDirection); setLiveAck(false) }}><option value="buy">009 Breakout – Buy</option><option value="sell">009 Breakout – Sell</option></select><small>{locked ? 'Stop and flatten before switching.' : 'Switching does not start trading.'}</small></label>
-        <nav className="workspace-nav" aria-label="Workspace">
-          <button className={view === 'market' ? 'active' : ''} aria-current={view === 'market' ? 'page' : undefined} onClick={() => navigate('market')}>Live market</button>
-          <button className={view === 'backtest' ? 'active' : ''} aria-current={view === 'backtest' ? 'page' : undefined} onClick={() => navigate('backtest')}>Backtest</button>
-          <button className={view === 'settings' ? 'active' : ''} aria-current={view === 'settings' ? 'page' : undefined} onClick={() => navigate('settings')}>Settings</button>
-          <button className={view === 'audit' ? 'active' : ''} aria-current={view === 'audit' ? 'page' : undefined} onClick={() => navigate('audit')}>Money & audit</button>
-          <button className={view === 'analytics' ? 'active' : ''} aria-current={view === 'analytics' ? 'page' : undefined} onClick={() => navigate('analytics')}>History & analytics</button>
-        </nav>
+
+          {session && (
+            <div className={`session-message ${session.status === 'blocked' ? 'attention' : ''}`} role="status">
+              <Radio size={14} /><span>{session.message}</span>
+              {session.status === 'blocked' && <button className="text-button" disabled={!online || !connected || !!working} onClick={() => void action('/api/strategy/reconcile', {}, 'reconcile')}><RefreshCw size={13} />Reconcile</button>}
+            </div>
+          )}
 
         <div hidden={view !== 'market'}>
           <section className="summary-grid" aria-label="Session summary">
@@ -142,17 +149,15 @@ export default function App() {
             </div>
           </section>
 
-          {session && (
-            <div className={`session-message ${session.status === 'blocked' ? 'attention' : ''}`} role="status">
-              <Radio size={14} /><span>{session.message}</span>
-              {session.status === 'blocked' && <button className="text-button" disabled={!online || !connected || !!working} onClick={() => void action('/api/strategy/reconcile', {}, 'reconcile')}><RefreshCw size={13} />Reconcile</button>}
-            </div>
-          )}
           <div className="workspace">
             <MarketChart connected={connected} identity={identity} now={now} marks={data?.marks ?? {}} legs={session?.legs ?? {}} trades={session?.trades ?? []} settings={session ? settingsFor(session) : selectedSettings} />
             <SessionControls session={session} locked={locked} connected={connected} online={online} working={working} now={now} mode={mode} setMode={setMode} liveAck={liveAck} setLiveAck={setLiveAck} action={action} onRules={() => setRulesDialog(true)} settings={locked || dayLocked ? settingsFor(session) : selectedSettings} onSettings={() => navigate('settings')} liveAvailable={data?.runtime?.liveExecution !== false} liveReason={data?.runtime?.reason} />
           </div>
-          <div className="section-heading"><h2>Strategy positions</h2><span>References stay fixed for the session</span></div>
+          <div className="section-heading"><h2>Latest fills</h2><button className="text-button" onClick={() => navigate('positions')}>View positions & trades →</button></div>
+          <TradesPanel title="Recent trades" exportAvailable={false} trades={session?.trades.slice(-5) ?? []} />
+        </div>
+        <div hidden={view !== 'positions'}>
+          <div className="section-heading"><h2>Strategy positions</h2><button className="text-button" onClick={() => navigate('audit')}>Order lifecycle →</button></div>
           <div className="legs-grid">{sides.map(side => <LegCard key={side} side={side} leg={session?.legs[side]} mark={markFor(side)} now={now} settings={session ? settingsFor(session) : selectedSettings} />)}</div>
           <TradesPanel exportAvailable={!!session} trades={session?.trades ?? []} />
           <details className="panel activity-panel">
@@ -176,6 +181,7 @@ export default function App() {
           <a href="https://tradingapi.mstock.com/docs/v1/Introduction/" target="_blank" rel="noreferrer">Official mStock API</a>
         </footer>
       </main>
+      <AccountProfile open={profileOpen} onOpenChange={setProfileOpen} hideTrigger broker={broker} persistence={data?.persistence} onBroker={() => setBrokerDialog(true)} onSettings={() => navigate('settings')} />
       {brokerDialog && <BrokerDialog broker={broker} locked={locked} online={online} working={working} error={error} action={action} onClose={() => setBrokerDialog(false)} />}
       {rulesDialog && <RulesDialog settings={locked || dayLocked ? settingsFor(session) : selectedSettings} onClose={() => setRulesDialog(false)} />}
     </div>
