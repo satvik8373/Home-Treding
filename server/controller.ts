@@ -9,7 +9,7 @@ import { applyFill, candleSignal, levels, observeReentry, orderQuantity, priceEx
 import { completedBoundary, isTradingDay, istDate, istTime } from './time.ts'
 import type { Store } from './store.ts'
 import type { MarketFeed } from './feed.ts'
-import { DEFAULT_SETTINGS, SELL_DEFAULT_SETTINGS, sameSettings, settingsFor, validateSettings } from '../shared/settings.ts'
+import { DEFAULT_SETTINGS, SELL_DEFAULT_SETTINGS, sameSettings, settingsFor, validateSettings, productFor } from '../shared/settings.ts'
 import type { StrategySettings } from '../shared/settings.ts'
 import { rejectionSummary, matchesPositionRow, isNiftyDerivativePosition } from './orderIdentity.ts'
 
@@ -294,14 +294,17 @@ export class Controller {
       if (mode === 'live' && this.execution?.liveExecution === false) throw new Error(this.execution.reason)
       const now = this.now(), date = istDate(now)
       if (!this.connected()) throw new Error('Connect and verify your mStock account first.')
+      const preferences = this.strategySettings(direction)
       const permissions = this.broker.credentials?.permissions
-      if (mode === 'live' && permissions && (!permissions.exchanges.includes('NFO') || !permissions.products.includes('MIS') || !permissions.orderTypes.includes('MARKET'))) {
-        if (!permissions.exchanges.includes('NFO')) throw new Error('This broker login does not advertise NSE F&O (NFO). Check the activated segments in mStock, then use Refresh login metadata. Required: NFO, MIS and MARKET.')
-        throw new Error('This broker login does not advertise NFO, MIS and MARKET access required by the strategy. Verify account trading permissions with mStock before using Live mode.')
+      const savedDay = this.store.loadSession(this.broker.credentials!.account, date, mode, direction)
+      const locked = this.session?.date === date && this.session.account === this.broker.credentials!.account && this.session.mode === mode && directionOf(this.session.settings) === direction ? this.session : savedDay
+      const sessionProduct = productFor(locked ? settingsFor(locked) : preferences)
+      if (mode === 'live' && permissions && (!permissions.exchanges.includes('NFO') || !permissions.products.includes(sessionProduct) || !permissions.orderTypes.includes('MARKET'))) {
+        if (!permissions.exchanges.includes('NFO')) throw new Error(`This broker login does not advertise NSE F&O (NFO). Check the activated segments in mStock, then use Refresh login metadata. Required: NFO, ${sessionProduct} and MARKET.`)
+        throw new Error(`This broker login does not advertise NFO, ${sessionProduct} and MARKET access required by the strategy. Verify account trading permissions with mStock before using Live mode.`)
       }
       if (active(this.session)) throw new Error('The strategy is already running.')
       if (hasExposure(this.session)) throw new Error('Reconcile the saved position or order before starting.')
-      const preferences = this.strategySettings(direction)
       if (!isTradingDay(now) || now < istTime(date, '09:00') || now >= istTime(date, preferences.cutoff)) throw new Error(`Start on a trading weekday between 09:00 and ${preferences.cutoff} IST.`)
       const previous = this.session
       if (!previous || previous.date !== date || previous.account !== this.broker.credentials!.account || previous.mode !== mode || directionOf(previous.settings) !== direction) {
@@ -393,7 +396,7 @@ export class Controller {
     for (const side of SIDES) {
       const leg = this.session.legs[side]
       if (!leg) continue
-      const relevant = positions.filter(p => matchesPositionRow(p, leg.contract))
+      const relevant = positions.filter(p => matchesPositionRow(p, leg.contract, productFor(settingsFor(this.session))))
       const actual = signFor(settingsFor(this.session)) * relevant.reduce((total, p) => total + p.quantity, 0), expected = leg.position?.quantity ?? 0
       if (actual < 0 || actual > expected) throw new Error(`Unexpected ${side} broker exposure. Automatic orders are blocked until reconciled.`)
       if (actual !== expected) {
@@ -427,7 +430,7 @@ export class Controller {
       this.note(`${side} entry skipped: the live price became stale during broker verification.`); return
     }
     const intent: OrderIntent = { id: randomUUID(), tag: `n009${randomUUID().replaceAll('-', '').slice(0, 14)}`,
-      side, symbol: leg.contract.symbol, instrumentToken: leg.contract.token, expiry: leg.contract.expiry, transaction: buy ? entryTransaction(settingsFor(session)) : exitTransaction(settingsFor(session)), quantity, reason, submittedAt: this.now() }
+      side, symbol: leg.contract.symbol, instrumentToken: leg.contract.token, expiry: leg.contract.expiry, product: productFor(settingsFor(session)), transaction: buy ? entryTransaction(settingsFor(session)) : exitTransaction(settingsFor(session)), quantity, reason, submittedAt: this.now() }
     if (session.mode === 'paper') {
       if (!mark) { this.note(`${side} paper exit is waiting for a verified market price.`); return }
       applyFill(session, intent, { orderId: `PAPER-${intent.id}`, quantity, average: mark.price, status: 'COMPLETE' }, this.now())

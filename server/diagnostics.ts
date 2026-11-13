@@ -3,6 +3,8 @@ import type { BrokerCheck, BrokerDiagnostics } from '../shared/diagnostics.ts'
 import type { TradingSession } from '../shared/model.ts'
 import { istDate } from './time.ts'
 import { rejectionSummary, sameTradingSymbol } from './orderIdentity.ts'
+import { productFor } from '../shared/settings.ts'
+import type { StrategySettings } from '../shared/settings.ts'
 
 type Broker = Pick<MStock, 'credentials' | 'request' | 'positions'>
 type Stream = { status: string; lastTickAt: number | null; diagnostics?: { lastError: string } }
@@ -16,7 +18,8 @@ export class AccountDiagnostics {
   private owner: Broker['credentials'] = null
   private result: BrokerDiagnostics | null = null
   constructor(private broker: Broker, private stream: Stream, private now = Date.now,
-    private session: () => Pick<TradingSession, 'account' | 'date' | 'mode' | 'trades'> | null = () => null) {}
+    private session: () => Pick<TradingSession, 'account' | 'date' | 'mode' | 'trades' | 'settings'> | null = () => null,
+    private settings: () => StrategySettings | undefined = () => undefined) {}
   async read(): Promise<BrokerDiagnostics> {
     const credentials = this.broker.credentials
     if (!credentials || credentials.expiresAt <= this.now()) throw new Error('Reconnect mStock before running account checks.')
@@ -92,10 +95,11 @@ export class AccountDiagnostics {
       ? `Existing live fill ${confirmed.orderId} matches the broker order book: ${confirmed.quantity} units at ₹${confirmed.price.toFixed(2)}. This check sent no order.`
       : 'No matching current-day live engine fill was verified in the broker order book. Read-only checks and Paper mode never place a real order. This is an unperformed execution test, not a connection failure.', durationMs: 0 })
     const permissions = credentials.permissions
-    const missing = permissions ? [!permissions.exchanges.includes('NFO') ? 'NSE F&O (NFO)' : '', !permissions.products.includes('MIS') ? 'MIS' : '', !permissions.orderTypes.includes('MARKET') ? 'MARKET orders' : ''].filter(Boolean) : []
+    const product = productFor(this.session()?.settings ?? this.settings())
+    const missing = permissions ? [!permissions.exchanges.includes('NFO') ? 'NSE F&O (NFO)' : '', !permissions.products.includes(product) ? product : '', !permissions.orderTypes.includes('MARKET') ? 'MARKET orders' : ''].filter(Boolean) : []
     report.checks.push({ name: 'Login trading capabilities', status: !permissions ? 'untested' : missing.length ? 'failed' : 'pass', detail: permissions
-      ? `${missing.length ? `Not advertised by this login: ${missing.join(', ')}. ${!permissions.exchanges.includes('NFO') ? 'Check Profile → Segments in mStock and enable NSE F&O, or contact mStock if it is already active. Then use Refresh login metadata.' : 'Verify the missing capabilities with mStock, then refresh login metadata.'} ` : 'Required NFO, MIS and MARKET capabilities are advertised. ' }Exchanges: ${permissions.exchanges.join(', ')}; products: ${permissions.products.join(', ')}; order types: ${permissions.orderTypes.join(', ')}. This does not guarantee a fill.`
-      : 'This saved login predates capability capture, or mStock omitted those fields. Use Refresh login metadata below, complete OTP/TOTP, then rerun checks. Account read access does not establish NFO/MIS/MARKET permission.', durationMs: 0,
+      ? `${missing.length ? `Not advertised by this login: ${missing.join(', ')}. ${!permissions.exchanges.includes('NFO') ? 'Check Profile → Segments in mStock and enable NSE F&O, or contact mStock if it is already active. Then use Refresh login metadata.' : 'Verify the missing capabilities with mStock, then refresh login metadata.'} ` : `Required NFO, ${product} and MARKET capabilities are advertised. ` }Exchanges: ${permissions.exchanges.join(', ')}; products: ${permissions.products.join(', ')}; order types: ${permissions.orderTypes.join(', ')}. This does not guarantee a fill.`
+      : `This saved login predates capability capture, or mStock omitted those fields. Use Refresh login metadata below, complete OTP/TOTP, then rerun checks. Account read access does not establish NFO/${product}/MARKET permission.`, durationMs: 0,
       ...(permissions && !permissions.exchanges.includes('NFO') ? { helpUrl: 'https://www.mstock.com/articles/how-to-activate-a-segment-in-mstock' } : {}),
     })
     report.checkedAt = this.now()

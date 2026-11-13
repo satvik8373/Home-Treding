@@ -20,14 +20,15 @@ async function candle(f: Awaited<ReturnType<typeof fixture>>, time: string, ce =
 }
 
 test('Type A display-symbol NSE positions retain long/short quantities across restart and execute IST clock exits', async () => {
-  for (const direction of ['buy', 'sell'] as const) {
+  for (const direction of ['buy', 'sell'] as const) for (const product of ['MIS', 'NRML'] as const) {
     const f = await fixture()
-    f.controller.saveStrategySettings({ ...DEFAULT_SETTINGS, direction, enabledSides: ['CE'], target1Rule: { kind: 'clock', time: '09:30' }, target2Rule: { kind: 'clock', time: '09:35' } })
+    f.controller.saveStrategySettings({ ...DEFAULT_SETTINGS, product, direction, enabledSides: ['CE'], target1Rule: { kind: 'clock', time: '09:30' }, target2Rule: { kind: 'clock', time: '09:35' } })
+    f.broker.credentials!.permissions = { exchanges: ['NFO'], products: [product], orderTypes: ['MARKET'] }
     f.broker.contracts = async () => [
       { ...contract('CE'), symbol: 'NIFTY26O2725000CE' }, { ...contract('PE'), symbol: 'NIFTY26O2725000PE' },
     ]
     f.broker.positions = async () => [...f.broker.holdings].map(([symbol, quantity]) => ({
-      symbol: `NIFTY-27Oct2026-25000-${symbol.endsWith('CE') ? 'CE' : 'PE'}`, exchange: 'NSE', product: 'MIS', quantity,
+      symbol: `NIFTY-27Oct2026-25000-${symbol.endsWith('CE') ? 'CE' : 'PE'}`, exchange: 'NSE', product, quantity,
     }))
     await f.controller.start('live', direction)
     for (let i = 0; i < 30; i++) await new Promise(resolve => setImmediate(resolve))
@@ -52,6 +53,11 @@ test('Type A display-symbol NSE positions retain long/short quantities across re
       [direction === 'buy' ? 'BUY' : 'SELL', 260], [direction === 'buy' ? 'SELL' : 'BUY', 130], [direction === 'buy' ? 'SELL' : 'BUY', 130],
     ])
     assert.equal(restarted.session!.pnlVerified, true)
+    assert.equal(f.broker.submitted.every(order => order.product === product), true)
+    restarted.saveStrategySettings({ ...restarted.strategySettings(direction), product: product === 'MIS' ? 'NRML' : 'MIS' })
+    await restarted.stop(); await restarted.pump()
+    await restarted.start('live', direction)
+    assert.equal(restarted.session!.settings!.product, product, 'same-day Resume keeps its original broker product and permissions')
   }
 })
 
@@ -61,6 +67,14 @@ test('new Live sessions detect pre-existing NSE-labelled NIFTY option exposure b
   await f.controller.start('live')
   for (let i = 0; i < 30; i++) await new Promise(resolve => setImmediate(resolve))
   assert.match(f.controller.session!.message, /Existing NIFTY broker exposure/)
+  assert.equal(f.broker.submitted.length, 0)
+})
+
+test('Live Start rejects an NRML configuration when login advertises only MIS', async () => {
+  const f = await fixture()
+  f.controller.saveStrategySettings({ ...DEFAULT_SETTINGS, product: 'NRML' })
+  f.broker.credentials!.permissions = { exchanges: ['NFO'], products: ['MIS'], orderTypes: ['MARKET'] }
+  await assert.rejects(f.controller.start('live'), /NRML/)
   assert.equal(f.broker.submitted.length, 0)
 })
 

@@ -4,7 +4,7 @@ import { BookOpen, Play, Square } from "lucide-react";
 import type { Mode, TradingSession } from "../../shared/model";
 import type { useDashboard } from "../hooks/useDashboard";
 import { clock } from '../lib/format';
-import { DEFAULT_SETTINGS } from '../../shared/settings';
+import { DEFAULT_SETTINGS, productFor } from '../../shared/settings';
 import type { StrategySettings } from '../../shared/settings';
 
 type Props = {
@@ -87,6 +87,7 @@ export function SessionControls({
         </p>
         {!liveAvailable && <details className="execution-limit"><summary id="live-unavailable-reason">Why Live is unavailable</summary><p>{liveReason}</p><p>A match with your saved IP reference does not verify that the broker approved the IP or that the address is static.</p></details>}
         <dl className="session-rules">
+          <div><dt>Broker product</dt><dd>{productFor(settings) === 'MIS' ? 'Day Trade · MIS' : 'Carry Forward · NRML'}</dd></div>
           <div>
             <dt>Signal candle</dt>
             <dd>5 minutes</dd>

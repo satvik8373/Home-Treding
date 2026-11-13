@@ -64,7 +64,7 @@ export function createApp(
     },
   });
   const historical = new HistoricalData(controller.broker as MStock, () => ({ connected: controller.connected(), account: controller.broker.credentials?.account ?? null, session: controller.session }), repository);
-  const accountDiagnostics = new AccountDiagnostics(controller.broker as MStock, controller.feed, Date.now, () => controller.session);
+  const accountDiagnostics = new AccountDiagnostics(controller.broker as MStock, controller.feed, Date.now, () => controller.session, () => controller.strategySettings());
   const audit = new AccountAudit(accountDiagnostics, () => controller.snapshot());
   const charts = new MarketCharts(controller.broker as MStock, () => ({
     connected: controller.connected(),

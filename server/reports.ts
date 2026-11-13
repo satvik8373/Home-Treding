@@ -2,7 +2,7 @@ import { directionOf, strategyName, referenceStop, entryLevel } from '../shared/
 import { targetPrice, targetDeadline, targetLabel } from '../shared/targets.ts'
 import type { TradingSession } from '../shared/model.ts'
 import type { BacktestReport } from '../shared/backtest.ts'
-import { settingsFor } from '../shared/settings.ts'
+import { settingsFor, productFor } from '../shared/settings.ts'
 
 type Cell = string | number | boolean | null | undefined
 type Row = Record<string, Cell>
@@ -24,7 +24,7 @@ export function csvRows(columns: string[], rows: Row[]): string {
   return '\ufeff' + [columns.map(csvCell).join(','), ...rows.map(row => columns.map(key => csvCell(row[key])).join(','))].join('\r\n') + '\r\n'
 }
 const timeColumns = (prefix: string) => ['date_ist', 'time_ist', 'datetime_ist', 'time_utc'].map(key => `${prefix}_${key}`)
-const commonColumns = [...timeColumns('fill'), 'timezone', 'strategy', 'strategy_direction', 'timestamp_basis', 'session_date', 'mode', 'side', 'symbol', 'transaction', 'quantity_units', 'lot_size_units', 'lots', 'fill_price_inr', 'premium_value_inr', 'premium_cash_flow_inr', 'reason', 'order_id', 'trade_id', 'cycle_id', 'entry_datetime_ist', 'entry_price_inr', 'remaining_cycle_units', 'cycle_match', 'reference_close_inr', 'breakout_level_inr', 'lower_exit_level_inr', 'upper_exit_level_inr', 'candle_exit_level_inr', 'reference_stop_inr', 'target1_price_inr', 'target2_price_inr', 'target1_rule', 'target2_rule', 'target1_deadline_ist', 'target2_deadline_ist', 'realized_gross_pnl_inr', 'cumulative_realized_gross_pnl_inr', 'actual_broker_charges_inr', 'estimated_fee_inr', 'cumulative_pnl_after_estimated_fees_inr', 'pnl_verified', 'session_id', 'exported_datetime_ist', 'report_scope', 'cost_note', 'strategy_settings_json']
+const commonColumns = [...timeColumns('fill'), 'timezone', 'strategy', 'strategy_direction', 'timestamp_basis', 'session_date', 'mode', 'broker_product', 'side', 'symbol', 'transaction', 'quantity_units', 'lot_size_units', 'lots', 'fill_price_inr', 'premium_value_inr', 'premium_cash_flow_inr', 'reason', 'order_id', 'trade_id', 'cycle_id', 'entry_datetime_ist', 'entry_price_inr', 'remaining_cycle_units', 'cycle_match', 'reference_close_inr', 'breakout_level_inr', 'lower_exit_level_inr', 'upper_exit_level_inr', 'candle_exit_level_inr', 'reference_stop_inr', 'target1_price_inr', 'target2_price_inr', 'target1_rule', 'target2_rule', 'target1_deadline_ist', 'target2_deadline_ist', 'realized_gross_pnl_inr', 'cumulative_realized_gross_pnl_inr', 'actual_broker_charges_inr', 'estimated_fee_inr', 'cumulative_pnl_after_estimated_fees_inr', 'pnl_verified', 'session_id', 'exported_datetime_ist', 'report_scope', 'cost_note', 'strategy_settings_json']
 
 export function tradesReport(session: TradingSession | null, exportedAt = Date.now()) {
   const settings = settingsFor(session), rows: Row[] = []
@@ -43,7 +43,7 @@ export function tradesReport(session: TradingSession | null, exportedAt = Date.n
     const leg = candidate?.contract.symbol === trade.symbol ? candidate : undefined
     realized = rounded(realized + (trade.pnl ?? 0)); estimated = rounded(estimated + settings.feePerOrderEstimate)
     rows.push({ ...istFields(trade.at), timezone: 'Asia/Kolkata (UTC+05:30)', strategy: strategyName(settings), strategy_direction: directionOf(settings), timestamp_basis: trade.mode === 'paper' ? 'Paper simulation timestamp' : 'Engine fill-confirmation timestamp; exchange fill time not captured',
-      session_date: session?.date, mode: trade.mode, side: trade.side, symbol: trade.symbol, transaction: trade.transaction,
+      session_date: session?.date, mode: trade.mode, broker_product: productFor(settings), side: trade.side, symbol: trade.symbol, transaction: trade.transaction,
       quantity_units: trade.quantity, lot_size_units: leg?.contract.lotSize, lots: leg ? trade.quantity / leg.contract.lotSize : null,
       fill_price_inr: trade.price, premium_value_inr: rounded(trade.quantity * trade.price), premium_cash_flow_inr: rounded((trade.transaction === 'BUY' ? -1 : 1) * trade.quantity * trade.price),
       reason: trade.reason, order_id: trade.orderId, trade_id: trade.id, cycle_id: cycle?.valid ? cycle.id : null,
@@ -70,13 +70,13 @@ export function ordersReport(session: TradingSession | null, exportedAt = Date.n
   }
   const rows: Row[] = records.sort((a, b) => a.submittedAt - b.submittedAt).map(order => ({
     ...istFields(order.submittedAt, 'submitted'), ...istFields(order.updatedAt, 'updated'), timezone: 'Asia/Kolkata (UTC+05:30)', strategy: strategyName(session?.settings), strategy_direction: directionOf(session?.settings), session_date: session?.date,
-    mode: order.mode, side: order.side, symbol: order.symbol, transaction: order.transaction, requested_quantity_units: order.quantity,
+    mode: order.mode, broker_product: productFor(settingsFor(session)), side: order.side, symbol: order.symbol, transaction: order.transaction, requested_quantity_units: order.quantity,
     confirmed_filled_units: order.filled, unfilled_requested_units: order.filled == null ? null : Math.max(0, order.quantity - order.filled),
     confirmed_average_inr: order.average, status: order.status, reason: order.reason, order_id: order.orderId, intent_id: order.id, tag: order.tag,
     detail: order.detail, status_history_ist: JSON.stringify((order.events ?? []).map(event => ({ at_ist: istFields(event.at).fill_datetime_ist, status: event.status, detail: event.detail }))),
     session_id: session?.id, exported_datetime_ist: istFields(exportedAt).fill_datetime_ist,
     report_scope: 'Engine order audit; pending/rejected orders are not fills; Paper entries are simulated.' }))
-  return { filename: `009-${directionOf(session?.settings)}-${session?.mode ?? 'session'}-orders-${session?.date ?? 'empty'}.csv`, body: csvRows([...timeColumns('submitted'), ...timeColumns('updated'), 'timezone', 'strategy', 'strategy_direction', 'session_date', 'mode', 'side', 'symbol', 'transaction', 'requested_quantity_units', 'confirmed_filled_units', 'unfilled_requested_units', 'confirmed_average_inr', 'status', 'reason', 'order_id', 'intent_id', 'tag', 'detail', 'status_history_ist', 'session_id', 'exported_datetime_ist', 'report_scope'], rows) }
+  return { filename: `009-${directionOf(session?.settings)}-${session?.mode ?? 'session'}-orders-${session?.date ?? 'empty'}.csv`, body: csvRows([...timeColumns('submitted'), ...timeColumns('updated'), 'timezone', 'strategy', 'strategy_direction', 'session_date', 'mode', 'broker_product', 'side', 'symbol', 'transaction', 'requested_quantity_units', 'confirmed_filled_units', 'unfilled_requested_units', 'confirmed_average_inr', 'status', 'reason', 'order_id', 'intent_id', 'tag', 'detail', 'status_history_ist', 'session_id', 'exported_datetime_ist', 'report_scope'], rows) }
 }
 
 export function backtestTradesReport(report: BacktestReport, jobId: string, exportedAt = Date.now()) {
@@ -88,7 +88,7 @@ export function backtestTradesReport(report: BacktestReport, jobId: string, expo
       const remaining = (quantities.get(fill.cycleId) ?? 0) + (fill.reason === 'BREAKOUT' ? fill.quantity : -fill.quantity)
       quantities.set(fill.cycleId, remaining); realized = rounded(realized + (fill.grossPnl ?? 0)); fees = rounded(fees + fill.fee)
       rows.push({ ...istFields(fill.at), timezone: 'Asia/Kolkata (UTC+05:30)', strategy: strategyName(settings), strategy_direction: directionOf(settings), timestamp_basis: !fill.timing ? 'Legacy backtest timestamp; exact execution timing not recorded' : fill.timing === 'intrabar-unknown' ? 'Candle-end proxy; exact intrabar time/order unknown' : 'Modelled candle-open execution',
-        session_date: day.date, mode: 'backtest', side: fill.side, symbol: fill.symbol, transaction: fill.transaction, quantity_units: fill.quantity,
+        session_date: day.date, mode: 'backtest', broker_product: productFor(settings), side: fill.side, symbol: fill.symbol, transaction: fill.transaction, quantity_units: fill.quantity,
         lot_size_units: day.lotSize, lots: fill.quantity / day.lotSize, fill_price_inr: fill.price, premium_value_inr: rounded(fill.quantity * fill.price),
         premium_cash_flow_inr: rounded((fill.transaction === 'BUY' ? -1 : 1) * fill.quantity * fill.price), reason: fill.reason, trade_id: fill.id, cycle_id: fill.cycleId,
         entry_datetime_ist: cycle ? istFields(cycle.entryAt).fill_datetime_ist : null, entry_price_inr: cycle?.entryPrice, remaining_cycle_units: remaining,

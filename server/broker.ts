@@ -147,7 +147,7 @@ export class MStock implements TradingBroker {
   async place(intent: OrderIntent): Promise<string> {
     const data = record(await this.request('/orders/regular', 'POST', { tradingsymbol: intent.symbol,
       exchange: 'NFO', transaction_type: intent.transaction, order_type: 'MARKET',
-      quantity: String(intent.quantity), product: 'MIS', validity: 'DAY', price: '0', trigger_price: '0',
+      quantity: String(intent.quantity), product: intent.product ?? 'MIS', validity: 'DAY', price: '0', trigger_price: '0',
       disclosed_quantity: '0', tag: intent.tag }))
     if (!data.order_id) throw new BrokerError('Broker acknowledgement has no order ID. Reconciliation is required.')
     return String(data.order_id)

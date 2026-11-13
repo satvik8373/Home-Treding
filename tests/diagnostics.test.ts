@@ -7,6 +7,7 @@ import type { AddressInfo } from 'node:net'
 import { istDate } from '../server/time.ts'
 import type { Trade } from '../shared/model.ts'
 import type { SavedBroker } from '../server/store.ts'
+import { DEFAULT_SETTINGS } from '../shared/settings.ts'
 
 function setup() {
   let time = Date.now(), failOrders = false
@@ -29,6 +30,17 @@ function setup() {
   const service = new AccountDiagnostics(broker, stream, () => time)
   return { broker, service, stream, calls, advance: () => { time += 11_000 }, failOrders: () => { failOrders = true } }
 }
+
+test('login capability checks use the configured NRML product instead of requiring MIS', async () => {
+  for (const advertised of ['NRML', 'MIS']) {
+    const f = setup()
+    ;(f.broker.credentials as SavedBroker).permissions = { exchanges: ['NFO'], products: [advertised], orderTypes: ['MARKET'] }
+    const service = new AccountDiagnostics(f.broker, f.stream, Date.now, () => null, () => ({ ...DEFAULT_SETTINGS, product: 'NRML' }))
+    const report = await service.read(), check = report.checks.find(item => item.name === 'Login trading capabilities')!
+    assert.equal(check.status, advertised === 'NRML' ? 'pass' : 'failed')
+    assert.match(check.detail, /NRML/)
+  }
+})
 
 test('account checks use only read endpoints and distinguish order-book access from live execution', async () => {
   const f = setup(), report = await f.service.read()

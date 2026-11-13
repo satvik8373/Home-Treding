@@ -1,4 +1,5 @@
 import type { Contract, OrderIntent } from '../shared/model.ts'
+import type { BrokerProduct } from '../shared/settings.ts'
 
 type Row = Record<string, unknown>
 const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
@@ -35,8 +36,8 @@ export function isNiftyDerivativePosition(row: { symbol: string; exchange: strin
 }
 
 /** Type A can label recognized NIFTY options NSE and use its display symbol. */
-export function matchesPositionRow(row: { symbol: string; exchange: string; product: string }, contract: Contract): boolean {
-  if (!sameTradingSymbol(row.symbol, contract.symbol, contract.expiry) || !['MIS', 'INTRADAY', 'INTRA'].includes(row.product)) return false
+export function matchesPositionRow(row: { symbol: string; exchange: string; product: string }, contract: Contract, product: BrokerProduct = 'MIS'): boolean {
+  if (!sameTradingSymbol(row.symbol, contract.symbol, contract.expiry) || !(product === 'MIS' ? ['MIS', 'INTRADAY', 'INTRA'].includes(row.product) : row.product === 'NRML')) return false
   return row.exchange === 'NFO' || row.exchange === 'NSE'
     && contractIdentity(row.symbol, contract.expiry) !== null && contractIdentity(contract.symbol, contract.expiry) !== null
 }
@@ -53,7 +54,7 @@ export function matchesOrderRow(row: Row, intent: OrderIntent, requireTag = fals
   if (row.transaction_type && String(row.transaction_type).toUpperCase() !== intent.transaction) return false
   if (row.quantity != null && Number(row.quantity) !== intent.quantity) return false
   if (intent.instrumentToken && Number(row.instrument_token) > 0 && String(row.instrument_token) !== intent.instrumentToken) return false
-  if (row.product && !['MIS', 'INTRADAY'].includes(String(row.product).toUpperCase())) return false
+  if (row.product && !((intent.product ?? 'MIS') === 'MIS' ? ['MIS', 'INTRADAY', 'INTRA'].includes(String(row.product).toUpperCase()) : String(row.product).toUpperCase() === 'NRML')) return false
   return true
 }
 

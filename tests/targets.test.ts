@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { DEFAULT_SETTINGS, sameSettings, validateSettings } from '../shared/settings.ts'
+import { DEFAULT_SETTINGS, sameSettings, validateSettings, productFor } from '../shared/settings.ts'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { StrategySettingsPanel } from '../src/components/StrategySettingsPanel.tsx'
@@ -14,6 +14,11 @@ import type { StrategySettings } from '../shared/settings.ts'
 import type { TargetRule } from '../shared/targets.ts'
 
 test('target types validate and legacy settings keep point-based defaults', () => {
+  assert.equal(productFor(DEFAULT_SETTINGS), 'MIS')
+  assert.equal(productFor(validateSettings({ ...DEFAULT_SETTINGS, product: 'NRML' })), 'NRML')
+  assert.equal(sameSettings(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, product: 'MIS' }), true)
+  assert.equal(sameSettings(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, product: 'NRML' }), false)
+  assert.throws(() => validateSettings({ ...DEFAULT_SETTINGS, product: 'CNC' }), /NIFTY options/)
   assert.deepEqual(validateSettings(DEFAULT_SETTINGS), DEFAULT_SETTINGS)
   assert.equal(sameSettings(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, target1Rule: { kind: 'points', value: 20 }, target2Rule: { kind: 'points', value: 40 } }), true)
   assert.equal(targetPrice(DEFAULT_SETTINGS, 1, 200), 220)
@@ -33,12 +38,14 @@ test('settings renders only Price and Time choices and saving preferences preser
   assert.deepEqual(f.store.get('strategy:settings'), saved)
   const html = renderToStaticMarkup(createElement(StrategySettingsPanel, { saved, effective: DEFAULT_SETTINGS, active: true, online: true, working: '', action: async () => null }))
   for (const kind of ['price', 'time']) assert.equal((html.match(new RegExp(`option value="${kind}"`, 'g')) ?? []).length, 2)
-  assert.equal((html.match(/<option /g) ?? []).length, 4)
+  assert.equal((html.match(/<option /g) ?? []).length, 6, 'two broker products and two Price/Time choices per target')
   assert.doesNotMatch(html, /Minutes after original entry/)
   assert.match(html, /Saved duration: 10 min after entry/)
   assert.equal((html.match(/type="time"/g) ?? []).length, 3, 'both targets use clock inputs, plus square-off')
   assert.match(html, /max="15:09"/)
   assert.match(html, /Exit time · IST/)
+  assert.match(html, /Day Trade \(MIS\)/)
+  assert.match(html, /Carry Forward \(NRML\)/)
   assert.equal(f.broker.submitted.length, 0)
 })
 

@@ -4,7 +4,8 @@ import { targetLabel, targetRule } from '../../shared/targets'
 import type { TargetRule } from '../../shared/targets'
 import { useState } from 'react'
 import type { StrategySettings } from '../../shared/settings'
-import { DEFAULT_SETTINGS, sameSettings, validateSettings } from '../../shared/settings'
+import { DEFAULT_SETTINGS, sameSettings, validateSettings, productFor } from '../../shared/settings'
+import type { BrokerProduct } from '../../shared/settings'
 import type { useDashboard } from '../hooks/useDashboard'
 
 const numeric = [
@@ -19,24 +20,26 @@ export function StrategySettingsPanel({ saved, effective, active, hasSession = a
   saved: StrategySettings; effective: StrategySettings; active: boolean; hasSession?: boolean; online: boolean; working: string; action: ReturnType<typeof useDashboard>['action'];
 }) {
   const [form, setForm] = useState(() => formOf(saved)), [cutoff, setCutoff] = useState(saved.cutoff), [sides, setSides] = useState(saved.enabledSides)
+  const [product, setProduct] = useState<BrokerProduct>(productFor(saved))
   const [rules, setRules] = useState<[TargetRule, TargetRule]>(() => [targetRule(saved, 1), targetRule(saved, 2)])
   const [dirty, setDirty] = useState(false), [error, setError] = useState(''), [note, setNote] = useState('')
   const shownRules: [TargetRule, TargetRule] = dirty ? rules : [targetRule(saved, 1), targetRule(saved, 2)]
   const [target2Draft, setTarget2Draft] = useState<string | null>(null)
   const shownForm = dirty ? form : formOf(saved), shownCutoff = dirty ? cutoff : saved.cutoff, shownSides = dirty ? sides : saved.enabledSides
+  const shownProduct = dirty ? product : productFor(saved)
   const cutoffMinutes = Number(shownCutoff.slice(0, 2)) * 60 + Number(shownCutoff.slice(3)) - 1
   const lastTargetTime = `${String(Math.floor(cutoffMinutes / 60)).padStart(2, '0')}:${String(cutoffMinutes % 60).padStart(2, '0')}`
-  const modified = dirty && (JSON.stringify(shownRules) !== JSON.stringify([targetRule(saved, 1), targetRule(saved, 2)]) || numeric.some(([key]) => Number(shownForm[key]) !== saved[key]) || shownCutoff !== saved.cutoff || [...shownSides].sort().join() !== [...saved.enabledSides].sort().join())
-  function edit(change: { form?: typeof form; cutoff?: string; sides?: StrategySettings['enabledSides']; rules?: [TargetRule, TargetRule] }) { setTarget2Draft(null); setRules(change.rules ?? shownRules); setDirty(true); setForm(change.form ?? shownForm); setCutoff(change.cutoff ?? shownCutoff); setSides(change.sides ?? shownSides); setError(''); setNote('') }
+  const modified = dirty && (shownProduct !== productFor(saved) || JSON.stringify(shownRules) !== JSON.stringify([targetRule(saved, 1), targetRule(saved, 2)]) || numeric.some(([key]) => Number(shownForm[key]) !== saved[key]) || shownCutoff !== saved.cutoff || [...shownSides].sort().join() !== [...saved.enabledSides].sort().join())
+  function edit(change: { product?: BrokerProduct; form?: typeof form; cutoff?: string; sides?: StrategySettings['enabledSides']; rules?: [TargetRule, TargetRule] }) { setProduct(change.product ?? shownProduct); setTarget2Draft(null); setRules(change.rules ?? shownRules); setDirty(true); setForm(change.form ?? shownForm); setCutoff(change.cutoff ?? shownCutoff); setSides(change.sides ?? shownSides); setError(''); setNote('') }
   const target2Lots = target2Draft ?? (shownForm.entryLots.trim() && shownForm.target1Lots.trim() ? String(Number(shownForm.entryLots) - Number(shownForm.target1Lots)) : '')
   const changed = !sameSettings(saved, effective)
-  function reset() { setRules([targetRule(DEFAULT_SETTINGS, 1), targetRule(DEFAULT_SETTINGS, 2)]); setTarget2Draft(null); setDirty(true); setForm(formOf(DEFAULT_SETTINGS)); setCutoff(DEFAULT_SETTINGS.cutoff); setSides([...DEFAULT_SETTINGS.enabledSides]); setError(''); setNote('4-lot defaults loaded: target 1 sells 2 lots; target 2 sells the remaining 2. Save to apply.') }
+  function reset() { setProduct('MIS'); setRules([targetRule(DEFAULT_SETTINGS, 1), targetRule(DEFAULT_SETTINGS, 2)]); setTarget2Draft(null); setDirty(true); setForm(formOf(DEFAULT_SETTINGS)); setCutoff(DEFAULT_SETTINGS.cutoff); setSides([...DEFAULT_SETTINGS.enabledSides]); setError(''); setNote('MIS / 4-lot defaults loaded: target 1 sells 2 lots; target 2 sells the remaining 2. Save to apply.') }
   async function save() {
     setError(''); setNote('')
     try {
       if (numeric.some(([key]) => !shownForm[key].trim())) throw new Error('Complete every numeric field. Use 0 only where explicitly allowed.')
       if (!target2Lots.trim() || !Number.isInteger(Number(target2Lots)) || Number(target2Lots) < 1 || Number(shownForm.target1Lots) + Number(target2Lots) !== Number(shownForm.entryLots)) throw new Error('Target 1 lots + target 2 lots must equal entry lots, with at least 1 lot remaining for target 2.')
-      const settings = validateSettings({ direction: saved.direction, target1Points: saved.target1Points, target2Points: saved.target2Points, target1Rule: shownRules[0], target2Rule: shownRules[1], ...Object.fromEntries(numeric.map(([key]) => [key, Number(shownForm[key])])), cutoff: shownCutoff, enabledSides: shownSides })
+      const settings = validateSettings({ product: shownProduct, direction: saved.direction, target1Points: saved.target1Points, target2Points: saved.target2Points, target1Rule: shownRules[0], target2Rule: shownRules[1], ...Object.fromEntries(numeric.map(([key]) => [key, Number(shownForm[key])])), cutoff: shownCutoff, enabledSides: shownSides })
       const result = await action('/api/strategy/settings', settings, 'save-settings')
       if (result) setNote('Saved. Current session rules are unchanged; new backtests use these settings; the saved day-session keeps its original rules until the next trading day.')
     } catch (error) { setError(error instanceof Error ? error.message : 'Could not save settings.') }
@@ -59,6 +62,7 @@ export function StrategySettingsPanel({ saved, effective, active, hasSession = a
           <div className="settings-section-heading"><span className="settings-section-icon"><ArrowUpRight size={18} /></span><div><h3 id="entry-settings-title">Entry setup</h3><p>Size and conditions for each new position.</p></div><span className="settings-section-number">01</span></div>
           <div className="settings-field-grid">
             {numberField('entryLots', 'Entry size', directionOf(saved) === 'sell' ? 'Lots sold short per enabled leg.' : 'Lots bought per enabled leg.', 'lots')}
+            <label className="setting-field"><span>Broker product</span><select value={shownProduct} disabled={disabled} onChange={event => edit({ product: event.target.value as BrokerProduct })}><option value="MIS">Day Trade (MIS)</option><option value="NRML">Carry Forward (NRML)</option></select><small>Both products follow this strategy’s square-off time. Overnight holding is not enabled.</small></label>
             {numberField('breakoutPercent', directionOf(saved) === 'sell' ? 'Breakout below reference' : 'Breakout above reference', 'Uses the fixed opening option close.', '%')}
             <fieldset className="setting-legs"><legend>Trade legs</legend><div>{(['CE', 'PE'] as const).map(side => <label key={side}><input type="checkbox" checked={shownSides.includes(side)} disabled={disabled} onChange={event => edit({ sides: event.target.checked ? [...shownSides, side] : shownSides.filter(value => value !== side) })} /><span>{side === 'CE' ? 'Call' : 'Put'}<small>{side}</small></span></label>)}</div><small>Both legs use their own reference and position.</small></fieldset>
           </div>
@@ -93,10 +97,10 @@ export function StrategySettingsPanel({ saved, effective, active, hasSession = a
       <aside className="settings-overview" aria-label="Configuration preview">
         <div className="settings-summary"><span className="settings-kicker">ORDER ALLOCATION</span><div className="settings-total">{shownForm.entryLots || '—'}<span>lots per leg</span></div><div className="settings-allocation"><div><span>Target 1</span><strong>{shownForm.target1Lots || '—'} <small>lots</small></strong></div><div><span>Target 2</span><strong>{target2Lots || '—'} <small>lots</small></strong></div></div>
           {!allocationValid && <p className="settings-allocation-error" role="status">Target lots must equal entry lots, with at least 1 lot for T2.</p>}
-          <dl className="settings-preview"><div><dt>Enabled legs</dt><dd>{shownSides.length ? shownSides.join(' + ') : 'None selected'}</dd></div><div><dt>T1 trigger</dt><dd>{Number(shownForm.target1Lots) === 0 ? 'Skipped' : targetLabel(previewSettings, 1)}</dd></div><div><dt>T2 trigger</dt><dd>{targetLabel(previewSettings, 2)}</dd></div><div><dt>Square-off</dt><dd>{shownCutoff || '—'} IST</dd></div></dl>
+          <dl className="settings-preview"><div><dt>Broker product</dt><dd>{shownProduct === 'MIS' ? 'Day Trade (MIS)' : 'Carry Forward (NRML)'}</dd></div><div><dt>Enabled legs</dt><dd>{shownSides.length ? shownSides.join(' + ') : 'None selected'}</dd></div><div><dt>T1 trigger</dt><dd>{Number(shownForm.target1Lots) === 0 ? 'Skipped' : targetLabel(previewSettings, 1)}</dd></div><div><dt>T2 trigger</dt><dd>{targetLabel(previewSettings, 2)}</dd></div><div><dt>Square-off</dt><dd>{shownCutoff || '—'} IST</dd></div></dl>
         </div>
         <div className="settings-session-note"><LockKeyhole size={15} /><div><strong>{hasSession ? 'Your session keeps its rules' : 'Save now, start when ready'}</strong><p>{hasSession ? 'Saving prepares the next trading day. Today’s reference, positions and targets stay locked.' : 'Saving settings does not start trading. New backtests use your saved configuration.'}</p></div></div>
-        {hasSession && <details className="settings-snapshot"><summary>View current session rules{changed && <span>Different from saved</span>}</summary><dl><div><dt>Entry</dt><dd>{effective.entryLots} lots</dd></div><div><dt>T1</dt><dd>{effective.target1Lots ? targetLabel(effective, 1) : 'Skipped'}</dd></div><div><dt>T2</dt><dd>{targetLabel(effective, 2)}</dd></div><div><dt>Square-off</dt><dd>{effective.cutoff} IST</dd></div></dl></details>}
+        {hasSession && <details className="settings-snapshot"><summary>View current session rules{changed && <span>Different from saved</span>}</summary><dl><div><dt>Broker product</dt><dd>{productFor(effective)}</dd></div><div><dt>Entry</dt><dd>{effective.entryLots} lots</dd></div><div><dt>T1</dt><dd>{effective.target1Lots ? targetLabel(effective, 1) : 'Skipped'}</dd></div><div><dt>T2</dt><dd>{targetLabel(effective, 2)}</dd></div><div><dt>Square-off</dt><dd>{effective.cutoff} IST</dd></div></dl></details>}
       </aside></div>
       <div className="settings-savebar"><div className="settings-save-status">{!online ? <><span>Engine offline</span><small>Reconnect to save settings.</small></> : <><span>{modified ? 'Unsaved changes' : <><Check size={14} />Settings saved</>}</span><small>Applies next trading day · available immediately to new backtests</small></>}</div><div className="settings-save-actions"><button type="button" className="button secondary" disabled={!modified || !!working} onClick={() => { setDirty(false); setTarget2Draft(null); setError(''); setNote('') }}>Discard changes</button><button className="button primary" disabled={disabled || !modified}><Save size={14} />{working === 'save-settings' ? 'Saving…' : 'Save settings'}</button></div>{(error || note) && <p className={error ? 'settings-feedback settings-feedback-error' : 'settings-feedback'} role={error ? 'alert' : 'status'}>{error || note}</p>}</div>
     </form>

@@ -9,7 +9,7 @@ import { parseBrokerTime, istTime } from '../server/time.ts'
 import { Store } from '../server/store.ts'
 import { DAY } from './helpers.ts'
 import type { OrderIntent } from '../shared/model.ts'
-import { sameTradingSymbol, matchesPositionRow, isNiftyDerivativePosition } from '../server/orderIdentity.ts'
+import { sameTradingSymbol, matchesPositionRow, isNiftyDerivativePosition, matchesOrderRow } from '../server/orderIdentity.ts'
 
 test('official form-based OTP and TOTP flows send the documented fields', async () => {
   const calls: Array<{ url: string; body: string; headers: Headers }> = []
@@ -31,6 +31,8 @@ test('position identity recognizes the Type A NSE option display alias without m
   const contract = { token: '45391', symbol: 'NIFTY26N1725100PE', expiry: '2026-11-17', strike: 25100, lotSize: 65, side: 'PE' as const }
   const row = { symbol: 'NIFTY-17Nov2026-25100-PE', exchange: 'NSE', product: 'MIS' }
   assert.equal(matchesPositionRow(row, contract), true)
+  assert.equal(matchesPositionRow({ ...row, product: 'NRML' }, contract, 'NRML'), true)
+  assert.equal(matchesPositionRow(row, contract, 'NRML'), false)
   assert.equal(isNiftyDerivativePosition(row), true)
   for (const mismatch of [{ ...row, symbol: 'NIFTY-17Nov2026-25200-PE' }, { ...row, symbol: 'NIFTY-17Nov2026-25100-CE' }, { ...row, symbol: 'NIFTY-24Nov2026-25100-PE' }, { ...row, exchange: 'BSE' }, { ...row, product: 'NRML' }, { ...row, symbol: 'NIFTYBEES' }]) assert.equal(matchesPositionRow(mismatch, contract), false)
   assert.equal(isNiftyDerivativePosition({ symbol: 'NIFTYBEES', exchange: 'NSE' }), false)
@@ -96,6 +98,20 @@ test('contracts use 09:20 spot, nearest unexpired pair and official lot size', (
   assert.throws(() => resolveContracts(rows.map(row => ({ ...row, expiry: '2026-10-20' })), DAY, 25020), /No current/)
 })
 const intent: OrderIntent = { id: 'i', tag: 'tag', side: 'CE', symbol: 'TEST-CE', transaction: 'BUY', quantity: 195, reason: 'BREAKOUT', submittedAt: 0, orderId: '1' }
+test('broker order placement and recovery use the saved NRML product and reject a MIS order with the same identity', async () => {
+  let body = ''
+  const broker = new MStock(async (_url, options) => { body = String(options?.body); return new Response(JSON.stringify({ status: 'success', data: { order_id: '1' } })) })
+  broker.credentials = { apiKey: 'test', accessToken: 'test', account: 'test', name: 'Test', expiresAt: Date.now() + 60_000 }
+  const nrml = { ...intent, product: 'NRML' as const }
+  await broker.place(nrml)
+  assert.equal(new URLSearchParams(body).get('product'), 'NRML')
+  const row = { tag: 'tag', tradingsymbol: intent.symbol, transaction_type: 'BUY', exchange: 'NFO', quantity: 195, product: 'NRML' }
+  assert.equal(matchesOrderRow(row, nrml, true), true)
+  assert.equal(matchesOrderRow({ ...row, product: 'MIS' }, nrml, true), false)
+  assert.equal(matchesOrderRow(row, intent, true), false, 'old saved orders default to MIS')
+  await broker.place(intent)
+  assert.equal(new URLSearchParams(body).get('product'), 'MIS')
+})
 test('broker acknowledgement and open partial orders are not confirmed fills', () => {
   assert.equal(parseReceipt([{ order_id: '1', status: 'OPEN', filled_quantity: 65, average_price: 100 }], intent), null)
   assert.equal(parseReceipt({ order_id: '1' }, intent), null)

@@ -64,6 +64,7 @@ export interface Leg {
   exitReason: Exclude<Reason, "BREAKOUT"> | null;
 }
 export interface OrderIntent {
+  product?: import('./settings.ts').BrokerProduct;
   instrumentToken?: string;
   expiry?: string;
   id: string;

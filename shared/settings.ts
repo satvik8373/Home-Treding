@@ -4,6 +4,7 @@ import type { TargetRule } from './targets.ts'
 import type { Side } from './model.ts'
 
 export interface StrategySettings {
+  product?: BrokerProduct;
   direction?: StrategyDirection;
   breakoutPercent: number; exitPercent: number; entryLots: number; target1Lots: number;
   target1Points: number; target2Points: number; cutoff: string; maxEntriesPerLeg: number;
@@ -11,6 +12,8 @@ export interface StrategySettings {
   stopLossPoints?: number;
   enabledSides: Side[]; feePerOrderEstimate: number;
 }
+export type BrokerProduct = 'MIS' | 'NRML'
+export const productFor = (settings?: Pick<StrategySettings, 'product'> | null): BrokerProduct => settings?.product ?? 'MIS'
 export const DEFAULT_SETTINGS: StrategySettings = { breakoutPercent: 0.09, exitPercent: 0.09, entryLots: 4, target1Lots: 2,
   target1Points: 20, target2Points: 40, stopLossPoints: 25, cutoff: '15:10', maxEntriesPerLeg: 0, enabledSides: ['CE', 'PE'], feePerOrderEstimate: 0 }
 export const SELL_DEFAULT_SETTINGS: StrategySettings = { ...DEFAULT_SETTINGS, direction: 'sell' }
@@ -19,6 +22,7 @@ export const LEGACY_SETTINGS: StrategySettings = { ...DEFAULT_SETTINGS, entryLot
 export function validateSettings(input: unknown): StrategySettings {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Strategy settings must be an object.')
   const body = input as Record<string, unknown>
+  if (body.product !== undefined && body.product !== 'MIS' && body.product !== 'NRML') throw new Error('Choose Day Trade (MIS) or Carry Forward (NRML) for NIFTY options.')
   if (body.direction !== undefined && !['buy', 'sell'].includes(String(body.direction))) throw new Error('Choose the Buy or Sell strategy.')
   const number = (key: keyof StrategySettings, min: number, max: number, integer = false) => {
     const value = body[key]
@@ -49,14 +53,15 @@ export function validateSettings(input: unknown): StrategySettings {
   const target1Rule = rule('target1Rule'), target2Rule = rule('target2Rule')
   const one = target1Rule ?? { kind: 'points', value: target1Points }, two = target2Rule ?? { kind: 'points', value: target2Points }
   if (target1Lots > 0 && one.kind === two.kind && ('time' in one && 'time' in two ? two.time <= one.time : 'value' in one && 'value' in two && two.value <= one.value)) throw new Error('For the same target type, target 2 must be above/later than target 1.')
-  return { ...(body.direction === 'sell' ? { direction: 'sell' as const } : {}), ...(target1Rule ? { target1Rule } : {}), ...(target2Rule ? { target2Rule } : {}), breakoutPercent: number('breakoutPercent', 0.01, 10), exitPercent: number('exitPercent', 0.01, 10), entryLots, target1Lots, target1Points, target2Points, stopLossPoints: body.stopLossPoints === undefined ? 0 : number('stopLossPoints', 0, 2000),
+  return { ...(body.product !== undefined ? { product: body.product as BrokerProduct } : {}), ...(body.direction === 'sell' ? { direction: 'sell' as const } : {}), ...(target1Rule ? { target1Rule } : {}), ...(target2Rule ? { target2Rule } : {}), breakoutPercent: number('breakoutPercent', 0.01, 10), exitPercent: number('exitPercent', 0.01, 10), entryLots, target1Lots, target1Points, target2Points, stopLossPoints: body.stopLossPoints === undefined ? 0 : number('stopLossPoints', 0, 2000),
     cutoff: body.cutoff, maxEntriesPerLeg: number('maxEntriesPerLeg', 0, 100, true), enabledSides: [...body.enabledSides].sort() as Side[], feePerOrderEstimate: number('feePerOrderEstimate', 0, 1000) }
 }
 export function settingsFor(session?: { settings?: StrategySettings } | null): StrategySettings { return session ? session.settings ?? LEGACY_SETTINGS : DEFAULT_SETTINGS }
 export function sameSettings(a: StrategySettings, b: StrategySettings) {
   const canonical = (s: StrategySettings) => {
     const v = validateSettings(s)
-    return { target1Rule: targetRule(v, 1), target2Rule: targetRule(v, 2), ...v, target1Points: 0, target2Points: 0 }
+    const { product: _product, ...rest } = v
+    return { target1Rule: targetRule(v, 1), target2Rule: targetRule(v, 2), ...rest, product: productFor(v), target1Points: 0, target2Points: 0 }
   }
   return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b))
 }
