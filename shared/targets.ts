@@ -20,5 +20,5 @@ export function targetDeadline(settings: StrategySettings, target: TargetNumber,
 }
 export function targetLabel(settings: StrategySettings, target: TargetNumber): string {
   const rule = targetRule(settings, target)
-  return rule.kind === 'clock' ? `${rule.time} IST` : rule.kind === 'minutes' ? `${rule.value} min after entry` : rule.kind === 'price' ? `₹${rule.value} premium` : rule.kind === 'percent' ? `Entry ${signFor(settings) > 0 ? '+' : '−'}${rule.value}%` : `Entry ${signFor(settings) > 0 ? '+' : '−'}₹${rule.value}`
+  return rule.kind === 'clock' ? rule.time ? `${rule.time} IST` : 'Select IST time' : rule.kind === 'minutes' ? `${rule.value} min after entry` : rule.kind === 'price' ? `₹${rule.value} premium` : rule.kind === 'percent' ? `Entry ${signFor(settings) > 0 ? '+' : '−'}${rule.value}%` : `Entry ${signFor(settings) > 0 ? '+' : '−'}₹${rule.value}`
 }

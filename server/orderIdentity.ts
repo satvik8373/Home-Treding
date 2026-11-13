@@ -1,4 +1,4 @@
-import type { OrderIntent } from '../shared/model.ts'
+import type { Contract, OrderIntent } from '../shared/model.ts'
 
 type Row = Record<string, unknown>
 const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
@@ -26,6 +26,19 @@ export function sameTradingSymbol(a: unknown, b: unknown, expiry?: string): bool
   if (a.trim().toUpperCase() === b.trim().toUpperCase()) return true
   const left = contractIdentity(a, expiry), right = contractIdentity(b, expiry)
   return !!left && left === right
+}
+
+export function isNiftyDerivativePosition(row: { symbol: string; exchange: string }): boolean {
+  return row.exchange === 'NFO' && row.symbol.toUpperCase().startsWith('NIFTY')
+    || row.exchange === 'NSE' && (contractIdentity(row.symbol) !== null
+      || /^NIFTY\d{2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d+(?:\.\d+)?(CE|PE)$/.test(row.symbol.trim().toUpperCase()))
+}
+
+/** Type A can label recognized NIFTY options NSE and use its display symbol. */
+export function matchesPositionRow(row: { symbol: string; exchange: string; product: string }, contract: Contract): boolean {
+  if (!sameTradingSymbol(row.symbol, contract.symbol, contract.expiry) || !['MIS', 'INTRADAY', 'INTRA'].includes(row.product)) return false
+  return row.exchange === 'NFO' || row.exchange === 'NSE'
+    && contractIdentity(row.symbol, contract.expiry) !== null && contractIdentity(contract.symbol, contract.expiry) !== null
 }
 
 export function matchesOrderRow(row: Row, intent: OrderIntent, requireTag = false): boolean {

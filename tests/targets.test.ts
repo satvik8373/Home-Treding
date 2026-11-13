@@ -17,7 +17,7 @@ test('target types validate and legacy settings keep point-based defaults', () =
   assert.deepEqual(validateSettings(DEFAULT_SETTINGS), DEFAULT_SETTINGS)
   assert.equal(sameSettings(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, target1Rule: { kind: 'points', value: 20 }, target2Rule: { kind: 'points', value: 40 } }), true)
   assert.equal(targetPrice(DEFAULT_SETTINGS, 1, 200), 220)
-  for (const rule of [{ kind: 'percent', value: 0 }, { kind: 'price', value: NaN }, { kind: 'minutes', value: 1.5 }, { kind: 'clock', time: '09:99' }, { kind: 'clock', time: '15:10' }, { kind: 'unknown', value: 5 }]) {
+  for (const rule of [{ kind: 'percent', value: 0 }, { kind: 'price', value: NaN }, { kind: 'minutes', value: 1.5 }, { kind: 'clock', time: '' }, { kind: 'clock', time: '09:99' }, { kind: 'clock', time: '15:10' }, { kind: 'unknown', value: 5 }]) {
     assert.throws(() => validateSettings({ ...DEFAULT_SETTINGS, target1Rule: rule }))
   }
   for (const kind of ['minutes', 'percent', 'points', 'price']) assert.throws(() => validateSettings({ ...DEFAULT_SETTINGS, target1Rule: { kind, value: 20 }, target2Rule: { kind, value: 10 } }))
@@ -34,7 +34,10 @@ test('settings renders only Price and Time choices and saving preferences preser
   const html = renderToStaticMarkup(createElement(StrategySettingsPanel, { saved, effective: DEFAULT_SETTINGS, active: true, online: true, working: '', action: async () => null }))
   for (const kind of ['price', 'time']) assert.equal((html.match(new RegExp(`option value="${kind}"`, 'g')) ?? []).length, 2)
   assert.equal((html.match(/<option /g) ?? []).length, 4)
-  assert.match(html, /Minutes after original entry/)
+  assert.doesNotMatch(html, /Minutes after original entry/)
+  assert.match(html, /Saved duration: 10 min after entry/)
+  assert.equal((html.match(/type="time"/g) ?? []).length, 3, 'both targets use clock inputs, plus square-off')
+  assert.match(html, /max="15:09"/)
   assert.match(html, /Exit time · IST/)
   assert.equal(f.broker.submitted.length, 0)
 })

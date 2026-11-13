@@ -9,7 +9,7 @@ import { parseBrokerTime, istTime } from '../server/time.ts'
 import { Store } from '../server/store.ts'
 import { DAY } from './helpers.ts'
 import type { OrderIntent } from '../shared/model.ts'
-import { sameTradingSymbol } from '../server/orderIdentity.ts'
+import { sameTradingSymbol, matchesPositionRow, isNiftyDerivativePosition } from '../server/orderIdentity.ts'
 
 test('official form-based OTP and TOTP flows send the documented fields', async () => {
   const calls: Array<{ url: string; body: string; headers: Headers }> = []
@@ -25,6 +25,17 @@ test('official form-based OTP and TOTP flows send the documented fields', async 
   assert.deepEqual(Object.fromEntries(new URLSearchParams(calls[2].body)), { api_key: 'key+/@@', totp: '654321' })
   assert.equal(calls[0].headers.get('x-mirae-version'), '1')
   assert.equal(calls[0].headers.get('authorization'), null)
+})
+
+test('position identity recognizes the Type A NSE option display alias without merging contracts or products', () => {
+  const contract = { token: '45391', symbol: 'NIFTY26N1725100PE', expiry: '2026-11-17', strike: 25100, lotSize: 65, side: 'PE' as const }
+  const row = { symbol: 'NIFTY-17Nov2026-25100-PE', exchange: 'NSE', product: 'MIS' }
+  assert.equal(matchesPositionRow(row, contract), true)
+  assert.equal(isNiftyDerivativePosition(row), true)
+  for (const mismatch of [{ ...row, symbol: 'NIFTY-17Nov2026-25200-PE' }, { ...row, symbol: 'NIFTY-17Nov2026-25100-CE' }, { ...row, symbol: 'NIFTY-24Nov2026-25100-PE' }, { ...row, exchange: 'BSE' }, { ...row, product: 'NRML' }, { ...row, symbol: 'NIFTYBEES' }]) assert.equal(matchesPositionRow(mismatch, contract), false)
+  assert.equal(isNiftyDerivativePosition({ symbol: 'NIFTYBEES', exchange: 'NSE' }), false)
+  assert.equal(isNiftyDerivativePosition({ symbol: 'NIFTY26NOV25100PE', exchange: 'NSE' }), true)
+  assert.equal(isNiftyDerivativePosition({ symbol: 'NIFTY26XYZ25100PE', exchange: 'NSE' }), false)
 })
 
 test('OTP and TOTP capture only explicitly advertised login capabilities', async () => {

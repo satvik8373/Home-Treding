@@ -11,7 +11,7 @@ import type { Store } from './store.ts'
 import type { MarketFeed } from './feed.ts'
 import { DEFAULT_SETTINGS, SELL_DEFAULT_SETTINGS, sameSettings, settingsFor, validateSettings } from '../shared/settings.ts'
 import type { StrategySettings } from '../shared/settings.ts'
-import { rejectionSummary } from './orderIdentity.ts'
+import { rejectionSummary, matchesPositionRow, isNiftyDerivativePosition } from './orderIdentity.ts'
 
 type Feed = Pick<MarketFeed, 'status' | 'lastTickAt' | 'connect' | 'close' | 'onMark' | 'onChange'> & Partial<Pick<MarketFeed, 'setAgent'>>
 type Repository = Pick<Store, 'session' | 'loadSession' | 'saveSession' | 'broker' | 'saveBroker'> & Partial<Pick<Store, 'get' | 'put' | 'persist'>>
@@ -310,6 +310,7 @@ export class Controller {
       }
       if (directionOf(this.session?.settings) !== direction) throw new Error('Saved strategy direction mismatch. Reconcile before starting.')
       if (hasExposure(this.session)) throw new Error('This mode has saved exposure that needs reconciliation before starting.')
+      if (mode === 'live' && !this.session!.pnlVerified) throw new Error('This day-session has unverified quantity accounting. Automatic entries remain blocked; review the broker ledger before resuming. Position reconciliation alone does not verify historical P&L.')
       this.session!.settings ??= structuredClone(settingsFor(this.session))
       this.stopRequested = false
       this.session!.status = 'armed'
@@ -346,7 +347,7 @@ export class Controller {
       await this.checkPositions()
       this.session.status = hasExposure(this.session) ? 'stopping' : 'stopped'
       this.stopRequested = hasExposure(this.session)
-      this.note(hasExposure(this.session) ? 'Positions reconciled. Closing the recovered exposure.' : 'Broker and saved state reconciled. Start when ready.')
+      this.note(hasExposure(this.session) ? 'Positions reconciled. Closing the recovered exposure.' : !this.session.pnlVerified ? 'Broker positions are flat, but historical quantity accounting remains unverified. Automatic entries remain blocked; review the broker ledger.' : 'Broker and saved state reconciled. Start when ready.')
     })
     void this.pump()
   }
@@ -376,7 +377,7 @@ export class Controller {
   }
   private async requireNoExistingNifty(): Promise<void> {
     const positions = await this.broker.positions()
-    if (positions.some(p => p.exchange === 'NFO' && p.symbol.startsWith('NIFTY') && p.quantity !== 0)) throw new Error('Existing NIFTY broker exposure must be closed or reconciled before a new session.')
+    if (positions.some(p => isNiftyDerivativePosition(p) && p.quantity !== 0)) throw new Error('Existing NIFTY broker exposure must be closed or reconciled before a new session.')
   }
   private fresh(side: Side): Mark | null {
     const leg = this.session?.legs[side], mark = leg ? this.marks[leg.contract.token] : null
@@ -392,7 +393,7 @@ export class Controller {
     for (const side of SIDES) {
       const leg = this.session.legs[side]
       if (!leg) continue
-      const relevant = positions.filter(p => p.symbol === leg.contract.symbol && p.exchange === 'NFO' && ['MIS', 'INTRADAY', 'INTRA'].includes(p.product))
+      const relevant = positions.filter(p => matchesPositionRow(p, leg.contract))
       const actual = signFor(settingsFor(this.session)) * relevant.reduce((total, p) => total + p.quantity, 0), expected = leg.position?.quantity ?? 0
       if (actual < 0 || actual > expected) throw new Error(`Unexpected ${side} broker exposure. Automatic orders are blocked until reconciled.`)
       if (actual !== expected) {

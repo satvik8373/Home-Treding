@@ -35,7 +35,7 @@ export function explainLeg(session: TradingSession | null, side: Side, marks: Re
   const headline = !session ? 'Start a session to lock the original ATM contracts.' : session.pending ? 'Waiting for broker confirmation. No new entry can be submitted.'
     : !leg ? 'Waiting for the completed opening reference.' : leg.position ? 'Position open: monitoring selected targets and the completed-candle protective exit.'
       : !enabled ? 'This leg is disabled in the session settings.' : !quota ? 'The configured entry limit has been reached.'
-        : cutoff != null && now >= cutoff ? 'Cutoff reached: new entries are disabled.' : session.status !== 'running' ? `Session is ${session.status}.`
+        : cutoff != null && now >= cutoff ? 'Cutoff reached: new entries are disabled.' : !session.pnlVerified ? 'Quantity accounting is unverified. Automatic entries are blocked; review the broker ledger.' : session.status !== 'running' ? `Session is ${session.status}.`
           : !fresh ? 'Waiting for a fresh market price.' : 'Waiting for a new completed five-minute candle that qualifies for entry.'
   return { side, headline, mark, fresh, markReceiptAgeMs: mark ? Math.max(0, now - mark.receivedAt) : null, entryQuantity: leg ? settings.entryLots * leg.contract.lotSize : null,
     estimatedEntryPremium: leg && fresh ? round(settings.entryLots * leg.contract.lotSize * mark.price) : null,

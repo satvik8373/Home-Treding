@@ -19,6 +19,63 @@ async function candle(f: Awaited<ReturnType<typeof fixture>>, time: string, ce =
   for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve))
 }
 
+test('Type A display-symbol NSE positions retain long/short quantities across restart and execute IST clock exits', async () => {
+  for (const direction of ['buy', 'sell'] as const) {
+    const f = await fixture()
+    f.controller.saveStrategySettings({ ...DEFAULT_SETTINGS, direction, enabledSides: ['CE'], target1Rule: { kind: 'clock', time: '09:30' }, target2Rule: { kind: 'clock', time: '09:35' } })
+    f.broker.contracts = async () => [
+      { ...contract('CE'), symbol: 'NIFTY26O2725000CE' }, { ...contract('PE'), symbol: 'NIFTY26O2725000PE' },
+    ]
+    f.broker.positions = async () => [...f.broker.holdings].map(([symbol, quantity]) => ({
+      symbol: `NIFTY-27Oct2026-25000-${symbol.endsWith('CE') ? 'CE' : 'PE'}`, exchange: 'NSE', product: 'MIS', quantity,
+    }))
+    await f.controller.start('live', direction)
+    for (let i = 0; i < 30; i++) await new Promise(resolve => setImmediate(resolve))
+    await candle(f, '09:20', direction === 'buy' ? 101 : 99, 100)
+    assert.equal(f.controller.session!.legs.CE!.position?.quantity, 260)
+    f.setTime(f.now() + 16_000); f.mark('CE', 100); await f.controller.pump()
+    assert.equal(f.controller.session!.pnlVerified, true)
+    assert.equal(f.controller.session!.legs.CE!.position?.quantity, 260)
+    const restarted = new Controller(f.broker, f.store, f.feed, f.now)
+    await restarted.restore()
+    assert.equal(restarted.session!.pnlVerified, true)
+    assert.equal(restarted.session!.status, 'running')
+    assert.equal(restarted.session!.legs.CE!.position?.quantity, 260)
+    assert.equal(f.broker.submitted.length, 1)
+    for (const [time, remaining] of [['09:30', 130], ['09:35', 0]] as const) {
+      f.setTime(istTime(DAY, time))
+      restarted.marks['101'] = { token: '101', price: 100, source: 'rest', receivedAt: f.now() }
+      await restarted.pump()
+      assert.equal(restarted.session!.legs.CE!.position?.quantity ?? 0, remaining)
+    }
+    assert.deepEqual(f.broker.submitted.map(order => [order.transaction, order.quantity]), [
+      [direction === 'buy' ? 'BUY' : 'SELL', 260], [direction === 'buy' ? 'SELL' : 'BUY', 130], [direction === 'buy' ? 'SELL' : 'BUY', 130],
+    ])
+    assert.equal(restarted.session!.pnlVerified, true)
+  }
+})
+
+test('new Live sessions detect pre-existing NSE-labelled NIFTY option exposure before any entry', async () => {
+  const f = await fixture()
+  f.broker.positions = async () => [{ symbol: 'NIFTY-27Oct2026-25000-CE', exchange: 'NSE', product: 'MIS', quantity: 65 }]
+  await f.controller.start('live')
+  for (let i = 0; i < 30; i++) await new Promise(resolve => setImmediate(resolve))
+  assert.match(f.controller.session!.message, /Existing NIFTY broker exposure/)
+  assert.equal(f.broker.submitted.length, 0)
+})
+
+test('a flat reconciliation cannot silently re-arm a live session with unverified historical quantities', async () => {
+  const f = await fixture(); await f.start('live')
+  await f.controller.stop(); await f.controller.pump()
+  f.controller.session!.pnlVerified = false
+  await f.controller.reconcile()
+  assert.match(f.controller.session!.message, /accounting remains unverified/)
+  assert.equal(f.controller.session!.pnlVerified, false)
+  await assert.rejects(f.controller.start('live'), /Automatic entries remain blocked/)
+  assert.equal(f.controller.session!.status, 'stopped')
+  assert.equal(f.broker.submitted.length, 0)
+})
+
 test('closing and reopening the SQLite store restores the exact running paper day-session', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'n009-resume-'))
   const f = await fixture()
