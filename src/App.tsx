@@ -127,13 +127,10 @@ export default function App() {
           )}
 
         <div hidden={view !== 'market'}>
-          <section className="summary-grid" aria-label="Session summary">
-            <div>
-              <span className="eyebrow">ENGINE</span>
-              <strong className="status-value"><i className={`status-dot ${session?.status === 'running' ? 'green' : ''}`} />{statusLabels[session?.status ?? 'idle']}</strong>
-              <small>{session?.pending ? 'Waiting for broker confirmation' : '5-minute candle decisions'}</small>
-            </div>
-            <div>
+          <section className="home-hero" aria-label="Session overview">
+            <div className="hero-context"><span>SESSION SNAPSHOT</span><span className="hero-engine"><i className={`status-dot ${session?.status === 'running' ? 'green' : ''}`} />{statusLabels[session?.status ?? 'idle']}{session?.pending && <small>· Awaiting broker confirmation</small>}</span></div>
+            <div className="summary-grid" aria-label="Session summary">
+            <div className="hero-total">
               <span className="eyebrow">SESSION P&L</span>
               <strong className={total != null && total < 0 ? 'negative-text' : total != null && total > 0 ? 'positive-text' : ''}>{money(total)}</strong>
               <small>Realized + open · before charges</small>
@@ -158,16 +155,20 @@ export default function App() {
               <strong>{session?.atm?.toLocaleString('en-IN') ?? '—'}</strong>
               <small>{session?.expiry ? `Expiry ${date(session.expiry)}` : 'Selected from the 09:20 close'}</small>
             </div>
+            </div>
           </section>
 
+          <section className="home-positions" aria-labelledby="home-positions-title">
+          <div className="section-heading"><h2 id="home-positions-title">Strategy positions</h2><button className="text-button" onClick={() => navigate('audit')}>Order lifecycle →</button></div>
+          <div className="legs-grid">{sides.map(side => <LegCard key={side} side={side} leg={session?.legs[side]} mark={markFor(side)} now={now} settings={session ? settingsFor(session) : selectedSettings} />)}</div>
+          </section>
+          <div className="section-heading market-section-heading"><h2>Market & execution</h2><span>5-minute candle chart</span></div>
           <div className="workspace">
             <MarketChart connected={connected} identity={identity} now={now} marks={data?.marks ?? {}} legs={session?.legs ?? {}} trades={session?.trades ?? []} settings={session ? settingsFor(session) : selectedSettings} />
             <SessionControls session={session} locked={locked} connected={connected} online={online} working={working} now={now} mode={mode} setMode={setMode} liveAck={liveAck} setLiveAck={setLiveAck} action={action} onRules={() => setRulesDialog(true)} settings={locked || dayLocked ? settingsFor(session) : selectedSettings} onSettings={() => navigate('settings')} liveAvailable={data?.runtime?.liveExecution !== false} liveReason={data?.runtime?.reason} />
           </div>
-          <div className="section-heading"><h2>Strategy positions</h2><button className="text-button" onClick={() => navigate('audit')}>Order lifecycle →</button></div>
-          <div className="legs-grid">{sides.map(side => <LegCard key={side} side={side} leg={session?.legs[side]} mark={markFor(side)} now={now} settings={session ? settingsFor(session) : selectedSettings} />)}</div>
-          <OrdersPanel session={session} />
           <TradesPanel title="Executed trades" exportAvailable={!!session} trades={session?.trades ?? []} />
+          <OrdersPanel session={session} />
           <details className="panel activity-panel">
             <summary>Session activity <span>{session?.activity.length ?? 0} events</span></summary>
             {session?.activity.length ? (

@@ -188,3 +188,51 @@ th, td { border-color: var(--ui-divider); padding: 15px 17px; }
 .leg-open-pnl > span { display: flex; justify-content: space-between; gap: 12px; }
 .leg-open-pnl b { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .orders-panel { margin-bottom: 20px; }
+
+/* Home: a consolidated P&L hero, positions first, then chart and executions. */
+.home-hero { margin-bottom: 24px; border: 1px solid var(--ui-border); border-radius: 14px; overflow: hidden; background: #fff; }
+.hero-context { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--ui-divider); }
+.hero-context > span:first-child { color: #72717e; font-size: 9px; font-weight: 600; letter-spacing: .1em; }
+.hero-engine { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 7px; color: #52515f; font-size: 11px; }
+.hero-engine small { font-size: 10px; color: #72717e; }
+.home-hero .summary-grid { grid-template-columns: minmax(0,1.2fr) repeat(2,minmax(0,1fr)); margin: 0; gap: 0; background: #fff; }
+.home-hero .summary-grid > div { padding: 18px 22px; border: 0; border-radius: 0; border-bottom: 1px solid var(--ui-divider); border-left: 1px solid var(--ui-divider); }
+.home-hero .summary-grid > div:nth-last-child(-n+2) { border-bottom: 0; }
+.home-hero .summary-grid .hero-total { grid-row: span 2; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 28px; background: #282631; color: #fff; border: 0; }
+.home-hero .hero-total .eyebrow { color: #d0ccd9; font-size: 10px; }
+.home-hero .hero-total strong { color: #fff; font-size: clamp(30px,3.1vw,46px); font-weight: 500; letter-spacing: -1.4px; margin: 20px 0 14px; overflow-wrap: anywhere; }
+.home-hero .hero-total small { color: #d0ccd9; font-size: 11px; }
+.home-hero .summary-grid > div:not(.hero-total) strong { font-size: 23px; margin: 9px 0 5px; }
+.home-hero .summary-grid > div:not(.hero-total) .status-value { font-size: 18px; }
+.home-positions { margin-bottom: 26px; }
+.home-positions .section-heading { margin-top: 0; }
+.home-positions .legs-grid { margin-bottom: 0; }
+.home-positions .leg-card { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+.home-positions .leg-heading, .home-positions .leg-values, .home-positions .leg-footer { grid-column: 1 / -1; }
+.home-positions .leg-price-row { flex-wrap: wrap; gap: 6px; padding: 18px 20px; }
+.home-positions .leg-open-pnl { display: flex; align-items: center; justify-content: flex-end; padding: 18px 20px 18px 0; }
+.home-positions .leg-open-pnl > span { flex-direction: column; align-items: flex-end; gap: 7px; font-size: 10px; }
+.home-positions .leg-open-pnl b { font-size: 22px; }
+.home-positions .leg-values { background: #faf9fb; gap: 15px 10px; }
+.home-positions .leg-footer { padding-top: 10px; padding-bottom: 10px; }
+.market-section-heading { margin-top: 0; }
+.workspace-shell .orders-panel { margin-top: 20px; }
+@media (min-width: 1250px) { .home-positions .leg-values { grid-template-columns: repeat(4,minmax(0,1fr)); } }
+@media (max-width: 720px) {
+  .home-hero .summary-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .home-hero .summary-grid .hero-total { grid-column: 1 / -1; grid-row: auto; padding: 24px; }
+  .home-hero .hero-total strong { font-size: 38px; margin: 12px 0 8px; }
+  .home-hero .summary-grid > div { padding: 16px; }
+  .home-hero .summary-grid > div:nth-child(even) { border-left: 0; }
+  .home-positions .legs-grid { gap: 14px; }
+  .hero-context { align-items: flex-start; padding: 13px 16px; }
+  .hero-engine { justify-content: flex-end; text-align: right; }
+  .workspace > .session-panel { grid-row: auto; }
+}
+@media (max-width: 480px) {
+  .home-hero .summary-grid > div:not(.hero-total) strong { font-size: 21px; }
+  .home-hero .summary-grid > div:not(.hero-total) .status-value { font-size: 16px; }
+  .home-hero .summary-grid > div { padding: 15px 12px; }
+  .hero-context > span:first-child { font-size: 8px; }
+  .hero-engine { font-size: 10px; }
+}
