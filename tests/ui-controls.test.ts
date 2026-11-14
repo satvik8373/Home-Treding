@@ -33,7 +33,7 @@ test('hero labels gross P&L and never labels it net', () => {
 test('pending and rejected orders retain quantities, reasons and broker details', () => {
   const order: OrderAudit = { id: 'order', tag: 'tag', side: 'CE', symbol: 'TEST', transaction: 'BUY', quantity: 65, reason: 'BREAKOUT', submittedAt: now, updatedAt: now, mode: 'live', status: 'rejected', filled: 0, average: null, detail: 'Broker rejected this request.' }
   const html = renderToStaticMarkup(createElement(OrdersPanel, { session: { ...session('blocked'), pending: order, orderAudit: [order] } }))
-  assert.match(html, /Requested qty[\s\S]*Filled qty[\s\S]*class="numeric">65<\/td><td class="numeric">0<\/td>/)
+  assert.match(html, /Filled 0 \/ 65/)
   assert.match(html, /Broker rejected this request/)
   assert.match(html, /Fill price unavailable/)
   assert.doesNotMatch(html, /Awaiting Confirmation/)
@@ -46,8 +46,8 @@ test('trade records render semantic tables with full quantities, timestamps and 
   const trade: Trade = { id: 'table-fill', at: now, side: 'PE', symbol: 'TEST-CONTRACT', transaction: 'BUY', quantity: 65, price: 100, reason: 'BREAKOUT', orderId: 'simulated', mode: 'paper', pnl: null }
   const html = renderToStaticMarkup(createElement(TradesPanel, { trades: [trade], exportAvailable: true }))
   assert.match(html, /<table/)
-  assert.match(html, /Time \(IST\)/)
-  assert.match(html, /Date/); assert.match(html, /PUT \(PE\)/); assert.match(html, /BUY \/ SELL/); assert.match(html, /13 Nov 2026/); assert.match(html, /10:00:00/)
+  assert.match(html, /Date \/ time IST/)
+  assert.match(html, /Date/); assert.match(html, /PUT \(PE\)/); assert.match(html, /Action/); assert.match(html, /13 Nov 2026/); assert.match(html, /10:00:00/)
   assert.match(html, /Premium amount/)
   assert.match(html, /6,500.00/)
   assert.match(html, /Simulated/)
