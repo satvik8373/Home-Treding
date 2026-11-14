@@ -1,99 +1,117 @@
+/* ==========================================================================
+   MAVRIX 009 — Apple Bento System: Broker Setup & Diagnostics
+   ========================================================================== */
+
 .setup-stack {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   text-align: left;
 }
+
 .setup-card {
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  background: #ffffff;
-  padding: 13px 14px;
+  border: 1px solid var(--border-subtle, #f2f2f2);
+  border-radius: var(--tile-radius, 1.5rem);
+  background: var(--tile, #FFFFFF);
+  padding: 1.5rem;
+  box-shadow: none;
+  transition: transform 200ms ease, box-shadow 200ms ease;
 }
+
+.setup-card:hover {
+  box-shadow: none;
+}
+
 .setup-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 12px;
+  margin-bottom: 10px;
 }
+
 .setup-card-head strong {
-  color: #0f172a;
-  font-size: 12px;
+  color: var(--ink, #1D1D1F);
+  font-size: 14px;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
+
 .setup-links {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 11px;
+  font-size: 12px;
 }
+
 .setup-links a {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #2563eb;
-  font-weight: 500;
+  color: var(--blue, #2563eb);
+  font-weight: 600;
+  text-decoration: none;
 }
+.setup-links a:hover {
+  text-decoration: underline;
+}
+
 .setup-desc {
-  margin: 0 0 10px;
-  color: #64748b;
-  font-size: 11px;
+  margin: 0 0 12px;
+  color: var(--text-muted, #4B5563);
+  font-size: 12px;
   line-height: 1.6;
 }
+
 .setup-meta {
-  margin: 6px 0 0;
-  color: #64748b;
+  margin: 8px 0 0;
+  color: var(--text-secondary, #6E6E73);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
+
 .setup-attention {
-  margin: 8px 0 0;
-  color: #92400e;
-  font-size: 11px;
-  line-height: 1.55;
+  margin: 10px 0 0;
+  color: #B45309;
+  background: #fff7eb;
+  border: 1px solid #ffeacc;
+  border-radius: var(--inner-radius, 1rem);
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.6;
 }
+
 .setup-success {
-  margin: 8px 0 0;
-  color: #166534;
-  font-size: 11px;
-  font-weight: 500;
-}
-.setup-note {
-  margin: 0;
-  color: #475569;
-  font-size: 11px;
-}
-.setup-route-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.setup-compare {
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  background: #ffffff;
-  padding: 11px 14px;
-}
-.setup-compare > summary {
-  cursor: pointer;
+  margin: 10px 0 0;
+  color: var(--green, #15803d);
+  background: #effbf2;
+  border: 1px solid #d6f4de;
+  border-radius: var(--inner-radius, 1rem);
+  padding: 10px 14px;
   font-size: 12px;
   font-weight: 600;
-  color: #334155;
 }
-.setup-compare[open] > summary {
-  margin-bottom: 10px;
+
+.setup-error {
+  margin: 10px 0 0;
+  color: var(--red, #b91c1c);
+  background: #ffefee;
+  border: 1px solid #ffd8d6;
+  border-radius: var(--inner-radius, 1rem);
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
 }
-.setup-ip-pair {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+
+.setup-actions {
+  display: flex;
+  align-items: center;
   gap: 10px;
+  margin-top: 14px;
 }
-.setup-ip-pair input {
-  min-width: 0;
-}
-@media (max-width: 480px) {
-  .setup-ip-pair {
-    grid-template-columns: 1fr;
-  }
+
+.setup-actions .button {
+  border-radius: var(--pill-radius, 9999px);
+  min-height: 40px;
+  font-size: 13px;
 }

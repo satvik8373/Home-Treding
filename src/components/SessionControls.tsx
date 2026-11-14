@@ -1,4 +1,5 @@
 import { directionOf, strategyName } from '../../shared/strategy';
+import type { StrategyDirection } from '../../shared/strategy';
 import { targetLabel } from '../../shared/targets';
 import { BookOpen, Play, Square } from "lucide-react";
 import type { Mode, TradingSession } from "../../shared/model";
@@ -8,6 +9,8 @@ import { DEFAULT_SETTINGS, productFor } from '../../shared/settings';
 import type { StrategySettings } from '../../shared/settings';
 
 type Props = {
+  direction?: StrategyDirection;
+  onDirectionChange?: (dir: StrategyDirection) => void;
   liveAvailable?: boolean;
   liveReason?: string;
   settings?: StrategySettings;
@@ -26,6 +29,8 @@ type Props = {
   onRules: () => void;
 };
 export function SessionControls({
+  direction,
+  onDirectionChange,
   session,
   locked,
   connected,
@@ -50,9 +55,24 @@ export function SessionControls({
     ![0, 6].includes(local.getUTCDay()) && minutes >= 540 && minutes < Number(settings.cutoff.slice(0, 2)) * 60 + Number(settings.cutoff.slice(3));
   const resumeDay = session?.date === local.toISOString().slice(0, 10) && session.mode === shownMode;
   return (
-    <section className="panel session-panel">
+    <section className="tile tile--wide session-panel">
       <div className="panel-title">
-        <h2>{strategyName(settings)}</h2>
+        <div className="panel-strategy-hub">
+          {onDirectionChange ? (
+            <select
+              className="strategy-header-select"
+              title={locked ? 'Stop and flatten before switching.' : 'Selecting a strategy does not start trading.'}
+              value={direction ?? directionOf(settings)}
+              disabled={locked || !!working}
+              onChange={event => onDirectionChange(event.target.value as StrategyDirection)}
+            >
+              <option value="buy">009 Breakout – Buy</option>
+              <option value="sell">009 Breakout – Sell</option>
+            </select>
+          ) : (
+            <h2>{strategyName(settings)}</h2>
+          )}
+        </div>
         <div className="session-rule-actions">{onSettings && <button className="text-button" onClick={onSettings}>Settings</button>}<button className="text-button" onClick={onRules}>
           <BookOpen size={13} />
           Rules
@@ -86,34 +106,6 @@ export function SessionControls({
             : "Real orders · connected mStock account"}
         </p>
         {!liveAvailable && <details className="execution-limit"><summary id="live-unavailable-reason">Why Live is unavailable</summary><p>{liveReason}</p><p>A match with your saved IP reference does not verify that the broker approved the IP or that the address is static.</p></details>}
-        <dl className="session-rules">
-          <div><dt>Broker product</dt><dd>{productFor(settings) === 'MIS' ? 'Day Trade · MIS' : 'Carry Forward · NRML'}</dd></div>
-          <div>
-            <dt>Signal candle</dt>
-            <dd>5 minutes</dd>
-          </div>
-          <div>
-            <dt>Reference close</dt>
-            <dd>09:15–09:20</dd>
-          </div>
-          <div>
-            <dt>Breakout / exit</dt>
-            <dd>{directionOf(settings) === 'sell' ? '−' : '+'}{settings.breakoutPercent}% / {directionOf(settings) === 'sell' ? '+' : '−'}{settings.exitPercent}%</dd>
-          </div>
-          <div>
-            <dt>Entry size</dt>
-            <dd>{settings.entryLots} lots · {settings.enabledSides.join(' + ')}</dd>
-          </div>
-          <div>
-            <dt>Target exits</dt>
-            <dd>{settings.target1Lots ? targetLabel(settings, 1) : 'T1 skipped'} / {targetLabel(settings, 2)}</dd>
-          </div>
-          <div>
-            <dt>Square off</dt>
-            <dd>{settings.cutoff} IST</dd>
-          </div>
-          <div><dt>Reference stop</dt><dd>{(settings.stopLossPoints ?? 0) > 0 ? `Reference ${directionOf(settings) === 'sell' ? '+' : '−'}${settings.stopLossPoints} pts` : 'Disabled'}</dd></div>
-        </dl>
         {shownMode === "live" && !locked && (
           <label className="live-check">
             <input
@@ -164,6 +156,36 @@ export function SessionControls({
               ? `Start window: weekdays 09:00–${settings.cutoff} IST.`
               : "The backend monitors even when this tab is closed."}
         </p>
+        <details className="control-rules"><summary><span>Session setup</span><small>{settings.entryLots} lots · {productFor(settings)} · {settings.cutoff} IST</small></summary>
+          <dl className="session-rules">
+            <div><dt>Broker product</dt><dd>{productFor(settings) === 'MIS' ? 'Day Trade · MIS' : 'Carry Forward · NRML'}</dd></div>
+            <div>
+              <dt>Signal candle</dt>
+              <dd>5 minutes</dd>
+            </div>
+            <div>
+              <dt>Reference close</dt>
+              <dd>09:15–09:20</dd>
+            </div>
+            <div>
+              <dt>Breakout / exit</dt>
+              <dd>{directionOf(settings) === 'sell' ? '−' : '+'}{settings.breakoutPercent}% / {directionOf(settings) === 'sell' ? '+' : '−'}{settings.exitPercent}%</dd>
+            </div>
+            <div>
+              <dt>Entry size</dt>
+              <dd>{settings.entryLots} lots · {settings.enabledSides.join(' + ')}</dd>
+            </div>
+            <div>
+              <dt>Target exits</dt>
+              <dd>{settings.target1Lots ? targetLabel(settings, 1) : 'T1 skipped'} / {targetLabel(settings, 2)}</dd>
+            </div>
+            <div>
+              <dt>Square off</dt>
+              <dd>{settings.cutoff} IST</dd>
+            </div>
+            <div><dt>Reference stop</dt><dd>{(settings.stopLossPoints ?? 0) > 0 ? `Reference ${directionOf(settings) === 'sell' ? '+' : '−'}${settings.stopLossPoints} pts` : 'Disabled'}</dd></div>
+          </dl>
+        </details>
         {session?.pending && <div className="pending-order" role="status">
           <strong>Awaiting broker confirmation</strong>
           <span>{session.pending.side} · {session.pending.transaction} · {session.pending.quantity} units</span>

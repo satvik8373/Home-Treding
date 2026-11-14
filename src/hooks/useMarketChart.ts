@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChartSymbol, MarketChart } from "../../shared/model";
+import { isMarketOpen } from "../lib/marketWindow";
 
 export function useMarketChart(
   symbol: ChartSymbol,
@@ -53,9 +54,10 @@ export function useMarketChart(
       }
     }
     void refresh();
+    const intervalMs = isMarketOpen() ? 3000 : 30_000;
     const timer = setInterval(() => {
       if (document.visibilityState !== "hidden") void refresh();
-    }, 3000);
+    }, intervalMs);
     return () => {
       alive = false;
       controller.abort();

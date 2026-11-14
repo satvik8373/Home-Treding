@@ -1,21 +1,202 @@
-.transparency-view > .panel, .audit-leg-grid { margin-bottom: 18px; }
-.audit-help { padding: 12px 18px; color: #64748b; font-size: 11px; line-height: 1.8; }
-.audit-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; padding: 12px 18px; }
-.audit-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); background: #e2e8f0; gap: 1px; }
-.audit-metrics > div { background: #fff; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
-.audit-metrics span, .audit-metrics small { font-size: 11px; color: #64748b; line-height: 1.6; }
-.audit-metrics strong { font-size: 21px; color: #0f172a; font-variant-numeric: tabular-nums; }
-.audit-facts { margin: 0; padding: 4px 18px 12px; }
-.audit-facts > div { display: flex; justify-content: space-between; gap: 20px; border-bottom: 1px solid #e2e8f0; padding: 12px 0; font-size: 11px; line-height: 1.7; }
-.audit-facts dt { color: #64748b; }
-.audit-facts dd { margin: 0; color: #334155; text-align: right; overflow-wrap: anywhere; }
-.audit-details { border-top: 1px solid #e2e8f0; }
-.audit-details summary { padding: 15px 18px; font-size: 12px; cursor: pointer; color: #334155; }
-.audit-details ul { margin: 0; padding: 0 18px 15px; list-style: none; }
-.audit-details li { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-top: 1px solid #f1f5f9; font-size: 11px; color: #64748b; line-height: 1.7; }
-.audit-details li strong { color: #334155; }
-.audit-detail-cell { white-space: normal; min-width: 230px; max-width: 420px; line-height: 1.7; overflow-wrap: anywhere; }
-.audit-detail-cell p { margin: 6px 0 0; color: #64748b; }
-.audit-leg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-@media(max-width:850px) { .audit-leg-grid { grid-template-columns: 1fr; } .audit-metrics { grid-template-columns: 1fr 1fr; } }
-@media(max-width:500px) { .audit-facts > div { flex-direction: column; gap: 6px; } .audit-facts dd { text-align: left; } }
+/* ==========================================================================
+   MAVRIX 009 — Apple Bento System: Transparency / Audit Lifecycle
+   ========================================================================== */
+
+.transparency-view > .panel {
+  background: var(--tile, #FFFFFF);
+  border: 1px solid var(--border-subtle, #f2f2f2);
+  border-radius: var(--tile-radius, 1.25rem);
+  box-shadow: none;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.transparency-view .panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 1.15rem 1.5rem 0.85rem;
+  border-bottom: 1px solid var(--border-divider, #f0f0f0);
+}
+
+.transparency-view .panel-title h2 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ink, #1D1D1F);
+  margin: 0;
+  letter-spacing: -0.015em;
+}
+
+.audit-leg-grid {
+  margin-bottom: 1.5rem;
+}
+
+.audit-leg-grid .panel {
+  background: var(--tile, #FFFFFF);
+  border: 1px solid var(--border-subtle, #f2f2f2);
+  border-radius: var(--tile-radius, 1.25rem);
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.audit-help {
+  padding: 1.25rem 1.5rem;
+  color: var(--text-muted, #4B5563);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.audit-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 1rem 1.5rem;
+}
+
+/* Apple Bento 4-Tile Grid for Audit Metrics */
+.audit-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.audit-metrics > div {
+  background: var(--tile, #FFFFFF);
+  border: 1px solid var(--border-subtle, #f2f2f2);
+  border-radius: var(--tile-radius, 1.5rem);
+  box-shadow: none;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 120px;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.audit-metrics > div:hover {
+  transform: scale(1.02);
+  box-shadow: none;
+}
+
+.audit-metrics span,
+.audit-metrics small {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #4B5563);
+  line-height: 1.5;
+}
+
+.audit-metrics strong {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink, #1D1D1F);
+  font-variant-numeric: tabular-nums;
+  margin: 0.25rem 0;
+}
+
+.audit-facts {
+  margin: 0;
+  padding: 0.5rem 1.5rem 1.25rem;
+}
+
+.audit-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--border-divider, #f0f0f0);
+  padding: 12px 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.audit-facts dt {
+  color: var(--text-muted, #4B5563);
+}
+
+.audit-facts dd {
+  margin: 0;
+  color: var(--ink, #1D1D1F);
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.audit-details {
+  border-top: 1px solid var(--border-divider, #f0f0f0);
+}
+
+.audit-details summary {
+  padding: 14px 1.5rem;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--ink, #1D1D1F);
+}
+
+.audit-details ul {
+  margin: 0;
+  padding: 0 1.5rem 1.5rem;
+  list-style: none;
+}
+
+.audit-details li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-divider, #f0f0f0);
+  font-size: 12px;
+  color: var(--text-muted, #4B5563);
+  line-height: 1.6;
+}
+
+.audit-details li strong {
+  color: var(--ink, #1D1D1F);
+}
+
+.audit-detail-cell {
+  white-space: normal;
+  min-width: 230px;
+  max-width: 420px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.audit-detail-cell p {
+  margin: 4px 0 0;
+  color: var(--text-muted, #4B5563);
+}
+
+.audit-leg-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 850px) {
+  .audit-leg-grid {
+    grid-template-columns: 1fr;
+  }
+  .audit-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .audit-metrics {
+    grid-template-columns: 1fr;
+  }
+  .audit-facts > div {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .audit-facts dd {
+    text-align: left;
+  }
+}

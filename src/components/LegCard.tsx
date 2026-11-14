@@ -36,7 +36,7 @@ export function LegCard({
       : null;
   return (
     <section
-      className="leg-card"
+      className="tile tile--wide leg-card"
       aria-label={`${side === "CE" ? "Call" : "Put"} position`}
     >
       <div className="leg-heading">
