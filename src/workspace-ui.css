@@ -3939,56 +3939,73 @@ tr:hover td {
 .table-order-details p { margin: 6px 0 0; font-size: 11px; color: #475569; line-height: 1.6; overflow-wrap: anywhere; }
 .table-rejection { max-width: 240px; white-space: normal; overflow-wrap: anywhere; }
 
-/* Calm command layout: one strategy bar, one account summary, one primary action. */
-.workspace-shell .topbar { height: 64px; min-height: 64px; background: #fff; border-bottom: 1px solid #e2e8f0; padding-left: 24px; padding-right: 24px; }
-.navbar-nav { background: #fff; border-radius: 0; padding: 0; gap: 4px; }
-.navbar-tab { min-height: 44px; padding: 10px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; }
-.navbar-tab.active { background: #f1f5f9; color: #0f172a; }
+/* Mavrix theme refinement: shared colors, typography, surfaces and spacing. */
+.workspace-shell .topbar { height: 64px; min-height: 64px; background: var(--tile); border-bottom: 1px solid var(--border-divider); padding: 0 24px; gap: 20px; }
+.navbar-brand { gap: 10px; }
+.navbar-brand-text .brand-name { color: var(--ink); font-size: 17px; font-weight: 700; letter-spacing: .035em; }
 .navbar-brand-text .brand-tag { display: none; }
-.navbar-brand-text .brand-name { font-size: 17px; letter-spacing: .04em; }
+.navbar-nav { background: var(--tile); border-radius: 0; padding: 0; gap: 4px; }
+.navbar-tab { min-height: 42px; padding: 10px 12px; border-radius: var(--inner-radius); color: var(--text-secondary); font-size: 12px; font-weight: 500; }
+.navbar-tab.active { background: var(--canvas); color: var(--blue); font-weight: 600; }
+.broker-button, .nav-profile-btn { min-height: 38px; border-radius: var(--inner-radius); font-size: 12px; background: var(--tile); border: 1px solid var(--border-divider); color: var(--text-muted); }
 .workspace-shell main { padding-top: 20px; }
-.dashboard-grid-top { display: flex; flex-direction: column; gap: 12px; }
-.strategy-context-banner { padding: 16px 20px; border-radius: 12px; }
-.banner-top-row { margin-bottom: 0; }
-.banner-select { font-size: 16px; font-weight: 600; padding-left: 0; }
-.banner-actions .banner-btn { min-height: 36px; border-radius: 6px; font-size: 11px; background: #f8fafc; }
-.banner-chips-row { gap: 8px 18px; margin: 12px 0 0; }
-.banner-chip { padding: 0; border: 0; border-radius: 0; background: #fff; font-size: 11px; font-weight: 400; color: #64748b; }
-.banner-accordion { margin-top: 10px; padding-top: 8px; }
-.accordion-trigger { font-size: 11px; }
-.portfolio-hero-card { border-radius: 12px; }
-.hero-upper-tier { display: grid; grid-template-columns: minmax(0,1fr) minmax(300px,400px); column-gap: 40px; row-gap: 16px; padding: 22px 24px; }
+.fintech-dashboard { gap: 20px; }
+.dashboard-grid-top { display: flex; flex-direction: column; gap: 14px; }
+.strategy-context-banner, .portfolio-hero-card, .session-table-panel { background: var(--tile); border: 1px solid var(--border-divider); border-radius: var(--tile-radius); box-shadow: none; }
+.strategy-context-banner { padding: 16px 22px; }
+.banner-top-row { margin-bottom: 0; gap: 16px; }
+.banner-select { min-height: 40px; padding-left: 0; color: var(--ink); font-size: 16px; font-weight: 600; letter-spacing: -.25px; }
+.banner-actions { gap: 8px; }
+.banner-actions .banner-btn { min-height: 36px; padding: 8px 12px; border-radius: var(--inner-radius); font-size: 11px; font-weight: 500; background: var(--canvas); color: var(--text-muted); }
+.banner-chips-row { gap: 8px 20px; margin: 10px 0 0; }
+.banner-chip { padding: 0; border: 0; border-radius: 0; background: var(--tile); font-size: 11px; font-weight: 400; color: var(--text-secondary); }
+.banner-chip strong { color: var(--text-muted); font-weight: 500; }
+.banner-accordion { margin-top: 10px; padding-top: 8px; border-color: var(--border-divider); }
+.accordion-trigger { color: var(--text-secondary); font-size: 11px; font-weight: 500; }
+.hero-upper-tier { display: grid; grid-template-columns: minmax(0,1fr) minmax(300px,400px); column-gap: 40px; row-gap: 18px; padding: 22px 24px; }
 .hero-top-row { grid-column: 1 / -1; margin: 0; }
+.hero-eyebrow { color: var(--text-secondary); font-size: 10px; font-weight: 600; letter-spacing: .08em; }
+.hero-mode-pill, .hero-status-pill { padding: 5px 9px; border: 0; border-radius: 6px; background: var(--canvas); color: var(--text-muted); font-size: 10px; font-weight: 500; }
+.hero-status-pill.active { background: #edf4ef; color: var(--green); }
 .hero-main-row { grid-column: 1; grid-row: 2; align-items: center; margin: 0; min-width: 0; }
-.hero-execution { grid-column: 2; grid-row: 2; min-width: 0; }
-.hero-balance-text { font-size: clamp(32px,3.4vw,48px); font-weight: 550; letter-spacing: -1.3px; line-height: 1.2; }
-.hero-balance-sub-label { font-size: 11px; color: #64748b; }
-.hero-eyebrow { font-size: 10px; font-weight: 600; color: #64748b; }
+.hero-execution { grid-column: 2; grid-row: 2; min-width: 0; padding-left: 24px; border-left: 1px solid var(--border-divider); }
+.hero-balance-text { font-size: clamp(32px,3.1vw,44px); font-weight: 600; letter-spacing: -1.2px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.hero-balance-sub-label { color: var(--text-secondary); font-size: 11px; line-height: 1.6; }
 .hero-actions-row { margin: 0; gap: 8px; }
-.hero-action-btn { min-height: 42px; padding: 10px 16px; border-radius: 7px; font-size: 12px; font-weight: 600; }
-.hero-action-btn.btn-primary { background: #2563eb; color: #fff; }
-.hero-action-btn.btn-secondary { background: #f1f5f9; color: #475569; }
+.hero-action-btn { min-height: 44px; padding: 11px 16px; border-radius: var(--inner-radius); font-size: 12px; font-weight: 600; }
+.hero-action-btn.btn-primary { background: var(--blue); color: #fff; }
+.hero-action-btn.btn-primary:hover:not(:disabled) { background: var(--blue-tile); }
+.hero-action-btn.btn-secondary { background: var(--canvas); color: var(--text-muted); }
+.hero-action-btn.btn-danger { background: var(--red); color: #fff; }
 .hero-live-warning { margin: 0 0 12px; }
-.hero-control-hint { margin-top: 10px; font-size: 11px; }
-.hero-session-message, .hero-pending { grid-column: 1 / -1; margin-top: 0; }
-.hero-metrics-strip { grid-template-columns: repeat(3,minmax(0,1fr)); padding: 18px 24px; gap: 24px; background: #fff; border-top: 1px solid #e2e8f0; }
-.metric-cell-label { font-size: 10px; font-weight: 500; letter-spacing: .04em; color: #64748b; }
-.metric-cell-value { font-size: 23px; font-weight: 550; margin-top: 7px; }
-.metric-cell-sub { font-size: 10px; line-height: 1.6; }
-.session-data-table { min-width: 720px; }
-.session-data-table th, .session-data-table td { padding-left: 16px; padding-right: 16px; }
+.hero-control-hint { margin-top: 10px; color: var(--text-secondary); font-size: 11px; }
+.hero-session-message, .hero-pending { grid-column: 1 / -1; margin-top: 0; color: var(--text-muted); border-color: var(--border-divider); }
+.hero-metrics-strip { grid-template-columns: repeat(3,minmax(0,1fr)); padding: 18px 24px; gap: 24px; background: var(--tile); border-top: 1px solid var(--border-divider); }
+.hero-metric-cell { padding: 0; }
+.hero-metric-cell + .hero-metric-cell { padding-left: 22px; border-left: 1px solid var(--border-divider); }
+.metric-cell-label { color: var(--text-secondary); font-size: 10px; font-weight: 500; letter-spacing: .04em; }
+.metric-cell-value { font-size: 23px; font-weight: 600; letter-spacing: -.5px; margin-top: 7px; }
+.metric-cell-sub { color: var(--text-secondary); font-size: 10px; line-height: 1.6; }
+.session-table-panel .orders-header-row, .session-table-panel .trades-header-row { padding: 17px 20px; }
+.orders-title-group h2, .trades-title-group h2 { color: var(--ink); font-size: 14px; font-weight: 600; }
+.session-data-table { min-width: 720px; font-family: var(--font-family); }
+.session-data-table th { padding: 11px 16px; background: var(--canvas); color: var(--text-secondary); font-size: 10px; font-weight: 500; border-color: var(--border-divider); }
+.session-data-table td { padding: 13px 16px; border-color: var(--border-divider); }
 .session-data-table td:nth-child(2) { min-width: 205px; }
+.session-data-table td strong { font-weight: 500; }
+.session-data-table td small, .table-order-details summary { color: var(--text-secondary); }
 .session-data-table .table-order-details { text-align: left; }
+.table-status { background: var(--canvas); border-radius: 5px; font-weight: 600; }
 @media (max-width: 720px) {
-  .workspace-shell .topbar { height: 58px; min-height: 58px; padding: 0 14px; }
+  .workspace-shell .topbar { height: 58px; min-height: 58px; padding: 0 14px; gap: 12px; }
   .hero-upper-tier { grid-template-columns: minmax(0,1fr); padding: 18px; gap: 16px; }
   .hero-main-row { grid-column: 1; grid-row: 2; }
-  .hero-execution { grid-column: 1; grid-row: 3; }
+  .hero-execution { grid-column: 1; grid-row: 3; padding: 0; border: 0; }
   .hero-top-row, .hero-session-message, .hero-pending { grid-column: 1; }
   .hero-actions-row { flex-wrap: nowrap; }
   .hero-action-btn { flex: 1; padding-left: 10px; padding-right: 10px; }
   .hero-metrics-strip { grid-template-columns: repeat(3,minmax(0,1fr)); padding: 16px; gap: 12px; }
-  .hero-metric-cell { padding: 0; }
+  .hero-metric-cell + .hero-metric-cell { padding-left: 12px; }
   .metric-cell-value { font-size: 20px; }
   .metric-cell-label { font-size: 9px; }
   .strategy-context-banner { padding: 14px 16px; }
