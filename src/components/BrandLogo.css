@@ -1,0 +1,5 @@
+.brand-lockup { flex-shrink: 0; }
+@media (max-width: 480px) {
+  .navbar-brand .brand-lockup { width: 108px !important; height: 34.56px !important; }
+  .broker-button > svg:last-child { display: none; }
+}

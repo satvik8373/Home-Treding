@@ -1,3 +1,4 @@
+import { BrandLogo } from './BrandLogo'
 import { useEffect, useRef, useState } from 'react'
 import { BookOpen, ChartNoAxesCombined, ChevronRight, FlaskConical, LayoutDashboard, Link2, Settings2, ShieldCheck, UserRound, X } from 'lucide-react'
 
@@ -39,7 +40,7 @@ export function WorkspaceSidebar({ view, open, onClose, onNavigate, onBroker, on
   return <>
     {mobile && open && <button className="sidebar-dismiss" tabIndex={-1} aria-label="Close navigation" onClick={onClose} />}
     <aside id="workspace-sidebar" ref={ref} className="workspace-sidebar" hidden={mobile && !open} role={mobile ? 'dialog' : 'complementary'} aria-modal={mobile ? true : undefined} aria-label="Workspace navigation">
-      <div className="sidebar-brand"><a className="wordmark" href="#market" onClick={() => select(() => onNavigate('market'))}><img src="/mavrix-icon.jpg" alt="" width="30" height="30" /><span>MAVRIX<small>TRADING WORKSPACE</small></span></a>{mobile && <button className="icon-button" aria-label="Close navigation" onClick={onClose}><X size={19} /></button>}</div>
+      <div className="sidebar-brand"><a className="wordmark" href="#market" onClick={() => select(() => onNavigate('market'))}><BrandLogo width={160} /></a>{mobile && <button className="icon-button" aria-label="Close navigation" onClick={onClose}><X size={19} /></button>}</div>
       <span className="sidebar-label">WORKSPACE</span>
       <nav aria-label="Main navigation">{(Object.keys(workspacePages) as WorkspaceView[]).map(key => {
         const Icon = icons[key]

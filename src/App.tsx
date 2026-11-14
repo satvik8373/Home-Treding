@@ -1,3 +1,4 @@
+import { BrandLogo } from './components/BrandLogo'
 import { directionOf, signFor } from '../shared/strategy'
 import type { StrategyDirection } from '../shared/strategy'
 import './components/StrategySettingsPanel.css'
@@ -101,11 +102,7 @@ export default function App() {
       <header className="topbar">
         <div className="navbar-left">
           <a className="navbar-brand" href="#market" onClick={(e) => { e.preventDefault(); navigate('market'); }}>
-            <img src="/mavrix-icon.jpg" alt="" width="28" height="28" className="navbar-logo" />
-            <div className="navbar-brand-text">
-              <span className="brand-name">MAVRIX</span>
-              <span className="brand-tag">009 ALGO</span>
-            </div>
+            <BrandLogo width={132} />
           </a>
         </div>
 

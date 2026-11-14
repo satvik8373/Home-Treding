@@ -1,3 +1,4 @@
+import { BrandLogo } from './BrandLogo'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ArrowRight, ShieldCheck } from 'lucide-react'
@@ -102,7 +103,7 @@ export function DeploymentGate({ children }: { children: ReactNode }) {
   if (status === 'open') return <AccountContext.Provider value={deployed ? { user, logout, busy } : null}><DeploymentContext.Provider value={{ available: true }}><Fragment key="active">{children}</Fragment></DeploymentContext.Provider></AccountContext.Provider>
   if (status === 'checking') return <StartupSplash />
   return <main className="auth-page">
-    <a className="auth-brand" href="/login" aria-label="Mavrix Trading sign in"><img src="/mavrix-icon.jpg" alt="" width="38" height="38" /><span>MAVRIX <small>TRADING</small></span></a>
+    <a className="auth-brand" href="/login" aria-label="Mavrix Trading sign in"><BrandLogo width={160} /></a>
     <section className="auth-card" aria-labelledby="login-title">
       <span className="auth-eyebrow">YOUR TRADING WORKSPACE</span><h1 id="login-title">Welcome to Mavrix</h1>
       <p className="auth-description">Sign in to restore your saved broker connection, settings and trading activity.</p>
