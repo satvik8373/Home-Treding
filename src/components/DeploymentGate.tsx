@@ -6,6 +6,7 @@ import type { DeploymentStatus } from '../../shared/deployment'
 import { DeploymentContext } from '../lib/deployment'
 import { AccountContext } from '../lib/account'
 import type { AccountUser } from '../lib/account'
+import { StartupSplash } from './StartupSplash'
 import './Account.css'
 
 function notifyAccountTabs() {
@@ -99,10 +100,11 @@ export function DeploymentGate({ children }: { children: ReactNode }) {
     } catch (error) { setBusy(false); throw error }
   }
   if (status === 'open') return <AccountContext.Provider value={deployed ? { user, logout, busy } : null}><DeploymentContext.Provider value={{ available: true }}><Fragment key="active">{children}</Fragment></DeploymentContext.Provider></AccountContext.Provider>
+  if (status === 'checking') return <StartupSplash />
   return <main className="auth-page">
     <a className="auth-brand" href="/login" aria-label="Mavrix Trading sign in"><img src="/mavrix-icon.jpg" alt="" width="38" height="38" /><span>MAVRIX <small>TRADING</small></span></a>
     <section className="auth-card" aria-labelledby="login-title">
-      <span className="auth-eyebrow">YOUR TRADING WORKSPACE</span><h1 id="login-title">{status === 'checking' ? 'Checking your session' : 'Welcome to Mavrix'}</h1>
+      <span className="auth-eyebrow">YOUR TRADING WORKSPACE</span><h1 id="login-title">Welcome to Mavrix</h1>
       <p className="auth-description">Sign in to restore your saved broker connection, settings and trading activity.</p>
       {status === 'locked' && <>
         {googleEnabled && <button className="google-signin" disabled={busy} onClick={async () => {
@@ -133,7 +135,6 @@ export function DeploymentGate({ children }: { children: ReactNode }) {
         }}><p>Access the original owner workspace.</p><label className="field">Owner password<input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required /></label><button className="button primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in as owner'}</button></form></details>
       </>}
       {(status === 'setup' || status === 'unavailable') && <div className="auth-unavailable"><p>{status === 'setup' ? 'The deployment connection needs to be configured before sign-in.' : 'We could not reach the sign-in service.'}</p><button className="button secondary" disabled={busy} onClick={retry}>{busy ? 'Checking…' : 'Try again'}</button></div>}
-      {status === 'checking' && <p className="auth-status" role="status">Verifying secure dashboard access…</p>}
       {error && <p className="inline-error" role="alert">{error}</p>}
     </section>
     <p className="auth-footer">MAVRIX / 009 <span>·</span> Your Google account opens the same trading workspace on every device.</p>
