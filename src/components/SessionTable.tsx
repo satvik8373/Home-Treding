@@ -21,7 +21,7 @@ export function SessionTable({ label, children }: { label: string; children: Rea
   }, [])
   const scroll = (direction: number) => {
     const node = viewport.current
-    if (node) node.scrollBy({ left: direction * Math.max(240, node.clientWidth * .75), behavior: 'instant' })
+    if (node) node.scrollBy({ left: direction * Math.max(240, node.clientWidth * .75), behavior: 'auto' })
   }
   return <div className="session-table-frame">
     {(edges.left || edges.right) && <div className="table-scroll-controls"><span>More columns</span><button type="button" aria-label={`Scroll ${label} left`} disabled={!edges.left} onClick={() => scroll(-1)}><ChevronLeft size={16} /></button><button type="button" aria-label={`Scroll ${label} right`} disabled={!edges.right} onClick={() => scroll(1)}><ChevronRight size={16} /></button></div>}
