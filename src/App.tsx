@@ -247,7 +247,7 @@ export default function App() {
             {/* Session Orders & Executed Trades (Old Perfect Simple & Clean) */}
             <section className="dashboard-orders-section" aria-label="Session orders and trades">
               <OrdersPanel session={session} />
-              <TradesPanel session={session} title="Executed trades" exportAvailable={!!session} trades={session?.trades ?? []} />
+              <TradesPanel exportAvailable={!!session} trades={session?.trades ?? []} />
               <details className="panel activity-panel">
                 <summary>Session activity <span>{session?.activity.length ?? 0} events</span></summary>
                 {session?.activity.length ? (

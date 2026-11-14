@@ -1,28 +1,17 @@
 import { SessionTable } from './SessionTable'
-import { RecordDetails } from './RecordDetails'
 import type { TradingSession } from '../../shared/model'
-import { calendarDate, clock, date, dateTime, price } from '../lib/format'
-import { Download } from 'lucide-react'
+import { calendarDate, clock, price } from '../lib/format'
 
-type Props = { session?: TradingSession; hideHeader?: boolean }
-export function OrdersPanel({ session, hideHeader = false }: Props) {
+export function OrdersPanel({ session }: { session?: TradingSession }) {
   const orders = [...(session?.orderAudit ?? [])].reverse()
   const pending = session?.pending && !orders.some(order => order.id === session.pending?.id) ? session.pending : null
-  return <section className="fintech-orders-container session-table-panel" aria-label="Session orders">
-    {!hideHeader && <div className="orders-header-row"><div className="orders-title-group"><h2>Session orders</h2><span className="orders-count-badge">{orders.length + (pending ? 1 : 0)}</span></div>{session && (orders.length > 0 || pending) && <a className="export-link-btn" href="/api/orders.csv"><Download size={13} />Orders CSV</a>}</div>}
-    {orders.length || pending ? <SessionTable label="Order records"><table className="session-data-table">
-      <caption className="visually-hidden">Current day-session order submissions, newest first. All timestamps are IST.</caption>
-      <thead><tr>{['Date | Time (IST)', 'Contract', 'Action', 'Qty / filled', 'Average fill', 'Status'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
+  return <section className="panel orders-panel" aria-labelledby="orders-title">
+    <div className="panel-title"><h2 id="orders-title">Orders <span className="count">{orders.length + (pending ? 1 : 0)}</span></h2>{session && <a className="text-button" href="/api/orders.csv">Orders CSV</a>}</div>
+    {orders.length || pending ? <SessionTable label="Order records"><table className="session-data-table original-record-table">
+      <thead><tr>{['Submitted IST', 'Contract', 'Action', 'Qty', 'Status', 'Filled / average', 'Order ID', 'Details'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
       <tbody>
-        {pending && <tr><td className="record-datetime">{calendarDate(pending.submittedAt)} <span aria-hidden="true">|</span> {clock(pending.submittedAt, true)}</td><td><strong className="record-contract">{pending.symbol}</strong><small className="record-meta">{pending.side === 'CE' ? 'CALL (CE)' : 'PUT (PE)'}</small></td><td>{pending.transaction}<small>{pending.reason === 'BREAKOUT' ? 'Entry' : 'Exit'}</small></td><td className="numeric">{pending.quantity}<small>Filled unknown</small></td><td>—</td><td><span className="table-status">Awaiting Confirmation</span><small>{session?.mode === 'paper' ? 'Paper' : 'Live'}</small><RecordDetails title="Pending order details"><p><strong>{pending.symbol}</strong> · {pending.side === 'CE' ? 'CALL (CE)' : 'PUT (PE)'}</p><p>{calendarDate(pending.submittedAt)} | {clock(pending.submittedAt, true)} IST</p><p>{pending.orderId ?? 'No broker ID'}</p><p>{pending.reason.replaceAll('_', ' ')}</p><p>Tag {pending.tag}</p><p>Submission outcome is not yet confirmed. Reconciliation is in progress.</p></RecordDetails></td></tr>}
-
-        {orders.map(order => <tr key={order.id}>
-          <td className="record-datetime">{calendarDate(order.submittedAt)} <span aria-hidden="true">|</span> {clock(order.submittedAt, true)}</td>
-          <td><strong className="record-contract">{order.symbol}</strong><small className="record-meta">{order.side === 'CE' ? 'CALL (CE)' : 'PUT (PE)'}</small>{session?.legs[order.side]?.contract.symbol === order.symbol && <small>Strike {session.legs[order.side]!.contract.strike.toLocaleString('en-IN')} · Expiry {date(session.legs[order.side]!.contract.expiry)}</small>}</td>
-          <td><span className={`table-status ${order.transaction === 'BUY' ? 'positive-text' : ''}`}>{order.transaction}</span><small>{order.reason === 'BREAKOUT' ? 'Entry' : 'Exit'}</small></td>
-          <td className="numeric">{order.quantity}<small>Filled {order.filled ?? 'Unknown'} / {order.quantity}</small></td><td className="numeric">{order.average == null ? <span title="Fill price unavailable">—</span> : `₹${price(order.average)}`}</td>
-          <td><span className={`table-status ${order.status === 'rejected' ? 'negative-text' : ''}`}>{order.status.replaceAll('-', ' ')}</span><small>{order.mode === 'paper' ? 'Paper' : 'Live'}</small><RecordDetails title="Order details"><p><strong>{order.symbol}</strong> · {order.side === 'CE' ? 'CALL (CE)' : 'PUT (PE)'}</p><p>{calendarDate(order.submittedAt)} | {clock(order.submittedAt, true)} IST</p><p>{order.orderId ?? (order.mode === 'paper' ? 'Simulated' : 'No broker ID')}</p><p>{order.reason.replaceAll('_', ' ')}</p><p>Updated {dateTime(order.updatedAt)} IST</p><p>Tag {order.tag}</p><p>{order.detail}</p></RecordDetails>{order.status === 'rejected' && <small className="negative-text table-rejection">{order.detail}</small>}</td>
-        </tr>)}
+        {pending && <tr><td className="record-datetime">{calendarDate(pending.submittedAt)} | {clock(pending.submittedAt, true)}</td><td className="contract-cell">{pending.symbol}</td><td>{pending.transaction}</td><td>{pending.quantity}</td><td>Awaiting confirmation</td><td>Unknown</td><td>{pending.orderId ?? 'Awaiting broker ID'}</td><td>Reconciliation in progress</td></tr>}
+        {orders.map(order => <tr key={order.id}><td className="record-datetime">{calendarDate(order.submittedAt)} | {clock(order.submittedAt, true)}</td><td className="contract-cell">{order.symbol}</td><td>{order.transaction}</td><td>{order.quantity}</td><td>{order.mode === 'paper' ? 'Paper · ' : ''}{order.status.replaceAll('-', ' ')}</td><td>{order.filled ?? 'Unknown'} / {order.average == null ? '—' : `₹${price(order.average)}`}</td><td>{order.orderId ?? 'No broker ID'}</td><td className="audit-detail-cell">{order.detail}</td></tr>)}
       </tbody>
     </table></SessionTable> : <p className="trade-empty">No order submissions recorded for this session.</p>}
   </section>

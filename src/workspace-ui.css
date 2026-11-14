@@ -4012,7 +4012,7 @@ tr:hover td {
   .banner-select { font-size: 14px; }
 }
 
-/* Scroll independently; open record details above the table rather than inside a clipped cell. */
+/* Keep original record tables independently scrollable on small screens. */
 .session-table-frame { min-width: 0; max-width: 100%; width: 100%; }
 .session-table-frame .session-table-scroll { display: block; box-sizing: border-box; min-width: 0; min-height: 0; width: 100%; max-width: 100%; max-height: 520px; overflow: auto; touch-action: pan-x pan-y; -webkit-overflow-scrolling: touch; scrollbar-width: auto; scrollbar-gutter: stable; }
 .session-table-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -4022,12 +4022,6 @@ tr:hover td {
 .table-scroll-controls > span { margin-right: auto; color: var(--text-secondary); font-size: 11px; }
 .table-scroll-controls button { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-divider); border-radius: 8px; background: var(--canvas); color: var(--ink); cursor: pointer; }
 .table-scroll-controls button:disabled { color: #a1a8b2; cursor: default; }
-.record-details-button { display: block; min-height: 36px; margin: 5px 0 0; padding: 7px 12px; border: 1px solid var(--border-divider); border-radius: 7px; background: var(--canvas); color: var(--blue); font-size: 11px; font-weight: 500; cursor: pointer; }
-.numeric .record-details-button { margin-left: auto; }
-.record-dialog-heading { padding-right: 32px; text-align: left; white-space: normal; }
-.record-dialog-heading h2 { margin: 0 0 16px; color: var(--ink); font-size: 18px; font-weight: 600; }
-.record-dialog-content { display: grid; gap: 10px; text-align: left; white-space: normal; font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; line-height: 1.7; }
-.record-dialog-content p { margin: 0; }
 
 .session-data-table .record-datetime { min-width: 175px; white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; }
 .record-datetime > span { color: var(--text-secondary); padding: 0 4px; }
