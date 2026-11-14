@@ -45,7 +45,7 @@ const mobileTabLabels: Record<WorkspaceView, string> = {
 
 export default function App() {
   const deployment = useDeployment()
-  const { data, online, now, error, setError, working, action } = useDashboard()
+  const { data, online, now, error, setError, notice, setNotice, working, action } = useDashboard()
   const [brokerDialog, setBrokerDialog] = useState(false)
   const [rulesDialog, setRulesDialog] = useState(false)
   const [selectedDirection, setSelectedDirection] = useState<StrategyDirection | null>(null)
@@ -163,6 +163,7 @@ export default function App() {
           </div>
         )}
 
+        {notice && <div className="notice action-notice" role="status"><span><strong>{clock(notice.at, true)} IST</strong> · {notice.message}</span><button aria-label="Dismiss action notification" onClick={() => setNotice(null)}><X size={15} /></button></div>}
         {session?.status === 'blocked' && (
           <div className="session-message attention" role="status">
             <Radio size={14} /><span>{session.message}</span>

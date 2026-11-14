@@ -122,6 +122,7 @@ export function PortfolioHeroCard({
             <button
               className="hero-action-btn btn-primary"
               disabled={!online || !connected || !!working || !inWindow || (shownMode === 'live' && (!liveAck || !liveAvailable))}
+              aria-describedby="strategy-control-hint"
               onClick={() =>
                 void action(
                   '/api/strategy/start',
@@ -137,7 +138,7 @@ export function PortfolioHeroCard({
 
           <button
             className="hero-action-btn btn-secondary"
-            disabled={locked || (shownMode === 'paper' && !liveAvailable)}
+            disabled={locked || !!working || (shownMode === 'paper' && !liveAvailable)}
             onClick={() => {
               if (!locked) {
                 setMode(shownMode === 'paper' ? 'live' : 'paper');
@@ -150,7 +151,7 @@ export function PortfolioHeroCard({
             <span>{shownMode === 'paper' ? 'Switch to Live' : 'Switch to Paper'}</span>
           </button>
         </div>
-        <p className="hero-control-hint">{!online ? 'Waiting for the engine connection.' : !connected ? 'Connect mStock to start.' : !inWindow && !locked ? `Start window: weekdays 09:00–${settings.cutoff} IST.` : locked ? 'Monitoring continues when this page is closed.' : shownMode === 'live' ? 'Real broker orders require your confirmation above.' : 'Paper orders are simulated.'}</p>
+        <p id="strategy-control-hint" className="hero-control-hint">{!online ? 'Waiting for the engine connection.' : !connected ? 'Connect mStock to start.' : working ? 'Request in progress. Waiting for engine confirmation.' : shownMode === 'live' && !liveAvailable ? liveReason || 'Live execution is unavailable on this engine.' : !inWindow && !locked ? `Start window: weekdays 09:00–${settings.cutoff} IST.` : locked ? 'Monitoring continues when this page is closed.' : shownMode === 'live' ? 'Real broker orders require your confirmation above.' : 'Paper orders are simulated.'}</p>
         {session && <p className="hero-session-message" role="status">{session.message}</p>}
         {session?.pending && <div className="hero-pending" role="status"><strong>Awaiting broker confirmation</strong><span>{session.pending.side} · {session.pending.transaction} · {session.pending.quantity} units</span><small>{session.pending.orderId ? `Order ID ${session.pending.orderId}` : 'Submission outcome not yet confirmed'}</small></div>}
       </div>

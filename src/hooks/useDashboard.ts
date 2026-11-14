@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { AppState } from "../../shared/model";
+import { requestDashboardAction, acceptedActionNotice, DashboardActionError } from '../lib/dashboardActions';
 import { useDeployment } from '../lib/deployment';
 
 export function useDashboard() {
@@ -9,6 +10,7 @@ export function useDashboard() {
   const [now, setNow] = useState(() => Date.now()),
     [error, setError] = useState(""),
     [working, setWorking] = useState("");
+  const [notice, setNotice] = useState<{ message: string; at: number } | null>(null);
   const csrf = useRef(""),
     offset = useRef(0);
   const refreshState = useRef<() => Promise<void>>(async () => {});
@@ -79,32 +81,24 @@ export function useDashboard() {
     if (actionPending.current) return null;
     actionPending.current = true;
     setError("");
+    setNotice(null);
     setWorking(name);
     try {
       if (!csrf.current) await refreshState.current();
-      const response = await fetch(path, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-009-CSRF": csrf.current,
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(25_000),
-      });
-      const result = await response.json();
-      if (response.status === 401) window.dispatchEvent(new Event('n009:session-expired'));
-      if (!response.ok)
-        throw new Error(result.error || "The request could not be completed.");
+      const result = await requestDashboardAction(path, body, csrf.current);
+      const message = acceptedActionNotice(path);
+      if (message) setNotice({ message, at: Date.now() + offset.current });
       return result;
     } catch (e) {
+      if (e instanceof DashboardActionError && e.unauthorized) window.dispatchEvent(new Event('n009:session-expired'));
       const uncertain = e instanceof Error && ['TimeoutError', 'AbortError', 'TypeError'].includes(e.name);
       setError(uncertain ? "The request outcome is not confirmed. Refreshing engine state; check its status before repeating this action." : e instanceof Error ? e.message : "Could not reach the engine.");
       return null;
     } finally {
+      await refreshState.current();
       actionPending.current = false;
       setWorking("");
-      void refreshState.current();
     }
   }
-  return { data, online, now, error, setError, working, action };
+  return { data, online, now, error, setError, notice, setNotice, working, action };
 }
