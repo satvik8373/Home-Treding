@@ -175,6 +175,18 @@ export default function App() {
           <div className="fintech-dashboard" aria-label="Strategy controls and session summary">
             {/* Top Row / Section: Hero + Strategy */}
             <div className="dashboard-grid-top">
+              <div className="dashboard-strategy-col">
+                <StrategyContextBanner
+                  settings={locked || dayLocked ? settingsFor(session) : selectedSettings}
+                  session={session}
+                  locked={locked}
+                  working={working}
+                  direction={chosenDirection}
+                  onDirectionChange={dir => { setSelectedDirection(dir); setLiveAck(false); }}
+                  onSettings={() => navigate('settings')}
+                  onRules={() => setRulesDialog(true)}
+                />
+              </div>
               <PortfolioHeroCard
                 session={session}
                 locked={locked}
@@ -196,18 +208,7 @@ export default function App() {
                 positions={positions}
               />
 
-              <div className="dashboard-strategy-col">
-                <StrategyContextBanner
-                  settings={locked || dayLocked ? settingsFor(session) : selectedSettings}
-                  session={session}
-                  locked={locked}
-                  working={working}
-                  direction={chosenDirection}
-                  onDirectionChange={dir => { setSelectedDirection(dir); setLiveAck(false); }}
-                  onSettings={() => navigate('settings')}
-                  onRules={() => setRulesDialog(true)}
-                />
-              </div>
+
             </div>
 
             {/* Strategy Positions (Old Perfect Simple & Clean) */}

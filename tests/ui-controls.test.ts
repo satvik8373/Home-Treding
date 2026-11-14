@@ -46,8 +46,8 @@ test('trade records render semantic tables with full quantities, timestamps and 
   const trade: Trade = { id: 'table-fill', at: now, side: 'PE', symbol: 'TEST-CONTRACT', transaction: 'BUY', quantity: 65, price: 100, reason: 'BREAKOUT', orderId: 'simulated', mode: 'paper', pnl: null }
   const html = renderToStaticMarkup(createElement(TradesPanel, { trades: [trade], exportAvailable: true }))
   assert.match(html, /<table/)
-  assert.match(html, /Date \/ time IST/)
-  assert.match(html, /Date/); assert.match(html, /PUT \(PE\)/); assert.match(html, /Action/); assert.match(html, /13 Nov 2026/); assert.match(html, /10:00:00/)
+  assert.match(html, /Time \(IST\)/)
+  assert.match(html, /PUT \(PE\)/); assert.match(html, /Action/); assert.match(html, /13 Nov 2026/); assert.match(html, /10:00:00/)
   assert.match(html, /Premium amount/)
   assert.match(html, /6,500.00/)
   assert.match(html, /Simulated/)

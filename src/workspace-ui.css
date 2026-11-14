@@ -3938,3 +3938,59 @@ tr:hover td {
 .table-order-details summary { cursor: pointer; color: #64748b; font-size: 10px; }
 .table-order-details p { margin: 6px 0 0; font-size: 11px; color: #475569; line-height: 1.6; overflow-wrap: anywhere; }
 .table-rejection { max-width: 240px; white-space: normal; overflow-wrap: anywhere; }
+
+/* Calm command layout: one strategy bar, one account summary, one primary action. */
+.workspace-shell .topbar { height: 64px; min-height: 64px; background: #fff; border-bottom: 1px solid #e2e8f0; padding-left: 24px; padding-right: 24px; }
+.navbar-nav { background: #fff; border-radius: 0; padding: 0; gap: 4px; }
+.navbar-tab { min-height: 44px; padding: 10px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+.navbar-tab.active { background: #f1f5f9; color: #0f172a; }
+.navbar-brand-text .brand-tag { display: none; }
+.navbar-brand-text .brand-name { font-size: 17px; letter-spacing: .04em; }
+.workspace-shell main { padding-top: 20px; }
+.dashboard-grid-top { display: flex; flex-direction: column; gap: 12px; }
+.strategy-context-banner { padding: 16px 20px; border-radius: 12px; }
+.banner-top-row { margin-bottom: 0; }
+.banner-select { font-size: 16px; font-weight: 600; padding-left: 0; }
+.banner-actions .banner-btn { min-height: 36px; border-radius: 6px; font-size: 11px; background: #f8fafc; }
+.banner-chips-row { gap: 8px 18px; margin: 12px 0 0; }
+.banner-chip { padding: 0; border: 0; border-radius: 0; background: #fff; font-size: 11px; font-weight: 400; color: #64748b; }
+.banner-accordion { margin-top: 10px; padding-top: 8px; }
+.accordion-trigger { font-size: 11px; }
+.portfolio-hero-card { border-radius: 12px; }
+.hero-upper-tier { display: grid; grid-template-columns: minmax(0,1fr) minmax(300px,400px); column-gap: 40px; row-gap: 16px; padding: 22px 24px; }
+.hero-top-row { grid-column: 1 / -1; margin: 0; }
+.hero-main-row { grid-column: 1; grid-row: 2; align-items: center; margin: 0; min-width: 0; }
+.hero-execution { grid-column: 2; grid-row: 2; min-width: 0; }
+.hero-balance-text { font-size: clamp(32px,3.4vw,48px); font-weight: 550; letter-spacing: -1.3px; line-height: 1.2; }
+.hero-balance-sub-label { font-size: 11px; color: #64748b; }
+.hero-eyebrow { font-size: 10px; font-weight: 600; color: #64748b; }
+.hero-actions-row { margin: 0; gap: 8px; }
+.hero-action-btn { min-height: 42px; padding: 10px 16px; border-radius: 7px; font-size: 12px; font-weight: 600; }
+.hero-action-btn.btn-primary { background: #2563eb; color: #fff; }
+.hero-action-btn.btn-secondary { background: #f1f5f9; color: #475569; }
+.hero-live-warning { margin: 0 0 12px; }
+.hero-control-hint { margin-top: 10px; font-size: 11px; }
+.hero-session-message, .hero-pending { grid-column: 1 / -1; margin-top: 0; }
+.hero-metrics-strip { grid-template-columns: repeat(3,minmax(0,1fr)); padding: 18px 24px; gap: 24px; background: #fff; border-top: 1px solid #e2e8f0; }
+.metric-cell-label { font-size: 10px; font-weight: 500; letter-spacing: .04em; color: #64748b; }
+.metric-cell-value { font-size: 23px; font-weight: 550; margin-top: 7px; }
+.metric-cell-sub { font-size: 10px; line-height: 1.6; }
+.session-data-table { min-width: 720px; }
+.session-data-table th, .session-data-table td { padding-left: 16px; padding-right: 16px; }
+.session-data-table td:nth-child(2) { min-width: 205px; }
+.session-data-table .table-order-details { text-align: left; }
+@media (max-width: 720px) {
+  .workspace-shell .topbar { height: 58px; min-height: 58px; padding: 0 14px; }
+  .hero-upper-tier { grid-template-columns: minmax(0,1fr); padding: 18px; gap: 16px; }
+  .hero-main-row { grid-column: 1; grid-row: 2; }
+  .hero-execution { grid-column: 1; grid-row: 3; }
+  .hero-top-row, .hero-session-message, .hero-pending { grid-column: 1; }
+  .hero-actions-row { flex-wrap: nowrap; }
+  .hero-action-btn { flex: 1; padding-left: 10px; padding-right: 10px; }
+  .hero-metrics-strip { grid-template-columns: repeat(3,minmax(0,1fr)); padding: 16px; gap: 12px; }
+  .hero-metric-cell { padding: 0; }
+  .metric-cell-value { font-size: 20px; }
+  .metric-cell-label { font-size: 9px; }
+  .strategy-context-banner { padding: 14px 16px; }
+  .banner-select { font-size: 14px; }
+}
