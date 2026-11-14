@@ -372,12 +372,7 @@ export function MarketChart({
       <div className="fintech-chart-header">
         <div className="instrument-pill-group" role="tablist" aria-label="Select instrument">
           {(['NIFTY', 'CE', 'PE'] as ChartSymbol[]).map((val) => {
-            const label =
-              val === 'NIFTY'
-                ? 'NIFTY 50'
-                : val === 'CE'
-                  ? `CALL ${legs.CE ? `${legs.CE.contract.strike}` : 'ATM'}`
-                  : `PUT ${legs.PE ? `${legs.PE.contract.strike}` : 'ATM'}`;
+            const strikeText = val === 'CE' ? (legs.CE ? `${legs.CE.contract.strike}` : 'ATM') : (legs.PE ? `${legs.PE.contract.strike}` : 'ATM');
             return (
               <button
                 key={val}
@@ -386,7 +381,12 @@ export function MarketChart({
                 className={`instrument-pill ${symbol === val ? 'active' : ''}`}
                 onClick={() => setSymbol(val)}
               >
-                {label}
+                <span className="pill-text-desktop">
+                  {val === 'NIFTY' ? 'NIFTY 50' : `${val === 'CE' ? 'CALL' : 'PUT'} ${strikeText}`}
+                </span>
+                <span className="pill-text-mobile">
+                  {val === 'NIFTY' ? 'NIFTY' : `${val} ${strikeText}`}
+                </span>
               </button>
             );
           })}

@@ -17,7 +17,8 @@ function notifyAccountTabs() {
 }
 export function DeploymentGate({ children }: { children: ReactNode }) {
   const deployed = import.meta.env.VITE_DEPLOY_TARGET === 'vercel' || import.meta.env.VITE_ENGINE_MODE !== 'isolated'
-  const [status, setStatus] = useState<DeploymentStatus>(deployed ? 'checking' : 'open')
+  const isPreview = import.meta.env.DEV && typeof window !== 'undefined' && (new URLSearchParams(window.location.search).has('preview') || window.location.hash.includes('preview'))
+  const [status, setStatus] = useState<DeploymentStatus>(isPreview ? 'open' : deployed ? 'checking' : 'open')
   const [password, setPassword] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false), [revision, setRevision] = useState(0)
   const [googleEnabled, setGoogleEnabled] = useState(false), [user, setUser] = useState<AccountUser | null>(null)
   const workspaceRef = useRef<string | null>(null)
@@ -56,7 +57,7 @@ export function DeploymentGate({ children }: { children: ReactNode }) {
     return () => { controller.abort(); if (retryTimer) clearTimeout(retryTimer) }
   }, [deployed, revision])
   useEffect(() => {
-    if (!deployed) return
+    if (!deployed || isPreview) return
     if (status === 'locked') window.history.replaceState(null, '', '/login')
     if (status === 'open' && window.location.pathname === '/login') window.history.replaceState(null, '', '/')
     let alive = true, renewing = false, retryTimer: ReturnType<typeof setTimeout> | undefined
@@ -80,7 +81,7 @@ export function DeploymentGate({ children }: { children: ReactNode }) {
     document.addEventListener('visibilitychange', visible)
     const timer = status === 'open' && user?.expiresAt ? setTimeout(expired, Math.max(0, user.expiresAt - Date.now() - (user.kind === 'google' ? 300_000 : 0))) : undefined
     return () => { alive = false; window.removeEventListener('n009:session-expired', expired); document.removeEventListener('visibilitychange', visible); if (timer) clearTimeout(timer); if (retryTimer) clearTimeout(retryTimer) }
-  }, [deployed, status, user?.expiresAt, user?.kind])
+  }, [deployed, isPreview, status, user?.expiresAt, user?.kind])
   useEffect(() => {
     if (!deployed || typeof BroadcastChannel === 'undefined') return
     const channel = new BroadcastChannel('n009-account')
@@ -100,7 +101,7 @@ export function DeploymentGate({ children }: { children: ReactNode }) {
       window.location.assign('/login')
     } catch (error) { setBusy(false); throw error }
   }
-  if (status === 'open') return <AccountContext.Provider value={deployed ? { user, logout, busy } : null}><DeploymentContext.Provider value={{ available: true }}><Fragment key="active">{children}</Fragment></DeploymentContext.Provider></AccountContext.Provider>
+  if (status === 'open' || (import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('preview'))) return <AccountContext.Provider value={deployed ? { user, logout, busy } : null}><DeploymentContext.Provider value={{ available: true }}><Fragment key="active">{children}</Fragment></DeploymentContext.Provider></AccountContext.Provider>
   if (status === 'checking') return <StartupSplash />
   return <main className="auth-page">
     <a className="auth-brand" href="/login" aria-label="Mavrix Trading sign in"><BrandLogo width={160} /></a>
