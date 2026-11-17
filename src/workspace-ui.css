@@ -1503,6 +1503,262 @@ tr:hover td {
 }
 
 /* --------------------------------------------------------------------------
+   Google Cricket Match Score Lock Screen Widget (Official Reference)
+   -------------------------------------------------------------------------- */
+.lockscreen-preview-wrapper {
+  background: radial-gradient(circle at 50% 20%, #1E1B4B 0%, #090A0F 70%, #000000 100%);
+  border-radius: 1.5rem;
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.lockscreen-clock-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  color: #FFFFFF;
+}
+
+.lockscreen-date {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.02em;
+}
+
+.lockscreen-time {
+  font-size: 38px;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.95);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The Lock Screen Pill / Card (Image 2) */
+.lockscreen-cricket-card {
+  width: 100%;
+  max-width: 360px;
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 22px;
+  padding: 12px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.lockscreen-card-main {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.lockscreen-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lockscreen-team.left {
+  justify-content: flex-start;
+}
+
+.lockscreen-team.right {
+  justify-content: flex-end;
+}
+
+.lockscreen-flag {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 11px;
+  line-height: 1;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.lockscreen-flag.call-flag {
+  background: linear-gradient(135deg, #065F46, #047857);
+  color: #A7F3D0;
+  border: 1.5px solid #10B981;
+}
+
+.lockscreen-flag.put-flag {
+  background: linear-gradient(135deg, #881337, #BE123C);
+  color: #FECDD3;
+  border: 1.5px solid #F43F5E;
+}
+
+.flag-sub {
+  font-size: 8px;
+  margin-top: 1px;
+}
+
+.lockscreen-score-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.lockscreen-score-group.right {
+  text-align: right;
+  align-items: flex-end;
+}
+
+.lockscreen-score {
+  font-size: 15px;
+  font-weight: 800;
+  color: #FFFFFF;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.lockscreen-overs {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #94A3B8;
+  white-space: nowrap;
+}
+
+/* Center Group */
+.lockscreen-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 4px;
+}
+
+.lockscreen-brand-icon {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #60A5FA;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.lockscreen-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--pill-radius);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.lockscreen-status-pill.live {
+  background: #10B981;
+  color: #FFFFFF;
+}
+
+.lockscreen-status-pill.stumps {
+  background: #FFFFFF;
+  color: #000000;
+}
+
+.lockscreen-center-pnl {
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  margin-top: 1px;
+  color: #F8FAFC;
+}
+
+.lockscreen-center-pnl.pos {
+  color: #10B981;
+}
+
+.lockscreen-center-pnl.neg {
+  color: #EF4444;
+}
+
+/* Bottom Labels Row (SL - ICC - PAK) */
+.lockscreen-labels-row {
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #CBD5E1;
+  letter-spacing: 0.04em;
+  padding-top: 2px;
+}
+
+.label-team.left {
+  text-align: center;
+}
+
+.label-center {
+  text-align: center;
+  color: #64748B;
+  font-size: 9.5px;
+}
+
+.label-team.right {
+  text-align: center;
+}
+
+/* The Google Style [ ⧉ Pin live score ] Button (Image 1) */
+.pin-live-score-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--ink);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  padding: 12px 18px;
+  border-radius: var(--pill-radius);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 180ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.pin-live-score-btn:hover {
+  background: #0B0F17;
+  color: #FFFFFF;
+  border-color: #0B0F17;
+  transform: translateY(-1px);
+}
+
+.pin-live-score-btn.active {
+  background: #10B981;
+  color: #FFFFFF;
+  border-color: #10B981;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+}
+
+/* --------------------------------------------------------------------------
    Live Cricket-Style Match Bar (Trading UI Reference)
    -------------------------------------------------------------------------- */
 .trading-match-bar {

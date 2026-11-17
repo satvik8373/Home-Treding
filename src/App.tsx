@@ -4,7 +4,7 @@ import type { StrategyDirection } from '../shared/strategy'
 import './components/StrategySettingsPanel.css'
 import { StrategySettingsPanel } from './components/StrategySettingsPanel'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChartNoAxesCombined, Check, FlaskConical, LayoutDashboard, Link2, Plus, Radio, RefreshCw, Settings2, ShieldCheck, UserRound, X } from 'lucide-react'
+import { ChartNoAxesCombined, Check, FlaskConical, LayoutDashboard, Link2, PictureInPicture2, Radio, RefreshCw, Settings2, ShieldCheck, UserRound, X } from 'lucide-react'
 import type { Mode, Side } from '../shared/model'
 import { freshMark } from '../shared/market'
 import { BrokerDialog } from './components/BrokerDialog'
@@ -163,10 +163,10 @@ export default function App() {
             type="button"
             className="topbar-shortcut-btn"
             onClick={() => setLiveScoreOpen(true)}
-            title="Add Shortcut to Home Screen & Lock Screen Widget"
+            title="Pin live score to lock screen & floating match widget"
           >
-            <Plus size={13} strokeWidth={2.5} />
-            <span className="shortcut-btn-label">Add Shortcut</span>
+            <PictureInPicture2 size={13} strokeWidth={2.2} />
+            <span className="shortcut-btn-label">Pin live score</span>
           </button>
           <button className="broker-button" disabled={!deployment.available} title={!deployment.available ? 'Connect the hosted execution engine first.' : undefined} onClick={() => setBrokerDialog(true)}>
             <Link2 size={14} />

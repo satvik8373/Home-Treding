@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Check, Pin, Plus, Sparkles, Square, Tv } from 'lucide-react';
+import { Check, PictureInPicture2, Pin, Plus, Sparkles, Square, Tv } from 'lucide-react';
 import { Dialog } from './Dialog';
 import type { LiveScoreData } from '../lib/liveScore';
 import {
@@ -97,81 +97,85 @@ export function LiveScoreModal({ open, onClose, data, onSquareOff }: Props) {
       <div className="livescore-modal-content">
         <div className="dialog-title-group">
           <div className="livescore-badge">
-            <Plus size={13} strokeWidth={2.5} />
-            <span>ADD SHORTCUT & WIDGETS</span>
+            <PictureInPicture2 size={13} strokeWidth={2.5} />
+            <span>GOOGLE LIVE SCORE PIN</span>
           </div>
-          <h2 id="shortcut-modal-title">Add Shortcut & Live Widgets</h2>
+          <h2 id="shortcut-modal-title">Pin Live Score</h2>
           <p className="dialog-description">
-            Pin live P&L shortcuts, lock screen ticker, and floating widgets to your device.
+            Official lock screen match widget & floating score like Google cricket score.
           </p>
         </div>
 
-        {/* Live Cricket-Style Trading Match Bar */}
-        <div className="trading-match-bar" role="region" aria-label="Live Trading Match Score">
-          <div className="match-bar-top">
-            <div className="match-brand">
-              <span className={`match-dot ${data.running ? 'running' : 'stopped'}`} />
-              <span>NIFTY 50 · 009 BREAKOUT</span>
-            </div>
-            <span className="match-time-tag">
-              {data.running ? 'IN PLAY' : 'CUTOFF 15:10 IST'}
-            </span>
+        {/* Lock Screen Live Score Widget (Image 2 Reference) */}
+        <div className="lockscreen-preview-wrapper" role="region" aria-label="Lock Screen Live Score Widget">
+          <div className="lockscreen-clock-header">
+            <span className="lockscreen-date">Tuesday, Nov 17</span>
+            <span className="lockscreen-time">09:39</span>
           </div>
 
-          <div className="match-bar-body">
-            {/* Team 1: CALL (CE) */}
-            <div className="match-team call-team">
-              <div className="team-badge call-badge">
-                <span className="badge-type">CE</span>
-                <span className="badge-arrow">▲</span>
+          <div className="lockscreen-cricket-card">
+            <div className="lockscreen-card-main">
+              {/* Left Side: CALL (CE) Team */}
+              <div className="lockscreen-team left">
+                <div className="lockscreen-flag call-flag">
+                  <span className="flag-icon">CE</span>
+                  <span className="flag-sub">▲</span>
+                </div>
+                <div className="lockscreen-score-group">
+                  <strong className="lockscreen-score">
+                    {data.cePrice != null ? `₹${data.cePrice.toFixed(1)}` : 'Watch'}
+                  </strong>
+                  <span className="lockscreen-overs">({data.ceStrike ?? 'ATM'})</span>
+                </div>
               </div>
-              <div className="team-text">
-                <span className="team-strike">{data.ceStrike ? `C${data.ceStrike}` : 'CALL ATM'}</span>
-                <strong className="team-price">
-                  {data.cePrice != null ? `₹${data.cePrice.toFixed(1)}` : 'Watch'}
-                </strong>
-                <span className="team-status">{data.ceStatus || 'Watching'}</span>
+
+              {/* Center: Brand + Status Pill + Net P&L */}
+              <div className="lockscreen-center">
+                <div className="lockscreen-brand-icon">
+                  <span className="brand-monogram">M</span>
+                </div>
+                <div className={`lockscreen-status-pill ${data.running ? 'live' : 'stumps'}`}>
+                  {data.running ? '● LIVE' : 'Stumps'}
+                </div>
+                <div className={`lockscreen-center-pnl ${isPos ? 'pos' : isNeg ? 'neg' : ''}`}>
+                  {pnlFormatted}
+                </div>
+              </div>
+
+              {/* Right Side: PUT (PE) Team */}
+              <div className="lockscreen-team right">
+                <div className="lockscreen-score-group right">
+                  <strong className="lockscreen-score">
+                    {data.pePrice != null ? `₹${data.pePrice.toFixed(1)}` : 'Watch'}
+                  </strong>
+                  <span className="lockscreen-overs">({data.peStrike ?? 'ATM'})</span>
+                </div>
+                <div className="lockscreen-flag put-flag">
+                  <span className="flag-icon">PE</span>
+                  <span className="flag-sub">▼</span>
+                </div>
               </div>
             </div>
 
-            {/* Center: Live Indicator & Net P&L Score */}
-            <div className="match-center">
-              <div className={`match-live-pill ${data.running ? 'live' : 'pre'}`}>
-                <span className="live-pulse-dot" />
-                <span>{data.running ? 'LIVE' : 'PRE'}</span>
-              </div>
-              <div className={`match-pnl ${isPos ? 'positive' : isNeg ? 'negative' : ''}`}>
-                {pnlFormatted}
-              </div>
-              <div className="match-context-tag">
-                {data.spotPrice != null ? `₹${data.spotPrice.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : 'NIFTY'} · {data.atm ? `${data.atm}` : 'ATM'}
-              </div>
+            {/* Sub-labels row (SL - ICC - PAK style) */}
+            <div className="lockscreen-labels-row">
+              <span className="label-team left">CALL</span>
+              <span className="label-center">NIFTY 50 · {data.mode.toUpperCase()}</span>
+              <span className="label-team right">PUT</span>
             </div>
-
-            {/* Team 2: PUT (PE) */}
-            <div className="match-team put-team">
-              <div className="team-text">
-                <span className="team-strike">{data.peStrike ? `P${data.peStrike}` : 'PUT ATM'}</span>
-                <strong className="team-price">
-                  {data.pePrice != null ? `₹${data.pePrice.toFixed(1)}` : 'Watch'}
-                </strong>
-                <span className="team-status">{data.peStatus || 'Watching'}</span>
-              </div>
-              <div className="team-badge put-badge">
-                <span className="badge-type">PE</span>
-                <span className="badge-arrow">▼</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="match-bar-footer">
-            <span className="footer-stat">Open: {data.openPnl != null ? `₹${data.openPnl.toFixed(0)}` : '₹0'}</span>
-            <span className="footer-dot">•</span>
-            <span className="footer-stat">Realized: {data.realized != null ? `₹${data.realized.toFixed(0)}` : '₹0'}</span>
-            <span className="footer-dot">•</span>
-            <span className="footer-stat">{data.mode.toUpperCase()}</span>
           </div>
         </div>
+
+        {/* Primary Action Button: Google-style [ ⧉ Pin live score ] (Image 1 Reference) */}
+        <button
+          type="button"
+          className={`pin-live-score-btn ${floatingOn ? 'active' : ''}`}
+          disabled={!isFloatingWidgetSupported()}
+          onClick={handleToggleFloating}
+        >
+          <PictureInPicture2 size={18} />
+          <span>{floatingOn ? 'Pinned live score ✓' : 'Pin live score'}</span>
+        </button>
 
         {/* Shortcut & Widget Options */}
         <div className="livescore-features-list">
