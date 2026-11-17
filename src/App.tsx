@@ -3,8 +3,8 @@ import { directionOf, signFor } from '../shared/strategy'
 import type { StrategyDirection } from '../shared/strategy'
 import './components/StrategySettingsPanel.css'
 import { StrategySettingsPanel } from './components/StrategySettingsPanel'
-import { useCallback, useEffect, useState } from 'react'
-import { ChartNoAxesCombined, Check, FlaskConical, LayoutDashboard, Link2, Radio, RefreshCw, Settings2, ShieldCheck, UserRound, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ChartNoAxesCombined, Check, FlaskConical, LayoutDashboard, Link2, Plus, Radio, RefreshCw, Settings2, ShieldCheck, UserRound, X } from 'lucide-react'
 import type { Mode, Side } from '../shared/model'
 import { freshMark } from '../shared/market'
 import { BrokerDialog } from './components/BrokerDialog'
@@ -26,6 +26,8 @@ import { useDeployment } from './lib/deployment'
 import { WorkspaceSidebar } from './components/WorkspaceSidebar'
 import { currentView, workspacePages, type WorkspaceView } from './lib/workspace'
 import { useAccount } from './lib/account'
+import { LiveScoreModal } from './components/LiveScoreModal'
+import { updateFloatingLiveScore, type LiveScoreData } from './lib/liveScore'
 
 const viewIcons: Record<WorkspaceView, React.ComponentType<{ size?: number }>> = {
   market: LayoutDashboard,
@@ -55,6 +57,7 @@ export default function App() {
   const [view, setView] = useState<WorkspaceView>(currentView)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [liveScoreOpen, setLiveScoreOpen] = useState(false)
   const closeSidebar = useCallback(() => setSidebarOpen(false), [])
   const account = useAccount()
 
@@ -85,15 +88,47 @@ export default function App() {
   const realized = session?.pnlVerified
     ? Object.values(session.legs).reduce((sum, leg) => sum + leg!.realized, 0)
     : null
-  let openPnl: number | null = session ? 0 : null
-  for (const side of positions) {
-    const leg = session!.legs[side]!, mark = data?.marks[leg.contract.token]
-    if (!freshMark(mark, now)) { openPnl = null; break }
-    openPnl! += signFor(settingsFor(session)) * (mark.price - leg.position!.average) * leg.position!.quantity
-  }
+  const openPnl: number | null = (() => {
+    if (!session) return null
+    let sum = 0
+    for (const side of positions) {
+      const leg = session.legs[side]!, mark = data?.marks[leg.contract.token]
+      if (!freshMark(mark, now)) return null
+      sum += signFor(settingsFor(session)) * (mark.price - leg.position!.average) * leg.position!.quantity
+    }
+    return sum
+  })()
   const total = realized == null || openPnl == null ? null : realized + openPnl
   const identity = `${broker?.account ?? 'disconnected'}:${session?.id ?? 'no-session'}`
   const markFor = (side: Side) => session?.legs[side] ? data?.marks[session.legs[side]!.contract.token] : undefined
+
+  const spotPrice = data?.marks?.['26000']?.price ?? null
+  const ceLeg = session?.legs?.CE
+  const peLeg = session?.legs?.PE
+  const ceMark = ceLeg ? data?.marks?.[ceLeg.contract.token] : undefined
+  const peMark = peLeg ? data?.marks?.[peLeg.contract.token] : undefined
+
+  const liveScoreData: LiveScoreData = useMemo(() => ({
+    running,
+    status: session?.status ?? 'idle',
+    mode,
+    total,
+    openPnl,
+    realized,
+    spotPrice,
+    atm: session?.atm ?? null,
+    ceStrike: ceLeg?.contract?.strike ?? null,
+    cePrice: ceMark?.price ?? null,
+    ceStatus: ceLeg?.position ? 'Active' : 'Watching',
+    peStrike: peLeg?.contract?.strike ?? null,
+    pePrice: peMark?.price ?? null,
+    peStatus: peLeg?.position ? 'Active' : 'Watching',
+    updatedAt: now,
+  }), [running, session?.status, session?.atm, mode, total, openPnl, realized, spotPrice, ceLeg, peLeg, ceMark?.price, peMark?.price, now])
+
+  useEffect(() => {
+    updateFloatingLiveScore(liveScoreData)
+  }, [liveScoreData])
 
   return (
     <div className={`app-shell workspace-shell ${view === 'market' ? 'home-view' : ''}`}>
@@ -124,13 +159,22 @@ export default function App() {
         </nav>
 
         <div className="topbar-right">
+          <button
+            type="button"
+            className="topbar-shortcut-btn"
+            onClick={() => setLiveScoreOpen(true)}
+            title="Add Shortcut to Home Screen & Lock Screen Widget"
+          >
+            <Plus size={13} strokeWidth={2.5} />
+            <span className="shortcut-btn-label">Add Shortcut</span>
+          </button>
           <button className="broker-button" disabled={!deployment.available} title={!deployment.available ? 'Connect the hosted execution engine first.' : undefined} onClick={() => setBrokerDialog(true)}>
             <Link2 size={14} />
             <span className="broker-btn-label">{connected ? 'mStock connected' : broker?.connection?.phase === 'checking' || broker?.connection?.phase === 'retrying' ? 'Restoring' : broker?.linked ? 'Verify' : 'Connect'}</span>
             {connected && <Check size={13} />}
           </button>
           {account && (
-            <button className="nav-profile-btn" aria-label="Open account profile" onClick={() => setProfileOpen(true)} title={account.user?.name ?? 'Profile'}>
+            <button className="nav-profile-btn" onClick={() => setProfileOpen(true)} title={account.user?.name ?? 'Profile'}>
               <UserRound size={15} />
               <span className="profile-name">{account.user?.name ? account.user.name.split(' ')[0] : 'Profile'}</span>
             </button>
@@ -139,7 +183,6 @@ export default function App() {
       </header>
 
       <main id="workspace-content" tabIndex={-1}>
-        {view !== 'audit' && <h1 className="visually-hidden">{workspacePages[view].title}</h1>}
         {view === 'audit' && (
           <div className="page-heading">
             <div className="page-title-group">
@@ -208,6 +251,19 @@ export default function App() {
 
             </div>
 
+            {/* Middle Row: Official Market Chart */}
+            <div className="dashboard-chart-row">
+              <MarketChart
+                connected={connected}
+                identity={identity}
+                now={now}
+                marks={data?.marks ?? {}}
+                legs={session?.legs ?? {}}
+                trades={session?.trades ?? []}
+                settings={session ? settingsFor(session) : selectedSettings}
+              />
+            </div>
+
             {/* Strategy Positions (Old Perfect Simple & Clean) */}
             <section className="dashboard-positions-section" aria-labelledby="strategy-positions-title">
               <div className="section-heading">
@@ -228,21 +284,8 @@ export default function App() {
               </div>
             </section>
 
-            {/* Middle Row: Official Market Chart */}
-            <div className="dashboard-chart-row">
-              <MarketChart
-                connected={connected}
-                identity={identity}
-                now={now}
-                marks={data?.marks ?? {}}
-                legs={session?.legs ?? {}}
-                trades={session?.trades ?? []}
-                settings={session ? settingsFor(session) : selectedSettings}
-              />
-            </div>
-
             {/* Session Orders & Executed Trades (Old Perfect Simple & Clean) */}
-            <section className="dashboard-orders-section" aria-label="Session orders and trades">
+            <section className="dashboard-orders-section" aria-labelledby="session-orders-title">
               <OrdersPanel session={session} />
               <TradesPanel exportAvailable={!!session} trades={session?.trades ?? []} />
               <details className="panel activity-panel">
@@ -271,6 +314,12 @@ export default function App() {
       <AccountProfile open={profileOpen} onOpenChange={setProfileOpen} hideTrigger broker={broker} persistence={data?.persistence} onBroker={() => setBrokerDialog(true)} onSettings={() => navigate('settings')} />
       {brokerDialog && <BrokerDialog broker={broker} locked={locked} online={online} working={working} error={error} action={action} onClose={() => setBrokerDialog(false)} />}
       {rulesDialog && <RulesDialog settings={locked || dayLocked ? settingsFor(session) : selectedSettings} onClose={() => setRulesDialog(false)} />}
+      <LiveScoreModal
+        open={liveScoreOpen}
+        onClose={() => setLiveScoreOpen(false)}
+        data={liveScoreData}
+        onSquareOff={() => void action('/api/strategy/stop', {}, 'stop')}
+      />
 
       {/* Mobile App Bottom Tab Bar (Apple/Fintech Dock) */}
       <nav className="mobile-bottom-bar" aria-label="Mobile Navigation">
