@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Check, Pin, Plus, Smartphone, Sparkles, Square, Tv } from 'lucide-react';
+import { Check, Pin, Plus, Sparkles, Square, Tv } from 'lucide-react';
 import { Dialog } from './Dialog';
 import type { LiveScoreData } from '../lib/liveScore';
 import {
@@ -156,14 +156,14 @@ export function LiveScoreModal({ open, onClose, data, onSquareOff }: Props) {
 
         {/* Shortcut & Widget Options */}
         <div className="livescore-features-list">
-          {/* Feature 1: Lock Screen Live Ticker */}
+          {/* Feature 1: Pinned Live Notification */}
           <div className="livescore-feature-row">
             <div className="feature-icon-wrap">
-              <Smartphone size={20} />
+              <Pin size={20} />
             </div>
             <div className="feature-info">
-              <strong>Lock Screen Shortcut & Ticker</strong>
-              <p>Silent in-place card on phone & desktop lock screen. Updates live every tick without buzzing.</p>
+              <strong>Pinned Live Notification</strong>
+              <p>Silent pinned card in your phone/desktop notification drawer. Updates quietly in-place without popup banners or buzzing.</p>
               {permState === 'denied' && (
                 <span className="feature-warn">Notifications blocked in browser site permissions.</span>
               )}
@@ -177,12 +177,12 @@ export function LiveScoreModal({ open, onClose, data, onSquareOff }: Props) {
               {lockScreenOn ? (
                 <>
                   <Check size={14} />
-                  <span>Added</span>
+                  <span>Pinned</span>
                 </>
               ) : (
                 <>
-                  <Plus size={14} />
-                  <span>Add Shortcut</span>
+                  <Pin size={14} />
+                  <span>Pin Notification</span>
                 </>
               )}
             </button>
@@ -195,7 +195,7 @@ export function LiveScoreModal({ open, onClose, data, onSquareOff }: Props) {
             </div>
             <div className="feature-info">
               <strong>Floating Live Widget</strong>
-              <p>Always-on-top mini card floating over WhatsApp, TradingView, or home screen (Picture-in-Picture).</p>
+              <p>Always-on-top mini live card floating over WhatsApp, TradingView, or home screen (Picture-in-Picture).</p>
             </div>
             <button
               type="button"
@@ -210,7 +210,7 @@ export function LiveScoreModal({ open, onClose, data, onSquareOff }: Props) {
                 </>
               ) : (
                 <>
-                  <Pin size={14} />
+                  <Tv size={14} />
                   <span>Pin Widget</span>
                 </>
               )}

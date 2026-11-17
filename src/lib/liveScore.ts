@@ -28,6 +28,10 @@ let activeVideo: HTMLVideoElement | null = null;
 let latestData: LiveScoreData | null = null;
 let squareOffCallback: (() => void) | null = null;
 let lockScreenActive = false;
+let lastNotifTitle = '';
+let lastNotifBody = '';
+let lastNotifTime = 0;
+const MIN_NOTIF_INTERVAL_MS = 4000;
 
 export function isLockScreenSupported(): boolean {
   return typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator;
@@ -73,7 +77,6 @@ export async function updateLockScreenNotification(data: LiveScoreData): Promise
   if (!lockScreenActive || !isLockScreenSupported() || Notification.permission !== 'granted') return;
 
   try {
-    const reg = await navigator.serviceWorker.ready;
     const pnlPrefix = data.total != null && data.total >= 0 ? '+₹' : '-₹';
     const pnlFormatted = data.total != null ? `${pnlPrefix}${Math.abs(data.total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
     const spotText = data.spotPrice != null ? `₹${data.spotPrice.toLocaleString('en-IN', { minimumFractionDigits: 1 })}` : '—';
@@ -85,16 +88,34 @@ export async function updateLockScreenNotification(data: LiveScoreData): Promise
     const title = `${statusEmoji} MAVRIX · P&L: ${pnlFormatted} (${data.mode.toUpperCase()})`;
     const body = `NIFTY: ${spotText} | ATM: ${data.atm ?? 'Auto'}\n${ceText} · ${peText}`;
 
-    // tag: 'mavrix-live-score' ensures OS updates in-place like a sports score
-    // renotify: false ensures silent update without vibrating on every tick
+    // Deduplicate: If notification text is unchanged, do not re-show
+    if (title === lastNotifTitle && body === lastNotifBody) {
+      return;
+    }
+
+    const now = Date.now();
+    // Throttle: ensure at least MIN_NOTIF_INTERVAL_MS between updates to prevent rapid popups
+    if (lastNotifTime > 0 && now - lastNotifTime < MIN_NOTIF_INTERVAL_MS) {
+      return;
+    }
+
+    lastNotifTitle = title;
+    lastNotifBody = body;
+    lastNotifTime = now;
+
+    const reg = await navigator.serviceWorker.ready;
+
+    // tag: 'mavrix-live-score' ensures OS keeps one pinned card in notification tray
+    // renotify: false ensures silent update without vibrating or heads-up popups
+    // requireInteraction: false ensures it stays pinned silently in tray, not popping up as an alert
     const notifOptions: NotificationOptions & { renotify?: boolean; actions?: Array<{ action: string; title: string }> } = {
       body,
       tag: 'mavrix-live-score',
       renotify: false,
       silent: true,
+      requireInteraction: false,
       icon: '/mavrix-icon.jpg',
       badge: '/mavrix-icon.jpg',
-      requireInteraction: data.running,
       data: { url: '/' },
       actions: data.running
         ? [
@@ -116,6 +137,9 @@ export async function updateLockScreenNotification(data: LiveScoreData): Promise
 }
 
 export async function clearLockScreenNotification(): Promise<void> {
+  lastNotifTitle = '';
+  lastNotifBody = '';
+  lastNotifTime = 0;
   if (!isLockScreenSupported()) return;
   try {
     const reg = await navigator.serviceWorker.ready;

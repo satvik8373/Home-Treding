@@ -123,8 +123,8 @@ export default function App() {
     peStrike: peLeg?.contract?.strike ?? null,
     pePrice: peMark?.price ?? null,
     peStatus: peLeg?.position ? 'Active' : 'Watching',
-    updatedAt: now,
-  }), [running, session?.status, session?.atm, mode, total, openPnl, realized, spotPrice, ceLeg, peLeg, ceMark?.price, peMark?.price, now])
+    updatedAt: 0,
+  }), [running, session?.status, session?.atm, mode, total, openPnl, realized, spotPrice, ceLeg, peLeg, ceMark?.price, peMark?.price])
 
   useEffect(() => {
     updateFloatingLiveScore(liveScoreData)
