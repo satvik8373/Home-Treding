@@ -3,6 +3,7 @@ import { Check, PictureInPicture2, Pin, Plus, Sparkles, Square, Tv } from 'lucid
 import { Dialog } from './Dialog';
 import type { LiveScoreData } from '../lib/liveScore';
 import {
+  isIOS,
   isLockScreenSupported,
   isFloatingWidgetSupported,
   isLockScreenActive,
@@ -28,6 +29,7 @@ interface BeforeInstallPromptEvent extends Event {
 export function LiveScoreModal({ open, onClose, data, onSquareOff }: Props) {
   const [lockScreenOn, setLockScreenOn] = useState(isLockScreenActive());
   const [floatingOn, setFloatingOn] = useState(isFloatingActive());
+  const [iosNotice, setIosNotice] = useState<string | null>(null);
   const [permState, setPermState] = useState<string>(() =>
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
   );
@@ -60,10 +62,14 @@ export function LiveScoreModal({ open, onClose, data, onSquareOff }: Props) {
       if (granted) {
         setLockScreenActive(true);
         setLockScreenOn(true);
+        if (isIOS()) {
+          setIosNotice('Lock Screen Live Card is now active! Lock your iPhone or check Control Center.');
+        }
       }
     } else {
       setLockScreenActive(false);
       setLockScreenOn(false);
+      setIosNotice(null);
     }
   };
 
@@ -71,9 +77,13 @@ export function LiveScoreModal({ open, onClose, data, onSquareOff }: Props) {
     if (!floatingOn) {
       const success = await openFloatingLiveScore(data, onSquareOff);
       setFloatingOn(success);
+      if (success && isIOS()) {
+        setIosNotice('Pinned! Lock your iPhone to view the live cricket score card on your Lock Screen & Dynamic Island.');
+      }
     } else {
       await closeFloatingLiveScore();
       setFloatingOn(false);
+      setIosNotice(null);
     }
   };
 
@@ -177,6 +187,17 @@ export function LiveScoreModal({ open, onClose, data, onSquareOff }: Props) {
           <span>{floatingOn ? 'Pinned live score ✓' : 'Pin live score'}</span>
         </button>
 
+        {/* iOS Lock Screen Feedback Toast */}
+        {iosNotice && (
+          <div className="livescore-ios-notice" role="status">
+            <span className="ios-notice-icon">📱</span>
+            <div className="ios-notice-text">
+              <strong>iPhone Lock Screen Live</strong>
+              <span>{iosNotice}</span>
+            </div>
+          </div>
+        )}
+
         {/* Shortcut & Widget Options */}
         <div className="livescore-features-list">
           {/* Feature 1: Pinned Live Notification */}
@@ -187,8 +208,14 @@ export function LiveScoreModal({ open, onClose, data, onSquareOff }: Props) {
             <div className="feature-info">
               <strong>Pinned Live Notification</strong>
               <p>Silent pinned card in your phone/desktop notification drawer. Updates quietly in-place without popup banners or buzzing.</p>
-              {permState === 'denied' && (
-                <span className="feature-warn">Notifications blocked in browser site permissions.</span>
+              {isIOS() ? (
+                <span className="feature-ios-hint">
+                  🍎 <strong>iPhone Safari:</strong> Uses native Lock Screen Live Card. For system push banners, add app to Home Screen.
+                </span>
+              ) : (
+                permState === 'denied' && (
+                  <span className="feature-warn">Notifications blocked in browser site permissions.</span>
+                )
               )}
             </div>
             <button

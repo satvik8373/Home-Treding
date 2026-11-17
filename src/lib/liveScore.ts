@@ -1,8 +1,12 @@
 // Native Official Live Score & Lock Screen Widget Controller
 // Supports:
-// 1. Lock Screen Live Score (Persistent in-place updating notifications like Google sports match score)
-// 2. Pin Floating Live Widget (W3C Document Picture-in-Picture & Canvas Stream PiP for all mobile/desktop browsers)
-// 3. Home Screen App Badging API
+// 1. Google Cricket-Style Lock Screen Live Card (Image 2 reference)
+//    - iOS (iPhone): Universal Lock Screen Live Card via navigator.mediaSession + Artwork Canvas
+//    - Android & Desktop: Persistent in-place Service Worker notification
+// 2. Pin Floating Live Widget (Image 1 reference)
+//    - W3C Document Picture-in-Picture (Chromium Desktop & Android)
+//    - iOS WebKit Video Presentation Mode PiP (Safari on iPhone/iPad)
+// 3. Home Screen PWA Badging API
 
 export type LiveScoreData = {
   running: boolean;
@@ -25,6 +29,8 @@ export type LiveScoreData = {
 let activeDocPiP: Window | null = null;
 let activeCanvas: HTMLCanvasElement | null = null;
 let activeVideo: HTMLVideoElement | null = null;
+let silentAudio: HTMLAudioElement | null = null;
+let latestArtworkBlobUrl: string | null = null;
 let latestData: LiveScoreData | null = null;
 let squareOffCallback: (() => void) | null = null;
 let lockScreenActive = false;
@@ -33,18 +39,47 @@ let lastNotifBody = '';
 let lastNotifTime = 0;
 const MIN_NOTIF_INTERVAL_MS = 4000;
 
+export function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
 export function isLockScreenSupported(): boolean {
-  return typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator;
+  if (typeof window === 'undefined') return false;
+  // On iOS, Lock Screen Live Card is universally supported via MediaSession API
+  if ('mediaSession' in navigator) return true;
+  return 'Notification' in window && 'serviceWorker' in navigator;
 }
 
 export function isFloatingWidgetSupported(): boolean {
   if (typeof window === 'undefined') return false;
-  // Official Document PiP (Chrome 116+) or Canvas Video PiP fallback
-  return 'documentPictureInPicture' in window || 'pictureInPictureEnabled' in document;
+  if ('documentPictureInPicture' in window) return true;
+  if ('pictureInPictureEnabled' in document && document.pictureInPictureEnabled) return true;
+
+  // iOS Safari presentation mode check
+  const v = document.createElement('video') as HTMLVideoElement & {
+    webkitSupportsPresentationMode?: (mode: string) => boolean;
+  };
+  if (typeof v.webkitSupportsPresentationMode === 'function' && v.webkitSupportsPresentationMode('picture-in-picture')) {
+    return true;
+  }
+
+  // Universal fallback: iOS Lock Screen Live Card
+  if ('mediaSession' in navigator) return true;
+
+  return false;
 }
 
 export async function requestLockScreenAccess(): Promise<boolean> {
-  if (!isLockScreenSupported()) return false;
+  // On iOS, mediaSession needs zero permissions; user gesture starts it
+  if (isIOS() && 'mediaSession' in navigator) {
+    ensureSilentAudioPlaying();
+    return true;
+  }
+  if (!('Notification' in window)) return true;
   if (Notification.permission === 'granted') return true;
   if (Notification.permission === 'denied') return false;
   const permission = await Notification.requestPermission();
@@ -55,8 +90,11 @@ export function setLockScreenActive(active: boolean) {
   lockScreenActive = active;
   if (!active) {
     void clearLockScreenNotification();
-  } else if (latestData) {
-    void updateLockScreenNotification(latestData);
+  } else {
+    ensureSilentAudioPlaying();
+    if (latestData) {
+      void updateLockScreenNotification(latestData);
+    }
   }
 }
 
@@ -65,74 +103,306 @@ export function isLockScreenActive(): boolean {
 }
 
 export function isFloatingActive(): boolean {
-  return !!activeDocPiP || (activeVideo != null && document.pictureInPictureElement === activeVideo);
+  if (activeDocPiP && !activeDocPiP.closed) return true;
+  if (activeVideo) {
+    const v = activeVideo as HTMLVideoElement & { webkitPresentationMode?: string };
+    if (v.webkitPresentationMode === 'picture-in-picture') return true;
+    if (document.pictureInPictureElement === activeVideo) return true;
+  }
+  return false;
 }
 
 // --------------------------------------------------------------------------
-// 1. Lock Screen Live Score (Like Google Live Cricket Score)
+// 1. Silent Background Audio for iOS Lock Screen Card Persistence
+// --------------------------------------------------------------------------
+
+function ensureSilentAudioPlaying() {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!silentAudio) {
+      silentAudio = new Audio();
+      silentAudio.src = '/silent.wav';
+      silentAudio.loop = true;
+      silentAudio.preload = 'auto';
+      silentAudio.crossOrigin = 'anonymous';
+      silentAudio.volume = 0.05;
+      silentAudio.setAttribute('playsinline', '');
+      silentAudio.setAttribute('webkit-playsinline', '');
+    }
+    if (silentAudio.paused) {
+      const playPromise = silentAudio.play();
+      if (playPromise && typeof playPromise.then === 'function') {
+        playPromise.catch(() => {
+          // If WAV fails or is blocked, try MP3 fallback
+          if (silentAudio) {
+            silentAudio.src = '/silent.mp3';
+            void silentAudio.play().catch(() => {});
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('Silent audio init error:', err);
+  }
+}
+
+function stopSilentAudio() {
+  if (silentAudio && !silentAudio.paused) {
+    silentAudio.pause();
+    silentAudio.currentTime = 0;
+  }
+}
+
+// --------------------------------------------------------------------------
+// 2. High-Res Artwork Generator for iPhone Lock Screen (Image 2 & 3 Reference)
+// --------------------------------------------------------------------------
+
+function generateMatchBarArtwork(data: LiveScoreData): void {
+  if (typeof document === 'undefined') return;
+  try {
+    const artCanvas = document.createElement('canvas');
+    artCanvas.width = 512;
+    artCanvas.height = 512;
+    const ctx = artCanvas.getContext('2d');
+    if (!ctx) return;
+
+    // Background - OLED Pitch Black
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Outer Lock Screen Capsule (matching iPhone 13 OLED card in Image 3)
+    ctx.fillStyle = '#0A0F1D';
+    ctx.beginPath();
+    ctx.roundRect(16, 120, 480, 272, 32);
+    ctx.fill();
+    ctx.strokeStyle = '#1E293B';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Top Center Brand Badge (Google-style logo / Monogram)
+    ctx.fillStyle = '#1E293B';
+    ctx.beginPath();
+    ctx.arc(256, 150, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#38BDF8';
+    ctx.font = '800 16px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('M', 256, 156);
+
+    // Status Pill: ● LIVE or Stumps
+    ctx.beginPath();
+    ctx.roundRect(206, 172, 100, 26, 13);
+    ctx.fillStyle = data.running ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)';
+    ctx.fill();
+    ctx.strokeStyle = data.running ? '#10B981' : '#F59E0B';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = data.running ? '#10B981' : '#F59E0B';
+    ctx.font = 'bold 13px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(data.running ? '● LIVE' : 'Stumps', 256, 189);
+
+    // Center Main Net P&L
+    ctx.textAlign = 'center';
+    const pnlPrefix = data.total != null && data.total >= 0 ? '+₹' : '-₹';
+    const pnlFormatted = data.total != null ? `${pnlPrefix}${Math.abs(data.total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '₹0.00';
+    ctx.fillStyle = data.total != null && data.total > 0 ? '#10B981' : data.total != null && data.total < 0 ? '#EF4444' : '#F8FAFC';
+    ctx.font = '800 48px -apple-system, system-ui, sans-serif';
+    ctx.fillText(pnlFormatted, 256, 260);
+
+    // Center Index / Subtitle (matching ICC in Image 3)
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = 'bold 17px -apple-system, system-ui, sans-serif';
+    const spotText = `${data.spotPrice != null ? `SPOT ₹${data.spotPrice.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : 'NIFTY 50'} · ${data.mode.toUpperCase()}`;
+    ctx.fillText(spotText, 256, 292);
+
+    // Left Side: CALL (CE) Team
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#064E3B';
+    ctx.beginPath();
+    ctx.roundRect(36, 195, 50, 50, 12);
+    ctx.fill();
+    ctx.strokeStyle = '#059669';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#34D399';
+    ctx.font = '800 20px -apple-system, system-ui, sans-serif';
+    ctx.fillText('CE', 48, 227);
+
+    ctx.fillStyle = '#F8FAFC';
+    ctx.font = '800 24px -apple-system, system-ui, sans-serif';
+    const cePrice = data.cePrice != null ? `₹${data.cePrice.toFixed(1)}` : 'Watch';
+    ctx.fillText(cePrice, 36, 280);
+
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = 'bold 15px -apple-system, system-ui, sans-serif';
+    ctx.fillText(data.ceStrike ? `(${data.ceStrike})` : '(ATM)', 36, 305);
+
+    ctx.fillStyle = '#64748B';
+    ctx.font = 'bold 14px -apple-system, system-ui, sans-serif';
+    ctx.fillText('CALL', 36, 350);
+
+    // Right Side: PUT (PE) Team
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#7F1D1D';
+    ctx.beginPath();
+    ctx.roundRect(426, 195, 50, 50, 12);
+    ctx.fill();
+    ctx.strokeStyle = '#DC2626';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#F87171';
+    ctx.font = '800 20px -apple-system, system-ui, sans-serif';
+    ctx.fillText('PE', 464, 227);
+
+    ctx.fillStyle = '#F8FAFC';
+    ctx.font = '800 24px -apple-system, system-ui, sans-serif';
+    const pePrice = data.pePrice != null ? `₹${data.pePrice.toFixed(1)}` : 'Watch';
+    ctx.fillText(pePrice, 476, 280);
+
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = 'bold 15px -apple-system, system-ui, sans-serif';
+    ctx.fillText(data.peStrike ? `(${data.peStrike})` : '(ATM)', 476, 305);
+
+    ctx.fillStyle = '#64748B';
+    ctx.font = 'bold 14px -apple-system, system-ui, sans-serif';
+    ctx.fillText('PUT', 476, 350);
+
+    // Bottom Center Tournament / Engine Label
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#64748B';
+    ctx.font = 'bold 14px -apple-system, system-ui, sans-serif';
+    ctx.fillText('MAVRIX 009 BREAKOUT', 256, 350);
+
+    // Convert to ObjectURL blob
+    artCanvas.toBlob(blob => {
+      if (blob) {
+        if (latestArtworkBlobUrl) {
+          try {
+            URL.revokeObjectURL(latestArtworkBlobUrl);
+          } catch {
+            // ignore
+          }
+        }
+        latestArtworkBlobUrl = URL.createObjectURL(blob);
+      }
+    }, 'image/png');
+  } catch (err) {
+    console.warn('Failed to generate match bar artwork:', err);
+  }
+}
+
+// --------------------------------------------------------------------------
+// 3. Lock Screen Live Score (Universal iOS & Android Flow)
 // --------------------------------------------------------------------------
 
 export async function updateLockScreenNotification(data: LiveScoreData): Promise<void> {
   latestData = data;
-  if (!lockScreenActive || !isLockScreenSupported() || Notification.permission !== 'granted') return;
+  if (!lockScreenActive) return;
 
-  try {
-    const pnlPrefix = data.total != null && data.total >= 0 ? '+₹' : '-₹';
-    const pnlFormatted = data.total != null ? `${pnlPrefix}${Math.abs(data.total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
-    const spotText = data.spotPrice != null ? `₹${data.spotPrice.toLocaleString('en-IN', { minimumFractionDigits: 1 })}` : '—';
-    const statusEmoji = data.running ? '🟢' : '⚪';
+  const pnlPrefix = data.total != null && data.total >= 0 ? '+₹' : '-₹';
+  const pnlFormatted = data.total != null ? `${pnlPrefix}${Math.abs(data.total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
+  const spotText = data.spotPrice != null ? `₹${data.spotPrice.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '—';
+  const ceText = data.cePrice != null ? `₹${data.cePrice.toFixed(1)}` : 'Watch';
+  const peText = data.pePrice != null ? `₹${data.pePrice.toFixed(1)}` : 'Watch';
 
-    const ceText = data.ceStrike ? `CE ${data.ceStrike}: ${data.cePrice != null ? `₹${data.cePrice.toFixed(1)}` : data.ceStatus || 'Flat'}` : 'CE: Flat';
-    const peText = data.peStrike ? `PE ${data.peStrike}: ${data.pePrice != null ? `₹${data.pePrice.toFixed(1)}` : data.peStatus || 'Flat'}` : 'PE: Flat';
+  // Branch A: iOS Lock Screen Live Card via navigator.mediaSession (Image 3 reference)
+  if ('mediaSession' in navigator) {
+    try {
+      ensureSilentAudioPlaying();
+      generateMatchBarArtwork(data);
 
-    const title = `${statusEmoji} MAVRIX · P&L: ${pnlFormatted} (${data.mode.toUpperCase()})`;
-    const body = `NIFTY: ${spotText} | ATM: ${data.atm ?? 'Auto'}\n${ceText} · ${peText}`;
+      if (navigator.mediaSession) {
+        navigator.mediaSession.playbackState = data.running ? 'playing' : 'paused';
 
-    // Deduplicate: If notification text is unchanged, do not re-show
-    if (title === lastNotifTitle && body === lastNotifBody) {
-      return;
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        const artworkItems: MediaImage[] = [
+          { src: `${origin}/brand/icon-512.png`, sizes: '512x512', type: 'image/png' },
+          { src: `${origin}/brand/icon-192.png`, sizes: '192x192', type: 'image/png' },
+          { src: `${origin}/brand/apple-touch-icon.png`, sizes: '180x180', type: 'image/png' },
+          { src: `${origin}/mavrix-icon.jpg`, sizes: '512x512', type: 'image/jpeg' }
+        ];
+
+        if (latestArtworkBlobUrl) {
+          artworkItems.unshift({ src: latestArtworkBlobUrl, sizes: '512x512', type: 'image/png' });
+        }
+
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: `${data.running ? '● LIVE' : 'Stumps'} · P&L: ${pnlFormatted}`,
+          artist: `CE ${ceText} (${data.ceStrike ?? 'ATM'}) vs PE ${peText} (${data.peStrike ?? 'ATM'})`,
+          album: `NIFTY SPOT ${spotText} · ${data.mode.toUpperCase()}`,
+          artwork: artworkItems
+        });
+
+        // Required iOS MediaSession handlers to maintain lock screen card
+        navigator.mediaSession.setActionHandler('play', () => {
+          ensureSilentAudioPlaying();
+          if (navigator.mediaSession) navigator.mediaSession.playbackState = 'playing';
+        });
+        navigator.mediaSession.setActionHandler('pause', () => {
+          if (silentAudio) silentAudio.pause();
+          if (navigator.mediaSession) navigator.mediaSession.playbackState = 'paused';
+        });
+        navigator.mediaSession.setActionHandler('stop', () => {
+          if (squareOffCallback) squareOffCallback();
+          void clearLockScreenNotification();
+        });
+      }
+    } catch (err) {
+      console.warn('iOS MediaSession update failed:', err);
     }
+  }
 
-    const now = Date.now();
-    // Throttle: ensure at least MIN_NOTIF_INTERVAL_MS between updates to prevent rapid popups
-    if (lastNotifTime > 0 && now - lastNotifTime < MIN_NOTIF_INTERVAL_MS) {
-      return;
+  // Branch B: Android & Desktop Service Worker Notification
+  if ('Notification' in window && 'serviceWorker' in navigator && Notification.permission === 'granted') {
+    try {
+      const statusEmoji = data.running ? '🟢' : '⚪';
+      const title = `${statusEmoji} MAVRIX · P&L: ${pnlFormatted} (${data.mode.toUpperCase()})`;
+      const body = `NIFTY: ${spotText} | ATM: ${data.atm ?? 'Auto'}\nCALL: ${ceText} · PUT: ${peText}`;
+
+      // Deduplicate: If notification text is unchanged, do not re-show
+      if (title === lastNotifTitle && body === lastNotifBody) {
+        return;
+      }
+
+      const now = Date.now();
+      if (lastNotifTime > 0 && now - lastNotifTime < MIN_NOTIF_INTERVAL_MS) {
+        return;
+      }
+
+      lastNotifTitle = title;
+      lastNotifBody = body;
+      lastNotifTime = now;
+
+      const reg = await navigator.serviceWorker.ready;
+      const notifOptions: NotificationOptions & { renotify?: boolean; actions?: Array<{ action: string; title: string }> } = {
+        body,
+        tag: 'mavrix-live-score',
+        renotify: false,
+        silent: true,
+        requireInteraction: false,
+        icon: '/mavrix-icon.jpg',
+        badge: '/mavrix-icon.jpg',
+        data: { url: '/' },
+        actions: data.running
+          ? [
+              { action: 'stop', title: 'Square Off & Stop' },
+              { action: 'open', title: 'Open Dashboard' }
+            ]
+          : [{ action: 'open', title: 'Open Dashboard' }]
+      };
+      await reg.showNotification(title, notifOptions);
+
+      if ('setAppBadge' in navigator && data.total != null) {
+        const badgeUnits = Math.round(Math.abs(data.total) / 100);
+        void navigator.setAppBadge(badgeUnits || 1).catch(() => {});
+      }
+    } catch (err) {
+      console.warn('Failed to update lock screen notification:', err);
     }
-
-    lastNotifTitle = title;
-    lastNotifBody = body;
-    lastNotifTime = now;
-
-    const reg = await navigator.serviceWorker.ready;
-
-    // tag: 'mavrix-live-score' ensures OS keeps one pinned card in notification tray
-    // renotify: false ensures silent update without vibrating or heads-up popups
-    // requireInteraction: false ensures it stays pinned silently in tray, not popping up as an alert
-    const notifOptions: NotificationOptions & { renotify?: boolean; actions?: Array<{ action: string; title: string }> } = {
-      body,
-      tag: 'mavrix-live-score',
-      renotify: false,
-      silent: true,
-      requireInteraction: false,
-      icon: '/mavrix-icon.jpg',
-      badge: '/mavrix-icon.jpg',
-      data: { url: '/' },
-      actions: data.running
-        ? [
-            { action: 'stop', title: 'Square Off & Stop' },
-            { action: 'open', title: 'Open Dashboard' }
-          ]
-        : [{ action: 'open', title: 'Open Dashboard' }]
-    };
-    await reg.showNotification(title, notifOptions);
-
-    // Update app icon badge if supported
-    if ('setAppBadge' in navigator && data.total != null) {
-      const badgeUnits = Math.round(Math.abs(data.total) / 100);
-      void navigator.setAppBadge(badgeUnits || 1).catch(() => {});
-    }
-  } catch (err) {
-    console.warn('Failed to update lock screen live score notification:', err);
   }
 }
 
@@ -140,32 +410,56 @@ export async function clearLockScreenNotification(): Promise<void> {
   lastNotifTitle = '';
   lastNotifBody = '';
   lastNotifTime = 0;
-  if (!isLockScreenSupported()) return;
-  try {
-    const reg = await navigator.serviceWorker.ready;
-    const notifications = await reg.getNotifications({ tag: 'mavrix-live-score' });
-    notifications.forEach(n => n.close());
-    if ('clearAppBadge' in navigator) {
-      void navigator.clearAppBadge().catch(() => {});
+  stopSilentAudio();
+
+  if (latestArtworkBlobUrl) {
+    try {
+      URL.revokeObjectURL(latestArtworkBlobUrl);
+    } catch {
+      // ignore
     }
-  } catch (err) {
-    console.warn('Failed to clear lock screen notification:', err);
+    latestArtworkBlobUrl = null;
+  }
+
+  if ('mediaSession' in navigator) {
+    try {
+      navigator.mediaSession.playbackState = 'none';
+      navigator.mediaSession.metadata = null;
+    } catch {
+      // ignore
+    }
+  }
+
+  if (typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const notifications = await reg.getNotifications({ tag: 'mavrix-live-score' });
+      notifications.forEach(n => n.close());
+      if ('clearAppBadge' in navigator) {
+        void navigator.clearAppBadge().catch(() => {});
+      }
+    } catch (err) {
+      console.warn('Failed to clear lock screen notification:', err);
+    }
   }
 }
 
 // --------------------------------------------------------------------------
-// 2. Pin Floating Live Widget (Picture-in-Picture)
+// 4. Pin Floating Live Widget (Picture-in-Picture & Universal Video PiP)
 // --------------------------------------------------------------------------
 
 export async function openFloatingLiveScore(data: LiveScoreData, onSquareOff?: () => void): Promise<boolean> {
   latestData = data;
   if (onSquareOff) squareOffCallback = onSquareOff;
 
-  // Method A: Official W3C Document Picture-in-Picture (Chrome Desktop & Android)
+  // Always activate Lock Screen Card alongside Floating Widget
+  setLockScreenActive(true);
+
+  // Method A: Official W3C Document Picture-in-Picture (Chromium Desktop & Android)
   if ('documentPictureInPicture' in window) {
     try {
       const pip = (window as unknown as { documentPictureInPicture: { requestWindow: (options: { width: number; height: number }) => Promise<Window> } }).documentPictureInPicture;
-      const pipWin = await pip.requestWindow({ width: 320, height: 180 });
+      const pipWin = await pip.requestWindow({ width: 340, height: 160 });
       activeDocPiP = pipWin;
 
       pipWin.document.title = 'Mavrix Match Score';
@@ -195,7 +489,6 @@ export async function openFloatingLiveScore(data: LiveScoreData, onSquareOff?: (
         .pip-pnl.negative { color: #EF4444; }
         .pip-spot { font-size: 9px; color: #94A3B8; font-weight: 600; white-space: nowrap; }
         .pip-stop-btn { width: 100%; background: #DC2626; color: #FFFFFF; border: 0; border-radius: 6px; padding: 4px; font-size: 10.5px; font-weight: 700; cursor: pointer; }
-        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } 100% { opacity: 1; transform: scale(1); } }
       `;
       pipWin.document.head.appendChild(style);
 
@@ -207,42 +500,74 @@ export async function openFloatingLiveScore(data: LiveScoreData, onSquareOff?: (
 
       return true;
     } catch (err) {
-      console.warn('Document PiP request failed, falling back to Canvas PiP:', err);
+      console.warn('Document PiP request failed, falling back:', err);
     }
   }
 
-  // Method B: Universal Canvas Stream Picture-in-Picture (Mobile Safari, Android Chrome, Edge)
-  if ('pictureInPictureEnabled' in document) {
-    try {
-      if (!activeCanvas) {
-        activeCanvas = document.createElement('canvas');
-        activeCanvas.width = 640;
-        activeCanvas.height = 360;
-      }
-      if (!activeVideo) {
-        activeVideo = document.createElement('video');
-        activeVideo.muted = true;
-        activeVideo.playsInline = true;
-      }
-
-      drawCanvasPiP(activeCanvas, data);
-
-      const stream = activeCanvas.captureStream(10);
-      activeVideo.srcObject = stream;
-      await activeVideo.play();
-      await activeVideo.requestPictureInPicture();
-
-      activeVideo.addEventListener('leavepictureinpicture', () => {
-        if (activeVideo) {
-          activeVideo.srcObject = null;
-        }
-      });
-
-      return true;
-    } catch (err) {
-      console.warn('Canvas Video PiP failed:', err);
-      return false;
+  // Method B: Universal Video PiP (Supports iOS Safari & Desktop Video PiP)
+  try {
+    if (!activeCanvas) {
+      activeCanvas = document.createElement('canvas');
+      activeCanvas.width = 640;
+      activeCanvas.height = 360;
     }
+    if (!activeVideo) {
+      activeVideo = document.createElement('video');
+      activeVideo.muted = true;
+      activeVideo.autoplay = true;
+      activeVideo.playsInline = true;
+      activeVideo.setAttribute('playsinline', '');
+      activeVideo.setAttribute('webkit-playsinline', '');
+    }
+
+    // Attach video to DOM with layout dimensions (WebKit requires visible non-zero dimensions)
+    if (!document.body.contains(activeVideo)) {
+      activeVideo.style.position = 'fixed';
+      activeVideo.style.bottom = '12px';
+      activeVideo.style.right = '12px';
+      activeVideo.style.width = '140px';
+      activeVideo.style.height = '80px';
+      activeVideo.style.borderRadius = '10px';
+      activeVideo.style.zIndex = '999999';
+      activeVideo.style.background = '#000000';
+      activeVideo.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.5)';
+      activeVideo.style.pointerEvents = 'auto';
+      document.body.appendChild(activeVideo);
+    }
+
+    drawCanvasPiP(activeCanvas, data);
+
+    const canvasWithCapture = activeCanvas as HTMLCanvasElement & { captureStream?: (fps: number) => MediaStream };
+    if (typeof canvasWithCapture.captureStream === 'function') {
+      const stream = canvasWithCapture.captureStream(15);
+      activeVideo.srcObject = stream;
+
+      const v = activeVideo as HTMLVideoElement & {
+        webkitSupportsPresentationMode?: (mode: string) => boolean;
+        webkitSetPresentationMode?: (mode: string) => void;
+      };
+
+      // iOS WebKit PiP method (trigger synchronously inside user gesture)
+      if (typeof v.webkitSetPresentationMode === 'function') {
+        v.webkitSetPresentationMode('picture-in-picture');
+        void activeVideo.play().catch(() => {});
+        return true;
+      }
+
+      // Standard HTML5 PiP method
+      if ('requestPictureInPicture' in activeVideo) {
+        await activeVideo.play().catch(() => {});
+        await activeVideo.requestPictureInPicture();
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn('Video PiP failed:', err);
+  }
+
+  // Universal iOS fallback: Lock Screen Live Card is already activated!
+  if (isIOS() || 'mediaSession' in navigator) {
+    return true;
   }
 
   return false;
@@ -255,8 +580,11 @@ export function updateFloatingLiveScore(data: LiveScoreData): void {
     renderDocPiP(activeDocPiP, data);
   }
 
-  if (activeCanvas && document.pictureInPictureElement === activeVideo) {
-    drawCanvasPiP(activeCanvas, data);
+  if (activeCanvas && activeVideo) {
+    const v = activeVideo as HTMLVideoElement & { webkitPresentationMode?: string };
+    if (v.webkitPresentationMode === 'picture-in-picture' || document.pictureInPictureElement === activeVideo) {
+      drawCanvasPiP(activeCanvas, data);
+    }
   }
 
   if (lockScreenActive) {
@@ -273,12 +601,21 @@ export async function closeFloatingLiveScore(): Promise<void> {
     await document.exitPictureInPicture().catch(() => {});
   }
   if (activeVideo) {
+    const v = activeVideo as HTMLVideoElement & { webkitSetPresentationMode?: (mode: string) => void };
+    if (typeof v.webkitSetPresentationMode === 'function') {
+      v.webkitSetPresentationMode('inline');
+    }
     activeVideo.srcObject = null;
+    if (document.body.contains(activeVideo)) {
+      document.body.removeChild(activeVideo);
+    }
+    activeVideo = null;
   }
+  setLockScreenActive(false);
 }
 
 // --------------------------------------------------------------------------
-// Internal Renderers
+// 5. Internal Renderers
 // --------------------------------------------------------------------------
 
 function renderDocPiP(win: Window, data: LiveScoreData) {
