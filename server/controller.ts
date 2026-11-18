@@ -36,6 +36,13 @@ export class Controller {
   private stopRequested = false
   private queue: Promise<unknown> = Promise.resolve()
   private auth: { id: string; apiKey: string; username: string; expires: number; attempts: number; method?: 'totp'; expectedAccount?: string; verifiedCredentials?: import('./store.ts').SavedBroker } | null = null
+  prepareRouteChange(): void {
+    if (this.busy || this.restoring) throw new Error('Wait for the current broker request before changing execution IP.')
+    if (active(this.session) || hasExposure(this.session) || this.session?.status === 'blocked') throw new Error('Stop and flatten the strategy before releasing or changing execution IP.')
+    if (this.broker.credentials || this.store.broker()) throw new Error('Disconnect mStock before releasing or changing execution IP.')
+    this.auth = null
+    this.connectionGeneration++
+  }
   private lastQuotes = 0
   private quotesInFlight = false
   private lastPositionCheck = 0
@@ -414,7 +421,19 @@ export class Controller {
     const buy = reason === 'BREAKOUT'
     if (buy && (this.stopRequested || session.status !== 'running' || !session.pnlVerified
       || !settingsFor(session).enabledSides.includes(side) || this.now() >= istTime(session.date, settingsFor(session).cutoff))) return
-    const mark = this.fresh(side)
+    let mark = this.fresh(side)
+    if (buy && !mark) {
+      try {
+        const quotes = await this.broker.quotes([leg.contract])
+        for (const m of quotes) {
+          this.marks[m.token] = m
+          this.feed.onMark(m)
+        }
+        mark = this.fresh(side)
+      } catch {
+        // REST quote fetch failure falls through to fresh check
+      }
+    }
     if (buy && !mark) {
       this.note(`${side} entry skipped: waiting for a fresh official market price.`); return
     }
@@ -427,7 +446,18 @@ export class Controller {
     // Stop can arrive while broker position verification is in flight.
     if (buy && (this.stopRequested || this.now() >= istTime(session.date, settingsFor(session).cutoff))) return
     if (buy && !this.fresh(side)) {
-      this.note(`${side} entry skipped: the live price became stale during broker verification.`); return
+      try {
+        const quotes = await this.broker.quotes([leg.contract])
+        for (const m of quotes) {
+          this.marks[m.token] = m
+          this.feed.onMark(m)
+        }
+      } catch {
+        // REST quote fetch failure falls through
+      }
+      if (!this.fresh(side)) {
+        this.note(`${side} entry skipped: the live price became stale during broker verification.`); return
+      }
     }
     const intent: OrderIntent = { id: randomUUID(), tag: `n009${randomUUID().replaceAll('-', '').slice(0, 14)}`,
       side, symbol: leg.contract.symbol, instrumentToken: leg.contract.token, expiry: leg.contract.expiry, product: productFor(settingsFor(session)), transaction: buy ? entryTransaction(settingsFor(session)) : exitTransaction(settingsFor(session)), quantity, reason, submittedAt: this.now() }
@@ -447,7 +477,9 @@ export class Controller {
         this.note(`${side} order rejected: ${error.message}`, 'error'); return
       }
       this.audit(intent, { status: 'unknown', detail: 'Submission outcome unknown. Do not assume rejected or filled. No automatic resend.' })
-      session.status = 'blocked'; this.note('Order submission outcome is unknown. Reconciling by its saved tag; it will never be resent automatically.', 'error'); return
+      session.status = 'blocked'; this.note('Order submission outcome is unknown. Reconciling by its saved tag; it will never be resent automatically.', 'error')
+      await this.resolvePending()
+      return
     }
     await this.resolvePending()
   }
