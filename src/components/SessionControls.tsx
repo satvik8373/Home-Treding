@@ -68,6 +68,7 @@ export function SessionControls({
             >
               <option value="buy">009 Breakout – Buy</option>
               <option value="sell">009 Breakout – Sell</option>
+              <option value="both">009 Breakout – Both (Buy & Sell)</option>
             </select>
           ) : (
             <h2>{strategyName(settings)}</h2>

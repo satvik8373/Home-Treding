@@ -28,29 +28,30 @@ const commonColumns = [...timeColumns('fill'), 'timezone', 'strategy', 'strategy
 
 export function tradesReport(session: TradingSession | null, exportedAt = Date.now()) {
   const settings = settingsFor(session), rows: Row[] = []
-  const cycles = new Map<string, { id: string; price: number; at: number; remaining: number; valid: boolean }>()
+  const cycles = new Map<string, { id: string; price: number; at: number; remaining: number; valid: boolean; transaction: 'BUY' | 'SELL' }>()
   let realized = 0, estimated = 0
   for (const trade of [...(session?.trades ?? [])].sort((a, b) => a.at - b.at)) {
     const key = `${trade.side}:${trade.symbol}`
     let cycle = cycles.get(key), matched = true
     if (trade.reason === 'BREAKOUT') {
       matched = !cycle?.remaining
-      cycle = { id: trade.id, price: trade.price, at: trade.at, remaining: trade.quantity, valid: matched }
+      cycle = { id: trade.id, price: trade.price, at: trade.at, remaining: trade.quantity, valid: matched, transaction: trade.transaction }
       cycles.set(key, cycle)
     } else if (!cycle || cycle.remaining < trade.quantity) { matched = false; cycle = undefined; cycles.delete(key) }
     else cycle.remaining -= trade.quantity
     const candidate = session?.legs[trade.side]
     const leg = candidate?.contract.symbol === trade.symbol ? candidate : undefined
     realized = rounded(realized + (trade.pnl ?? 0)); estimated = rounded(estimated + settings.feePerOrderEstimate)
+    const posDir: 'buy' | 'sell' = directionOf(settings) === 'sell' ? 'sell' : directionOf(settings) === 'both' ? (cycle?.transaction === 'SELL' ? 'sell' : 'buy') : 'buy'
     rows.push({ ...istFields(trade.at), timezone: 'Asia/Kolkata (UTC+05:30)', strategy: strategyName(settings), strategy_direction: directionOf(settings), timestamp_basis: trade.mode === 'paper' ? 'Paper simulation timestamp' : 'Engine fill-confirmation timestamp; exchange fill time not captured',
       session_date: session?.date, mode: trade.mode, broker_product: productFor(settings), side: trade.side, symbol: trade.symbol, transaction: trade.transaction,
       quantity_units: trade.quantity, lot_size_units: leg?.contract.lotSize, lots: leg ? trade.quantity / leg.contract.lotSize : null,
       fill_price_inr: trade.price, premium_value_inr: rounded(trade.quantity * trade.price), premium_cash_flow_inr: rounded((trade.transaction === 'BUY' ? -1 : 1) * trade.quantity * trade.price),
       reason: trade.reason, order_id: trade.orderId, trade_id: trade.id, cycle_id: cycle?.valid ? cycle.id : null,
       entry_datetime_ist: cycle?.valid ? istFields(cycle.at).fill_datetime_ist : null, entry_price_inr: cycle?.valid ? cycle.price : null, remaining_cycle_units: cycle?.remaining,
-      cycle_match: matched && cycle?.valid ? 'MATCHED' : 'UNMATCHED_OR_OVERLAPPING_HISTORY', reference_close_inr: leg?.reference.close, breakout_level_inr: leg ? entryLevel(leg, settings) : null, lower_exit_level_inr: leg?.lower, upper_exit_level_inr: leg?.upper, candle_exit_level_inr: directionOf(settings) === 'sell' ? leg?.upper : leg?.lower,
-      reference_stop_inr: leg && (settings.stopLossPoints ?? 0) > 0 ? referenceStop(leg.reference.close, settings) : null,
-      target1_price_inr: cycle && settings.target1Lots > 0 ? targetPrice(settings, 1, cycle.price) : null, target2_price_inr: cycle ? targetPrice(settings, 2, cycle.price) : null,
+      cycle_match: matched && cycle?.valid ? 'MATCHED' : 'UNMATCHED_OR_OVERLAPPING_HISTORY', reference_close_inr: leg?.reference.close, breakout_level_inr: leg ? entryLevel(leg, settings) : null, lower_exit_level_inr: leg?.lower, upper_exit_level_inr: leg?.upper, candle_exit_level_inr: posDir === 'sell' ? leg?.upper : leg?.lower,
+      reference_stop_inr: leg && (settings.stopLossPoints ?? 0) > 0 ? referenceStop(leg.reference.close, settings, posDir) : null,
+      target1_price_inr: cycle && settings.target1Lots > 0 ? targetPrice(settings, 1, cycle.price, posDir) : null, target2_price_inr: cycle ? targetPrice(settings, 2, cycle.price, posDir) : null,
       target1_rule: targetLabel(settings, 1), target2_rule: targetLabel(settings, 2),
       target1_deadline_ist: cycle && session && settings.target1Lots ? istFields(targetDeadline(settings, 1, cycle.at, session.date)).fill_datetime_ist : null,
       target2_deadline_ist: cycle && session ? istFields(targetDeadline(settings, 2, cycle.at, session.date)).fill_datetime_ist : null,

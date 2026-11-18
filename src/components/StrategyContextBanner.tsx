@@ -45,6 +45,7 @@ export function StrategyContextBanner({
               >
                 <option value="buy">009 Breakout – Buy</option>
                 <option value="sell">009 Breakout – Sell</option>
+                <option value="both">009 Breakout – Both (Buy & Sell)</option>
               </select>
               <ChevronDown size={14} className="select-arrow" />
             </div>

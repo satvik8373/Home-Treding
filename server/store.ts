@@ -80,7 +80,8 @@ export class Store {
     mode: Mode,
     direction: StrategyDirection = 'buy',
   ): TradingSession | null {
-    return this.get(`session:${date}:${account}:${mode}${direction === 'sell' ? ':sell' : ''}`);
+    const suffix = direction === 'sell' ? ':sell' : direction === 'both' ? ':both' : '';
+    return this.get(`session:${date}:${account}:${mode}${suffix}`);
   }
   saveSession(value: TradingSession): void {
     this.db.exec("BEGIN IMMEDIATE");
@@ -89,7 +90,9 @@ export class Store {
       this.history.capture(value, changed);
       this.put("session", value);
       this.put(`session:history:${value.id}`, value);
-      this.put(`session:${value.date}:${value.account}:${value.mode}${directionOf(value.settings) === 'sell' ? ':sell' : ''}`, value);
+      const dir = directionOf(value.settings);
+      const suffix = dir === 'sell' ? ':sell' : dir === 'both' ? ':both' : '';
+      this.put(`session:${value.date}:${value.account}:${value.mode}${suffix}`, value);
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");

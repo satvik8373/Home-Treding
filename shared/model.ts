@@ -47,6 +47,7 @@ export interface Position {
   average: number;
   target1Remaining: number;
   entryQuantity: number;
+  direction?: 'buy' | 'sell';
 }
 export interface Leg {
   lastDecision?: { candle: Candle; evaluatedAt: number; signal: 'BREAKOUT' | 'LOWER_CLOSE' | 'UPPER_CLOSE' | null; explanation: string };
@@ -62,6 +63,7 @@ export interface Leg {
   firstSignalConsumed?: boolean;
   lastCandleEnd: number;
   exitReason: Exclude<Reason, "BREAKOUT"> | null;
+  pendingDirection?: 'buy' | 'sell' | null;
 }
 export interface OrderIntent {
   product?: import('./settings.ts').BrokerProduct;
@@ -148,7 +150,7 @@ export interface BrokerStatus {
 export interface AppState {
   persistence?: { firestore: 'unconfigured' | 'pending' | 'synced' | 'unavailable'; lastSyncedAt: number | null; historyFirestore?: 'unconfigured' | 'pending' | 'synced' | 'unavailable'; historyLastSyncedAt?: number | null };
   runtime?: { kind: 'hosted-paper'; liveExecution: false; reason: string };
-  strategyProfiles?: { buy: StrategySettings; sell: StrategySettings };
+  strategyProfiles?: { buy: StrategySettings; sell: StrategySettings; both?: StrategySettings };
   savedSettings?: StrategySettings;
   csrf: string;
   serverTime: number;

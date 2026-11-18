@@ -179,8 +179,8 @@ export function createApp(
       res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid proxy configuration.' });
     }
   });
-  app.get('/api/strategy/settings', (req, res) => res.json({ saved: controller.strategySettings(req.query.strategy === 'sell' ? 'sell' : 'buy'), profiles: { buy: controller.strategySettings('buy'), sell: controller.strategySettings('sell') }, effective: controller.session?.settings ?? DEFAULT_SETTINGS, defaults: DEFAULT_SETTINGS }));
-  app.post('/api/strategy/settings', (req, res) => { const saved = controller.saveStrategySettings(req.body); repository.put(directionOf(saved) === 'sell' ? 'strategy:settings:sell' : 'strategy:settings', saved); res.json({ saved, appliesTo: 'next trading day; today retains the same saved day-session' }); });
+  app.get('/api/strategy/settings', (req, res) => res.json({ saved: controller.strategySettings(req.query.strategy === 'sell' ? 'sell' : req.query.strategy === 'both' ? 'both' : 'buy'), profiles: { buy: controller.strategySettings('buy'), sell: controller.strategySettings('sell'), both: controller.strategySettings('both') }, effective: controller.session?.settings ?? DEFAULT_SETTINGS, defaults: DEFAULT_SETTINGS }));
+  app.post('/api/strategy/settings', (req, res) => { const saved = controller.saveStrategySettings(req.body); const key = directionOf(saved) === 'sell' ? 'strategy:settings:sell' : directionOf(saved) === 'both' ? 'strategy:settings:both' : 'strategy:settings'; repository.put(key, saved); res.json({ saved, appliesTo: 'next trading day; today retains the same saved day-session' }); });
   app.get('/api/audit', async (_req, res) => res.json(await audit.read()));
   app.get('/api/analytics', (req, res) => res.json(analytics.read(req.query)));
   app.get('/api/analytics/session/:id', async (req, res) => res.json(await analytics.detail(String(req.params.id), req.query)));
@@ -354,7 +354,7 @@ export function createApp(
     if (mode === "live" && req.body.liveAcknowledged !== true)
       throw new Error("Confirm live orders before starting.");
     const direction = req.body.strategy ?? 'buy';
-    if (!['buy', 'sell'].includes(direction)) throw new Error('Choose the Buy or Sell strategy.');
+    if (!['buy', 'sell', 'both'].includes(direction)) throw new Error('Choose the Buy, Sell, or Both strategy.');
     await controller.start(mode as "paper" | "live", direction);
     res.status(202).json({ ok: true });
   });

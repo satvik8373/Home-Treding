@@ -20,7 +20,7 @@ import { clock } from './lib/format'
 import { BacktestPanel } from './components/BacktestPanel'
 import { TransparencyPanel } from './components/TransparencyPanel'
 import { AnalyticsPanel } from './components/AnalyticsPanel'
-import { DEFAULT_SETTINGS, SELL_DEFAULT_SETTINGS, settingsFor } from '../shared/settings'
+import { DEFAULT_SETTINGS, SELL_DEFAULT_SETTINGS, BOTH_DEFAULT_SETTINGS, settingsFor } from '../shared/settings'
 import { useDashboard } from './hooks/useDashboard'
 import { useDeployment } from './lib/deployment'
 import { WorkspaceSidebar } from './components/WorkspaceSidebar'
@@ -77,7 +77,7 @@ export default function App() {
   const engineSession = data?.session, broker = data?.broker, connected = !!broker?.connected
   const engineLocked = !!engineSession && (['armed', 'preparing', 'running', 'stopping'].includes(engineSession.status) || !!engineSession.pending || Object.values(engineSession.legs).some(leg => !!leg?.position))
   const chosenDirection = engineLocked ? directionOf(engineSession?.settings) : selectedDirection ?? directionOf(engineSession?.settings)
-  const selectedSettings = data?.strategyProfiles?.[chosenDirection] ?? (chosenDirection === 'sell' ? SELL_DEFAULT_SETTINGS : data?.savedSettings ?? DEFAULT_SETTINGS)
+  const selectedSettings = data?.strategyProfiles?.[chosenDirection] ?? (chosenDirection === 'sell' ? SELL_DEFAULT_SETTINGS : chosenDirection === 'both' ? BOTH_DEFAULT_SETTINGS : data?.savedSettings ?? DEFAULT_SETTINGS)
   const session = engineSession && directionOf(engineSession.settings) === chosenDirection ? engineSession : undefined
   const running = !!session && ['armed', 'preparing', 'running', 'stopping'].includes(session.status)
   const sides: Side[] = ['CE', 'PE']

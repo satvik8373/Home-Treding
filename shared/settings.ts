@@ -17,13 +17,14 @@ export const productFor = (settings?: Pick<StrategySettings, 'product'> | null):
 export const DEFAULT_SETTINGS: StrategySettings = { breakoutPercent: 0.09, exitPercent: 0.09, entryLots: 4, target1Lots: 2,
   target1Points: 20, target2Points: 40, stopLossPoints: 25, cutoff: '15:10', maxEntriesPerLeg: 0, enabledSides: ['CE', 'PE'], feePerOrderEstimate: 0 }
 export const SELL_DEFAULT_SETTINGS: StrategySettings = { ...DEFAULT_SETTINGS, direction: 'sell' }
+export const BOTH_DEFAULT_SETTINGS: StrategySettings = { ...DEFAULT_SETTINGS, direction: 'both' }
 // Sessions saved before rule snapshots existed used 3 lots and a 1+2 split.
 export const LEGACY_SETTINGS: StrategySettings = { ...DEFAULT_SETTINGS, entryLots: 3, target1Lots: 1, stopLossPoints: 0 }
 export function validateSettings(input: unknown): StrategySettings {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Strategy settings must be an object.')
   const body = input as Record<string, unknown>
   if (body.product !== undefined && body.product !== 'MIS' && body.product !== 'NRML') throw new Error('Choose Day Trade (MIS) or Carry Forward (NRML) for NIFTY options.')
-  if (body.direction !== undefined && !['buy', 'sell'].includes(String(body.direction))) throw new Error('Choose the Buy or Sell strategy.')
+  if (body.direction !== undefined && !['buy', 'sell', 'both'].includes(String(body.direction))) throw new Error('Choose the Buy, Sell, or Both strategy.')
   const number = (key: keyof StrategySettings, min: number, max: number, integer = false) => {
     const value = body[key]
     if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max || integer && !Number.isInteger(value)) throw new Error(`${key} must be ${integer ? 'an integer ' : ''}from ${min} to ${max}.`)
@@ -53,7 +54,7 @@ export function validateSettings(input: unknown): StrategySettings {
   const target1Rule = rule('target1Rule'), target2Rule = rule('target2Rule')
   const one = target1Rule ?? { kind: 'points', value: target1Points }, two = target2Rule ?? { kind: 'points', value: target2Points }
   if (target1Lots > 0 && one.kind === two.kind && ('time' in one && 'time' in two ? two.time <= one.time : 'value' in one && 'value' in two && two.value <= one.value)) throw new Error('For the same target type, target 2 must be above/later than target 1.')
-  return { ...(body.product !== undefined ? { product: body.product as BrokerProduct } : {}), ...(body.direction === 'sell' ? { direction: 'sell' as const } : {}), ...(target1Rule ? { target1Rule } : {}), ...(target2Rule ? { target2Rule } : {}), breakoutPercent: number('breakoutPercent', 0.01, 10), exitPercent: number('exitPercent', 0.01, 10), entryLots, target1Lots, target1Points, target2Points, stopLossPoints: body.stopLossPoints === undefined ? 0 : number('stopLossPoints', 0, 2000),
+  return { ...(body.product !== undefined ? { product: body.product as BrokerProduct } : {}), ...(body.direction === 'sell' ? { direction: 'sell' as const } : body.direction === 'both' ? { direction: 'both' as const } : {}), ...(target1Rule ? { target1Rule } : {}), ...(target2Rule ? { target2Rule } : {}), breakoutPercent: number('breakoutPercent', 0.01, 10), exitPercent: number('exitPercent', 0.01, 10), entryLots, target1Lots, target1Points, target2Points, stopLossPoints: body.stopLossPoints === undefined ? 0 : number('stopLossPoints', 0, 2000),
     cutoff: body.cutoff, maxEntriesPerLeg: number('maxEntriesPerLeg', 0, 100, true), enabledSides: [...body.enabledSides].sort() as Side[], feePerOrderEstimate: number('feePerOrderEstimate', 0, 1000) }
 }
 export function settingsFor(session?: { settings?: StrategySettings } | null): StrategySettings { return session ? session.settings ?? LEGACY_SETTINGS : DEFAULT_SETTINGS }

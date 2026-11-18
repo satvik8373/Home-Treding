@@ -1,4 +1,4 @@
-import { directionOf, signFor, entryTransaction, exitTransaction, isBeyondEntry } from '../shared/strategy.ts'
+import { directionOf, signFor, isBeyondEntry } from '../shared/strategy.ts'
 import type { StrategyDirection } from '../shared/strategy.ts'
 import { randomUUID } from 'node:crypto'
 import type { Activity, AppState, BrokerConnection, Candle, Mark, Mode, OrderAudit, OrderIntent, Reason, Side, TradingSession } from '../shared/model.ts'
@@ -9,7 +9,7 @@ import { applyFill, candleSignal, levels, observeReentry, orderQuantity, priceEx
 import { completedBoundary, isTradingDay, istDate, istTime } from './time.ts'
 import type { Store } from './store.ts'
 import type { MarketFeed } from './feed.ts'
-import { DEFAULT_SETTINGS, SELL_DEFAULT_SETTINGS, sameSettings, settingsFor, validateSettings, productFor } from '../shared/settings.ts'
+import { DEFAULT_SETTINGS, SELL_DEFAULT_SETTINGS, BOTH_DEFAULT_SETTINGS, sameSettings, settingsFor, validateSettings, productFor } from '../shared/settings.ts'
 import type { StrategySettings } from '../shared/settings.ts'
 import { rejectionSummary, matchesPositionRow, isNiftyDerivativePosition } from './orderIdentity.ts'
 
@@ -55,6 +55,7 @@ export class Controller {
   private savedSession = ''
   private suspended = false
   private sellPreferences: StrategySettings = structuredClone(SELL_DEFAULT_SETTINGS)
+  private bothPreferences: StrategySettings = structuredClone(BOTH_DEFAULT_SETTINGS)
   private preferences: StrategySettings = structuredClone(DEFAULT_SETTINGS)
   constructor(public broker: TradingBroker & Partial<Pick<MStock, 'login' | 'verify' | 'verifyAccount' | 'logout' | 'onAuthFailure' | 'setFetcher'>>,
     private store: Repository, public feed: Feed, private now = Date.now) {
@@ -69,6 +70,9 @@ export class Controller {
     const savedSell = store.get?.('strategy:settings:sell')
     if (savedSell) this.sellPreferences = validateSettings({ ...(savedSell as object), direction: 'sell' })
     else { this.sellPreferences = { ...structuredClone(this.preferences), direction: 'sell' }; store.put?.('strategy:settings:sell', this.sellPreferences) }
+    const savedBoth = store.get?.('strategy:settings:both')
+    if (savedBoth) this.bothPreferences = validateSettings({ ...(savedBoth as object), direction: 'both' })
+    else { this.bothPreferences = { ...structuredClone(this.preferences), direction: 'both' }; store.put?.('strategy:settings:both', this.bothPreferences) }
     feed.onMark = mark => {
       if (this.suspended) return
       if (!freshMark(mark, this.now())) return
@@ -94,12 +98,15 @@ export class Controller {
     feed.onChange = () => this.onChange()
   }
   connected(): boolean { return this.verified && !!this.broker.credentials && this.broker.credentials.expiresAt > this.now() }
-  strategySettings(direction: StrategyDirection = 'buy'): StrategySettings { return structuredClone(direction === 'sell' ? this.sellPreferences : this.preferences) }
+  strategySettings(direction: StrategyDirection = 'buy'): StrategySettings { return structuredClone(direction === 'sell' ? this.sellPreferences : direction === 'both' ? this.bothPreferences : this.preferences) }
   saveStrategySettings(input: unknown): StrategySettings {
     const settings = validateSettings(input)
     if (!this.store.put) throw new Error('Persistent settings storage is unavailable.')
-    this.store.put(directionOf(settings) === 'sell' ? 'strategy:settings:sell' : 'strategy:settings', settings)
-    if (directionOf(settings) === 'sell') this.sellPreferences = settings; else this.preferences = settings
+    const key = directionOf(settings) === 'sell' ? 'strategy:settings:sell' : directionOf(settings) === 'both' ? 'strategy:settings:both' : 'strategy:settings'
+    this.store.put(key, settings)
+    if (directionOf(settings) === 'sell') this.sellPreferences = settings
+    else if (directionOf(settings) === 'both') this.bothPreferences = settings
+    else this.preferences = settings
     this.onChange(); return structuredClone(settings)
   }
   private connectionSnapshot(): BrokerConnection {
@@ -114,7 +121,7 @@ export class Controller {
   }
   snapshot(csrf = ''): AppState {
     const credentials = this.broker.credentials
-    return { csrf, persistence: this.persistence?.(), runtime: this.execution, strategyProfiles: { buy: this.strategySettings('buy'), sell: this.strategySettings('sell') }, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { linked: credentials ? { account: credentials.account, name: credentials.name, totpRenewal: credentials.authMethod === 'totp' } : null, verificationMethod: credentials?.authMethod ?? null, connection: this.connectionSnapshot(), connected: this.connected(),
+    return { csrf, persistence: this.persistence?.(), runtime: this.execution, strategyProfiles: { buy: this.strategySettings('buy'), sell: this.strategySettings('sell'), both: this.strategySettings('both') }, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { linked: credentials ? { account: credentials.account, name: credentials.name, totpRenewal: credentials.authMethod === 'totp' } : null, verificationMethod: credentials?.authMethod ?? null, connection: this.connectionSnapshot(), connected: this.connected(),
       account: this.connected() ? credentials!.account : null, name: this.connected() ? credentials!.name : null,
       expiresAt: credentials?.expiresAt ?? null, feed: this.feed.status, lastTickAt: this.feed.lastTickAt },
       session: this.session, marks: this.marks }
@@ -459,8 +466,15 @@ export class Controller {
         this.note(`${side} entry skipped: the live price became stale during broker verification.`); return
       }
     }
+    const dir = directionOf(settingsFor(session))
+    const intentDirection: 'buy' | 'sell' = buy
+      ? (dir === 'both' ? (leg.pendingDirection ?? 'buy') : (dir === 'sell' ? 'sell' : 'buy'))
+      : (leg.position?.direction ?? (dir === 'sell' ? 'sell' : 'buy'))
+    const transaction = buy
+      ? (intentDirection === 'sell' ? 'SELL' : 'BUY')
+      : (intentDirection === 'sell' ? 'BUY' : 'SELL')
     const intent: OrderIntent = { id: randomUUID(), tag: `n009${randomUUID().replaceAll('-', '').slice(0, 14)}`,
-      side, symbol: leg.contract.symbol, instrumentToken: leg.contract.token, expiry: leg.contract.expiry, product: productFor(settingsFor(session)), transaction: buy ? entryTransaction(settingsFor(session)) : exitTransaction(settingsFor(session)), quantity, reason, submittedAt: this.now() }
+      side, symbol: leg.contract.symbol, instrumentToken: leg.contract.token, expiry: leg.contract.expiry, product: productFor(settingsFor(session)), transaction, quantity, reason, submittedAt: this.now() }
     if (session.mode === 'paper') {
       if (!mark) { this.note(`${side} paper exit is waiting for a verified market price.`); return }
       applyFill(session, intent, { orderId: `PAPER-${intent.id}`, quantity, average: mark.price, status: 'COMPLETE' }, this.now())
@@ -612,7 +626,7 @@ export class Controller {
           const unseen = bars.filter(c => c.end <= boundary && c.end > leg.lastCandleEnd).sort((a, b) => a.end - b.end)
           if (!leg.position && (leg.entries > 0 || leg.firstSignalConsumed)) {
             // Older saved sessions have no gate metadata: infer the last full exit while flat and fail closed without one.
-            if (leg.entries > 0) leg.lastExitAt ??= session.trades.findLast(trade => trade.side === side && trade.transaction === exitTransaction(settingsFor(session)))?.at ?? this.now()
+            if (leg.entries > 0) leg.lastExitAt ??= session.trades.findLast(trade => trade.side === side && (trade.transaction === 'SELL' || trade.transaction === 'BUY') && trade.reason !== 'BREAKOUT')?.at ?? this.now()
             for (const bar of unseen) {
               observeReentry(leg, bar, this.now(), settingsFor(session))
               if (bar !== unseen.at(-1) && validCandle(bar) && isBeyondEntry(bar.close, leg, settingsFor(session))) leg.reentryReady = false
@@ -625,7 +639,7 @@ export class Controller {
           if (!candle) return
           const signal = candleSignal(leg, candle, this.now(), session.date, settingsFor(session))
           if (!leg.position && validCandle(candle) && isBeyondEntry(candle.close, leg, settingsFor(session))) { leg.firstSignalConsumed = true; leg.reentryReady = false }
-          leg.lastDecision = { candle, evaluatedAt: this.now(), signal, explanation: signal === 'BREAKOUT' ? leg.entries > 0 ? directionOf(settingsFor(session)) === 'sell' ? 'A post-exit close above the fixed lower breakout was followed by a later close below it.' : 'A post-exit close below the fixed breakout level was followed by a later close above it.' : 'Completed close reached the breakout level while flat.' : signal === 'UPPER_CLOSE' ? 'Completed close rose above the upper exit while short.' : signal === 'LOWER_CLOSE' ? 'Completed close fell below the lower exit while holding units.' : leg.position ? 'No completed-candle lower exit. Fresh-price targets remain monitored.' : !settingsFor(session).enabledSides.includes(side) ? 'Leg disabled in this session settings.' : settingsFor(session).maxEntriesPerLeg && leg.entries >= settingsFor(session).maxEntriesPerLeg ? 'Configured entry limit reached.' : (leg.entries > 0 || leg.firstSignalConsumed) && !leg.reentryReady ? directionOf(settingsFor(session)) === 'sell' ? 'Fresh-cross gate locked: waiting for a completed close above the original lower breakout, then a later close below it.' : 'Fresh-cross gate locked: waiting for a completed close below the original breakout level, then a later close above it.' : this.now() - candle.end > 90_000 ? 'Candle too old for a new entry.' : 'Completed close did not meet the entry rule.' }
+          leg.lastDecision = { candle, evaluatedAt: this.now(), signal, explanation: signal === 'BREAKOUT' ? leg.entries > 0 ? directionOf(settingsFor(session)) === 'both' ? 'A post-exit reset was followed by a breakout.' : directionOf(settingsFor(session)) === 'sell' ? 'A post-exit close above the fixed lower breakout was followed by a later close below it.' : 'A post-exit close below the fixed breakout level was followed by a later close above it.' : 'Completed close reached the breakout level while flat.' : signal === 'UPPER_CLOSE' ? 'Completed close rose above the upper exit while short.' : signal === 'LOWER_CLOSE' ? 'Completed close fell below the lower exit while holding units.' : leg.position ? 'No completed-candle lower exit. Fresh-price targets remain monitored.' : !settingsFor(session).enabledSides.includes(side) ? 'Leg disabled in this session settings.' : settingsFor(session).maxEntriesPerLeg && leg.entries >= settingsFor(session).maxEntriesPerLeg ? 'Configured entry limit reached.' : (leg.entries > 0 || leg.firstSignalConsumed) && !leg.reentryReady ? directionOf(settingsFor(session)) === 'both' ? 'Fresh-cross gate locked: waiting for a completed close inside the channel.' : directionOf(settingsFor(session)) === 'sell' ? 'Fresh-cross gate locked: waiting for a completed close above the original lower breakout, then a later close below it.' : 'Fresh-cross gate locked: waiting for a completed close below the original breakout level, then a later close above it.' : this.now() - candle.end > 90_000 ? 'Candle too old for a new entry.' : 'Completed close did not meet the entry rule.' }
           session.decisionAudit ??= []
           session.decisionAudit.push({ side, ...leg.lastDecision })
           leg.lastCandleEnd = candle.end; this.save()

@@ -61,9 +61,9 @@ export function StrategySettingsPanel({ saved, effective, active, hasSession = a
         <section className="settings-section" aria-labelledby="entry-settings-title">
           <div className="settings-section-heading"><span className="settings-section-icon"><ArrowUpRight size={18} /></span><div><h3 id="entry-settings-title">Entry setup</h3><p>Size and conditions for each new position.</p></div><span className="settings-section-number">01</span></div>
           <div className="settings-field-grid">
-            {numberField('entryLots', 'Entry size', directionOf(saved) === 'sell' ? 'Lots sold short per enabled leg.' : 'Lots bought per enabled leg.', 'lots')}
+            {numberField('entryLots', 'Entry size', directionOf(saved) === 'sell' ? 'Lots sold short per enabled leg.' : directionOf(saved) === 'both' ? 'Lots per enabled leg (bi-directional).' : 'Lots bought per enabled leg.', 'lots')}
             <label className="setting-field"><span>Broker product</span><select value={shownProduct} disabled={disabled} onChange={event => edit({ product: event.target.value as BrokerProduct })}><option value="MIS">Day Trade (MIS)</option><option value="NRML">Carry Forward (NRML)</option></select><small>Both products follow this strategy’s square-off time. Overnight holding is not enabled.</small></label>
-            {numberField('breakoutPercent', directionOf(saved) === 'sell' ? 'Breakout below reference' : 'Breakout above reference', 'Uses the fixed opening option close.', '%')}
+            {numberField('breakoutPercent', directionOf(saved) === 'sell' ? 'Breakout below reference' : directionOf(saved) === 'both' ? 'Breakout above/below reference' : 'Breakout above reference', 'Uses the fixed opening option close.', '%')}
             <fieldset className="setting-legs"><legend>Trade legs</legend><div>{(['CE', 'PE'] as const).map(side => <label key={side}><input type="checkbox" checked={shownSides.includes(side)} disabled={disabled} onChange={event => edit({ sides: event.target.checked ? [...shownSides, side] : shownSides.filter(value => value !== side) })} /><span>{side === 'CE' ? 'Call' : 'Put'}<small>{side}</small></span></label>)}</div><small>Both legs use their own reference and position.</small></fieldset>
           </div>
         </section>
@@ -84,8 +84,8 @@ export function StrategySettingsPanel({ saved, effective, active, hasSession = a
         <section className="settings-section" aria-labelledby="protection-settings-title">
           <div className="settings-section-heading"><span className="settings-section-icon"><ShieldCheck size={18} /></span><div><h3 id="protection-settings-title">Protection & session</h3><p>Keep exits and the trading window under control.</p></div><span className="settings-section-number">03</span></div>
           <div className="settings-field-grid">
-            {numberField('stopLossPoints', 'Reference stop', directionOf(saved) === 'sell' ? 'Points above opening close. 0 disables this stop.' : 'Points below opening close. 0 disables this stop.', 'pts')}
-            {numberField('exitPercent', directionOf(saved) === 'sell' ? 'Upper candle-close exit' : 'Lower candle-close exit', directionOf(saved) === 'sell' ? 'Cover above reference after a completed 5-minute candle.' : 'Exit below reference after a completed 5-minute candle.', '%')}
+            {numberField('stopLossPoints', 'Reference stop', directionOf(saved) === 'sell' ? 'Points above opening close. 0 disables this stop.' : directionOf(saved) === 'both' ? 'Points beyond opening close (± pts). 0 disables this stop.' : 'Points below opening close. 0 disables this stop.', 'pts')}
+            {numberField('exitPercent', directionOf(saved) === 'sell' ? 'Upper candle-close exit' : directionOf(saved) === 'both' ? 'Opposite candle-close exit' : 'Lower candle-close exit', directionOf(saved) === 'sell' ? 'Cover above reference after a completed 5-minute candle.' : directionOf(saved) === 'both' ? 'Exit when a 5-minute candle closes across the channel.' : 'Exit below reference after a completed 5-minute candle.', '%')}
             <label className="setting-field"><span>Square-off time</span><div className="setting-input"><input type="time" min="09:30" max="15:25" step="300" value={shownCutoff} disabled={disabled} onChange={event => edit({ cutoff: event.target.value })} required /><span>IST</span></div><small>Close remaining positions and stop new entries.</small></label>
           </div>
         </section>

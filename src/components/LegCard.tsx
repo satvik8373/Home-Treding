@@ -25,14 +25,14 @@ export function LegCard({
     position = leg?.position;
   const targetDisplay = (target: 1 | 2) => {
     if (!position || target === 1 && !settings.target1Lots) return '—'
-    const level = targetPrice(settings, target, position.average)
+    const level = targetPrice(settings, target, position.average, position.direction)
     const day = new Date(now + 330 * 60_000).toISOString().slice(0, 10)
     const deadline = targetDeadline(settings, target, position.entryAt, day)
     return level != null ? price(level) : deadline != null ? `${clock(deadline, true)} IST` : targetLabel(settings, target)
   }
   const pnl =
     position && fresh
-      ? signFor(settings) * (mark.price - position.average) * position.quantity
+      ? signFor(settings, position.direction) * (mark.price - position.average) * position.quantity
       : null;
   return (
     <section
@@ -57,7 +57,7 @@ export function LegCard({
           <p>{leg?.contract.symbol ?? "Waiting for reference candle"}</p>
         </div>
         <span className={`tag ${position ? "positive" : ""}`}>
-          {position ? directionOf(settings) === 'sell' ? 'Short' : 'Long' : leg ? "Watching" : "Waiting"}
+          {position ? (position.direction === 'sell' || directionOf(settings) === 'sell' ? 'Short' : 'Long') : leg ? "Watching" : "Waiting"}
         </span>
       </div>
       <div className="leg-price-row">
@@ -85,17 +85,17 @@ export function LegCard({
         </div>
         <div>
           <dt>Breakout</dt>
-          <dd>{price(leg ? entryLevel(leg, settings) : null)}</dd>
+          <dd>{leg ? directionOf(settings) === 'both' ? `↑${price(leg.upper)} ↓${price(leg.lower)}` : price(entryLevel(leg, settings)) : '—'}</dd>
         </div>
         <div>
-          <dt>{directionOf(settings) === 'sell' ? 'Upper exit' : 'Lower exit'}</dt>
-          <dd>{price(leg ? directionOf(settings) === 'sell' ? leg.upper : leg.lower : null)}</dd>
+          <dt>{(position?.direction === 'sell' || directionOf(settings) === 'sell') ? 'Upper exit' : 'Lower exit'}</dt>
+          <dd>{price(leg ? (position?.direction === 'sell' || directionOf(settings) === 'sell' ? leg.upper : leg.lower) : null)}</dd>
         </div>
         <div>
           <dt>Avg fill</dt>
           <dd>{price(position?.average)}</dd>
         </div>
-        <div><dt>Reference stop</dt><dd>{position && (settings.stopLossPoints ?? 0) > 0 && referenceStop(leg!.reference.close, settings) > 0 ? price(referenceStop(leg!.reference.close, settings)) : '—'}</dd></div>
+        <div><dt>Reference stop</dt><dd>{position && (settings.stopLossPoints ?? 0) > 0 && referenceStop(leg!.reference.close, settings, position.direction) > 0 ? price(referenceStop(leg!.reference.close, settings, position.direction)) : '—'}</dd></div>
         <div>
           <dt>Target 1</dt>
           <dd>{targetDisplay(1)}</dd>
