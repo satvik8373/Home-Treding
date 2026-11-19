@@ -396,9 +396,9 @@ export class Controller {
     const positions = await this.broker.positions()
     if (positions.some(p => isNiftyDerivativePosition(p) && p.quantity !== 0)) throw new Error('Existing NIFTY broker exposure must be closed or reconciled before a new session.')
   }
-  private fresh(side: Side): Mark | null {
+  private fresh(side: Side, maxAge = 5000): Mark | null {
     const leg = this.session?.legs[side], mark = leg ? this.marks[leg.contract.token] : null
-    return freshMark(mark, this.now()) ? mark : null
+    return freshMark(mark, this.now(), maxAge) ? mark : null
   }
   private async checkPositions(): Promise<void> {
     if (!this.session || this.session.mode === 'paper') return
@@ -478,9 +478,11 @@ export class Controller {
     if (session.mode === 'paper') {
       if (!mark) { this.note(`${side} paper exit is waiting for a verified market price.`); return }
       applyFill(session, intent, { orderId: `PAPER-${intent.id}`, quantity, average: mark.price, status: 'COMPLETE' }, this.now())
+      if (buy) leg.pendingBreakout = null
       this.audit(intent, { orderId: `PAPER-${intent.id}`, status: 'simulated', filled: quantity, average: mark.price, detail: 'Simulated fill from a fresh market price. No broker order or cash debit.' })
       this.note(`${side} ${intent.transaction}: ${quantity} units at ₹${mark.price.toFixed(2)} · ${reason}`); return
     }
+    if (buy) leg.pendingBreakout = null
     session.pending = intent; this.audit(intent, { status: 'submitting', detail: 'Intent saved before submission. Waiting for a broker acknowledgement.' })
     try {
       intent.orderId = await this.broker.place(intent); this.audit(intent, { status: 'acknowledged', detail: 'Broker order ID received. Acknowledgement is not a fill.' })
@@ -579,6 +581,14 @@ export class Controller {
             if (session.pending) return
             if (leg.position && reason === 'TARGET_1' && leg.position.target1Remaining === 0 && leg.exitReason === reason) leg.exitReason = null
           }
+          if (!leg.position && leg.pendingBreakout) {
+            if (this.now() - leg.pendingBreakout.candle.end > 90_000) {
+              leg.pendingBreakout = null
+            } else if (this.fresh(side) && !session.pending && this.now() >= (this.backoff[side] ?? 0)) {
+              await this.submit(side, 'BREAKOUT')
+              if (session.pending) return
+            }
+          }
         }
         this.evaluateCandles()
       } catch (error) {
@@ -638,7 +648,12 @@ export class Controller {
           const candle = (leg.position ? unseen.find(c => ['LOWER_CLOSE', 'UPPER_CLOSE'].includes(candleSignal(leg, c, this.now(), session.date, settingsFor(session)) ?? '')) : null) ?? unseen.at(-1)
           if (!candle) return
           const signal = candleSignal(leg, candle, this.now(), session.date, settingsFor(session))
-          if (!leg.position && validCandle(candle) && isBeyondEntry(candle.close, leg, settingsFor(session))) { leg.firstSignalConsumed = true; leg.reentryReady = false }
+          if (!leg.position && validCandle(candle) && isBeyondEntry(candle.close, leg, settingsFor(session))) {
+            leg.firstSignalConsumed = true; leg.reentryReady = false
+            if (signal === 'BREAKOUT' && this.now() - candle.end <= 90_000) {
+              leg.pendingBreakout = { candle, evaluatedAt: this.now() }
+            }
+          }
           leg.lastDecision = { candle, evaluatedAt: this.now(), signal, explanation: signal === 'BREAKOUT' ? leg.entries > 0 ? directionOf(settingsFor(session)) === 'both' ? 'A post-exit reset was followed by a breakout.' : directionOf(settingsFor(session)) === 'sell' ? 'A post-exit close above the fixed lower breakout was followed by a later close below it.' : 'A post-exit close below the fixed breakout level was followed by a later close above it.' : 'Completed close reached the breakout level while flat.' : signal === 'UPPER_CLOSE' ? 'Completed close rose above the upper exit while short.' : signal === 'LOWER_CLOSE' ? 'Completed close fell below the lower exit while holding units.' : leg.position ? 'No completed-candle lower exit. Fresh-price targets remain monitored.' : !settingsFor(session).enabledSides.includes(side) ? 'Leg disabled in this session settings.' : settingsFor(session).maxEntriesPerLeg && leg.entries >= settingsFor(session).maxEntriesPerLeg ? 'Configured entry limit reached.' : (leg.entries > 0 || leg.firstSignalConsumed) && !leg.reentryReady ? directionOf(settingsFor(session)) === 'both' ? 'Fresh-cross gate locked: waiting for a completed close inside the channel.' : directionOf(settingsFor(session)) === 'sell' ? 'Fresh-cross gate locked: waiting for a completed close above the original lower breakout, then a later close below it.' : 'Fresh-cross gate locked: waiting for a completed close below the original breakout level, then a later close above it.' : this.now() - candle.end > 90_000 ? 'Candle too old for a new entry.' : 'Completed close did not meet the entry rule.' }
           session.decisionAudit ??= []
           session.decisionAudit.push({ side, ...leg.lastDecision })

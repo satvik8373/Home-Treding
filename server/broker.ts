@@ -3,7 +3,7 @@ import type { Candle, Contract, Fill, Mark, OrderIntent } from '../shared/model.
 import { FIVE_MINUTES, istDate, istTime, parseBrokerTime } from './time.ts'
 import { validCandle } from './strategy.ts'
 import type { SavedBroker } from './store.ts'
-import { matchesOrderRow, rejectionSummary } from './orderIdentity.ts'
+import { matchesOrderRow, rejectionSummary, sameTradingSymbol } from './orderIdentity.ts'
 
 const ROOT = 'https://api.mstock.trade/openapi/typea'
 export const INDEX_TOKEN = '26000'
@@ -136,11 +136,31 @@ export class MStock implements TradingBroker {
     })
   }
   async quotes(contracts: Contract[]): Promise<Mark[]> {
+    if (!contracts.length) return []
     const params = new URLSearchParams()
-    for (const c of contracts) params.append('i', `NFO:${c.symbol}`)
-    const data = record(await this.request(`/instruments/quote/ltp?${params}`))
+    for (const c of contracts) {
+      params.append('i', `NFO:${c.symbol}`)
+      if (!c.symbol.startsWith('NFO:')) params.append('i', c.symbol)
+    }
+    let raw: unknown
+    try {
+      raw = await this.request(`/instruments/quote/ltp?${params}`)
+    } catch {
+      return []
+    }
+    const data = record(raw)
     return contracts.flatMap(c => {
-      const row = record(data[`NFO:${c.symbol}`]), price = Number(row.last_price)
+      const target = c.symbol.trim().toUpperCase()
+      const row = record(
+        data[`NFO:${c.symbol}`]
+        ?? data[c.symbol]
+        ?? data[`NSE:${c.symbol}`]
+        ?? Object.entries(data).find(([k]) => {
+          const sym = k.split(':').pop()?.trim().toUpperCase()
+          return sym === target || sameTradingSymbol(sym ?? '', target, c.expiry)
+        })?.[1]
+      )
+      const price = Number(row.last_price)
       return Number.isFinite(price) && price > 0 ? [{ token: c.token, price, receivedAt: Date.now(), source: 'rest' as const }] : []
     })
   }

@@ -64,6 +64,7 @@ export interface Leg {
   lastCandleEnd: number;
   exitReason: Exclude<Reason, "BREAKOUT"> | null;
   pendingDirection?: 'buy' | 'sell' | null;
+  pendingBreakout?: { candle: Candle; evaluatedAt: number } | null;
 }
 export interface OrderIntent {
   product?: import('./settings.ts').BrokerProduct;

@@ -570,3 +570,21 @@ test('advertised missing derivative permissions block Live mode but allow Paper 
   await f.start('paper');
   assert.equal(f.controller.session!.mode, 'paper');
 });
+
+test('a breakout entry that temporarily lacks a fresh price is automatically retried and submitted as soon as the quote arrives within 90 seconds', async () => {
+  const f = await fixture(); await f.start('paper');
+  f.setTime(istTime(DAY, '09:25') + 3000);
+  f.broker.candles.set('101', [bar('09:15'), bar('09:20', 150)]);
+  f.broker.candles.set('102', [bar('09:15'), bar('09:20', 99)]);
+  await f.controller.pump();
+  for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.controller.session!.trades.length, 0);
+  assert.ok(f.controller.session!.legs.CE!.pendingBreakout);
+  f.setTime(f.now() + 3000);
+  f.controller.marks['101'] = { token: '101', price: 152, receivedAt: f.now(), source: 'websocket' };
+  await f.controller.pump();
+  assert.equal(f.controller.session!.trades.length, 1);
+  assert.equal(f.controller.session!.trades[0].reason, 'BREAKOUT');
+  assert.equal(f.controller.session!.legs.CE!.pendingBreakout, null);
+  assert.equal(f.controller.session!.legs.CE!.position!.quantity, 195);
+});
