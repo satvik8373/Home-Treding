@@ -177,24 +177,11 @@ export function SplineCurveChart({
           onPointerLeave={handlePointerLeave}
         >
           <defs>
-            {/* Dual tone curve stroke gradient: sky blue -> lavender/pink */}
-            <linearGradient id="curveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#38bdf8" stopOpacity="1" />
-              <stop offset="60%" stopColor="#60a5fa" stopOpacity="1" />
-              <stop offset="100%" stopColor="#a855f7" stopOpacity="1" />
-            </linearGradient>
-
-            {/* Soft area background fill */}
+            {/* Subtle soft monochromatic area fill */}
             <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.18" />
-              <stop offset="50%" stopColor="#818cf8" stopOpacity="0.07" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+              <stop offset="0%" stopColor="#2563eb" stopOpacity="0.08" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0.0" />
             </linearGradient>
-
-            {/* Bubble Drop Shadow Filter */}
-            <filter id="bubbleShadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="#0f172a" floodOpacity="0.1" />
-            </filter>
           </defs>
 
           {/* Faint Horizontal Dashed Gridlines & Price Labels */}
@@ -206,7 +193,7 @@ export function SplineCurveChart({
                   x={8}
                   y={y + 4}
                   fill="#94a3b8"
-                  fontSize="10.5"
+                  fontSize="10"
                   fontWeight="600"
                   fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"
                   style={{ fontVariantNumeric: 'tabular-nums' }}
@@ -218,7 +205,7 @@ export function SplineCurveChart({
                   y1={y}
                   x2={width - 15}
                   y2={y}
-                  stroke="#edf2f7"
+                  stroke="#f1f5f9"
                   strokeWidth="1"
                   strokeDasharray="4 6"
                 />
@@ -226,75 +213,64 @@ export function SplineCurveChart({
             )
           })}
 
-          {/* Area Fill Under Spline (with living shimmer fill animation) */}
+          {/* Clean monochromatic area fill */}
           <path d={areaPath} fill="url(#areaGradient)" className="neo-spline-area-fill" />
 
-          {/* Smooth Dual-Tone Spline Stroke */}
+          {/* Crisp, solid institutional blue curve line (Zero neon, zero glow) */}
           <path
             d={splinePath}
             fill="none"
-            stroke="url(#curveGradient)"
-            strokeWidth="3.2"
+            stroke="#2563eb"
+            strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
             className="neo-spline-curve-line"
           />
 
-          {/* Interactive Selected Point on Curve */}
+          {/* Interactive Selected Point on Curve (Clean, solid point, no pulsing aura) */}
           {activePoint && (
             <g className="neo-chart-active-marker">
-              {/* Pulsing subtle aura ring */}
+              {/* Solid outer ring */}
               <circle
                 cx={activePoint.x}
                 cy={activePoint.y}
-                r="10"
-                fill="#0f172a"
-                fillOpacity="0.1"
-              />
-              {/* Outer border */}
-              <circle
-                cx={activePoint.x}
-                cy={activePoint.y}
-                r="5.5"
+                r="4.5"
                 fill="#ffffff"
-                stroke="#0f172a"
-                strokeWidth="2.5"
+                stroke="#2563eb"
+                strokeWidth="2.2"
               />
-              {/* Center dark dot */}
+              {/* Center point */}
               <circle
                 cx={activePoint.x}
                 cy={activePoint.y}
-                r="2.5"
-                fill="#0f172a"
+                r="1.8"
+                fill="#2563eb"
               />
 
-              {/* Floating White Capsule Bubble with accurate Indian Rupee Price */}
+              {/* Floating Solid Capsule with exact Rupee Price (Crisp border, no glow shadow) */}
               <g
                 transform={`translate(${Math.max(
                   paddingX + 54,
                   Math.min(width - 64, activePoint.x)
                 )}, ${Math.max(26, activePoint.y - 24)})`}
               >
-                {/* Capsule background with drop shadow */}
                 <rect
                   x="-52"
-                  y="-15"
+                  y="-14"
                   width="104"
                   height="26"
-                  rx="13"
+                  rx="6"
                   fill="#ffffff"
-                  stroke="#e2e8f0"
-                  strokeWidth="0.8"
-                  filter="url(#bubbleShadow)"
+                  stroke="#cbd5e1"
+                  strokeWidth="1.2"
                 />
-                {/* Price text inside bubble */}
                 <text
                   x="0"
-                  y="2"
+                  y="3"
                   textAnchor="middle"
                   fill="#0f172a"
-                  fontSize="11.5"
-                  fontWeight="750"
+                  fontSize="11"
+                  fontWeight="700"
                   fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"
                   style={{ fontVariantNumeric: 'tabular-nums' }}
                 >

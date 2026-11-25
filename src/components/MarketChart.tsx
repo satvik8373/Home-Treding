@@ -415,26 +415,24 @@ export function MarketChart({
         </div>
       </div>
 
-      {/* 2. Streamlined Quote & Stats Row (Always visible with live price, change, High and Low) */}
-      <div className="fintech-chart-quote-bar">
-        <div className="quote-main-col">
-          <div className="quote-price-line">
-            <span className="quote-large-price">
-              {live?.price != null ? `₹${price(live.price)}` : '—'}
+      {/* 2. Structured Price Hero & Market Stats (Distinct rows with clean breathing room) */}
+      <div className="fintech-chart-quote-block">
+        <div className="quote-price-hero">
+          <span className="quote-large-price">
+            {live?.price != null ? `₹${price(live.price)}` : '—'}
+          </span>
+          {change != null && (
+            <span className={`quote-change-badge ${change >= 0 ? 'positive' : 'negative'}`}>
+              {change >= 0 ? '+' : ''}{price(change)} ({percent != null && percent >= 0 ? '+' : ''}{percent?.toFixed(2)}%)
             </span>
-            {change != null && (
-              <span className={`quote-change-badge ${change >= 0 ? 'positive' : 'negative'}`}>
-                {change >= 0 ? '+' : ''}{price(change)} ({percent != null && percent >= 0 ? '+' : ''}{percent?.toFixed(2)}%)
-              </span>
-            )}
-            <span className={`quote-feed-pill ${!marketOpen ? 'closed' : fresh ? 'live' : 'delayed'}`}>
-              <i className={`status-dot ${!marketOpen ? 'closed' : fresh ? 'green' : ''}`} />
-              {!marketOpen ? 'Market Closed' : fresh ? 'Live' : connected ? 'Polling' : 'Disconnected'}
-            </span>
-          </div>
+          )}
+          <span className={`quote-feed-pill ${!marketOpen ? 'closed' : fresh ? 'live' : 'delayed'}`}>
+            <i className={`status-dot ${!marketOpen ? 'closed' : fresh ? 'green' : ''}`} />
+            {!marketOpen ? 'Market Closed' : fresh ? 'Live' : connected ? 'Polling' : 'Disconnected'}
+          </span>
         </div>
 
-        <div className="quote-hl-col">
+        <div className="quote-stats-strip">
           <div className="quote-hl-box">
             <span className="hl-label">HIGH</span>
             <strong className="hl-val">{dayHigh != null ? `₹${price(dayHigh)}` : '—'}</strong>
@@ -443,6 +441,12 @@ export function MarketChart({
             <span className="hl-label">LOW</span>
             <strong className="hl-val">{dayLow != null ? `₹${price(dayLow)}` : '—'}</strong>
           </div>
+          {payload?.quote?.previousClose != null && (
+            <div className="quote-hl-box">
+              <span className="hl-label">PREV CLOSE</span>
+              <strong className="hl-val">₹{price(payload.quote.previousClose)}</strong>
+            </div>
+          )}
         </div>
       </div>
 
