@@ -38,3 +38,5 @@ firestore-backup.key
 *.njsproj
 *.sln
 *.sw?
+
+.vercel

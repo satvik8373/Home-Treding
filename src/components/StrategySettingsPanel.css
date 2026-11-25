@@ -303,6 +303,23 @@
   background: var(--canvas, #F5F5F7);
 }
 
+.settings-target-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.settings-target legend label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
 .settings-target legend {
   padding: 0 6px;
   font-size: 11px;

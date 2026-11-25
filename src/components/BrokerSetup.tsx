@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check, Copy, ExternalLink, RefreshCw } from 'lucide-react'
 import type { ExecutionSetup } from '../../shared/setup'
+import { executionRouteUnassigned } from '../../shared/setup'
 import type { useDashboard } from '../hooks/useDashboard'
 import { clock } from '../lib/format'
 import './BrokerSetup.css'
@@ -48,7 +49,9 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
     }
   }, [account, revision])
 
-  const ipv4 = report?.observed?.ipv4 ?? report?.expectedIPv4 ?? null
+  const unassigned = executionRouteUnassigned(report)
+  const ipv4 = unassigned ? null : report?.observed?.ipv4 ?? report?.expectedIPv4 ?? null
+  const canCopy = !!ipv4 && !!report?.current && !report?.sharedIpConflict && !report?.error
   const isCurrent = report?.current ?? false
   const egressMode = report?.egressMode ?? (report?.proxyConfigured ? 'proxy' : 'direct')
 
@@ -58,7 +61,7 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
   const registeredMatch = isSameAccount && ipv4 ? (report?.registeredMatch ?? (activeProfile ? [activeProfile.primary, activeProfile.secondary].includes(ipv4) : null)) : null
 
   async function copy() {
-    if (!ipv4) return
+    if (!ipv4 || !canCopy) return
     try {
       await navigator.clipboard.writeText(ipv4)
       setCopied(true)
@@ -87,7 +90,21 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
     }
   }
 
-  const routeLabel = egressMode === 'proxy'
+  async function manageIp(actionName: 'release' | 'assign') {
+    setRouteBusy(true); setNote('')
+    try {
+      const result = await action('/api/setup/ip', { action: actionName }, actionName === 'release' ? 'release-ip' : 'assign-ip')
+      if (result?.saved) {
+        setReport(result.network as ExecutionSetup)
+        setRevision(value => value + 1)
+        onNetworkChange?.()
+        setNote(actionName === 'release' ? 'IP released. This account stays unassigned until you choose Recheck. Another account can now claim the available IP.'
+          : result.assigned ? 'Execution IP assigned. Update this account’s mStock IP settings before connecting.' : 'No IP is available. Release one from another account, then Recheck.')
+      }
+    } finally { setRouteBusy(false) }
+  }
+
+  const routeLabel = unassigned ? 'Dedicated execution IP awaiting assignment' : egressMode === 'proxy'
     ? `Workspace proxy${report?.proxyLabel ? ` (${report.proxyLabel})` : ''}`
     : egressMode === 'interface'
       ? `Dedicated interface${report?.proxyLabel ? ` (${report.proxyLabel})` : ''}`
@@ -109,9 +126,10 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
             <button
               type="button"
               className="text-button"
+              disabled={routeBusy || !!working}
               onClick={() => {
-                setRevision(value => value + 1)
-                setNote('Rechecking outbound IP…')
+                if (report?.assignmentManaged && !report.proxyConfigured) void manageIp('assign')
+                else { setRevision(value => value + 1); setNote('Rechecking outbound IP…') }
               }}
             >
               <RefreshCw size={11} />
@@ -123,7 +141,7 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
         <button
           type="button"
           className="broker-ip-card"
-          disabled={!ipv4}
+          disabled={!canCopy}
           onClick={() => void copy()}
           title="Tap to copy execution IPv4"
         >
@@ -131,7 +149,7 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
             <span className={`broker-ip-label${report?.sharedIpConflict ? ' conflict' : ''}`}>
               {routeLabel}
             </span>
-            <code className="broker-ip-code">{ipv4 ?? (error || report?.error ? 'Unavailable' : 'Checking…')}</code>
+            <code className="broker-ip-code">{ipv4 ?? (unassigned ? 'Not assigned' : error || report?.error ? 'Unavailable' : 'Checking…')}</code>
           </span>
           <span className={`broker-ip-copy${copied ? ' copied' : ''}`}>
             {copied ? <Check size={13} /> : <Copy size={13} />}
@@ -139,18 +157,22 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
           </span>
         </button>
 
-        {report?.observed && (
+        {report?.observed && !unassigned && (
           <p className="setup-meta">
-            {isCurrent ? 'Verified' : 'Cached'} {clock(report.observed.checkedAt, true)} IST
+            {isCurrent ? 'Observed' : 'Cached'} {clock(report.observed.checkedAt, true)} IST
           </p>
         )}
-        {!report?.observed && report?.expectedIPv4 && (
+        {!unassigned && !report?.observed && report?.expectedIPv4 && (
           <p className="setup-meta">Configured host IP · {report.expectedIPv4}</p>
         )}
-        {(error || report?.error) && !ipv4 && <p className="inline-error" role="status">{error || report?.error}</p>}
-        {report?.sharedIpConflict && (
+        {(error || report?.error) && !unassigned && <p className="inline-error" role="status">{error || report?.error}</p>}
+        {unassigned ? (
           <p className="setup-attention" role="alert">
-            Another workspace uses {ipv4 ?? 'this host IP'} in mStock. Reusing it causes &ldquo;IP already used&rdquo;. Add a dedicated route below or run <code>run.bat</code> locally.
+            {report?.assignmentReleased ? 'IP released for this account. Choose Recheck when you want to request an available IP again.' : 'No execution IP is available for this account. Release an IP from another account, then choose Recheck.'}
+          </p>
+        ) : report?.sharedIpConflict && (
+          <p className="setup-attention" role="alert">
+            Another workspace has reserved {ipv4 ?? 'this host IP'}. Configure a route with a different public IPv4 before connecting mStock.
           </p>
         )}
         {report?.observed?.changed && (
@@ -159,22 +181,33 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
         {report?.expectedMatch === false && (
           <p className="setup-attention">Observed IP differs from host configuration ({report.expectedIPv4}).</p>
         )}
+        {report?.assignmentManaged && report.proxyConfigured && (
+          <div className="setup-ip-release">
+            <button type="button" className="button secondary" disabled={!!account || routeBusy || !!working} onClick={() => void manageIp('release')}>
+              {working === 'release-ip' ? 'Releasing…' : 'Release assigned IP'}
+            </button>
+            <p className="setup-meta">{account ? 'Stop the strategy and disconnect mStock before releasing its IP.' : 'Release frees this IP for another account. Remove its old registration in mStock before another user registers it.'}</p>
+          </div>
+        )}
       </section>
 
       <section className="setup-card" aria-label="Multi-user outbound route">
         <div className="setup-card-head">
-          <strong>Multi-user route isolation</strong>
+          <strong>Account execution route</strong>
           <span className="tag">
-            {egressMode === 'proxy' ? 'Proxy active' : egressMode === 'interface' ? 'Host interface' : 'Default host'}
+            {unassigned ? 'Setup required' : egressMode === 'proxy' ? 'Proxy active' : egressMode === 'interface' ? 'Host interface' : 'Default host'}
           </span>
         </div>
         <p className="setup-desc">
           {egressMode === 'interface'
             ? 'Orders and streams exit through a host-assigned network interface.'
-            : 'Route orders and live quotes through your own HTTP/HTTPS proxy URL so each mStock Client ID uses a unique IPv4.'}
+            : unassigned ? 'A different Google login or incognito window creates a separate workspace. Both still use the same execution server until a dedicated route is assigned.'
+              : 'This account’s orders and live quotes use the assigned execution route.'}
         </p>
         {egressMode !== 'interface' && (
-          <form
+          <details className="setup-route-advanced">
+            <summary>Use an existing dedicated route</summary>
+            <form
             onSubmit={async event => {
               event.preventDefault()
               if (!proxyInput.trim()) return
@@ -196,7 +229,7 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
               <button className="button primary" type="submit" disabled={!!account || routeBusy || !!working || !proxyInput.trim()}>
                 {routeBusy ? 'Testing route…' : 'Verify & apply'}
               </button>
-              {report?.proxyConfigured && egressMode === 'proxy' && (
+              {report?.proxyConfigured && egressMode === 'proxy' && !report.assignmentManaged && (
                 <button
                   className="button secondary"
                   type="button"
@@ -208,7 +241,8 @@ export function BrokerSetup({ account, action, working, onNetworkChange }: Props
               )}
             </div>
             {account && <p className="setup-meta">Disconnect mStock on the Account tab to edit route.</p>}
-          </form>
+            </form>
+          </details>
         )}
       </section>
 

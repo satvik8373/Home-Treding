@@ -45,6 +45,8 @@ export class Controller {
   }
   private lastQuotes = 0
   private quotesInFlight = false
+  private quoteTasks = new Map<Side, Promise<void>>()
+  private quoteIssues: Partial<Record<Side, string>> = {}
   private lastPositionCheck = 0
   private lastHistoryAttempt = 0
   private historyInFlight = false
@@ -229,6 +231,7 @@ export class Controller {
   private subscribe(): void {
     if (!this.broker.credentials) return
     this.marks = {}
+    this.quoteTasks.clear(); this.quoteIssues = {}
     this.feed.connect(this.broker.credentials, [INDEX_TOKEN, ...SIDES.flatMap(side => this.session?.legs[side]?.contract.token ? [this.session.legs[side]!.contract.token] : [])])
   }
   async beginLogin(username: string, password: string, apiKey: string): Promise<string> {
@@ -411,7 +414,7 @@ export class Controller {
       const leg = this.session.legs[side]
       if (!leg) continue
       const relevant = positions.filter(p => matchesPositionRow(p, leg.contract, productFor(settingsFor(this.session))))
-      const actual = signFor(settingsFor(this.session)) * relevant.reduce((total, p) => total + p.quantity, 0), expected = leg.position?.quantity ?? 0
+      const actual = signFor(settingsFor(this.session), leg.position?.direction) * relevant.reduce((total, p) => total + p.quantity, 0), expected = leg.position?.quantity ?? 0
       if (actual < 0 || actual > expected) throw new Error(`Unexpected ${side} broker exposure. Automatic orders are blocked until reconciled.`)
       if (actual !== expected) {
         this.session.pnlVerified = false
@@ -430,19 +433,11 @@ export class Controller {
       || !settingsFor(session).enabledSides.includes(side) || this.now() >= istTime(session.date, settingsFor(session).cutoff))) return
     let mark = this.fresh(side)
     if (buy && !mark) {
-      try {
-        const quotes = await this.broker.quotes([leg.contract])
-        for (const m of quotes) {
-          this.marks[m.token] = m
-          this.feed.onMark(m)
-        }
-        mark = this.fresh(side)
-      } catch {
-        // REST quote fetch failure falls through to fresh check
-      }
+      await this.loadQuotes([side])
+      mark = this.fresh(side)
     }
     if (buy && !mark) {
-      this.note(`${side} entry skipped: waiting for a fresh official market price.`); return
+      this.note(`${side} entry waiting: ${this.quoteIssues[side] ?? 'no fresh official market price'}. Retrying for up to 90 seconds after the signal candle.`); return
     }
     if (session.mode === 'live') {
       await this.checkPositions()
@@ -453,19 +448,16 @@ export class Controller {
     // Stop can arrive while broker position verification is in flight.
     if (buy && (this.stopRequested || this.now() >= istTime(session.date, settingsFor(session).cutoff))) return
     if (buy && !this.fresh(side)) {
-      try {
-        const quotes = await this.broker.quotes([leg.contract])
-        for (const m of quotes) {
-          this.marks[m.token] = m
-          this.feed.onMark(m)
-        }
-      } catch {
-        // REST quote fetch failure falls through
-      }
+      await this.loadQuotes([side])
       if (!this.fresh(side)) {
-        this.note(`${side} entry skipped: the live price became stale during broker verification.`); return
+        this.note(`${side} entry waiting: ${this.quoteIssues[side] ?? 'price became stale during broker verification'}. Retrying for up to 90 seconds after the signal candle.`); return
       }
     }
+    // Quote/position reads may finish after Stop, cutoff, logout or signal expiry.
+    if (buy && (!this.connected() || this.stopRequested || session !== this.session || session.status !== 'running'
+      || this.now() >= istTime(session.date, settingsFor(session).cutoff)
+      || leg.pendingBreakout && this.now() - leg.pendingBreakout.candle.end > 90_000)) return
+    mark = this.fresh(side)
     const dir = directionOf(settingsFor(session))
     const intentDirection: 'buy' | 'sell' = buy
       ? (dir === 'both' ? (leg.pendingDirection ?? 'buy') : (dir === 'sell' ? 'sell' : 'buy'))
@@ -584,6 +576,8 @@ export class Controller {
           if (!leg.position && leg.pendingBreakout) {
             if (this.now() - leg.pendingBreakout.candle.end > 90_000) {
               leg.pendingBreakout = null
+              leg.pendingDirection = null
+              this.note(`${side} entry skipped: the signal expired before a fresh-price entry could be submitted. Waiting for a new candle reset.`)
             } else if (this.fresh(side) && !session.pending && this.now() >= (this.backoff[side] ?? 0)) {
               await this.submit(side, 'BREAKOUT')
               if (session.pending) return
@@ -602,16 +596,42 @@ export class Controller {
   private refreshQuotes(): void {
     if (this.quotesInFlight || this.now() - this.lastQuotes < 2500) return
     const session = this.session
-    const contracts = SIDES.flatMap(side => session?.legs[side] && !this.fresh(side) ? [session.legs[side]!.contract] : [])
-    if (!contracts.length) return
+    const sides = SIDES.filter(side => session?.legs[side] && !this.fresh(side))
+    if (!sides.length) return
     this.lastQuotes = this.now(); this.quotesInFlight = true
     // Official REST snapshots also cover flat legs during a WebSocket outage.
     // Keep this read outside the order queue so Stop remains responsive.
-    void this.broker.quotes(contracts).then(marks => {
-      if (this.session !== session) return
-      for (const mark of marks) this.feed.onMark(mark)
-    }).catch(() => { /* No mark means no entry; the next bounded poll retries. */ })
-      .finally(() => { this.quotesInFlight = false })
+    void this.loadQuotes(sides).finally(() => { this.quotesInFlight = false })
+  }
+  private async loadQuotes(sides: Side[]): Promise<void> {
+    const session = this.session
+    if (!session) return
+    const missing = sides.filter(side => session.legs[side] && !this.quoteTasks.has(side))
+    if (missing.length) {
+      const contracts = missing.map(side => session.legs[side]!.contract)
+      const task = Promise.resolve().then(() => this.broker.quotes(contracts)).then(marks => {
+        if (this.session !== session) return
+        for (const mark of marks) if (contracts.some(contract => contract.token === mark.token)) this.feed.onMark(mark)
+        for (const side of missing) {
+          if (this.fresh(side)) delete this.quoteIssues[side]
+          else this.quoteIssues[side] = 'mStock returned no fresh valid price for this contract'
+        }
+      }).catch(error => {
+        if (this.session !== session) return
+        // Describe the cause without exposing raw broker text or account details.
+        const issue = error instanceof BrokerError
+          ? error.authentication ? 'mStock market-data authentication failed; reconnect the broker'
+            : error.httpStatus === 429 ? 'mStock market-data rate limit reached'
+            : error.httpStatus === 400 ? 'mStock rejected the option quote parameters'
+            : 'mStock market-data request failed'
+          : 'mStock market-data request timed out or could not connect'
+        for (const side of missing) this.quoteIssues[side] = issue
+      }).finally(() => {
+        for (const side of missing) if (this.quoteTasks.get(side) === task) this.quoteTasks.delete(side)
+      })
+      for (const side of missing) this.quoteTasks.set(side, task)
+    }
+    await Promise.all(sides.map(side => this.quoteTasks.get(side)))
   }
   private evaluateCandles(): void {
     const session = this.session!, now = this.now(), boundary = completedBoundary(now)
@@ -648,7 +668,7 @@ export class Controller {
           const candle = (leg.position ? unseen.find(c => ['LOWER_CLOSE', 'UPPER_CLOSE'].includes(candleSignal(leg, c, this.now(), session.date, settingsFor(session)) ?? '')) : null) ?? unseen.at(-1)
           if (!candle) return
           const signal = candleSignal(leg, candle, this.now(), session.date, settingsFor(session))
-          if (!leg.position && validCandle(candle) && isBeyondEntry(candle.close, leg, settingsFor(session))) {
+          if (!leg.position && validCandle(candle) && isBeyondEntry(candle.close, leg, settingsFor(session), true)) {
             leg.firstSignalConsumed = true; leg.reentryReady = false
             if (signal === 'BREAKOUT' && this.now() - candle.end <= 90_000) {
               leg.pendingBreakout = { candle, evaluatedAt: this.now() }

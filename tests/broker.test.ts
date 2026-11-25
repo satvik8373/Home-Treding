@@ -3,13 +3,55 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { MStock, normalizeCandles, parseReceipt, resolveContracts } from '../server/broker.ts'
+import { BrokerError, MStock, normalizeCandles, parseReceipt, resolveContracts } from '../server/broker.ts'
 import { parsePackets } from '../server/feed.ts'
 import { parseBrokerTime, istTime } from '../server/time.ts'
 import { Store } from '../server/store.ts'
-import { DAY } from './helpers.ts'
+import { DAY, contract } from './helpers.ts'
 import type { OrderIntent } from '../shared/model.ts'
 import { sameTradingSymbol, matchesPositionRow, isNiftyDerivativePosition, matchesOrderRow } from '../server/orderIdentity.ts'
+
+test('option REST quotes send only documented exchange-qualified instruments, once per contract', async () => {
+  const calls: string[][] = []
+  const ce = { ...contract('CE'), symbol: 'NIFTY26N1725100CE', expiry: '2026-11-17' }
+  const pe = { ...contract('PE'), symbol: 'NIFTY26N1725100PE', expiry: '2026-11-17' }
+  const broker = new MStock(async url => {
+    const symbols = new URL(String(url)).searchParams.getAll('i'); calls.push(symbols)
+    if (symbols.some(symbol => !/^NFO:NIFTY/.test(symbol))) return new Response(JSON.stringify({ status: 'error', message: 'Invalid instruments.' }), { status: 400 })
+    return new Response(JSON.stringify({ status: 'success', data: {
+      [`NFO:${ce.symbol}`]: { instrument_token: 101, last_price: 123.45 },
+      [`NFO:${pe.symbol}`]: { instrument_token: 102, last_price: 98.75 },
+    } }))
+  })
+  broker.credentials = { apiKey: 'test', accessToken: 'test', account: 'test', name: 'Test', expiresAt: Date.now() + 60_000 }
+  const marks = await broker.quotes([ce, pe, { ...ce, symbol: `NFO:${ce.symbol}` }])
+  assert.deepEqual(calls, [[`NFO:${ce.symbol}`, `NFO:${pe.symbol}`]])
+  assert.deepEqual(marks.map(mark => [mark.token, mark.price, mark.source]), [['101', 123.45, 'rest'], ['102', 98.75, 'rest'], ['101', 123.45, 'rest']])
+})
+
+test('REST quote aliases require the same option identity and cannot overwrite a token mismatch', async () => {
+  const ce = { ...contract('CE'), symbol: 'NIFTY26N1725100CE', expiry: '2026-11-17' }
+  for (const [key, token, price, expected] of [
+    ['NSE:NIFTY-17Nov2026-25100-CE', 101, 123, true],
+    ['NIFTY-17Nov2026-25100-CE', 101, 123, true],
+    [`NFO:${ce.symbol}`, 999, 123, false],
+    [`BSE:${ce.symbol}`, 101, 123, false],
+    ['NFO:NIFTY26N2425100CE', 101, 123, false],
+    ['NFO:NIFTY26N1725100PE', 101, 123, false],
+    [`NFO:${ce.symbol}`, 101, true, false],
+    [`NFO:${ce.symbol}`, 101, 0, false],
+  ] as const) {
+    const broker = new MStock(async () => new Response(JSON.stringify({ status: 'success', data: { [key]: { instrument_token: token, last_price: price } } })))
+    broker.credentials = { apiKey: 'test', accessToken: 'test', account: 'test', name: 'Test', expiresAt: Date.now() + 60_000 }
+    assert.equal((await broker.quotes([ce])).length, expected ? 1 : 0, key)
+  }
+})
+
+test('REST quote failures retain their HTTP cause instead of silently becoming empty prices', async () => {
+  const broker = new MStock(async () => new Response(JSON.stringify({ status: 'error', message: 'Rate limited.' }), { status: 429 }))
+  broker.credentials = { apiKey: 'test', accessToken: 'test', account: 'test', name: 'Test', expiresAt: Date.now() + 60_000 }
+  await assert.rejects(broker.quotes([contract('CE')]), error => error instanceof BrokerError && error.httpStatus === 429)
+})
 
 test('official form-based OTP and TOTP flows send the documented fields', async () => {
   const calls: Array<{ url: string; body: string; headers: Headers }> = []

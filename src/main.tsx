@@ -4,6 +4,7 @@ import "./index.css";
 import App from "./App.tsx";
 import { DeploymentGate } from './components/DeploymentGate';
 import './workspace-ui.css';
+import './workspace-primitives.css';
 
 if (window.isSecureContext && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {

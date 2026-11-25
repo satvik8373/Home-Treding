@@ -17,4 +17,14 @@ export interface ExecutionSetup {
   proxyConfigured?: boolean;
   proxyLabel?: string | null;
   sharedIpConflict?: boolean;
+  dedicatedRouteRequired?: boolean;
+  assignmentReleased?: boolean;
+  assignmentManaged?: boolean;
+}
+
+/** Older engines report a direct-host conflict without the assignment flag. */
+export function executionRouteUnassigned(report: ExecutionSetup | null): boolean {
+  if (!report) return false
+  const mode = report.egressMode ?? (report.proxyConfigured ? 'proxy' : 'direct')
+  return !!report.dedicatedRouteRequired || mode === 'direct' && !!report.sharedIpConflict
 }

@@ -1,6 +1,6 @@
 import { signFor, referenceStop, isBeyondEntry, entryTransaction, exitTransaction, directionOf } from '../../shared/strategy.ts'
 import { levels } from '../strategy.ts'
-import { targetPrice, targetDeadline } from '../../shared/targets.ts'
+import { targetPrice, targetDeadline, targetEnabled } from '../../shared/targets.ts'
 import type { BacktestCycle, BacktestDataset, BacktestDay, BacktestOptions, BacktestReport, EquityPoint } from '../../shared/backtest.ts'
 import type { Reason, Side } from '../../shared/model.ts'
 import { RULES } from '../../shared/model.ts'
@@ -61,7 +61,7 @@ export function replay(data: BacktestDataset, config: BacktestOptions): Backtest
     const posSign = posDir === 'sell' ? -1 : 1
     if (entering) {
       cycle = { id, date: data.date, side, symbol: contract.symbol, entryAt: at, entryPrice: price, exitAt: null, quantity, remaining: quantity, grossPnl: 0, fees: 0, netPnl: 0 }
-      result.cycles.push(cycle); entries[side]++; positions[side] = { average: price, quantity, firstTarget: settings.target1Lots === 0, cycle, direction: posDir }
+      result.cycles.push(cycle); entries[side]++; positions[side] = { average: price, quantity, firstTarget: !targetEnabled(settings, 1), cycle, direction: posDir }
       reentryReady[side] = false
     }
     const grossPnl = entering ? null : round(posSign * (price - position!.average) * quantity)

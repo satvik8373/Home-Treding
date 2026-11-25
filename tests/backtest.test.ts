@@ -359,7 +359,7 @@ test("a complete imported past session runs offline; partial past sessions are e
   );
   assert.equal(incomplete.result!.summary.sessions, 0);
   assert.match(incomplete.result!.skipped[0].reason, /incomplete/);
-  service.import(input(complete()));
+  service.import(input([...complete(), next]));
   const completeJob = await done(
     service,
     service.start({ startDate: DAY, endDate: DAY }).id,

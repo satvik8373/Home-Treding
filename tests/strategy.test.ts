@@ -88,7 +88,7 @@ test('duplicate, reference, stale and cutoff candles cannot open a new position'
   l.lastCandleEnd = c.end
   assert.equal(candleSignal(l, c, c.end + 2000, DAY), null)
   assert.equal(candleSignal(leg(), bar('09:15', 110), istTime(DAY, '09:20'), DAY), null)
-  assert.equal(candleSignal(leg(), bar('15:05', 110), istTime(DAY, '15:10'), DAY), null)
+  assert.equal(candleSignal(leg(), bar('15:10', 110), istTime(DAY, '15:15'), DAY), null)
 })
 test('lower exit is strictly below the level; a low wick or equality does not exit', () => {
   const l = leg(); l.position = { quantity: 195, average: 100, target1Remaining: 65, entryQuantity: 195 }

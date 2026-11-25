@@ -22,7 +22,7 @@ test('target types validate and legacy settings keep point-based defaults', () =
   assert.deepEqual(validateSettings(DEFAULT_SETTINGS), DEFAULT_SETTINGS)
   assert.equal(sameSettings(DEFAULT_SETTINGS, { ...DEFAULT_SETTINGS, target1Rule: { kind: 'points', value: 20 }, target2Rule: { kind: 'points', value: 40 } }), true)
   assert.equal(targetPrice(DEFAULT_SETTINGS, 1, 200), 220)
-  for (const rule of [{ kind: 'percent', value: 0 }, { kind: 'price', value: NaN }, { kind: 'minutes', value: 1.5 }, { kind: 'clock', time: '' }, { kind: 'clock', time: '09:99' }, { kind: 'clock', time: '15:10' }, { kind: 'unknown', value: 5 }]) {
+  for (const rule of [{ kind: 'percent', value: 0 }, { kind: 'price', value: NaN }, { kind: 'minutes', value: 1.5 }, { kind: 'clock', time: '' }, { kind: 'clock', time: '09:99' }, { kind: 'clock', time: '15:15' }, { kind: 'unknown', value: 5 }]) {
     assert.throws(() => validateSettings({ ...DEFAULT_SETTINGS, target1Rule: rule }))
   }
   for (const kind of ['minutes', 'percent', 'points', 'price']) assert.throws(() => validateSettings({ ...DEFAULT_SETTINGS, target1Rule: { kind, value: 20 }, target2Rule: { kind, value: 10 } }))
@@ -87,11 +87,60 @@ test('time exits use original entry, work at a loss, survive persistence and ret
   assert.equal(targetSignal(l, 180, clock, istTime(DAY, '10:30')), 'TARGET_1')
 })
 
-function replayWith(one: TargetRule, two: TargetRule) {
+function replayWith(one: TargetRule, two: TargetRule, overrides: Partial<StrategySettings> = {}) {
   const bars = Array.from({ length: 10 }, (_, i) => ({ start: istTime(DAY, '09:15') + i * 300_000, end: istTime(DAY, '09:20') + i * 300_000, open: i < 2 ? 100 : 105, high: 106, low: 100, close: i === 0 ? 100 : 105 }))
   const data = dataset({ version: 1, date: DAY, spotReferenceClose: 25000, contracts: { CE: contract('CE'), PE: contract('PE') }, candles: { CE: bars, PE: bars } }, istTime(DAY, '16:00'), 'import')
-  return replay(data, { slippagePoints: 0, feePerOrder: 0, strategySettings: { ...DEFAULT_SETTINGS, enabledSides: ['CE'], maxEntriesPerLeg: 1, target1Rule: one, target2Rule: two } })
+  return replay(data, { slippagePoints: 0, feePerOrder: 0, strategySettings: { ...DEFAULT_SETTINGS, enabledSides: ['CE'], maxEntriesPerLeg: 1, target1Rule: one, target2Rule: two, ...overrides } })
 }
+
+test('each target can be disabled independently in execution and backtests', async () => {
+  for (const [one, two, expected] of [[false, false, []], [false, true, ['TARGET_2']], [true, false, ['TARGET_1']], [true, true, ['TARGET_1', 'TARGET_2']]] as const) {
+    const f = await fixture(); await f.start('paper')
+    const s = f.controller.session!
+    s.settings = validateSettings({ ...DEFAULT_SETTINGS, target1Enabled: one, target2Enabled: two })
+    const entry = { id:'entry', tag:'entry', side:'CE' as const, symbol:contract('CE').symbol, transaction:'BUY' as const, quantity:260, reason:'BREAKOUT' as const, submittedAt:f.now() }
+    applyFill(s,entry,{orderId:'test',quantity:260,average:100,status:'COMPLETE'},f.now())
+    assert.equal(targetSignal(s.legs.CE!,145,s.settings,f.now()), expected[0] ?? null)
+    assert.equal(targetPrice(s.settings,1,100),one ? 120 : null)
+    assert.equal(targetPrice(s.settings,2,100),two ? 140 : null)
+    const html = renderToStaticMarkup(createElement(StrategySettingsPanel,{saved:s.settings,effective:s.settings,active:false,online:true,working:'',action:async()=>null}))
+    assert.match(html,/Enable Target 1/); assert.match(html,/Enable Target 2/)
+    assert.equal((html.match(/<fieldset disabled=""/g) ?? []).length,Number(!one)+Number(!two))
+    const replayed = replayWith({kind:'clock',time:'09:30'},{kind:'clock',time:'09:35'},{target1Enabled:one,target2Enabled:two})
+    assert.deepEqual(replayed.fills.filter(fill=>fill.reason.startsWith('TARGET')).map(fill=>fill.reason),[...expected])
+    if (!one && two) assert.equal(replayed.fills.find(fill=>fill.reason==='TARGET_2')!.quantity,260)
+  }
+})
+
+test('no-target mode preserves regular exits and closes at the configured 15:15 cutoff', async () => {
+  const f = await fixture(); await f.start('paper')
+  const s = f.controller.session!
+  s.settings = validateSettings({...DEFAULT_SETTINGS,target1Enabled:false,target2Enabled:false,cutoff:'15:15'})
+  assert.equal(s.settings.cutoff,'15:15')
+  applyFill(s,{id:'entry',tag:'entry',side:'CE',symbol:contract('CE').symbol,transaction:'BUY',quantity:260,reason:'BREAKOUT',submittedAt:f.now()},{orderId:'test',quantity:260,average:100,status:'COMPLETE'},f.now())
+  f.setTime(istTime(DAY,'15:10'));f.mark('CE',150);await f.controller.pump()
+  assert.equal(s.legs.CE!.position!.quantity,260)
+  f.setTime(istTime(DAY,'15:15'));f.mark('CE',150);await f.controller.pump()
+  assert.equal(s.status,'stopped');assert.equal(s.trades.at(-1)!.reason,'SESSION_END')
+  const l = {...s.legs.CE!,position:{average:100,quantity:260,entryQuantity:260,target1Remaining:0}}
+  assert.equal(priceExitSignal(l,75,s.settings,f.now()),'STOP_LOSS')
+})
+
+test('both targets enabled keep normal exits before square-off, with the original 15:10 default', async () => {
+  assert.equal(DEFAULT_SETTINGS.cutoff,'15:10')
+  for (const direction of ['buy','sell','both'] as const) {
+    const f = await fixture(); await f.start('paper')
+    const s = f.controller.session!
+    s.settings = {...DEFAULT_SETTINGS,direction,target1Enabled:true,target2Enabled:true}
+    const short = direction === 'sell'
+    applyFill(s,{id:'entry',tag:'entry',side:'CE',symbol:contract('CE').symbol,transaction:short?'SELL':'BUY',quantity:260,reason:'BREAKOUT',submittedAt:f.now()},{orderId:'test',quantity:260,average:100,status:'COMPLETE'},f.now())
+    f.setTime(istTime(DAY,'09:30')); f.mark('CE',short?60:140)
+    await f.controller.pump(); await f.controller.pump()
+    assert.deepEqual(s.trades.map(trade=>trade.reason),['BREAKOUT','TARGET_1','TARGET_2'])
+    assert.equal(s.legs.CE!.position,null)
+    assert.equal(f.now(),istTime(DAY,'09:30'))
+  }
+})
 test('backtest schedules elapsed/IST exits on next available candle open with a 2+2 lot split', () => {
   for (const [one, two] of [[{ kind: 'minutes', value: 7 }, { kind: 'minutes', value: 12 }], [{ kind: 'clock', time: '09:32' }, { kind: 'clock', time: '09:37' }]] as [TargetRule, TargetRule][]) {
     const day = replayWith(one, two)

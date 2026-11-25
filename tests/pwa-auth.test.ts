@@ -6,6 +6,7 @@ import type { TestContext } from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { runInNewContext } from 'node:vm'
 import { createFirebaseAuthProxy } from '../api/firebase-auth.ts'
+import { FIREBASE_WEB_CONFIG } from '../shared/firebase-config.ts'
 import { createRedirectCompletion, needsGoogleRedirect, signInDeadline } from '../src/lib/google-flow.ts'
 
 async function serve(t: TestContext, handler: Parameters<typeof createServer>[1]) {
@@ -14,6 +15,21 @@ async function serve(t: TestContext, handler: Parameters<typeof createServer>[1]
   t.after(() => { server.closeAllConnections(); server.close() })
   return `http://127.0.0.1:${(server.address() as AddressInfo).port}`
 }
+
+test('Firebase init configuration remains available when Hosting auto-configuration is absent and never derives its domain from caller input', async t => {
+  let upstreamCalls = 0
+  const root = await serve(t, createFirebaseAuthProxy(async () => { upstreamCalls++; return new Response('not hosted', { status: 404 }) }))
+  const url = root + '/?resource=init.json&authDomain=evil.example'
+  const response = await fetch(url)
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { ...FIREBASE_WEB_CONFIG, authDomain: 'home-treding.vercel.app' })
+  assert.equal(response.headers.get('cache-control'), 'no-store')
+  assert.equal(response.headers.get('set-cookie'), null)
+  const head = await fetch(url, { method: 'HEAD' })
+  assert.equal(head.status, 200); assert.equal(await head.text(), '')
+  assert.equal((await fetch(url, { method: 'POST', body: '{}' })).status, 405)
+  assert.equal(upstreamCalls, 0)
+})
 
 test('iPhone Home Screen, iPad desktop mode, mobile and standalone apps use full-page Google redirect', () => {
   const desktop = { userAgent: 'Mozilla/5.0 Windows NT', platform: 'Win32', maxTouchPoints: 0 }

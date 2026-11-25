@@ -3,10 +3,14 @@ import type { StrategySettings } from './settings.ts'
 
 export type TargetRule = { kind: 'points' | 'percent' | 'price' | 'minutes'; value: number } | { kind: 'clock'; time: string }
 export type TargetNumber = 1 | 2
+export function targetEnabled(settings: StrategySettings, target: TargetNumber): boolean {
+  return settings[target === 1 ? 'target1Enabled' : 'target2Enabled'] !== false && (target === 2 || settings.target1Lots > 0)
+}
 export function targetRule(settings: StrategySettings, target: TargetNumber): TargetRule {
   return settings[target === 1 ? 'target1Rule' : 'target2Rule'] ?? { kind: 'points', value: target === 1 ? settings.target1Points : settings.target2Points }
 }
 export function targetPrice(settings: StrategySettings, target: TargetNumber, entry: number, positionDirection?: 'buy' | 'sell'): number | null {
+  if (!targetEnabled(settings, target)) return null
   const rule = targetRule(settings, target)
   if (rule.kind === 'minutes' || rule.kind === 'clock') return null
   const sign = signFor(settings, positionDirection)
@@ -14,12 +18,14 @@ export function targetPrice(settings: StrategySettings, target: TargetNumber, en
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
 export function targetDeadline(settings: StrategySettings, target: TargetNumber, entryAt: number | undefined, day: string): number | null {
+  if (!targetEnabled(settings, target)) return null
   const rule = targetRule(settings, target)
   if (rule.kind === 'clock') return Date.parse(`${day}T${rule.time}:00+05:30`)
   if (rule.kind === 'minutes' && entryAt != null && Number.isFinite(entryAt)) return entryAt + rule.value * 60_000
   return null
 }
 export function targetLabel(settings: StrategySettings, target: TargetNumber): string {
+  if (!targetEnabled(settings, target)) return 'Disabled'
   const rule = targetRule(settings, target)
   const dir = directionOf(settings)
   const signStr = dir === 'sell' ? '−' : dir === 'both' ? '±' : '+'

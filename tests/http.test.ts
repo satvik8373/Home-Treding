@@ -117,7 +117,7 @@ test("backtest HTTP imports full sessions, exports pinned data and fills, and le
     });
   const date = "2026-10-23",
     start = istTime(date, "09:15");
-  const candles = Array.from({ length: 72 }, (_, i) => ({
+  const candles = Array.from({ length: 73 }, (_, i) => ({
     start: start + i * 300_000,
     end: start + (i + 1) * 300_000,
     open: 100,

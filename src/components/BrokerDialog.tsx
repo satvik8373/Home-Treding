@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { BrokerStatus } from "../../shared/model";
 import type { ExecutionSetup } from "../../shared/setup";
+import { executionRouteUnassigned } from '../../shared/setup';
 import type { useDashboard } from "../hooks/useDashboard";
 import { clock, dateTime } from "../lib/format";
 import { Dialog } from "./Dialog";
@@ -59,10 +60,11 @@ export function BrokerDialog({
   const [setupRevision, setSetupRevision] = useState(0);
   const [copied, setCopied] = useState(false);
 
-  const executionIp = network?.observed?.ipv4 ?? network?.expectedIPv4 ?? null;
+  const unassigned = executionRouteUnassigned(network);
+  const executionIp = unassigned ? null : network?.observed?.ipv4 ?? network?.expectedIPv4 ?? null;
+  const networkBlocked = !network || !network.current || !!network.error || !!network.sharedIpConflict || !!network.dedicatedRouteRequired;
 
   useEffect(() => {
-    if (showConnection) return;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     fetch('/api/setup/network', {
@@ -78,10 +80,10 @@ export function BrokerDialog({
       })
       .catch(() => { clearTimeout(timer); });
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [showConnection, setupRevision]);
+  }, [showConnection, setupRevision, connectionRevision]);
 
   async function copyExecutionIp() {
-    if (!executionIp) return;
+    if (!executionIp || networkBlocked) return;
     try {
       await navigator.clipboard.writeText(executionIp);
       setCopied(true);
@@ -180,7 +182,7 @@ export function BrokerDialog({
           className={tab === 'network' ? 'active' : ''}
           onClick={() => setTab('network')}
         >
-          {network?.sharedIpConflict ? 'IP & Route · Conflict' : 'IP & Route'}
+          {unassigned ? 'IP & Route · Setup required' : network?.sharedIpConflict ? 'IP & Route · Conflict' : 'IP & Route'}
         </button>
       </div>
 
@@ -209,6 +211,10 @@ export function BrokerDialog({
                 {broker.expiresAt ? `${dateTime(broker.expiresAt)} IST` : "—"}
               </dd>
             </div>
+            <div>
+              <dt>Execution IP</dt>
+              <dd>{executionIp ?? "—"}</dd>
+            </div>
           </dl>
           <BrokerDiagnostics key={broker.account} account={broker.account!} />
           <button className="button secondary full-width" disabled={locked || !online || !!working} onClick={() => { setRefreshLogin(true); setFlowId('') }}>Refresh login metadata</button>
@@ -234,13 +240,13 @@ export function BrokerDialog({
           <button
             type="button"
             className="broker-ip-card"
-            disabled={!executionIp}
+            disabled={!executionIp || networkBlocked}
             onClick={() => void copyExecutionIp()}
             title="Tap to copy execution IPv4"
           >
             <span className="broker-ip-info">
               <span className={`broker-ip-label${network?.sharedIpConflict ? ' conflict' : ''}`}>
-                {network?.sharedIpConflict
+                {unassigned ? 'Dedicated execution IP awaiting assignment' : network?.sharedIpConflict
                   ? 'Shared Host IPv4 · Claimed by another account'
                   : network?.egressMode === 'proxy'
                     ? 'Dedicated Proxy IPv4'
@@ -248,7 +254,7 @@ export function BrokerDialog({
                       ? 'Dedicated Interface IPv4'
                       : 'Execution IPv4'}
               </span>
-              <code className="broker-ip-code">{executionIp ?? 'Checking…'}</code>
+              <code className="broker-ip-code">{executionIp ?? (unassigned ? 'Not assigned' : 'Checking…')}</code>
             </span>
             <span className={`broker-ip-copy${copied ? ' copied' : ''}`}>
               {copied ? <Check size={13} /> : <Copy size={13} />}
@@ -256,11 +262,11 @@ export function BrokerDialog({
             </span>
           </button>
           <p className={`broker-ip-tip${network?.sharedIpConflict ? ' conflict' : ''}`}>
-            {network?.sharedIpConflict ? (
+            {unassigned || network?.error || network?.sharedIpConflict ? (
               <>
-                IP {executionIp} is already used by another workspace.{' '}
+                {unassigned ? 'A dedicated execution IP must be assigned to this account before connecting mStock.' : network?.error ?? `IP ${executionIp} is reserved by another workspace.`}{' '}
                 <button type="button" className="text-button" onClick={() => setTab('network')}>
-                  Configure route &rarr;
+                  View IP setup &rarr;
                 </button>
               </>
             ) : (
@@ -275,7 +281,7 @@ export function BrokerDialog({
             <form onSubmit={totp}>
               {!savedTotp && <>{verificationMethod()}<label className="field">Type A API key<input required type="password" autoComplete="off" value={form.apiKey} onChange={event => { setFlowId(''); setForm({ ...form, apiKey: event.target.value }) }} /></label></>}
               <label className="field">Authenticator code<input required autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={form.code} onChange={event => setForm({ ...form, code: event.target.value.replace(/\D/g, '') })} /></label>
-              <button className="button primary full-width" disabled={!online || !!working || form.code.length !== 6}>{working ? 'Verifying…' : savedTotp ? 'Verify & reconnect' : 'Verify & connect'}<ArrowRight size={15} /></button>
+              <button className="button primary full-width" disabled={!online || !!working || networkBlocked || form.code.length !== 6}>{working ? 'Verifying…' : savedTotp ? 'Verify & reconnect' : 'Verify & connect'}<ArrowRight size={15} /></button>
               {flowId && error && <button type="button" className="text-button restart-auth" disabled={!!working} onClick={() => { setFlowId(''); setForm({ ...form, code: '' }) }}>Restart verification</button>}
               {savedTotp ? <button type="button" className="text-button restart-auth" disabled={!!working} onClick={() => { setNewConnection(true); setPasswordLogin(false); setFlowId(''); setForm({ username: '', password: '', apiKey: '', code: '' }) }}>Change connection setup</button> : <button type="button" className="text-button restart-auth" disabled={!!working} onClick={() => { setPasswordLogin(true); setFlowId(''); setForm({ ...form, code: '' }) }}>Use client code and password login</button>}
             </form>
@@ -299,7 +305,7 @@ export function BrokerDialog({
               </label>
               <button
                 className="button primary full-width"
-                disabled={!online || !!working || form.code.length !== 6}
+                disabled={!online || !!working || networkBlocked || form.code.length !== 6}
               >
                 {working === "verify" ? "Verifying…" : "Verify & connect"}
                 <ArrowRight size={15} />
@@ -340,7 +346,7 @@ export function BrokerDialog({
               ))}
               <button
                 className="button primary full-width"
-                disabled={!online || !!working}
+                disabled={!online || !!working || networkBlocked}
               >
                 {working === "login" ? "Connecting…" : "Continue"}
                 <ArrowRight size={15} />

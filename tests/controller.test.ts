@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { DEFAULT_SETTINGS } from '../shared/settings.ts'
+import { BOTH_DEFAULT_SETTINGS, DEFAULT_SETTINGS } from '../shared/settings.ts'
 import { Controller } from '../server/controller.ts'
 import { BrokerError } from '../server/broker.ts'
 import { istTime } from '../server/time.ts'
@@ -588,3 +588,136 @@ test('a breakout entry that temporarily lacks a fresh price is automatically ret
   assert.equal(f.controller.session!.legs.CE!.pendingBreakout, null);
   assert.equal(f.controller.session!.legs.CE!.position!.quantity, 195);
 });
+
+test('Both entries share an in-flight REST batch and keep their long/short directions after quote recovery', async () => {
+  const f = await fixture()
+  f.controller.saveStrategySettings({ ...BOTH_DEFAULT_SETTINGS, enabledSides: ['CE', 'PE'] })
+  await f.controller.start('paper', 'both')
+  for (let i = 0; i < 30; i++) await new Promise(resolve => setImmediate(resolve))
+  let release!: (marks: import('../shared/model.ts').Mark[]) => void
+  const quotes = new Promise<import('../shared/model.ts').Mark[]>(resolve => { release = resolve })
+  let requests = 0
+  f.broker.quotes = async () => { requests++; return quotes }
+  f.setTime(istTime(DAY, '09:25') + 3000)
+  f.broker.candles.set('101', [bar('09:15'), bar('09:20', 101)])
+  f.broker.candles.set('102', [bar('09:15'), bar('09:20', 99)])
+  await f.controller.pump()
+  for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve))
+  assert.equal(requests, 1, 'candle submission must share the polling request')
+  assert.equal(f.controller.session!.trades.length, 0)
+  release(['101', '102'].map((token, index) => ({ token, price: index ? 98 : 102, receivedAt: f.now(), source: 'rest' })))
+  for (let i = 0; i < 30; i++) await new Promise(resolve => setImmediate(resolve))
+  await f.controller.pump()
+  assert.deepEqual(f.controller.session!.trades.map(trade => [trade.side, trade.transaction, trade.price]), [['CE', 'BUY', 102], ['PE', 'SELL', 98]])
+  assert.equal(f.controller.session!.legs.CE!.pendingBreakout, null)
+  assert.equal(f.controller.session!.legs.PE!.pendingBreakout, null)
+  assert.equal(f.broker.submitted.length, 0)
+})
+
+test('Both Live reconciles a short leg across monitoring and restart and closes the actual remaining quantities', async () => {
+  const f = await fixture()
+  f.controller.saveStrategySettings({ ...BOTH_DEFAULT_SETTINGS, enabledSides: ['CE', 'PE'] })
+  await f.controller.start('live', 'both')
+  for (let i = 0; i < 30; i++) await new Promise(resolve => setImmediate(resolve))
+  f.broker.plans.push({ average: 101 }, { average: 99 })
+  await candle(f, '09:20', 101, 99)
+  assert.deepEqual(f.broker.submitted.map(order => order.transaction), ['BUY', 'SELL'])
+  f.setTime(f.now() + 16_000); f.mark('CE', 101); f.mark('PE', 99)
+  await f.controller.pump()
+  assert.equal(f.controller.session!.status, 'running')
+  assert.equal(f.controller.session!.pnlVerified, true)
+  const restarted = new Controller(f.broker, f.store, f.feed, f.now)
+  await restarted.restore()
+  assert.equal(restarted.session!.status, 'running')
+  assert.equal(restarted.session!.legs.PE!.position!.direction, 'sell')
+  f.feed.onMark({ token: '102', price: 79, receivedAt: f.now(), source: 'websocket' })
+  for (let i = 0; i < 20; i++) await new Promise(resolve => setImmediate(resolve))
+  await restarted.pump()
+  assert.equal(restarted.session!.legs.PE!.position!.quantity, 130)
+  await restarted.stop(); await restarted.pump()
+  assert.deepEqual(f.broker.submitted.map(order => [order.transaction, order.quantity]), [['BUY', 260], ['SELL', 260], ['BUY', 130], ['SELL', 260], ['BUY', 130]])
+  assert.equal(restarted.session!.status, 'stopped')
+  assert.equal([...f.broker.holdings.values()].every(quantity => quantity === 0), true)
+})
+
+test('quote failures explain the retry, recover automatically and never accept invalid REST prices', async () => {
+  const f = await fixture(); await f.start('paper')
+  f.broker.quotes = async () => { throw new BrokerError('private account text must stay hidden', false, false, 429) }
+  f.setTime(istTime(DAY, '09:25') + 3000)
+  f.broker.candles.set('101', [bar('09:15'), bar('09:20', 101)])
+  f.broker.candles.set('102', [bar('09:15'), bar('09:20', 100)])
+  await f.controller.pump()
+  for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve))
+  assert.equal(f.controller.session!.trades.length, 0)
+  assert.ok(f.controller.session!.legs.CE!.pendingBreakout)
+  assert.match(f.controller.session!.message, /rate limit.*Retrying/)
+  assert.doesNotMatch(f.controller.session!.message, /private account/)
+  f.broker.quotes = async () => [{ token: '101', price: 152, receivedAt: f.now(), exchangeAt: f.now() - 6000, source: 'rest' }]
+  f.setTime(f.now() + 3000); await f.controller.pump()
+  for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve))
+  assert.equal(f.controller.marks['101'], undefined)
+  assert.equal(f.controller.session!.trades.length, 0)
+  f.broker.quotes = async () => [{ token: '101', price: 153, receivedAt: f.now(), source: 'rest' }]
+  f.setTime(f.now() + 3000); await f.controller.pump()
+  for (let i = 0; i < 20; i++) await new Promise(resolve => setImmediate(resolve))
+  await f.controller.pump()
+  assert.equal(f.controller.session!.trades.length, 1)
+  assert.equal(f.controller.session!.trades[0].price, 153)
+})
+
+test('a REST response after signal expiry or Stop never submits the waiting entry', async () => {
+  for (const reason of ['expired', 'stop', 'cutoff'] as const) {
+    const f = await fixture(); await f.start('paper')
+    let release!: (marks: import('../shared/model.ts').Mark[]) => void
+    f.broker.quotes = async () => new Promise(resolve => { release = resolve })
+    f.setTime(istTime(DAY, '09:25') + 3000)
+    f.broker.candles.set('101', [bar('09:15'), bar('09:20', 101)])
+    await f.controller.pump()
+    for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve))
+    if (reason === 'expired') f.setTime(istTime(DAY, '09:26') + 31_000)
+    else if (reason === 'cutoff') f.setTime(istTime(DAY, '15:10'))
+    else void f.controller.stop()
+    release([{ token: '101', price: 102, receivedAt: f.now(), source: 'rest' }])
+    for (let i = 0; i < 20; i++) await new Promise(resolve => setImmediate(resolve))
+    await f.controller.pump()
+    assert.equal(f.controller.session!.trades.length, 0, reason)
+    assert.equal(f.broker.submitted.length, 0, reason)
+  }
+})
+
+test('Live refreshes a price that expires during position verification before submitting once', async () => {
+  const f = await fixture(); await f.start('live')
+  let calls = 0
+  f.broker.quotes = async () => {
+    calls++
+    return [{ token: '101', price: 125, receivedAt: f.now(), source: 'rest' }]
+  }
+  let positionReads = 0
+  f.broker.positions = async () => {
+    if (++positionReads === 2) f.setTime(f.now() + 6000)
+    return []
+  }
+  await candle(f, '09:20')
+  assert.ok(calls > 0)
+  assert.equal(f.controller.marks['101'].price, 125)
+  assert.equal(f.broker.submitted.length, 1)
+  assert.equal(f.broker.submitted[0].reason, 'BREAKOUT')
+})
+
+test('a close exactly at the first entry level retains the retry window and reports expiry', async () => {
+  const f = await fixture(); await f.start('paper')
+  const leg = f.controller.session!.legs.CE!
+  f.setTime(istTime(DAY, '09:25') + 3000)
+  f.broker.candles.set('101', [bar('09:15'), bar('09:20', leg.upper)])
+  await f.controller.pump()
+  for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve))
+  assert.ok(leg.pendingBreakout)
+  assert.equal(leg.firstSignalConsumed, true)
+  f.setTime(istTime(DAY, '09:26') + 31_000)
+  await f.controller.pump()
+  assert.equal(leg.pendingBreakout, null)
+  assert.equal(leg.pendingDirection, null)
+  assert.match(f.controller.session!.message, /signal expired/)
+  f.mark('CE', 102); await f.controller.pump()
+  assert.equal(f.controller.session!.trades.length, 0)
+})

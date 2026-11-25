@@ -24,6 +24,8 @@ import { firestoreClient } from './backup/accountSync.ts';
 
 export interface AppNetworkOptions {
   conflictCheck?: (observedIp: string | null, routeUrl: string | null) => boolean;
+  dedicatedRouteRequired?: () => boolean;
+  manageAssignment?: (action: 'release' | 'assign') => Promise<boolean>;
   applyEgress?: (routeUrl: string | null) => void;
   allowPrivateProxy?: boolean;
   onSetupReady?: (controls: { setEgressRoute: (routeUrl: string | null, ipv4?: string) => void }) => void;
@@ -57,6 +59,8 @@ export function createApp(
     observeForRoute(initialProxy?.url ?? null),
     Date.now,
     appNetwork?.conflictCheck,
+    undefined,
+    appNetwork?.dedicatedRouteRequired,
   );
   if (initialProxy?.url) {
     try { applyEgress(initialProxy.url); } catch { /* retain default routing if saved proxy fails init */ }
@@ -159,6 +163,27 @@ export function createApp(
   app.get("/api/state", (_req, res) => res.json(controller.snapshot(csrf)));
   app.get('/api/setup/network', async (_req, res) => res.json(await setup.read()));
   app.post('/api/setup/network', (req, res) => res.json(setup.save(req.body)));
+  app.post('/api/setup/ip', async (req, res) => {
+    const action = req.body?.action;
+    if (action !== 'release' && action !== 'assign') return res.status(400).json({ error: 'Choose Release or Recheck execution IP.' });
+    try {
+      let assigned: boolean;
+      if (appNetwork?.manageAssignment) assigned = await appNetwork.manageAssignment(action);
+      else {
+        controller.prepareRouteChange();
+        repository.put('setup:ip-released', action === 'release');
+        if (action === 'release') {
+          await setup.saveProxy('');
+          applyEgress(null);
+          setup.setObserve(baseObserve);
+        }
+        assigned = action === 'assign';
+      }
+      res.json({ assigned, network: await setup.read() });
+    } catch (error) {
+      res.status(409).json({ error: error instanceof Error ? error.message : 'Execution IP assignment could not be changed.' });
+    }
+  });
   app.post('/api/setup/proxy', async (req, res) => {
     if (controller.session && ['armed', 'preparing', 'running', 'stopping', 'blocked'].includes(controller.session.status)) {
       return res.status(409).json({ error: 'Stop and flatten the active strategy session before changing outbound IP routing.' });
@@ -353,6 +378,14 @@ export function createApp(
     loginAttempts.push(Date.now());
     return true;
   };
+  app.use(['/api/broker/totp', '/api/broker/login', '/api/broker/verify', '/api/broker/recheck', '/api/strategy/start'], async (req, res, next) => {
+    if (req.method !== 'POST' || req.originalUrl.split('?')[0] === '/api/strategy/start' && req.body?.mode !== 'live'
+      || !appNetwork?.dedicatedRouteRequired && !appNetwork?.conflictCheck) return next();
+    const network = await setup.read();
+    if (network.dedicatedRouteRequired) return void res.status(409).json({ error: 'No dedicated execution IP is assigned. Recheck execution IP setup.' });
+    if (network.sharedIpConflict) return void res.status(409).json({ error: 'This execution IP is reserved by another workspace. Recheck execution IP setup.' });
+    next();
+  });
   app.post('/api/broker/totp', async (req, res) => {
     if (!reserveLoginAttempt()) return res.status(429).json({ error: 'Wait one minute before another login attempt.' });
     if (typeof req.body.useSaved !== 'boolean') throw new Error('Choose saved connection or new API key.');

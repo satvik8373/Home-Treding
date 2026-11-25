@@ -1,5 +1,5 @@
 import { directionOf } from '../shared/strategy.ts'
-import type { Candle, Contract, Fill, OrderIntent, TradingSession } from '../shared/model.ts'
+import type { Candle, Contract, Fill, Mark, OrderIntent, TradingSession } from '../shared/model.ts'
 import type { PositionRow, TradingBroker } from '../server/broker.ts'
 import type { SavedBroker } from '../server/store.ts'
 import { Controller } from '../server/controller.ts'
@@ -22,9 +22,10 @@ export class MemoryStore {
   session() { return this.saved ? structuredClone(this.saved) : null }
   saveSession(value: TradingSession) {
     this.saved = structuredClone(value); this.writes.push(structuredClone(value))
-    this.archives.set(`${value.date}:${value.account}:${value.mode}${directionOf(value.settings) === 'sell' ? ':sell' : ''}`, structuredClone(value))
+    const direction = directionOf(value.settings)
+    this.archives.set(`${value.date}:${value.account}:${value.mode}${direction === 'buy' ? '' : ':' + direction}`, structuredClone(value))
   }
-  loadSession(account: string, date: string, mode: string, direction = 'buy') { return structuredClone(this.archives.get(`${date}:${account}:${mode}${direction === 'sell' ? ':sell' : ''}`) ?? null) }
+  loadSession(account: string, date: string, mode: string, direction = 'buy') { return structuredClone(this.archives.get(`${date}:${account}:${mode}${direction === 'buy' ? '' : ':' + direction}`) ?? null) }
   broker() { return this.savedBroker }
   saveBroker(value: SavedBroker | null) { this.savedBroker = value }
 }
@@ -46,7 +47,7 @@ export class FakeBroker implements TradingBroker {
     if (this.positionFailure) throw new Error('Position request timed out.')
     return [...this.holdings].map(([symbol, quantity]) => ({ symbol, quantity, exchange: 'NFO', product: 'MIS' }))
   }
-  async quotes() { return [] }
+  async quotes(): Promise<Mark[]> { return [] }
   async place(intent: OrderIntent) {
     this.beforePlace?.()
     this.submitted.push(structuredClone(intent))

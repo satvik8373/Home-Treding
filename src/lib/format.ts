@@ -30,3 +30,8 @@ export const dateTime = (at: number) => new Intl.DateTimeFormat('en-GB', {
 
 const calendarDateFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' });
 export const calendarDate = (at: number) => calendarDateFormatter.format(at);
+
+export function pnlTone(amount?: number | null) {
+  if (amount == null || !Number.isFinite(amount) || amount === 0) return undefined;
+  return amount < 0 ? "negative" : "positive";
+}

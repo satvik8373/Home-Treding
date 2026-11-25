@@ -16,6 +16,10 @@ import { createApp } from '../server/http.ts'
 import { fixture } from './helpers.ts'
 import { DEFAULT_SETTINGS } from '../shared/settings.ts'
 import type { TradingSession, OrderIntent } from '../shared/model.ts'
+import { DatabaseSync } from 'node:sqlite'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { AnalyticsCalendar } from '../src/components/AnalyticsCalendar.tsx'
 
 async function session(day = '2026-11-09', mode: 'paper' | 'live' = 'paper') {
   const f = await fixture(); await f.start('paper')
@@ -50,6 +54,43 @@ test('daily/weekly/monthly analytics count complete cycles rather than partial f
   assert.equal(csv.some(row => row.realized_gross_pnl_inr === '-1300'), true, 'numeric losses must remain numbers rather than formula-escaped text')
   assert.equal(periodFor('2027-01-01', 'week'), '2026-12-28'); assert.equal(periodFor('2027-01-01', 'month'), '2027-01')
   assert.throws(() => analyticsFilters({ mode: 'all' }), /separately/); assert.throws(() => analyticsFilters({ from: '2026-02-30' }), /valid date/)
+})
+
+test('Both analytics verifies short and long cycles, repairs cached summaries on read, and accepts its strategy filter', async t => {
+  const root = await mkdtemp(join(tmpdir(),'n009-both-analytics-')), store = new Store(root)
+  t.after(async () => { store.close(); await rm(root,{recursive:true,force:true}) })
+  const value = await session('2026-11-23')
+  value.settings = {...DEFAULT_SETTINGS,direction:'both'}
+  const at = Date.parse('2026-11-23T09:25:00+05:30')
+  const intent = (id:string,reason:OrderIntent['reason'],transaction:'BUY'|'SELL',quantity:number):OrderIntent => ({id,tag:id,side:'CE',symbol:value.legs.CE!.contract.symbol,reason,transaction,quantity,submittedAt:at})
+  applyFill(value,intent('short','BREAKOUT','SELL',260),{orderId:'short',quantity:260,average:100,status:'COMPLETE'},at)
+  applyFill(value,intent('cover','UPPER_CLOSE','BUY',260),{orderId:'cover',quantity:260,average:90,status:'COMPLETE'},at+60000)
+  cycle(value,at+120000)
+  store.saveSession(value)
+  const db = new DatabaseSync(join(root,'009.sqlite'))
+  db.prepare("UPDATE history_sessions SET summary=json_set(summary,'$.realizedGross',NULL,'$.closedCycles',0),cycles='[]' WHERE id=?").run(value.id)
+  db.close()
+  const service = new Analytics(store,()=>null,()=>undefined,()=>at)
+  const report = service.read({from:value.date,to:value.date,mode:'paper',strategy:'both'})
+  assert.equal(report.sessions.length,1);assert.equal(report.sessions[0].strategy,'both')
+  assert.equal(report.totals.realizedGross,3900);assert.equal(report.totals.closedCycles,2)
+  assert.equal(report.totals.unverifiedSessions,0)
+  assert.equal(service.read({from:value.date,to:value.date,mode:'live',strategy:'both'}).sessions.length,0)
+  const html = renderToStaticMarkup(createElement(AnalyticsCalendar,{month:'2026-11',sessions:report.sessions,today:value.date,selected:value.date,onMonth(){},onDay(){}}))
+  assert.match(html,/November 2026/);assert.match(html,/5 fills/)
+  assert.match(html,/3,900/);assert.match(html,/Previous calendar month/)
+  value.trades[1].transaction='SELL'
+  assert.equal(aggregate([value]).realizedGross,null,'a wrong-side exit must remain unverified')
+})
+
+test('today analytics overlays current fills without waiting for a stale saved summary', async t => {
+  const root=await mkdtemp(join(tmpdir(),'n009-current-analytics-')),store=new Store(root)
+  t.after(async()=>{store.close();await rm(root,{recursive:true,force:true})})
+  const value=await session('2026-11-23');store.saveSession(value)
+  cycle(value,Date.parse('2026-11-23T10:00:00+05:30'))
+  const service=new Analytics(store,()=>value)
+  const report=service.read({from:value.date,to:value.date,mode:'paper'})
+  assert.equal(report.sessions.length,1);assert.equal(report.totals.fills,3);assert.equal(report.totals.realizedGross,1300)
 })
 
 test('permanent journal survives rolling activity trimming, deduplicates saves, and excludes credentials from daily archives', async t => {

@@ -415,38 +415,36 @@ export function MarketChart({
         </div>
       </div>
 
-      {/* 2. Streamlined Quote & Stats Row (Only in Candles mode to avoid competing with Hero balance) */}
-      {chartType === 'candles' && (
-        <div className="fintech-chart-quote-bar">
-          <div className="quote-main-col">
-            <div className="quote-price-line">
-              <span className="quote-large-price">
-                {live?.price != null ? `₹${price(live.price)}` : '—'}
+      {/* 2. Streamlined Quote & Stats Row (Always visible with live price, change, High and Low) */}
+      <div className="fintech-chart-quote-bar">
+        <div className="quote-main-col">
+          <div className="quote-price-line">
+            <span className="quote-large-price">
+              {live?.price != null ? `₹${price(live.price)}` : '—'}
+            </span>
+            {change != null && (
+              <span className={`quote-change-badge ${change >= 0 ? 'positive' : 'negative'}`}>
+                {change >= 0 ? '+' : ''}{price(change)} ({percent != null && percent >= 0 ? '+' : ''}{percent?.toFixed(2)}%)
               </span>
-              {change != null && (
-                <span className={`quote-change-badge ${change >= 0 ? 'positive' : 'negative'}`}>
-                  {change >= 0 ? '+' : ''}{price(change)} ({percent != null && percent >= 0 ? '+' : ''}{percent?.toFixed(2)}%)
-                </span>
-              )}
-              <span className={`quote-feed-pill ${!marketOpen ? 'closed' : fresh ? 'live' : 'delayed'}`}>
-                <i className={`status-dot ${!marketOpen ? 'closed' : fresh ? 'green' : ''}`} />
-                {!marketOpen ? 'Market Closed' : fresh ? 'Live' : connected ? 'Polling' : 'Disconnected'}
-              </span>
-            </div>
-          </div>
-
-          <div className="quote-hl-col">
-            <div className="quote-hl-box">
-              <span className="hl-label">HIGH</span>
-              <strong className="hl-val">{dayHigh != null ? `₹${price(dayHigh)}` : '—'}</strong>
-            </div>
-            <div className="quote-hl-box">
-              <span className="hl-label">LOW</span>
-              <strong className="hl-val">{dayLow != null ? `₹${price(dayLow)}` : '—'}</strong>
-            </div>
+            )}
+            <span className={`quote-feed-pill ${!marketOpen ? 'closed' : fresh ? 'live' : 'delayed'}`}>
+              <i className={`status-dot ${!marketOpen ? 'closed' : fresh ? 'green' : ''}`} />
+              {!marketOpen ? 'Market Closed' : fresh ? 'Live' : connected ? 'Polling' : 'Disconnected'}
+            </span>
           </div>
         </div>
-      )}
+
+        <div className="quote-hl-col">
+          <div className="quote-hl-box">
+            <span className="hl-label">HIGH</span>
+            <strong className="hl-val">{dayHigh != null ? `₹${price(dayHigh)}` : '—'}</strong>
+          </div>
+          <div className="quote-hl-box">
+            <span className="hl-label">LOW</span>
+            <strong className="hl-val">{dayLow != null ? `₹${price(dayLow)}` : '—'}</strong>
+          </div>
+        </div>
+      </div>
 
       {/* 3. Subtle OHLC readout only when inspecting a candle */}
       {hover && (

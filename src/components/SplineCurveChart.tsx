@@ -30,49 +30,58 @@ export function SplineCurveChart({
     onTimeframeChange?.(tf)
   }
 
-  // Generate or sample smooth points (matching the aesthetic of Image 1)
   const isDefaultFlow = !candles || candles.length < 8
+
+  // Base reference price: use live quote, or realistic NIFTY 50 / option ATM base
+  const basePrice = useMemo(() => {
+    if (livePrice && livePrice > 0) return livePrice
+    if (symbol === 'NIFTY') return 24150.0
+    return 185.0
+  }, [livePrice, symbol])
 
   const chartData = useMemo(() => {
     if (!isDefaultFlow && candles.length >= 8) {
       // Sample ~24 representative points for a smooth aesthetic curve
       const step = Math.max(1, Math.floor(candles.length / 24))
-      const sampled = []
+      const sampled: number[] = []
       for (let i = 0; i < candles.length; i += step) {
-        sampled.push(candles[i].close)
+        sampled.push(Number(candles[i].close.toFixed(2)))
       }
       if (livePrice && sampled[sampled.length - 1] !== livePrice) {
-        sampled.push(livePrice)
+        sampled.push(Number(livePrice.toFixed(2)))
       }
       return sampled
     }
 
-    // Exact curve data from Image 1:
-    // Starts at $3000, dips slightly, rises to peak at $7320.36, drops softly, then curves up
-    return [
-      3000, 2900, 2800, 3300, 4900, 7320.36, 6100, 4800, 4600, 5400, 5600, 5400, 5900, 6300,
+    // Realistic market wave oscillation around basePrice
+    const multipliers = [
+      0.997, 0.995, 0.994, 0.997, 1.002, 1.006, 1.004, 1.001, 0.998, 1.002, 1.005, 1.003, 1.006, 1.008,
     ]
-  }, [candles, livePrice, isDefaultFlow])
+    return multipliers.map((m) => Number((basePrice * m).toFixed(2)))
+  }, [candles, livePrice, isDefaultFlow, basePrice])
 
   // Coordinate math for SVG spline
   const width = 640
   const height = 240
-  const paddingX = 65
-  const paddingY = 40
+  const paddingX = 72
+  const paddingY = 36
 
-  const minVal = isDefaultFlow ? 0 : Math.min(...chartData) * 0.92
-  const maxVal = isDefaultFlow ? 9500 : Math.max(...chartData) * 1.08
+  const rawMin = Math.min(...chartData)
+  const rawMax = Math.max(...chartData)
+  const margin = Math.max(1, (rawMax - rawMin) * 0.12)
+  const minVal = rawMin - margin
+  const maxVal = rawMax + margin
   const range = maxVal - minVal || 1
 
   const points = useMemo(() => {
     return chartData.map((val, idx) => {
-      const x = paddingX + (idx / (chartData.length - 1)) * (width - paddingX - 25)
+      const x = paddingX + (idx / Math.max(1, chartData.length - 1)) * (width - paddingX - 25)
       const y = height - paddingY - ((val - minVal) / range) * (height - paddingY * 2)
       return { x, y, val }
     })
   }, [chartData, minVal, range])
 
-  // Find peak point for the default bubble (e.g. $7320.36 in Image 1)
+  // Find peak point for default bubble
   const peakIndex = useMemo(() => {
     let maxIdx = 0
     chartData.forEach((v, idx) => {
@@ -115,24 +124,16 @@ export function SplineCurveChart({
     return `${splinePath} L ${last.x} ${bottom} L ${first.x} ${bottom} Z`
   }, [splinePath, points])
 
-  // Grid price levels (exact Image 1: $9000, $6000, $3000, $00)
+  // Grid price levels in Indian Rupee format
   const gridLevels = useMemo(() => {
-    if (isDefaultFlow) {
-      return [
-        { label: '$9000', val: 9000 },
-        { label: '$6000', val: 6000 },
-        { label: '$3000', val: 3000 },
-        { label: '$00', val: 500 },
-      ]
-    }
-    const step = range / 3
+    const step = (rawMax - rawMin) / 3 || 10
     return [
-      { label: `₹${Math.round(maxVal).toLocaleString('en-IN')}`, val: maxVal },
-      { label: `₹${Math.round(minVal + step * 2).toLocaleString('en-IN')}`, val: minVal + step * 2 },
-      { label: `₹${Math.round(minVal + step).toLocaleString('en-IN')}`, val: minVal + step },
-      { label: `₹${Math.max(0, Math.round(minVal)).toLocaleString('en-IN')}`, val: minVal },
+      { label: `₹${Math.round(rawMax).toLocaleString('en-IN')}`, val: rawMax },
+      { label: `₹${Math.round(rawMin + step * 2).toLocaleString('en-IN')}`, val: rawMin + step * 2 },
+      { label: `₹${Math.round(rawMin + step).toLocaleString('en-IN')}`, val: rawMin + step },
+      { label: `₹${Math.round(rawMin).toLocaleString('en-IN')}`, val: rawMin },
     ]
-  }, [isDefaultFlow, minVal, maxVal, range])
+  }, [rawMin, rawMax])
 
   // Handle pointer interaction for smooth tracking
   const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
@@ -140,7 +141,6 @@ export function SplineCurveChart({
     const rect = svgRef.current.getBoundingClientRect()
     const pointerX = ((e.clientX - rect.left) / rect.width) * width
 
-    // Find nearest point
     let closestIdx = 0
     let closestDist = Infinity
     points.forEach((p, idx) => {
@@ -157,6 +157,13 @@ export function SplineCurveChart({
     setHoverIndex(null)
   }
 
+  const bubbleText = activePoint
+    ? `₹${Number(activePoint.val).toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`
+    : ''
+
   return (
     <div className="neo-spline-card">
       {/* 1. Spline Curve SVG Canvas */}
@@ -170,38 +177,39 @@ export function SplineCurveChart({
           onPointerLeave={handlePointerLeave}
         >
           <defs>
-            {/* Dual tone curve stroke gradient: sky blue -> lavender/pink (exact Image 1) */}
+            {/* Dual tone curve stroke gradient: sky blue -> lavender/pink */}
             <linearGradient id="curveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#60a5fa" stopOpacity="1" />
-              <stop offset="65%" stopColor="#93c5fd" stopOpacity="1" />
-              <stop offset="100%" stopColor="#c084fc" stopOpacity="1" />
+              <stop offset="0%" stopColor="#38bdf8" stopOpacity="1" />
+              <stop offset="60%" stopColor="#60a5fa" stopOpacity="1" />
+              <stop offset="100%" stopColor="#a855f7" stopOpacity="1" />
             </linearGradient>
 
             {/* Soft area background fill */}
             <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.16" />
-              <stop offset="50%" stopColor="#c084fc" stopOpacity="0.06" />
+              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.18" />
+              <stop offset="50%" stopColor="#818cf8" stopOpacity="0.07" />
               <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
             </linearGradient>
 
             {/* Bubble Drop Shadow Filter */}
             <filter id="bubbleShadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="4" stdDeviation="5" floodColor="#0f172a" floodOpacity="0.08" />
+              <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="#0f172a" floodOpacity="0.1" />
             </filter>
           </defs>
 
-          {/* Faint Horizontal Dashed Gridlines & Price Labels (Exact Image 1) */}
+          {/* Faint Horizontal Dashed Gridlines & Price Labels */}
           {gridLevels.map((lvl, index) => {
             const y = height - paddingY - ((lvl.val - minVal) / range) * (height - paddingY * 2)
             return (
               <g key={index} className="neo-grid-level">
                 <text
-                  x={12}
+                  x={8}
                   y={y + 4}
                   fill="#94a3b8"
-                  fontSize="11"
-                  fontWeight="500"
-                  fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif"
+                  fontSize="10.5"
+                  fontWeight="600"
+                  fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"
+                  style={{ fontVariantNumeric: 'tabular-nums' }}
                 >
                   {lvl.label}
                 </text>
@@ -226,13 +234,13 @@ export function SplineCurveChart({
             d={splinePath}
             fill="none"
             stroke="url(#curveGradient)"
-            strokeWidth="3.5"
+            strokeWidth="3.2"
             strokeLinecap="round"
             strokeLinejoin="round"
             className="neo-spline-curve-line"
           />
 
-          {/* Interactive Selected Point on Curve (Dark Dot in Image 1) */}
+          {/* Interactive Selected Point on Curve */}
           {activePoint && (
             <g className="neo-chart-active-marker">
               {/* Pulsing subtle aura ring */}
@@ -241,7 +249,7 @@ export function SplineCurveChart({
                 cy={activePoint.y}
                 r="10"
                 fill="#0f172a"
-                fillOpacity="0.12"
+                fillOpacity="0.1"
               />
               {/* Outer border */}
               <circle
@@ -256,22 +264,22 @@ export function SplineCurveChart({
               <circle
                 cx={activePoint.x}
                 cy={activePoint.y}
-                r="3"
+                r="2.5"
                 fill="#0f172a"
               />
 
-              {/* Exact Floating White Capsule Bubble (Image 1: $7320.36) */}
+              {/* Floating White Capsule Bubble with accurate Indian Rupee Price */}
               <g
                 transform={`translate(${Math.max(
-                  paddingX + 45,
-                  Math.min(width - 55, activePoint.x)
+                  paddingX + 54,
+                  Math.min(width - 64, activePoint.x)
                 )}, ${Math.max(26, activePoint.y - 24)})`}
               >
                 {/* Capsule background with drop shadow */}
                 <rect
-                  x="-42"
-                  y="-16"
-                  width="84"
+                  x="-52"
+                  y="-15"
+                  width="104"
                   height="26"
                   rx="13"
                   fill="#ffffff"
@@ -282,14 +290,15 @@ export function SplineCurveChart({
                 {/* Price text inside bubble */}
                 <text
                   x="0"
-                  y="1"
+                  y="2"
                   textAnchor="middle"
                   fill="#0f172a"
                   fontSize="11.5"
-                  fontWeight="700"
-                  fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif"
+                  fontWeight="750"
+                  fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', Inter, sans-serif"
+                  style={{ fontVariantNumeric: 'tabular-nums' }}
                 >
-                  ${activePoint.val.toFixed(2)}
+                  {bubbleText}
                 </text>
               </g>
             </g>
@@ -297,7 +306,7 @@ export function SplineCurveChart({
         </svg>
       </div>
 
-      {/* 2. Timeframe Pill Bar Below Chart (Exact Image 1: 1D 1W 1M [3M] 1Y ALL) */}
+      {/* 2. Timeframe Pill Bar Below Chart (1D 1W 1M [3M] 1Y ALL) */}
       <div className="neo-timeframe-bar" role="tablist" aria-label="Chart time intervals">
         {TIMEFRAMES.map((tf) => {
           const isActive = activeTimeframe === tf

@@ -1,4 +1,4 @@
-import { ChevronDown, SlidersHorizontal, BookOpen, Clock } from 'lucide-react';
+import { ChevronDown, BookOpen, Clock } from 'lucide-react';
 import type { StrategyDirection } from '../../shared/strategy';
 import { directionOf, strategyName } from '../../shared/strategy';
 import { targetLabel } from '../../shared/targets';
@@ -13,7 +13,6 @@ type Props = {
   working: string;
   direction?: StrategyDirection;
   onDirectionChange?: (dir: StrategyDirection) => void;
-  onSettings?: () => void;
   onRules?: () => void;
 };
 
@@ -24,7 +23,6 @@ export function StrategyContextBanner({
   working,
   direction,
   onDirectionChange,
-  onSettings,
   onRules,
 }: Props) {
   const currentDir = direction ?? directionOf(settings);
@@ -55,12 +53,6 @@ export function StrategyContextBanner({
         </div>
 
         <div className="banner-actions">
-          {onSettings && (
-            <button className="banner-btn" onClick={onSettings} title="Configure parameters">
-              <SlidersHorizontal size={13} />
-              <span>Settings</span>
-            </button>
-          )}
           {onRules && (
             <button className="banner-btn" onClick={onRules} title="Read strategy rules">
               <BookOpen size={13} />

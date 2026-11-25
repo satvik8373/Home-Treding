@@ -12,7 +12,7 @@ import { createApp } from './http.ts'
 import { createAccountSync } from './backup/accountSync.ts'
 import type { AccountSync } from './backup/accountSync.ts'
 import { createHistorySync } from './backup/dailyArchives.ts'
-import { observeExecutionIPv4 } from './setup.ts'
+import { observeExecutionIPv4, publicIPv4 } from './setup.ts'
 import { createEgressAgent, createProxyFetcher, validateEgressRoute } from './proxy.ts'
 
 export interface Workspace {
@@ -42,6 +42,8 @@ export async function sharedNetworkObserver(): Promise<string> {
 
 export interface WorkspaceContext {
   conflictCheck?: (observedIp: string | null, routeUrl: string | null) => boolean
+  dedicatedRouteRequired?: () => boolean
+  manageAssignment?: (action: 'release' | 'assign') => Promise<boolean>
 }
 
 export type WorkspaceFactory = (directory: string, context?: WorkspaceContext) => Workspace
@@ -56,6 +58,8 @@ export const createWorkspace: WorkspaceFactory = (directory, context) => {
   let controls: { setEgressRoute: (routeUrl: string | null, ipv4?: string) => void } | undefined
   const app = createApp(controller, process.cwd(), 4310, store, undefined, sharedNetworkObserver, {
     conflictCheck: context?.conflictCheck,
+    dedicatedRouteRequired: context?.dedicatedRouteRequired,
+    manageAssignment: context?.manageAssignment,
     applyEgress: (routeUrl) => {
       broker.setFetcher(routeUrl ? createProxyFetcher(routeUrl) : fetch)
       feed.setAgent(routeUrl ? createEgressAgent(routeUrl) : undefined)
@@ -95,7 +99,17 @@ export class Workspaces {
   private owner: Workspace
   private directory: string
   private closing = false
-  constructor(private data: string, private secret: string, private capacity = 4, private factory: WorkspaceFactory = createWorkspace) {
+  private egressQueue: Promise<void> = Promise.resolve()
+  private restoreTask: Promise<void> | null = null
+  private routeProbes = new Map<string, { ipv4: string | null; expiresAt: number }>()
+  constructor(
+    private data: string,
+    private secret: string,
+    private capacity = 4,
+    private factory: WorkspaceFactory = createWorkspace,
+    private environment: () => NodeJS.ProcessEnv = () => process.env,
+    private observeRoute: (routeUrl: string) => Promise<string> = routeUrl => observeExecutionIPv4(createProxyFetcher(routeUrl)),
+  ) {
     if (secret.length < 32 || !Number.isInteger(capacity) || capacity < 1 || capacity > 32) throw new Error('Invalid workspace configuration.')
     this.directory = join(data, 'tenants')
     mkdirSync(this.directory, { recursive: true, mode: 0o700 })
@@ -112,7 +126,7 @@ export class Workspaces {
       if (this.closing) return void res.status(503).json({ error: 'Engine maintenance in progress. Retry shortly.' })
       if (req.path === '/api/health' && req.method === 'GET') return void res.json({ ok: true, service: 'nifty-009', workspaceIsolation: true })
       try {
-        const workspace = await this.get(identity.tenant)
+        const workspace = await this.get(identity.tenant, req.method === 'GET' && req.path === '/api/setup/network')
         workspace.app(req, res)
       } catch { res.status(503).json({ error: 'Workspace unavailable or server capacity reached. Contact the deployment owner.' }) }
     })
@@ -121,15 +135,16 @@ export class Workspaces {
   private hasSharedIpConflict(myId: string, observedIp: string | null, myRouteUrl: string | null): boolean {
     for (const [otherId, other] of this.values) {
       if (otherId === myId) continue
-      const otherBound = other.controller.connected() || Boolean(other.store.broker())
-      if (!otherBound) continue
       const otherProxy = other.store.get<{ url?: string; ipv4?: string } | null>('setup:workspace-proxy')
+      // Routes remain reserved even before broker login and after disconnect.
+      if (myRouteUrl && myRouteUrl === otherProxy?.url) return true
+      const otherBound = other.controller.connected() || Boolean(other.store.broker())
+      if (!otherProxy?.url && !otherBound) continue
       if (!myRouteUrl && !otherProxy?.url) return true
       if (observedIp) {
-        const otherIp = otherProxy?.url
-          ? (otherProxy.ipv4 ?? other.store.get<{ ipv4?: string } | null>('setup:last-observed-ip')?.ipv4 ?? null)
-          : (other.store.get<{ ipv4?: string } | null>('setup:last-observed-ip')?.ipv4 ?? sharedIpCache?.ip ?? null)
-        if (otherIp && otherIp === observedIp) return true
+        const lastIp = other.store.get<{ ipv4?: string } | null>('setup:last-observed-ip')?.ipv4
+        const otherIps = otherProxy?.url ? [otherProxy.ipv4, lastIp] : [lastIp ?? sharedIpCache?.ip]
+        if (otherIps.includes(observedIp)) return true
       }
     }
     return false
@@ -144,14 +159,42 @@ export class Workspaces {
     return claimed
   }
 
-  private async maybeAssignPoolEgress(id: string, workspace: Workspace): Promise<void> {
-    if (id === 'owner') return
+  private claimedObservedIps(excludeId: string): Set<string> {
+    const claimed = new Set<string>()
+    for (const [otherId, workspace] of this.values) {
+      if (otherId === excludeId) continue
+      const saved = workspace.store.get<{ url?: string; ipv4?: string } | null>('setup:workspace-proxy')
+      if (saved?.url) {
+        const observed = workspace.store.get<{ ipv4?: string } | null>('setup:last-observed-ip')?.ipv4
+        for (const routedIp of [saved.ipv4, observed]) if (routedIp && publicIPv4(routedIp)) claimed.add(routedIp)
+        continue
+      }
+      if (workspace.controller.connected() || Boolean(workspace.store.broker())) {
+        const directIp = workspace.store.get<{ ipv4?: string } | null>('setup:last-observed-ip')?.ipv4 ?? sharedIpCache?.ip ?? null
+        if (directIp && isIPv4(directIp)) claimed.add(directIp)
+      }
+    }
+    return claimed
+  }
+
+  private maybeAssignPoolEgress(id: string, workspace: Workspace): Promise<void> {
+    // Hold one allocator across IP probes and the durable claim. Concurrent first
+    // requests must never select the same route or two routes behind the same NAT.
+    const task = this.egressQueue.catch(() => {}).then(() => this.assignPoolEgress(id, workspace))
+    this.egressQueue = task
+    return task
+  }
+
+  private async assignPoolEgress(id: string, workspace: Workspace): Promise<void> {
+    if (id === 'owner' || !workspace.setEgressRoute) return
+    if (workspace.store.get('setup:ip-released') === true) return
     const currentProxy = workspace.store.get<{ url?: string } | null>('setup:workspace-proxy')
     if (currentProxy?.url) return
     if (workspace.store.broker()) return
-    const pool = configuredEgressPool()
+    const pool = configuredEgressPool(this.environment())
     if (!pool.length) return
-    const claimed = this.claimedPoolRoutes()
+    const claimedRoutes = this.claimedPoolRoutes()
+    const claimedIps = this.claimedObservedIps(id)
     for (const candidate of pool) {
       let normalized: string
       try {
@@ -159,14 +202,27 @@ export class Workspaces {
       } catch {
         continue
       }
-      if (claimed.has(normalized)) continue
+      if (claimedRoutes.has(normalized)) continue
       try {
-        const fetcher = createProxyFetcher(normalized)
-        const ipv4 = await observeExecutionIPv4(fetcher)
+        let probe = this.routeProbes.get(normalized)
+        if (!probe || probe.expiresAt <= Date.now()) {
+          const ipv4 = await this.observeRoute(normalized).catch(() => null)
+          probe = { ipv4: publicIPv4(ipv4) ? ipv4 : null, expiresAt: Date.now() + 30_000 }
+          this.routeProbes.set(normalized, probe)
+        }
+        const ipv4 = probe.ipv4
+        if (!publicIPv4(ipv4)) continue
+        if (claimedIps.has(ipv4) || this.claimedPoolRoutes().has(normalized) || this.claimedObservedIps(id).has(ipv4)) continue
         const now = Date.now()
         workspace.store.put('setup:workspace-proxy', { url: normalized, ipv4, savedAt: now })
-        workspace.store.put('setup:last-observed-ip', { ipv4, checkedAt: now, changed: false })
-        workspace.setEgressRoute?.(normalized, ipv4)
+        try {
+          workspace.setEgressRoute?.(normalized, ipv4)
+          workspace.store.put('setup:last-observed-ip', { ipv4, checkedAt: now, changed: false })
+        } catch (error) {
+          workspace.store.put('setup:workspace-proxy', null)
+          workspace.setEgressRoute?.(null)
+          throw error
+        }
         return
       } catch {
         // Skip unreachable pool routes and try next candidate
@@ -190,18 +246,46 @@ export class Workspaces {
     if (saved) workspace.controller.authorizeBroker(saved.account)
   }
 
-  private async loadWorkspace(id: string, assignPool: boolean): Promise<Workspace> {
+  private manageAssignment(id: string, action: 'release' | 'assign'): Promise<boolean> {
+    const task = this.egressQueue.catch(() => {}).then(async () => {
+      const workspace = this.values.get(id)
+      if (!workspace) throw new Error('Workspace unavailable.')
+      if (action === 'assign' && workspace.store.get('setup:workspace-proxy')) return true
+      workspace.controller.prepareRouteChange()
+      workspace.store.put('setup:ip-released', action === 'release')
+      if (action === 'release') {
+        workspace.store.put('setup:workspace-proxy', null)
+        workspace.store.put('setup:last-observed-ip', null)
+        workspace.setEgressRoute?.(null)
+        await workspace.store.persist()
+        return false
+      }
+      await this.assignPoolEgress(id, workspace)
+      await workspace.store.persist()
+      return !!workspace.store.get('setup:workspace-proxy')
+    })
+    this.egressQueue = task.then(() => {}, () => {})
+    return task
+  }
+
+  private async loadWorkspace(id: string, assignPool: boolean, restoreController = true): Promise<Workspace> {
     const pending = this.tasks.get(id)
     if (pending) return pending
     const loaded = this.values.get(id)
     if (loaded) return loaded
     if (!/^[a-f0-9]{64}$/.test(id) || this.values.size - 1 >= this.capacity) throw new Error('Workspace capacity reached.')
-    const workspace = this.factory(join(this.directory, id), { conflictCheck: (ip, route) => this.hasSharedIpConflict(id, ip, route) })
+    const workspace = this.factory(join(this.directory, id), {
+      conflictCheck: (ip, route) => this.hasSharedIpConflict(id, ip, route),
+      // A Google identity always selects a separate account workspace. Local
+      // preview and incognito still use this engine, regardless of its label.
+      dedicatedRouteRequired: () => true,
+      manageAssignment: action => this.manageAssignment(id, action),
+    })
     this.values.set(id, workspace)
     const task = (async () => {
       this.bind(id, workspace)
       if (assignPool) await this.maybeAssignPoolEgress(id, workspace)
-      await workspace.controller.restore()
+      if (restoreController) await workspace.controller.restore()
       return workspace
     })()
     this.tasks.set(id, task)
@@ -210,21 +294,30 @@ export class Workspaces {
     } finally { this.tasks.delete(id) }
   }
 
-  private async get(id: string): Promise<Workspace> {
-    return this.loadWorkspace(id, true)
+  private async get(id: string, networkRequest = false): Promise<Workspace> {
+    await this.restore()
+    const workspace = await this.loadWorkspace(id, true)
+    // Retry unassigned workspaces when the operator adds routes. Saved broker
+    // connections and existing reservations are never moved automatically.
+    if (networkRequest && !workspace.store.get('setup:workspace-proxy') && configuredEgressPool(this.environment()).length)
+      await this.maybeAssignPoolEgress(id, workspace)
+    return workspace
   }
 
   async restore() {
-    await this.owner.controller.restore()
+    this.restoreTask ??= this.restoreAll()
+    await this.restoreTask
+  }
+
+  private async restoreAll() {
     // Restore saved workspaces even when no browser is open; active sessions keep their own controllers.
     const ids = readdirSync(this.directory, { withFileTypes: true }).filter(entry => entry.isDirectory() && /^[a-f0-9]{64}$/.test(entry.name))
     if (ids.length > this.capacity) throw new Error('Existing workspaces exceed configured capacity. Increase capacity before starting.')
     // First load all persisted workspaces so existing pool claims are registered before assigning unused slots.
-    for (const entry of ids) await this.loadWorkspace(entry.name, false)
-    for (const entry of ids) {
-      const workspace = this.values.get(entry.name)
-      if (workspace) await this.maybeAssignPoolEgress(entry.name, workspace)
-    }
+    for (const entry of ids) await this.loadWorkspace(entry.name, false, false)
+    // Keep saved reservations, but allocate new routes only when a workspace is
+    // requested. Old unused Google sign-ins must not consume newly added IPs.
+    for (const workspace of this.values.values()) await workspace.controller.restore()
   }
 
   async pump() {
@@ -233,7 +326,9 @@ export class Workspaces {
 
   async close(): Promise<boolean> {
     this.closing = true
+    await this.restoreTask
     await Promise.allSettled([...this.tasks.values()])
+    await this.egressQueue.catch(() => {})
     const workspaces = [...this.values.values()]
     try { for (const { controller } of workspaces) await controller.checkpointForRestart() }
     catch (error) { for (const { controller } of workspaces) controller.resumeAfterAbortedRestart(); this.closing = false; throw error }

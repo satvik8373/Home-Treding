@@ -13,7 +13,7 @@ npm run build
 npm start
 ```
 
-Open **http://127.0.0.1:4310**. Keep the backend terminal running while a strategy is active. Closing the browser does not stop monitoring. The server binds to this computer by default. For the Vercel-native hosted Paper worker, encrypted cloud storage, or the external-engine gateway, follow [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md).
+Open **http://127.0.0.1:4310**. Keep the backend terminal running while a strategy is active. Closing the browser does not stop monitoring. The server binds to this computer by default. For Vercel hosting and the authenticated persistent-engine gateway, follow [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md).
 
 For development, `npm run dev` runs the React UI at **http://127.0.0.1:5173** and proxies API requests to the backend. Development reloads can interrupt a session; use the built app with `npm start` for trading.
 
@@ -46,6 +46,8 @@ The backend serializes order submissions. It records an intent before sending an
 Reference downloads run outside the order queue so slow chart requests do not hold up Stop or target processing. Current-day history falls back to the official intraday endpoint when date-ranged history fails, is empty, or returns `candles: null`.
 
 Buys require fresh official option prices. The authenticated WebSocket is the primary feed; the official REST quote endpoint supplies fresh snapshots when streaming is unavailable, for both Paper and Live modes. The fallback polls missing CE/PE marks in one request at most every 2.5 seconds and runs outside the order queue. Invalid/stale data blocks an entry rather than inventing a premium. Late starts and restarts do not replay old entry candles. Both open-time and close-time candle labels are normalized from the opening bar; the broker’s documented truncated `+05` timestamp is treated as IST.
+
+Option REST requests use only the documented `NFO:tradingsymbol` identifiers; bare symbols are never mixed into the batch. Entry checks share an in-flight poll instead of duplicating it. Returned premiums must match the locked contract and pass the same freshness checks as stream prices. A missing quote retains the candle signal for up to 90 seconds; activity reports distinguish rate limits, rejected quote parameters, authentication failures, unavailable prices and expired signals. Stop, cutoff and signal age are checked again after delayed broker reads, before any entry. This applies to Buy, Sell and Both profiles in Paper and Live modes.
 
 WebSocket prices must have a positive finite value, a receipt within five seconds, and, when supplied, an exchange timestamp within five seconds (one second of future clock tolerance). Older updates cannot overwrite newer ticks or latch targets. The feed reconnects if any subscribed instrument stops delivering fresh ticks for more than twenty seconds, even when heartbeats continue. Reconnection repeats authentication and subscriptions; REST fallback remains available independently. REST LTP responses do not supply an exchange timestamp, so their freshness measures successful receipt rather than independently proving exchange age.
 

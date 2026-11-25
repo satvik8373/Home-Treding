@@ -1,5 +1,5 @@
 import { directionOf, signFor, isBeyondEntry, entryTransaction, exitTransaction, referenceStop } from '../shared/strategy.ts'
-import { targetPrice, targetDeadline } from '../shared/targets.ts'
+import { targetPrice, targetDeadline, targetEnabled } from '../shared/targets.ts'
 import { istDate } from './time.ts'
 import type { Candle, Fill, Leg, OrderIntent, Reason, TradingSession } from '../shared/model.ts'
 import { RULES } from '../shared/model.ts'
@@ -75,7 +75,7 @@ export function targetSignal(leg: Leg, price: number, settings: StrategySettings
   if (!leg.position || !Number.isFinite(price) || price <= 0) return null
   const posDir = leg.position.direction ?? (directionOf(settings) === 'sell' ? 'sell' : 'buy')
   const sign = posDir === 'sell' ? -1 : 1
-  const target = leg.position.target1Remaining > 0 ? 1 : 2
+  const target = targetEnabled(settings, 1) && leg.position.target1Remaining > 0 ? 1 : 2
   const level = targetPrice(settings, target, leg.position.average, posDir)
   const deadline = targetDeadline(settings, target, leg.position.entryAt, istDate(now))
   if (level != null ? sign * (price - level) >= 0 : deadline != null && now >= deadline) return target === 1 ? 'TARGET_1' : 'TARGET_2'
@@ -111,7 +111,7 @@ export function applyFill(session: TradingSession, intent: OrderIntent, fill: Fi
     if (leg.position) throw new Error('A confirmed entry would overlap an existing strategy position.')
     const posDir: 'buy' | 'sell' = intent.transaction === 'BUY' ? 'buy' : 'sell'
     leg.position = { entryAt: now, quantity: fill.quantity, average: fill.average, entryQuantity: fill.quantity,
-      target1Remaining: Math.min(settingsFor(session).target1Lots * leg.contract.lotSize, fill.quantity),
+      target1Remaining: targetEnabled(settings, 1) ? Math.min(settingsFor(session).target1Lots * leg.contract.lotSize, fill.quantity) : 0,
       direction: posDir }
     leg.entries++
     leg.reentryReady = false

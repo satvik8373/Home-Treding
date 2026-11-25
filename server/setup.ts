@@ -60,6 +60,7 @@ export class ExecutionNetwork {
   private error: string | null = null
   private task: Promise<void> | null = null
   private observedRouteUrl: string | null | undefined = undefined
+  private routeGeneration = 0
   constructor(
     private repository: BacktestRepository,
     private context: () => Context,
@@ -67,6 +68,8 @@ export class ExecutionNetwork {
     private observe: () => Promise<string> = observeExecutionIPv4,
     private now = Date.now,
     private conflictCheck: (observedIp: string | null, routeUrl: string | null) => boolean = () => false,
+    private observeWithFetcher: (fetcher?: typeof fetch) => Promise<string> = observeExecutionIPv4,
+    private requiresDedicatedRoute: () => boolean = () => false,
   ) {
     const previous = this.repository.get<{ ipv4: string; checkedAt: number; changed: boolean }>('setup:last-observed-ip')
     if (previous && publicIPv4(previous.ipv4)) {
@@ -74,6 +77,7 @@ export class ExecutionNetwork {
     }
   }
   setObserve(nextObserve: () => Promise<string>, cachedIpv4?: string) {
+    this.routeGeneration++
     this.observe = nextObserve
     this.task = null
     this.observedRouteUrl = this.repository.get<{ url: string } | null>('setup:workspace-proxy')?.url ?? null
@@ -106,27 +110,32 @@ export class ExecutionNetwork {
     return { saved: true }
   }
   private async refresh(routeUrl: string | null) {
+    const generation = this.routeGeneration
     this.attemptedAt = this.now()
     this.observedRouteUrl = routeUrl
     try {
       const ipv4 = await this.observe()
+      if (generation !== this.routeGeneration) return
       if (!publicIPv4(ipv4)) throw new Error('Invalid observer result')
       const previous = this.repository.get<{ ipv4: string; changed: boolean }>('setup:last-observed-ip')
       this.observation = { ipv4, checkedAt: this.now(), changed: previous ? previous.ipv4 !== ipv4 || previous.changed : false }
       this.repository.put('setup:last-observed-ip', this.observation)
       this.current = true; this.error = null
     } catch {
+      if (generation !== this.routeGeneration) return
       this.current = false; this.error = 'Could not observe the execution IPv4. Retry shortly; no broker action was sent.'
     }
   }
   async read(): Promise<ExecutionSetup> {
     const savedProxy = this.repository.get<{ url: string; ipv4?: string; savedAt: number } | null>('setup:workspace-proxy')
     const routeUrl = savedProxy?.url ?? null
+    const assignmentReleased = !routeUrl && this.repository.get('setup:ip-released') === true
+    const dedicatedRouteRequired = !routeUrl && (this.requiresDedicatedRoute() || assignmentReleased)
     if (this.observedRouteUrl !== undefined && this.observedRouteUrl !== routeUrl) {
       this.attemptedAt = -Infinity
       this.current = false
     }
-    if (!this.task && this.now() - this.attemptedAt >= (this.current ? 30_000 : 15_000)) {
+    if (!dedicatedRouteRequired && !this.task && this.now() - this.attemptedAt >= (this.current ? 30_000 : 15_000)) {
       const task = this.refresh(routeUrl); this.task = task
       void task.finally(() => { if (this.task === task) this.task = null })
     }
@@ -134,28 +143,35 @@ export class ExecutionNetwork {
     const context = this.context(), env = this.environment(), expected = env.N009_EXECUTION_IPV4 ?? ''
     const profile = context ? this.repository.get<NetworkProfile>(this.profileKey(context)) : null
     const validExpected = publicIPv4(expected) ? expected : null
+    const routeChanged = !!routeUrl && !!savedProxy?.ipv4 && this.current && savedProxy.ipv4 !== this.observation?.ipv4
     return {
       location: env.N009_EXECUTION_LOCATION === 'hosted' ? 'hosted' : env.N009_EXECUTION_LOCATION === 'local' ? 'local' : 'unspecified',
-      observed: this.observation ? { ...this.observation } : null,
-      current: this.current,
-      error: !routeUrl && expected && !validExpected ? 'The host execution IPv4 configuration is invalid. Ask the operator to correct it.' : this.error,
-      expectedIPv4: routeUrl ? null : validExpected,
-      expectedMatch: !routeUrl && validExpected && this.current ? validExpected === this.observation?.ipv4 : null,
+      observed: !dedicatedRouteRequired && this.observation ? { ...this.observation } : null,
+      current: !dedicatedRouteRequired && this.current,
+      error: dedicatedRouteRequired ? 'No dedicated execution IP is assigned. The host operator must configure an available route with a unique public IPv4.'
+        : routeChanged ? 'The assigned route now exits from a different public IPv4. Ask the host operator to restore its assigned IP before reconnecting.'
+        : !routeUrl && expected && !validExpected ? 'The host execution IPv4 configuration is invalid. Ask the operator to correct it.' : this.error,
+      expectedIPv4: routeUrl || dedicatedRouteRequired ? null : validExpected,
+      expectedMatch: !routeUrl && !dedicatedRouteRequired && validExpected && this.current ? validExpected === this.observation?.ipv4 : null,
       account: context?.account ?? null,
       connectionScope: context ? this.scope(context) : null,
       profile,
-      registeredMatch: profile && this.current ? [profile.primary, profile.secondary].includes(this.observation!.ipv4) : null,
+      registeredMatch: profile && !dedicatedRouteRequired && this.current ? [profile.primary, profile.secondary].includes(this.observation!.ipv4) : null,
       registrationSource: 'user-entered',
       brokerRegistrationVerified: false,
       egressMode: egressModeOf(routeUrl),
       proxyConfigured: !!routeUrl,
       proxyLabel: routeUrl ? formatEgressLabel(routeUrl) : null,
       sharedIpConflict: this.conflictCheck(this.observation?.ipv4 ?? null, routeUrl),
+      dedicatedRouteRequired,
+      assignmentReleased,
+      assignmentManaged: this.requiresDedicatedRoute(),
     }
   }
   async saveProxy(proxyUrlInput: unknown, options: ValidateProxyOptions = {}): Promise<{ saved: boolean; ipv4: string | null; routeUrl: string | null }> {
     const raw = typeof proxyUrlInput === 'string' ? proxyUrlInput.trim() : ''
     if (!raw) {
+      this.routeGeneration++
       this.repository.put('setup:workspace-proxy', null)
       this.repository.put('setup:last-observed-ip', null)
       this.observation = null
@@ -169,11 +185,16 @@ export class ExecutionNetwork {
     const proxyFetcher = createProxyFetcher(normalized)
     let ipv4: string
     try {
-      ipv4 = await observeExecutionIPv4(proxyFetcher)
+      ipv4 = await this.observeWithFetcher(proxyFetcher)
+      if (!publicIPv4(ipv4)) throw new Error('Invalid public IPv4 from route test')
     } catch (err) {
       throw new Error(`Proxy connection test failed: ${err instanceof Error ? err.message : 'Could not observe IP through proxy'}`)
     }
+    if (this.conflictCheck(ipv4, normalized)) {
+      throw new Error(`This route exits from ${ipv4}, which is already used by another workspace. Choose a proxy with a unique public IPv4.`)
+    }
     const savedAt = this.now()
+    this.routeGeneration++
     this.repository.put('setup:workspace-proxy', { url: normalized, ipv4, savedAt })
     this.observation = { ipv4, checkedAt: savedAt, changed: false }
     this.repository.put('setup:last-observed-ip', this.observation)

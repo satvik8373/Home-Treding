@@ -153,6 +153,19 @@ test('paper cash math reconciles premiums, realized/open P&L and explicit estima
   assert.equal(sessionMoney(session, marks, f.now())!.grossRealized, null)
 })
 
+test('Both mode marks long and short legs using each position direction', async () => {
+  const f = await fixture(); await f.start('paper')
+  const session = f.controller.session!
+  session.settings = { ...DEFAULT_SETTINGS, direction: 'both' }
+  const long = session.legs.CE!, short = session.legs.PE!
+  long.position = { direction: 'buy', average: 100, quantity: 5, entryQuantity: 5, target1Remaining: 0 }
+  short.position = { direction: 'sell', average: 100, quantity: 10, entryQuantity: 10, target1Remaining: 0 }
+  const marks = Object.fromEntries([long, short].map(({ contract }) => [contract.token, {
+    token: contract.token, price: 110, source: 'websocket' as const, receivedAt: f.now(),
+  }]))
+  assert.equal(sessionMoney(session, marks, f.now())?.openPnl, -50)
+})
+
 function sample() {
   const start = istTime(DAY, '09:15')
   const ce = Array.from({ length: 75 }, (_, i) => ({ start: start + i * 300_000, end: start + (i + 1) * 300_000, open: 100, high: i === 2 ? 115 : 105, low: 95, close: i === 0 ? 100 : 101 }))

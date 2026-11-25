@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react'
 import type { Mode, TradingSession } from '../../shared/model'
 import type { AnalyticsFilters, AnalyticsReport } from '../../shared/analytics'
+import { periodFor } from '../../shared/analytics'
 import type { HistoryEvent, HistoryKind } from '../../server/sessionHistory'
-import { money, dateTime } from '../lib/format'
+import { DataGrid } from './DataGrid'
+import { money, dateTime, pnlTone } from '../lib/format'
 import { strategyName } from '../../shared/strategy'
 import { settingsFor, productFor } from '../../shared/settings'
+import { AnalyticsCalendar } from './AnalyticsCalendar'
 import './AnalyticsPanel.css'
 
 type Detail = { session: TradingSession; events: HistoryEvent[]; total: number; coverage: string; offset: number; limit: number; cloudIssue?: string | null }
+const historyStart = () => new Date(Date.parse(dayNow()) - 3660 * 86_400_000).toISOString().slice(0, 10)
 const dayNow = () => new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10)
-const prior = (days: number) => new Date(Date.parse(dayNow()) - days * 86_400_000).toISOString().slice(0, 10)
 const eventText = (event: HistoryEvent) => {
   const data = event.data as Record<string, unknown>
   if (event.kind === 'activity') return String(data.message ?? '')
@@ -18,19 +21,39 @@ const eventText = (event: HistoryEvent) => {
 }
 
 export function AnalyticsPanel({ initialMode, online }: { initialMode: Mode; online: boolean }) {
-  const [filters, setFilters] = useState<AnalyticsFilters>({ from: prior(29), to: dayNow(), mode: initialMode, strategy: 'all', product: 'all', group: 'day', account: '' })
+  const [filters, setFilters] = useState<AnalyticsFilters>({ from: historyStart(), to: dayNow(), mode: initialMode, strategy: 'all', product: 'all', group: 'day', account: '' })
   const [report, setReport] = useState<AnalyticsReport | null>(null), [error, setError] = useState(''), [loading, setLoading] = useState(true), [revision, setRevision] = useState(0)
   const [selected, setSelected] = useState(''), [kind, setKind] = useState<HistoryKind | ''>(''), [offset, setOffset] = useState(0), [detail, setDetail] = useState<Detail | null>(null), [detailError, setDetailError] = useState('')
+  const [calendarMonth, setCalendarMonth] = useState(dayNow().slice(0, 7)), [calendarDay, setCalendarDay] = useState('')
+  const [period, setPeriod] = useState<'all' | 'today' | 'week' | 'month' | 'other'>('all')
+  const [calendarResult, setCalendarResult] = useState<{ key: string; report: AnalyticsReport } | null>(null)
+  const [calendarFailure, setCalendarFailure] = useState<{ key: string; message: string } | null>(null)
   const [format, setFormat] = useState('summary')
   const [exporting, setExporting] = useState(false)
   const params = new URLSearchParams({ ...filters }).toString()
   useEffect(() => {
     const cancel = new AbortController()
     void fetch(`/api/analytics?${params}`, { cache: 'no-store', signal: AbortSignal.any([cancel.signal, AbortSignal.timeout(15_000)]) }).then(async response => {
-      const value = await response.json(); if (!response.ok) throw Error(value.error || 'History could not be loaded.'); if (!cancel.signal.aborted) setReport(value)
+      const value = await response.json(); if (!response.ok) throw Error(value.error || 'History could not be loaded.'); if (!cancel.signal.aborted) { setReport(value); setError('') }
     }).catch(error => { if (!cancel.signal.aborted) { setReport(null); setError(error instanceof Error ? error.message : 'History could not be loaded.') } }).finally(() => { if (!cancel.signal.aborted) setLoading(false) })
     return () => cancel.abort()
   }, [params, revision])
+
+  const calendarParams = new URLSearchParams({ ...filters, from: calendarMonth + '-01', to: new Date(Date.UTC(Number(calendarMonth.slice(0, 4)), Number(calendarMonth.slice(5)), 0)).toISOString().slice(0, 10), group: 'day' }).toString()
+  useEffect(() => {
+    const cancel = new AbortController()
+    void fetch(`/api/analytics?${calendarParams}`, { cache: 'no-store', signal: AbortSignal.any([cancel.signal, AbortSignal.timeout(15_000)]) }).then(async response => {
+      const value = await response.json()
+      if (!response.ok) throw Error(value.error || 'Calendar could not be loaded.')
+      if (!cancel.signal.aborted) { setCalendarResult({ key: calendarParams, report: value }); setCalendarFailure(null) }
+    }).catch(error => { if (!cancel.signal.aborted) { setCalendarResult(null); setCalendarFailure({ key: calendarParams, message: error instanceof Error ? error.message : 'Calendar could not be loaded.' }) } })
+    return () => cancel.abort()
+  }, [calendarParams, revision])
+  useEffect(() => {
+    if (!online) return
+    const timer = setInterval(() => { if (!document.hidden) setRevision(value => value + 1) }, 15000)
+    return () => clearInterval(timer)
+  }, [online])
   useEffect(() => {
     if (!selected) return
     const cancel = new AbortController()
@@ -39,7 +62,12 @@ export function AnalyticsPanel({ initialMode, online }: { initialMode: Mode; onl
     }).catch(error => { if (!cancel.signal.aborted) setDetailError(error instanceof Error ? error.message : 'Session history unavailable.') })
     return () => cancel.abort()
   }, [selected, offset, kind, revision])
-  const change = (patch: Partial<AnalyticsFilters>) => { setLoading(true); setError(''); setReport(null); setSelected(''); setDetail(null); setFilters(value => ({ ...value, ...patch })); setRevision(value => value + 1) }
+  const change = (patch: Partial<AnalyticsFilters>) => { if (patch.to) setCalendarMonth(patch.to.slice(0, 7)); setLoading(true); setError(''); setCalendarDay(''); setReport(null); setSelected(''); setDetail(null); setFilters(value => ({ ...value, ...patch })); setRevision(value => value + 1) }
+  const selectPeriod = (next: 'all' | 'today' | 'week' | 'month') => {
+    setPeriod(next)
+    const today = dayNow()
+    change({ from: next === 'all' ? historyStart() : next === 'week' ? periodFor(today, 'week') : next === 'month' ? calendarMonth + '-01' : today, to: next === 'month' ? monthEnd(calendarMonth) : today, group: 'day' })
+  }
   const openSession = (id: string) => { if (selected === id) return; setDetail(null); setDetailError(''); setSelected(id); setOffset(0); setKind('') }
   async function download(extra: Record<string, string> = { format }) {
     setExporting(true); setError('')
@@ -51,26 +79,62 @@ export function AnalyticsPanel({ initialMode, online }: { initialMode: Mode; onl
     } catch (error) { setError(error instanceof Error ? error.message : 'Export unavailable.') }
     finally { setExporting(false) }
   }
+  const monthEnd = (month: string) => {
+    const last = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 0)).toISOString().slice(0, 10)
+    return last < dayNow() ? last : dayNow()
+  }
+  const calendarError = calendarFailure?.key === calendarParams ? calendarFailure.message : ''
+  const calendarReport = calendarResult?.key === calendarParams ? calendarResult.report : null
+  const chooseDay = (day: string) => {
+    setPeriod(day === dayNow() ? 'today' : day ? 'other' : 'month')
+    change(day ? { from: day, to: day } : { from: calendarMonth + '-01', to: monthEnd(calendarMonth) })
+    setCalendarDay(day)
+  }
   const stats = report?.totals
   return <section className="analytics-panel" aria-labelledby="analytics-title">
-    <header className="analytics-heading"><div><h2 id="analytics-title">History & analytics</h2><p>Daily, Monday-based weekly and calendar-month reports · IST</p></div><button className="button secondary" disabled={loading || !online} onClick={() => { setLoading(true); setError(''); setRevision(value => value + 1) }}>{loading ? 'Loading…' : 'Refresh history'}</button></header>
+    <header className="analytics-heading"><div><span className="history-eyebrow">TRADING JOURNAL</span><h2 id="analytics-title">History</h2><p>Your trading days, results and session reports.</p></div><button className="text-button" disabled={loading || !online} onClick={() => { setLoading(true); setError(''); setRevision(value => value + 1) }}>{loading ? 'Updating…' : 'Refresh'}</button></header>
+    <div className="history-calendar-controls"><div role="group" aria-label="History mode">{(['paper', 'live'] as const).map(mode => <button key={mode} type="button" aria-pressed={filters.mode === mode} onClick={() => change({ mode })}>{mode === 'paper' ? 'Paper' : 'Live'}</button>)}</div><label><span className="sr-only">History strategy</span><select aria-label="History strategy" value={filters.strategy} onChange={e => change({ strategy: e.target.value as AnalyticsFilters['strategy'] })}><option value="all">All strategies</option><option value="buy">Buy</option><option value="sell">Sell</option><option value="both">Both · Buy &amp; Sell</option></select></label></div>
+    <AnalyticsCalendar month={calendarMonth} sessions={calendarReport?.sessions ?? []} selected={calendarDay} today={dayNow()} loading={!calendarReport && !calendarError} error={calendarError} onDay={chooseDay} onMonth={month => { setPeriod('month'); change({ from: month + '-01', to: monthEnd(month) }); }} />
+    <section className="history-analysis" aria-labelledby="history-analysis-title">
+      <div className="history-section-title"><div><span className="history-eyebrow">PERFORMANCE</span><h3 id="history-analysis-title">Analysis & reports</h3></div><span>{period === 'all' ? 'All recorded history' : filters.from === filters.to ? filters.to : `${filters.from} – ${filters.to}`} · IST</span></div>
+    <div className="analytics-periods" role="group" aria-label="History period">{(['all', 'today', 'week', 'month'] as const).map(value => <button key={value} type="button" aria-pressed={period === value} onClick={() => selectPeriod(value)}>{value[0].toUpperCase() + value.slice(1)}</button>)}</div>
+    {error && <p className="analytics-error" role="alert">{error}</p>}
+    {loading && <p className="history-loading" role="status">Updating analysis…</p>}
+    {stats && <>
+      <DataGrid className="analytics-simple-stats" label="Performance summary" fields={[
+        { label: 'Gross P&L', value: money(stats.realizedGross), detail: 'Before charges', tone: pnlTone(stats.realizedGross) },
+        { label: 'Closed trades', value: stats.closedCycles, detail: `${stats.fills} fills` },
+        { label: 'Win rate', value: stats.winRate == null ? '—' : `${stats.winRate}%`, detail: `${stats.wins}W · ${stats.losses}L` },
+      ]} />
+      {!!stats.unverifiedSessions && <p className="analytics-warning" role="status">{stats.unverifiedSessions} session(s) await accounting verification. Complete P&L is unavailable.</p>}
+      {!!(stats.openLegs || stats.pendingOrders) && <p className="analytics-scope">{stats.openLegs} open legs · {stats.pendingOrders} pending orders</p>}
+      <details className="history-report-breakdown">
+        <summary>Performance breakdown <span>Trades, risk & activity</span></summary>
+        <DataGrid label="Performance breakdown" fields={[
+          { label: 'Winning trades', value: stats.wins },
+          { label: 'Losing trades', value: stats.losses },
+          { label: 'Breakeven trades', value: stats.breakeven },
+          { label: 'Profit factor', value: stats.profitFactor == null ? '—' : stats.profitFactor.toFixed(2) },
+          { label: 'Maximum drawdown', value: money(stats.maxDrawdown) },
+          { label: 'Recorded sessions', value: stats.sessions },
+          { label: 'Entries', value: stats.entries },
+          { label: 'Executed fills', value: stats.fills },
+        ]} />
+      </details>
+      <div className="analytics-history-heading"><h3>Session history</h3><span>{filters.mode === 'paper' ? 'Simulated fills' : 'Confirmed engine fills'}</span></div>
+      <div className="analytics-session-list">{report.sessions.filter(session => !calendarDay || session.date === calendarDay).map(session => <button type="button" className="analytics-session-card" key={session.id} onClick={() => openSession(session.id)} aria-pressed={selected === session.id} aria-label={`Open ${session.date} ${session.strategy} session`}><div><strong>{session.date}</strong><span>{session.strategy === 'both' ? 'Both · Buy & Sell' : session.strategy === 'sell' ? 'Breakout Sell' : 'Breakout Buy'} · {session.product}</span><small>{session.fills} fills · {session.status}</small></div><div className="analytics-session-result"><strong className={session.realizedGross != null && session.realizedGross > 0 ? 'positive-text' : session.realizedGross != null && session.realizedGross < 0 ? 'negative-text' : ''}>{money(session.realizedGross)}</strong><span>View details →</span></div></button>)}</div>
+      {!report.sessions.some(session => !calendarDay || session.date === calendarDay) && <p className="analytics-empty">No recorded {filters.mode} sessions {period === 'today' ? 'today' : 'for this selection'}.</p>}
+    </>}
+    </section>
+    <details className="analytics-other" aria-label="Other history options"><summary>Custom dates & exports</summary>
     <div className="analytics-filters">
-      <label>From<input type="date" value={filters.from} onChange={e => change({ from: e.target.value })} /></label><label>To<input type="date" value={filters.to} onChange={e => change({ to: e.target.value })} /></label>
-      <label>Mode<select value={filters.mode} onChange={e => change({ mode: e.target.value as Mode })}><option value="live">Live</option><option value="paper">Paper</option></select></label>
-      <label>Report<select value={filters.group} onChange={e => change({ group: e.target.value as AnalyticsFilters['group'] })}><option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option></select></label>
-      <label>Strategy<select value={filters.strategy} onChange={e => change({ strategy: e.target.value as AnalyticsFilters['strategy'] })}><option value="all">Buy + Sell</option><option value="buy">Breakout Buy</option><option value="sell">Breakout Sell</option></select></label>
+      <label>From<input type="date" value={filters.from} onChange={e => { setPeriod('other'); change({ from: e.target.value }) }} /></label><label>To<input type="date" value={filters.to} onChange={e => { setPeriod('other'); change({ to: e.target.value }) }} /></label>
       <label>Product<select value={filters.product} onChange={e => change({ product: e.target.value as AnalyticsFilters['product'] })}><option value="all">All products</option><option value="MIS">MIS</option><option value="NRML">NRML</option></select></label>
       {!!report?.accounts.length && <label>Broker account<select value={filters.account} onChange={e => change({ account: e.target.value })}><option value="">All saved accounts</option>{report.accounts.map(account => <option key={account}>{account}</option>)}</select></label>}
     </div>
-    <div className="analytics-tools"><button className="text-button" onClick={() => change({ from: dayNow(), to: dayNow() })}>Today</button><button className="text-button" onClick={() => change({ from: prior(6), to: dayNow() })}>Last 7 days</button><button className="text-button" onClick={() => change({ from: dayNow().slice(0, 7) + '-01', to: dayNow() })}>This month</button>{report?.earliest && <button className="text-button" onClick={() => change({ from: report.earliest!, to: dayNow() })}>All saved</button>}<span className="analytics-mode">{filters.mode === 'paper' ? 'Paper · simulated fills' : 'Live · engine-confirmed fills'}</span></div>
-    {error && <p className="analytics-error" role="alert">{error}</p>}
-    {stats && <><div className="analytics-metrics"><div><span>Realized gross P&L</span><strong>{money(stats.realizedGross)}</strong><small>Before broker charges</small></div><div><span>Closed cycles</span><strong>{stats.closedCycles}</strong><small>{stats.entries} entries · {stats.fills} fills</small></div><div><span>Win rate · verified cycles</span><strong>{stats.winRate == null ? '—' : `${stats.winRate}%`}</strong><small>{stats.wins} wins · {stats.losses} losses · {stats.breakeven} flat</small></div><div><span>Maximum cycle drawdown</span><strong>{money(stats.maxDrawdown)}</strong><small>Gross closed-cycle equity</small></div></div>
-      {!!stats.unverifiedSessions && <p className="analytics-warning" role="status">{stats.unverifiedSessions} session(s) have unverified accounting. Complete P&L is unavailable; verified-session subtotal: {money(stats.verifiedSubtotal)}.</p>}
-      <p className="analytics-scope">Grouped by saved session date. Engine history only; manual broker trades and actual charges are not included. Estimated costs {money(stats.estimatedCosts)} · Estimated net {money(stats.estimatedNet)} · {stats.openLegs} open legs · {stats.pendingOrders} pending orders.</p>
-      <div className="analytics-download"><label>CSV report<select value={format} onChange={e => setFormat(e.target.value)}><option value="summary">Period summary</option><option value="trades">Detailed fills</option><option value="orders">Order audit</option><option value="events">Engine events</option></select></label><button className="button secondary" disabled={exporting || loading} onClick={() => void download()}>{exporting ? 'Preparing…' : 'Download CSV'}</button><span>{report.persistence?.historyFirestore === 'synced' ? 'Daily archives saved to Firestore' : report.persistence?.historyFirestore === 'pending' ? 'Daily archives syncing' : report.persistence?.historyFirestore === 'unavailable' ? 'Cloud archive retrying · local history retained' : 'Cloud archives not configured'}</span></div>
-      <div className="analytics-table-wrap"><table><caption>{filters.group === 'week' ? 'Weeks start on Monday' : filters.group === 'month' ? 'Calendar months' : 'Daily results'}</caption><thead><tr><th>Period</th><th>Sessions</th><th>Closed cycles</th><th>Gross P&L</th><th>Estimated net</th><th>Unverified</th></tr></thead><tbody>{report.buckets.map(bucket => <tr key={bucket.period}><td>{bucket.period}</td><td>{bucket.stats.sessions}</td><td>{bucket.stats.closedCycles}</td><td>{money(bucket.stats.realizedGross)}</td><td>{money(bucket.stats.estimatedNet)}</td><td>{bucket.stats.unverifiedSessions || '—'}</td></tr>)}{!report.buckets.length && <tr><td colSpan={6}>No saved {filters.mode} sessions in this date range.</td></tr>}</tbody></table></div>
-      <h3>Saved sessions</h3><div className="analytics-table-wrap"><table><thead><tr><th>Date / strategy</th><th>Account / product</th><th>Status</th><th>Gross P&L</th><th>History coverage</th><th>Cloud copy</th><th>Details</th></tr></thead><tbody>{report.sessions.map(session => <tr key={session.id}><td>{session.date}<small>{session.strategy === 'sell' ? 'Breakout Sell' : 'Breakout Buy'}</small></td><td>{session.account}<small>{session.product}</small></td><td>{session.status}</td><td>{money(session.realizedGross)}</td><td>{session.journalCoverage === 'recorded' ? 'Journal recorded' : 'Legacy · partial logs'}<small>{session.events} events</small></td><td>{session.syncPending ? 'Pending' : session.syncedAt ? `Saved ${dateTime(session.syncedAt)}` : 'Not synced'}</td><td><button className="text-button" onClick={() => openSession(session.id)}>Open</button></td></tr>)}</tbody></table></div>
-    </>}
+      <div className="analytics-other-actions"><button className="text-button" onClick={() => { setPeriod('other'); change({ from: dayNow().slice(0, 4) + '-01-01', to: dayNow() }) }}>This year</button></div>
+      <div className="analytics-download"><label>Export<select value={format} onChange={e => setFormat(e.target.value)}><option value="summary">Summary</option><option value="trades">Fills</option><option value="orders">Orders</option><option value="events">Events</option></select></label><button className="button secondary" disabled={exporting || loading} onClick={() => void download()}>{exporting ? 'Preparing…' : 'Download CSV'}</button></div>
+    </details>
     {selected && <section className="analytics-detail" aria-label="Session history"><header><h3>Session report</h3><button className="text-button" onClick={() => setSelected('')}>Close</button></header>{detailError && <p role="alert">{detailError}</p>}{!detail && !detailError && <p>Loading session history…</p>}{detail && <>
       <p>{detail.session.date} · {strategyName(detail.session.settings)} · {detail.session.mode.toUpperCase()} · {productFor(settingsFor(detail.session))}</p>
       <p>{detail.coverage === 'recorded' ? 'Journal retained from session recording.' : 'Only events present in the legacy snapshot could be recovered. Older trimmed logs are unavailable.'}</p>

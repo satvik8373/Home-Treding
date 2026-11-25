@@ -9,6 +9,7 @@ export interface StrategySettings {
   breakoutPercent: number; exitPercent: number; entryLots: number; target1Lots: number;
   target1Points: number; target2Points: number; cutoff: string; maxEntriesPerLeg: number;
   target1Rule?: TargetRule; target2Rule?: TargetRule;
+  target1Enabled?: boolean; target2Enabled?: boolean;
   stopLossPoints?: number;
   enabledSides: Side[]; feePerOrderEstimate: number;
 }
@@ -19,10 +20,12 @@ export const DEFAULT_SETTINGS: StrategySettings = { breakoutPercent: 0.09, exitP
 export const SELL_DEFAULT_SETTINGS: StrategySettings = { ...DEFAULT_SETTINGS, direction: 'sell' }
 export const BOTH_DEFAULT_SETTINGS: StrategySettings = { ...DEFAULT_SETTINGS, direction: 'both' }
 // Sessions saved before rule snapshots existed used 3 lots and a 1+2 split.
-export const LEGACY_SETTINGS: StrategySettings = { ...DEFAULT_SETTINGS, entryLots: 3, target1Lots: 1, stopLossPoints: 0 }
+export const LEGACY_SETTINGS: StrategySettings = { ...DEFAULT_SETTINGS, cutoff: '15:10', entryLots: 3, target1Lots: 1, stopLossPoints: 0 }
 export function validateSettings(input: unknown): StrategySettings {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Strategy settings must be an object.')
   const body = input as Record<string, unknown>
+  for (const key of ['target1Enabled', 'target2Enabled']) if (body[key] !== undefined && typeof body[key] !== 'boolean') throw new Error(`${key} must be enabled or disabled.`)
+  const bothTargets = body.target1Enabled !== false && body.target2Enabled !== false
   if (body.product !== undefined && body.product !== 'MIS' && body.product !== 'NRML') throw new Error('Choose Day Trade (MIS) or Carry Forward (NRML) for NIFTY options.')
   if (body.direction !== undefined && !['buy', 'sell', 'both'].includes(String(body.direction))) throw new Error('Choose the Buy, Sell, or Both strategy.')
   const number = (key: keyof StrategySettings, min: number, max: number, integer = false) => {
@@ -33,13 +36,13 @@ export function validateSettings(input: unknown): StrategySettings {
   const entryLots = number('entryLots', 1, 20, true), target1Lots = number('target1Lots', 0, 19, true)
   if (target1Lots >= entryLots) throw new Error('First-target lots must be smaller than entry lots. Use 0 to skip the first target.')
   const target1Points = number('target1Points', 0.05, 1000), target2Points = number('target2Points', 0.1, 2000)
-  if (!body.target1Rule && !body.target2Rule && target2Points <= target1Points) throw new Error('Target 2 points must exceed target 1 points.')
+  if (bothTargets && !body.target1Rule && !body.target2Rule && target2Points <= target1Points) throw new Error('Target 2 points must exceed target 1 points.')
   if (typeof body.cutoff !== 'string' || !/^\d{2}:\d{2}$/.test(body.cutoff)) throw new Error('Choose a valid cutoff time.')
   const [h, m] = body.cutoff.split(':').map(Number), minutes = h * 60 + m
   if (m >= 60 || minutes < 570 || minutes > 925 || m % 5 !== 0) throw new Error('Cutoff must be on a five-minute boundary from 09:30 to 15:25 IST.')
   if (!Array.isArray(body.enabledSides) || !body.enabledSides.length || body.enabledSides.length > 2 || new Set(body.enabledSides).size !== body.enabledSides.length || body.enabledSides.some(side => !['CE', 'PE'].includes(String(side)))) throw new Error('Enable CALL, PUT, or both without duplicate legs.')
   const rule = (key: 'target1Rule' | 'target2Rule'): TargetRule | undefined => {
-    if (body[key] === undefined) return undefined
+    if (body[key] === undefined || body[key === 'target1Rule' ? 'target1Enabled' : 'target2Enabled'] === false) return undefined
     const r = body[key] as Record<string, unknown>
     if (!r || typeof r !== 'object' || Array.isArray(r)) throw new Error(`${key}: select a valid target type.`)
     if (r.kind === 'clock') {
@@ -53,8 +56,8 @@ export function validateSettings(input: unknown): StrategySettings {
   }
   const target1Rule = rule('target1Rule'), target2Rule = rule('target2Rule')
   const one = target1Rule ?? { kind: 'points', value: target1Points }, two = target2Rule ?? { kind: 'points', value: target2Points }
-  if (target1Lots > 0 && one.kind === two.kind && ('time' in one && 'time' in two ? two.time <= one.time : 'value' in one && 'value' in two && two.value <= one.value)) throw new Error('For the same target type, target 2 must be above/later than target 1.')
-  return { ...(body.product !== undefined ? { product: body.product as BrokerProduct } : {}), ...(body.direction === 'sell' ? { direction: 'sell' as const } : body.direction === 'both' ? { direction: 'both' as const } : {}), ...(target1Rule ? { target1Rule } : {}), ...(target2Rule ? { target2Rule } : {}), breakoutPercent: number('breakoutPercent', 0.01, 10), exitPercent: number('exitPercent', 0.01, 10), entryLots, target1Lots, target1Points, target2Points, stopLossPoints: body.stopLossPoints === undefined ? 0 : number('stopLossPoints', 0, 2000),
+  if (bothTargets && target1Lots > 0 && one.kind === two.kind && ('time' in one && 'time' in two ? two.time <= one.time : 'value' in one && 'value' in two && two.value <= one.value)) throw new Error('For the same target type, target 2 must be above/later than target 1.')
+  return { ...(body.target1Enabled !== undefined ? { target1Enabled: body.target1Enabled as boolean } : {}), ...(body.target2Enabled !== undefined ? { target2Enabled: body.target2Enabled as boolean } : {}), ...(body.product !== undefined ? { product: body.product as BrokerProduct } : {}), ...(body.direction === 'sell' ? { direction: 'sell' as const } : body.direction === 'both' ? { direction: 'both' as const } : {}), ...(target1Rule ? { target1Rule } : {}), ...(target2Rule ? { target2Rule } : {}), breakoutPercent: number('breakoutPercent', 0.01, 10), exitPercent: number('exitPercent', 0.01, 10), entryLots, target1Lots, target1Points, target2Points, stopLossPoints: body.stopLossPoints === undefined ? 0 : number('stopLossPoints', 0, 2000),
     cutoff: body.cutoff, maxEntriesPerLeg: number('maxEntriesPerLeg', 0, 100, true), enabledSides: [...body.enabledSides].sort() as Side[], feePerOrderEstimate: number('feePerOrderEstimate', 0, 1000) }
 }
 export function settingsFor(session?: { settings?: StrategySettings } | null): StrategySettings { return session ? session.settings ?? LEGACY_SETTINGS : DEFAULT_SETTINGS }
@@ -62,7 +65,7 @@ export function sameSettings(a: StrategySettings, b: StrategySettings) {
   const canonical = (s: StrategySettings) => {
     const v = validateSettings(s)
     const { product: _product, ...rest } = v
-    return { target1Rule: targetRule(v, 1), target2Rule: targetRule(v, 2), ...rest, product: productFor(v), target1Points: 0, target2Points: 0 }
+    return { target1Enabled: true, target2Enabled: true, target1Rule: targetRule(v, 1), target2Rule: targetRule(v, 2), ...rest, product: productFor(v), target1Points: 0, target2Points: 0 }
   }
   return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b))
 }

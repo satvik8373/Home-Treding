@@ -8,6 +8,13 @@ import { fixture, DAY, bar, contract } from './helpers.ts'
 import { istTime } from '../server/time.ts'
 import type { Leg, OrderIntent, TradingSession } from '../shared/model.ts'
 import type { StrategySettings } from '../shared/settings.ts'
+import { createApp } from '../server/http.ts'
+import { Store } from '../server/store.ts'
+import { Controller } from '../server/controller.ts'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import type { AddressInfo } from 'node:net'
 
 const bothSettings: StrategySettings = { ...BOTH_DEFAULT_SETTINGS, enabledSides: ['CE', 'PE'] }
 const leg = (): Leg => ({ contract: contract('CE'), reference: bar('09:15'), ...levels(100, bothSettings), position: null, realized: 0, entries: 0, lastCandleEnd: istTime(DAY, '09:20'), exitReason: null })
@@ -121,4 +128,47 @@ test('Controller starts Both strategy and persists preferences', async () => {
   for (let i = 0; i < 25; i++) await tick()
   assert.equal(f.controller.session!.settings!.direction, 'both')
   assert.equal(strategyName(f.controller.session!.settings), '009 Breakout – Both (Buy & Sell)')
+})
+
+test('Both Start API accepts Paper and Live and reports the configured time window after cutoff', async t => {
+  for (const mode of ['paper', 'live'] as const) {
+    const f = await fixture()
+    f.setTime(istTime(DAY, '09:05'))
+    const server = createApp(f.controller, process.cwd()).listen(0, '127.0.0.1')
+    await new Promise<void>(resolve => server.on('listening', resolve))
+    t.after(() => { server.closeAllConnections(); server.close() })
+    const root = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+    const state = await (await fetch(root+'/api/state')).json() as { csrf: string }
+    const start = () => fetch(root+'/api/strategy/start', { method:'POST', headers:{'content-type':'application/json','x-009-csrf':state.csrf}, body:JSON.stringify({mode,strategy:'both',liveAcknowledged:true}) })
+    const accepted = await start()
+    assert.equal(accepted.status,202,JSON.stringify(await accepted.json()))
+    assert.equal(f.controller.session!.settings!.direction,'both')
+    assert.equal(f.controller.session!.status,'armed')
+    assert.equal(f.broker.submitted.length,0)
+    await f.controller.stop(); await f.controller.pump()
+    f.setTime(istTime(DAY,'15:11'))
+    const rejected = await start()
+    assert.equal(rejected.status,400)
+    assert.match((await rejected.json() as {error:string}).error,/09:00.*15:10/)
+  }
+})
+
+test('SQLite keeps Buy, Sell and Both day sessions separate when switching and resuming', async t => {
+  const directory = await mkdtemp(join(tmpdir(),'n009-both-start-'))
+  const store = new Store(directory)
+  t.after(async () => { store.close(); await rm(directory,{recursive:true,force:true}) })
+  const f = await fixture(); f.setTime(istTime(DAY,'09:05'))
+  store.saveBroker(f.broker.credentials)
+  const controller = new Controller(f.broker,store,f.feed,f.now)
+  await controller.restore()
+  const ids = new Map<string,string>()
+  for (const direction of ['buy','sell','both','buy','both'] as const) {
+    await controller.start('paper',direction)
+    assert.equal(directionOf(controller.session!.settings),direction)
+    if (ids.has(direction)) assert.equal(controller.session!.id,ids.get(direction))
+    else ids.set(direction,controller.session!.id)
+    await controller.stop(); await controller.pump()
+  }
+  assert.equal(new Set(ids.values()).size,3)
+  assert.equal(f.broker.submitted.length,0)
 })

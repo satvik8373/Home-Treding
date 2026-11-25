@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { FIREBASE_WEB_CONFIG } from '../cloud-runtime/firebase-config.mjs'
 
 const HELPERS: Record<string, string> = {
   handler: '/__/auth/handler', 'handler.js': '/__/auth/handler.js', iframe: '/__/auth/iframe', 'iframe.js': '/__/auth/iframe.js',
@@ -20,6 +21,12 @@ export function createFirebaseAuthProxy(fetcher: typeof fetch = fetch) {
     if (!['GET', 'HEAD', 'POST'].includes(req.method ?? 'GET')) { res.setHeader('Allow', 'GET, HEAD, POST'); return fail(405) }
     const incoming = new URL(req.url ?? '/', 'https://dashboard.invalid'), resource = incoming.searchParams.get('resource') ?? ''
     if (!Object.hasOwn(HELPERS, resource)) return fail(404)
+    if (resource === 'init.json') {
+      if (!['GET', 'HEAD'].includes(req.method ?? 'GET')) { res.setHeader('Allow', 'GET, HEAD'); return fail(405) }
+      res.statusCode = 200
+      res.setHeader('Content-Type', 'application/json; charset=utf-8')
+      return res.end(req.method === 'HEAD' ? undefined : JSON.stringify({ ...FIREBASE_WEB_CONFIG, authDomain: 'home-treding.vercel.app' }))
+    }
     topLevel = resource === 'handler' || resource === 'links'
     incoming.searchParams.delete('resource')
     const target = new URL(HELPERS[resource], 'https://mavrix-trading.firebaseapp.com'); target.search = incoming.search

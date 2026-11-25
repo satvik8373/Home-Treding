@@ -1,13 +1,12 @@
 import { initializeApp } from '@firebase/app'
 import { browserLocalPersistence, getAuth, getRedirectResult, GoogleAuthProvider, setPersistence, signInWithPopup, signInWithRedirect, signOut } from '@firebase/auth'
 import { createRedirectCompletion, needsGoogleRedirect, signInDeadline } from './google-flow'
+import { FIREBASE_WEB_CONFIG } from '../../shared/firebase-config'
 
 // Firebase web identifiers are public. Broker and server credentials never enter this module.
 const app = initializeApp({
-  apiKey: 'AIzaSyAlmxCoJhCQCncKx05iZsWNlxWlSLIldn0',
+  ...FIREBASE_WEB_CONFIG,
   authDomain: window.location.hostname === 'home-treding.vercel.app' ? 'home-treding.vercel.app' : 'mavrix-trading.firebaseapp.com',
-  projectId: 'mavrix-trading',
-  appId: '1:315103441060:web:92dbf76316165a9007b631',
 })
 export async function googleSignIn() {
   const auth = getAuth(app)

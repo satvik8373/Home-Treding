@@ -1,0 +1,40 @@
+/* Shared typography and spacing for labeled financial values. */
+.data-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 8px;
+  margin: 0;
+}
+
+.data-grid-wide { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+@media (max-width: 720px) {
+  .data-grid-wide { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.data-grid > div { min-width: 0; }
+
+.data-grid dt,
+.data-grid-detail {
+  color: var(--text-muted, #475467);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.data-grid dt { font-weight: 500; }
+
+.data-grid dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.data-grid-value {
+  color: var(--ink, #17212f);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-grid-value[data-tone="positive"] { color: #167047; }
+.data-grid-value[data-tone="negative"] { color: #b42318; }

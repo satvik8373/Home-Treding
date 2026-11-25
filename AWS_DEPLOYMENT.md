@@ -22,6 +22,8 @@ N009_EXECUTION_LOCATION=hosted
 
 Also set `N009_GATEWAY_SECRET` to a private random value of at least 32 characters. Optionally set `N009_EXECUTION_IPV4` to the verified host outbound IPv4; this is an expected-value comparison, not proof of a static allocation or broker approval. For multi-user deployments where separate users connect separate mStock accounts on the same engine, configure `N009_WORKSPACE_PROXIES` (comma-separated HTTP/HTTPS proxy URLs) or `N009_WORKSPACE_INTERFACES` (comma-separated local IPv4 interface addresses) so each workspace exits from a unique IPv4 address.
 
+Hosted workspaces require an available dedicated route before broker login. The operator must already control the proxy/interface and its fixed public IPv4; these settings do not create addresses. Reserve at least one distinct public IPv4 per user workspace. Private interface addresses behind a shared NAT count as the same public IP and are skipped. Reservations persist across restart and broker disconnect. If the pool is empty or exhausted, the dashboard shows **Not assigned** and blocks login/new Live starts instead of offering the shared host IP. See [connection setup](BROKER_CONNECTION.md) for assignment and migration details. Use existing resources within their actual zero-cost allowance; no paid service is introduced or required by the code.
+
 ## Connect Vercel
 
 Set production server-side variables, then redeploy:
@@ -43,3 +45,13 @@ Keep these values out of Git and browser environment variables. Production `verc
 The current EC2 address is auto-assigned, without an Elastic IP. Stop/start or replacement can change it. If it changes, update engine DNS, the HTTPS origin, expected IP and broker allowlist before Live use. Do not describe it as a guaranteed static address. No additional instance, subscription or Elastic IP is required by these templates; existing AWS resources remain subject to the account's actual free-tier eligibility and usage.
 
 Before any engine upgrade/restart, stop entries and resolve broker exposure in the dashboard. Never force a deployment through unresolved orders. Inspect `systemctl status nifty009`, restart counts, memory and disk; the starter memory limit is not a performance guarantee. Keep the old release and a verified state backup for rollback.
+
+## 20 November 2026 quote recovery deployment
+
+The engine was upgraded from `20261114-full-1bf0cc5c` to `20261120-quote-retry-f865c565`. The running 14 November bundle did not include the 18–19 November on-demand REST fallback and 90-second breakout retry commits, despite those changes being present in GitHub. The reported 09:25 PE / 09:45 CE skips match the archived 19 November Live session.
+
+The new release includes quote recovery, validated contract matching, shared in-flight quote reads, signal-expiry checks, restored execution-IP callbacks and correct signed-quantity verification for Both strategy shorts. All 276 tests, TypeScript checking, the production build and lint passed before activation. The bundled engine checksum is `f865c5652f4eee534af2b6e690ef4b0771efe0d9606e410b4b2a9128cf85333b`.
+
+Every workspace was stopped with no saved strategy position or pending intent before activation. SQLite backups, encryption keys and the existing environment were preserved privately under `/var/lib/nifty009/maintenance-backup-20261120-quote-retry-1795181949`. All five workspace sessions matched their pre-deployment state after restart. Keep this backup and the previous release for rollback.
+
+Post-deployment checks verified certificate-valid public HTTPS (200 authenticated, 401 without authentication), restored broker connections, assigned execution routes, funds/positions/order-book reads, advertised trading capabilities and official option REST responses. Verification placed no orders. The market was closed: fresh streaming ticks and an actual market-hours entry/retry remain unverified. Do not infer execution success from an after-hours REST price or a passing build.

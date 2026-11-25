@@ -1,4 +1,4 @@
-import { signFor, directionOf, entryLevel } from './strategy.ts'
+import { positionPnl, directionOf, entryLevel } from './strategy.ts'
 import type { Mark, TradingSession } from './model.ts'
 import { settingsFor } from './settings.ts'
 import { freshMark } from './market.ts'
@@ -10,17 +10,21 @@ export function sessionMoney(session: TradingSession | null, marks: Record<strin
   const trades = session.trades.filter(trade => trade.mode === session.mode)
   const buys = round(trades.filter(t => t.transaction === 'BUY').reduce((sum, t) => sum + t.quantity * t.price, 0))
   const sells = round(trades.filter(t => t.transaction === 'SELL').reduce((sum, t) => sum + t.quantity * t.price, 0))
-  let value: number | null = 0, cost = 0
+  const settings = settingsFor(session)
+  let value: number | null = 0, cost = 0, markedPnl = 0
   for (const leg of Object.values(session.legs)) if (leg?.position) {
     cost += leg.position.average * leg.position.quantity
     const mark = marks[leg.contract.token]
     if (!freshMark(mark, now)) value = null
-    else if (value != null) value += mark.price * leg.position.quantity
+    else if (value != null) {
+      value += mark.price * leg.position.quantity
+      markedPnl += positionPnl(leg.position, mark.price, settings)
+    }
   }
   const grossRealized = session.pnlVerified ? round(trades.reduce((sum, t) => sum + (t.pnl ?? 0), 0)) : null
-  const openPnl = value == null ? null : round(signFor(settingsFor(session)) * (value - cost))
+  const openPnl = value == null ? null : round(markedPnl)
   const grossMarked = grossRealized == null || openPnl == null ? null : round(grossRealized + openPnl)
-  const estimate = round(settingsFor(session).feePerOrderEstimate * trades.length)
+  const estimate = round(settings.feePerOrderEstimate * trades.length)
   return { mode: session.mode, buyPremiums: buys, sellProceeds: sells, premiumCashflow: round(sells - buys), openCost: round(cost),
     openMarketValue: value == null ? null : round(value), grossRealized, openPnl, grossMarked, estimatedCosts: estimate,
     estimatedNet: grossMarked == null ? null : round(grossMarked - estimate), actualBrokerCharges: null, actualNetAfterCharges: null,

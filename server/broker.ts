@@ -11,7 +11,7 @@ type Row = Record<string, unknown>
 const record = (v: unknown): Row => v && typeof v === 'object' && !Array.isArray(v) ? v as Row : {}
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 export class BrokerError extends Error {
-  constructor(message: string, public definitive = false, public authentication = false) { super(message) }
+  constructor(message: string, public definitive = false, public authentication = false, public httpStatus?: number) { super(message) }
 }
 export interface PositionRow { symbol: string; exchange: string; product: string; quantity: number }
 export interface TradingBroker {
@@ -55,7 +55,7 @@ export class MStock implements TradingBroker {
       for (const secret of [credentials?.apiKey, credentials?.accessToken, ...Object.values(form ?? {})])
         if (secret && secret.length >= 4) message = message.split(secret).join('[redacted]')
       const error = new BrokerError(message, response.status < 500 && response.status !== 408 && response.status !== 429 && body.error_type !== 'GeneralException',
-        authenticated && (response.status === 401 || ['TokenException', 'APIKeyException'].includes(String(body.error_type))))
+        authenticated && (response.status === 401 || ['TokenException', 'APIKeyException'].includes(String(body.error_type))), response.status)
       if (error.authentication && this.credentials === credentials) this.onAuthFailure(error)
       throw error
     }
@@ -138,29 +138,22 @@ export class MStock implements TradingBroker {
   async quotes(contracts: Contract[]): Promise<Mark[]> {
     if (!contracts.length) return []
     const params = new URLSearchParams()
-    for (const c of contracts) {
-      params.append('i', `NFO:${c.symbol}`)
-      if (!c.symbol.startsWith('NFO:')) params.append('i', c.symbol)
-    }
-    let raw: unknown
-    try {
-      raw = await this.request(`/instruments/quote/ltp?${params}`)
-    } catch {
-      return []
-    }
+    // Type A requires exchange:tradingsymbol for every i value. One bare
+    // symbol can invalidate the whole batch, including the other option leg.
+    for (const symbol of new Set(contracts.map(c => c.symbol.replace(/^NFO:/i, '').trim()))) params.append('i', `NFO:${symbol}`)
+    const raw = await this.request(`/instruments/quote/ltp?${params}`)
     const data = record(raw)
     return contracts.flatMap(c => {
-      const target = c.symbol.trim().toUpperCase()
-      const row = record(
-        data[`NFO:${c.symbol}`]
-        ?? data[c.symbol]
-        ?? data[`NSE:${c.symbol}`]
-        ?? Object.entries(data).find(([k]) => {
-          const sym = k.split(':').pop()?.trim().toUpperCase()
-          return sym === target || sameTradingSymbol(sym ?? '', target, c.expiry)
-        })?.[1]
-      )
-      const price = Number(row.last_price)
+      const target = c.symbol.replace(/^NFO:/i, '').trim()
+      const row = Object.entries(data).map(([key, value]) => ({ key, row: record(value) })).find(({ key, row }) => {
+        // Response aliases are acceptable only for this exact contract. Never
+        // relabel another expiry/strike's premium with the requested token.
+        const parts = key.split(':')
+        if (parts.length > 2 || parts.length === 2 && !['NFO', 'NSE'].includes(parts[0].toUpperCase())) return false
+        if (row.instrument_token != null && String(row.instrument_token) !== c.token) return false
+        return sameTradingSymbol(parts.at(-1), target, c.expiry)
+      })?.row
+      const price = typeof row?.last_price === 'number' || typeof row?.last_price === 'string' && row.last_price.trim() !== '' ? Number(row.last_price) : NaN
       return Number.isFinite(price) && price > 0 ? [{ token: c.token, price, receivedAt: Date.now(), source: 'rest' as const }] : []
     })
   }

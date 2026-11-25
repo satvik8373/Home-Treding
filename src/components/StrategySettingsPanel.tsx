@@ -1,5 +1,5 @@
 import { directionOf, strategyName } from '../../shared/strategy'
-import { SlidersHorizontal, ArrowUpRight, Crosshair, ShieldCheck, RotateCcw, LockKeyhole, Check, Save } from 'lucide-react'
+import { ArrowUpRight, Crosshair, ShieldCheck, LockKeyhole, Check, Save } from 'lucide-react'
 import { targetLabel, targetRule } from '../../shared/targets'
 import type { TargetRule } from '../../shared/targets'
 import { useState } from 'react'
@@ -22,24 +22,26 @@ export function StrategySettingsPanel({ saved, effective, active, hasSession = a
   const [form, setForm] = useState(() => formOf(saved)), [cutoff, setCutoff] = useState(saved.cutoff), [sides, setSides] = useState(saved.enabledSides)
   const [product, setProduct] = useState<BrokerProduct>(productFor(saved))
   const [rules, setRules] = useState<[TargetRule, TargetRule]>(() => [targetRule(saved, 1), targetRule(saved, 2)])
+  const [enabled, setEnabled] = useState<[boolean, boolean]>([saved.target1Enabled !== false, saved.target2Enabled !== false])
+  const [normalCutoff, setNormalCutoff] = useState(saved.target1Enabled === false && saved.target2Enabled === false ? DEFAULT_SETTINGS.cutoff : saved.cutoff)
   const [dirty, setDirty] = useState(false), [error, setError] = useState(''), [note, setNote] = useState('')
+  const shownEnabled: [boolean, boolean] = dirty ? enabled : [saved.target1Enabled !== false, saved.target2Enabled !== false]
   const shownRules: [TargetRule, TargetRule] = dirty ? rules : [targetRule(saved, 1), targetRule(saved, 2)]
   const [target2Draft, setTarget2Draft] = useState<string | null>(null)
   const shownForm = dirty ? form : formOf(saved), shownCutoff = dirty ? cutoff : saved.cutoff, shownSides = dirty ? sides : saved.enabledSides
   const shownProduct = dirty ? product : productFor(saved)
   const cutoffMinutes = Number(shownCutoff.slice(0, 2)) * 60 + Number(shownCutoff.slice(3)) - 1
   const lastTargetTime = `${String(Math.floor(cutoffMinutes / 60)).padStart(2, '0')}:${String(cutoffMinutes % 60).padStart(2, '0')}`
-  const modified = dirty && (shownProduct !== productFor(saved) || JSON.stringify(shownRules) !== JSON.stringify([targetRule(saved, 1), targetRule(saved, 2)]) || numeric.some(([key]) => Number(shownForm[key]) !== saved[key]) || shownCutoff !== saved.cutoff || [...shownSides].sort().join() !== [...saved.enabledSides].sort().join())
-  function edit(change: { product?: BrokerProduct; form?: typeof form; cutoff?: string; sides?: StrategySettings['enabledSides']; rules?: [TargetRule, TargetRule] }) { setProduct(change.product ?? shownProduct); setTarget2Draft(null); setRules(change.rules ?? shownRules); setDirty(true); setForm(change.form ?? shownForm); setCutoff(change.cutoff ?? shownCutoff); setSides(change.sides ?? shownSides); setError(''); setNote('') }
+  const modified = dirty && (shownEnabled[0] !== (saved.target1Enabled !== false) || shownEnabled[1] !== (saved.target2Enabled !== false) || shownProduct !== productFor(saved) || JSON.stringify(shownRules) !== JSON.stringify([targetRule(saved, 1), targetRule(saved, 2)]) || numeric.some(([key]) => Number(shownForm[key]) !== saved[key]) || shownCutoff !== saved.cutoff || [...shownSides].sort().join() !== [...saved.enabledSides].sort().join())
+  function edit(change: { enabled?: [boolean, boolean]; product?: BrokerProduct; form?: typeof form; cutoff?: string; sides?: StrategySettings['enabledSides']; rules?: [TargetRule, TargetRule] }) { setEnabled(change.enabled ?? shownEnabled); setProduct(change.product ?? shownProduct); setTarget2Draft(null); setRules(change.rules ?? shownRules); setDirty(true); setForm(change.form ?? shownForm); setCutoff(change.cutoff ?? shownCutoff); setSides(change.sides ?? shownSides); setError(''); setNote('') }
   const target2Lots = target2Draft ?? (shownForm.entryLots.trim() && shownForm.target1Lots.trim() ? String(Number(shownForm.entryLots) - Number(shownForm.target1Lots)) : '')
   const changed = !sameSettings(saved, effective)
-  function reset() { setProduct('MIS'); setRules([targetRule(DEFAULT_SETTINGS, 1), targetRule(DEFAULT_SETTINGS, 2)]); setTarget2Draft(null); setDirty(true); setForm(formOf(DEFAULT_SETTINGS)); setCutoff(DEFAULT_SETTINGS.cutoff); setSides([...DEFAULT_SETTINGS.enabledSides]); setError(''); setNote('MIS / 4-lot defaults loaded: target 1 sells 2 lots; target 2 sells the remaining 2. Save to apply.') }
   async function save() {
     setError(''); setNote('')
     try {
       if (numeric.some(([key]) => !shownForm[key].trim())) throw new Error('Complete every numeric field. Use 0 only where explicitly allowed.')
-      if (!target2Lots.trim() || !Number.isInteger(Number(target2Lots)) || Number(target2Lots) < 1 || Number(shownForm.target1Lots) + Number(target2Lots) !== Number(shownForm.entryLots)) throw new Error('Target 1 lots + target 2 lots must equal entry lots, with at least 1 lot remaining for target 2.')
-      const settings = validateSettings({ product: shownProduct, direction: saved.direction, target1Points: saved.target1Points, target2Points: saved.target2Points, target1Rule: shownRules[0], target2Rule: shownRules[1], ...Object.fromEntries(numeric.map(([key]) => [key, Number(shownForm[key])])), cutoff: shownCutoff, enabledSides: shownSides })
+      if (shownEnabled[0] && shownEnabled[1] && (!target2Lots.trim() || !Number.isInteger(Number(target2Lots)) || Number(target2Lots) < 1 || Number(shownForm.target1Lots) + Number(target2Lots) !== Number(shownForm.entryLots))) throw new Error('Target 1 lots + target 2 lots must equal entry lots, with at least 1 lot remaining for target 2.')
+      const settings = validateSettings({ target1Enabled: shownEnabled[0], target2Enabled: shownEnabled[1], product: shownProduct, direction: saved.direction, target1Points: saved.target1Points, target2Points: saved.target2Points, target1Rule: shownRules[0], target2Rule: shownRules[1], ...Object.fromEntries(numeric.map(([key]) => [key, Number(shownForm[key])])), cutoff: shownCutoff, enabledSides: shownSides })
       const result = await action('/api/strategy/settings', settings, 'save-settings')
       if (result) setNote('Saved. Current session rules are unchanged; new backtests use these settings; the saved day-session keeps its original rules until the next trading day.')
     } catch (error) { setError(error instanceof Error ? error.message : 'Could not save settings.') }
@@ -52,8 +54,15 @@ export function StrategySettingsPanel({ saved, effective, active, hasSession = a
   function changeRule(index: number, rule: TargetRule) {
     edit({ rules: shownRules.map((r, i) => i === index ? rule : r) as [TargetRule, TargetRule] })
   }
-  const allocationValid = Number(shownForm.target1Lots) >= 0 && Number(target2Lots) >= 1 && Number(shownForm.target1Lots) + Number(target2Lots) === Number(shownForm.entryLots)
-  const previewSettings = { ...saved, target1Rule: shownRules[0], target2Rule: shownRules[1] }
+  function toggleTarget(index: number, checked: boolean) {
+    const next = shownEnabled.map((value, i) => i === index ? checked : value) as [boolean, boolean]
+    const wasDisabled = !shownEnabled[0] && !shownEnabled[1]
+    const allDisabled = !next[0] && !next[1]
+    if (allDisabled && !wasDisabled) setNormalCutoff(shownCutoff)
+    edit({ enabled: next, cutoff: allDisabled && !wasDisabled ? '15:15' : wasDisabled && !allDisabled ? normalCutoff : shownCutoff })
+  }
+  const allocationValid = !shownEnabled[0] || !shownEnabled[1] || Number(shownForm.target1Lots) >= 0 && Number(target2Lots) >= 1 && Number(shownForm.target1Lots) + Number(target2Lots) === Number(shownForm.entryLots)
+  const previewSettings = { ...saved, target1Enabled: shownEnabled[0], target2Enabled: shownEnabled[1], target1Rule: shownRules[0], target2Rule: shownRules[1] }
   return <section className="strategy-settings" aria-labelledby="strategy-settings-title">
     <header className="settings-heading"><div><span className="settings-kicker">{strategyName(saved).toUpperCase()} / CONFIGURATION</span><h2 id="strategy-settings-title">Strategy settings</h2><p>Set your entries, target exits and protection in one place.</p></div><span className="settings-status"><LockKeyhole size={13} />Applies next trading day</span></header>
     <form onSubmit={event => { event.preventDefault(); void save() }}>
@@ -68,18 +77,18 @@ export function StrategySettingsPanel({ saved, effective, active, hasSession = a
           </div>
         </section>
         <section className="settings-section" aria-labelledby="target-settings-title">
-          <div className="settings-section-heading"><span className="settings-section-icon"><Crosshair size={18} /></span><div><h3 id="target-settings-title">Target exits</h3><p>Take the first exit, then close the remaining lots.</p></div><span className="settings-section-number">02</span></div>
-          <div className="settings-target-grid">{shownRules.map((rule, index) => <fieldset className="settings-target" key={index}><legend><span>T{index + 1}</span>Target {index + 1}</legend>
+          <div className="settings-section-heading"><span className="settings-section-icon"><Crosshair size={18} /></span><div><h3 id="target-settings-title">Target exits</h3><p>Untick either target to disable it. Regular exits and square-off remain active.</p></div><span className="settings-section-number">02</span></div>
+          <div className="settings-target-grid">{shownRules.map((rule, index) => <fieldset className="settings-target" key={index}><legend><span>T{index + 1}</span><label><input type="checkbox" checked={shownEnabled[index]} disabled={disabled} onChange={event => toggleTarget(index, event.target.checked)} />Enable Target {index + 1}</label></legend><fieldset disabled={disabled || !shownEnabled[index]} className="settings-target-fields">
             <label className="setting-field"><span>Exit by</span><select value={rule.kind === 'minutes' || rule.kind === 'clock' ? 'time' : 'price'} disabled={disabled} onChange={event => {
               changeRule(index, event.target.value === 'time' ? { kind: 'clock', time: '' } : { kind: 'points', value: index ? 40 : 20 })
             }}><option value="price">Price</option><option value="time">Time</option></select></label>
             <label className="setting-field"><span>{rule.kind === 'clock' || rule.kind === 'minutes' ? 'Exit time · IST' : rule.kind === 'percent' ? directionOf(saved) === 'sell' ? 'Fall from entry · %' : 'Gain from entry · %' : rule.kind === 'price' ? 'Option premium · ₹' : directionOf(saved) === 'sell' ? 'Premium points below entry' : 'Premium points above entry'}</span><div className="setting-input">{rule.kind === 'clock' || rule.kind === 'minutes' ? <input type="time" min="09:20" max={lastTargetTime} step="60" value={rule.kind === 'clock' ? rule.time : ''} disabled={disabled} onChange={event => changeRule(index, { kind: 'clock', time: event.target.value })} required /> : <input type="number" min="0.01" max={rule.kind === 'percent' ? 1000 : 100000} step="0.01" value={Number.isFinite(rule.value) ? rule.value : ''} disabled={disabled} onChange={event => changeRule(index, { ...rule, value: event.target.value === '' ? NaN : Number(event.target.value) })} required />}<span>{rule.kind === 'clock' || rule.kind === 'minutes' ? 'IST' : rule.kind === 'percent' ? '%' : rule.kind === 'price' ? '₹' : 'pts'}</span></div>{rule.kind === 'minutes' && <small>Saved duration: {rule.value} min after entry. Select an IST time to replace it; current session stays unchanged.</small>}</label>
-            {index === 0 ? numberField('target1Lots', directionOf(saved) === 'sell' ? 'Buy back quantity' : 'Sell quantity', 'Use 0 to skip the first target.', 'lots') : <label className="setting-field"><span>{directionOf(saved) === 'sell' ? 'Buy back quantity' : 'Sell quantity'}</span><div className="setting-input"><input type="number" min="1" max="20" step="1" value={target2Lots} disabled={disabled} onChange={event => {
+            {index === 0 ? numberField('target1Lots', directionOf(saved) === 'sell' ? 'Buy back quantity' : 'Sell quantity', 'Use 0 to skip the first target.', 'lots') : <label className="setting-field"><span>{directionOf(saved) === 'sell' ? 'Buy back quantity' : 'Sell quantity'}</span><div className="setting-input"><input type="number" min="1" max="20" step="1" value={shownEnabled[0] ? target2Lots : shownForm.entryLots} disabled={disabled || !shownEnabled[0]} onChange={event => {
               const value = event.target.value, remaining = Number(value), entry = Number(shownForm.entryLots)
               edit({ form: value.trim() && Number.isInteger(remaining) ? { ...shownForm, target1Lots: String(entry - remaining) } : shownForm }); setTarget2Draft(value)
             }} required /><span>lots</span></div><small>Adjusts T1 to keep your total allocation.</small></label>}
-          </fieldset>)}</div>
-          <p className="settings-footnote">Time uses the selected IST clock time, regardless of profit or loss. T2 follows T1. An entry after its target time makes that exit due immediately.</p>
+          </fieldset></fieldset>)}</div>
+          <p className="settings-footnote">With targets enabled, exits trigger normally when reached. Disabling both sets square-off to 15:15 IST; re-enabling a target restores the previous square-off. Regular candle-close exits and the configured stop remain active. With only T2 enabled, it closes the full remaining position. With only T1 enabled, the balance follows regular exits. Time targets use IST regardless of profit or loss.</p>
         </section>
         <section className="settings-section" aria-labelledby="protection-settings-title">
           <div className="settings-section-heading"><span className="settings-section-icon"><ShieldCheck size={18} /></span><div><h3 id="protection-settings-title">Protection & session</h3><p>Keep exits and the trading window under control.</p></div><span className="settings-section-number">03</span></div>
@@ -89,10 +98,6 @@ export function StrategySettingsPanel({ saved, effective, active, hasSession = a
             <label className="setting-field"><span>Square-off time</span><div className="setting-input"><input type="time" min="09:30" max="15:25" step="300" value={shownCutoff} disabled={disabled} onChange={event => edit({ cutoff: event.target.value })} required /><span>IST</span></div><small>Close remaining positions and stop new entries.</small></label>
           </div>
         </section>
-        <details className="settings-section settings-advanced"><summary><SlidersHorizontal size={16} /><span>Limits & cost estimates</span><small>Optional</small></summary><div className="settings-field-grid">
-          {numberField('maxEntriesPerLeg', 'Entry limit per leg', '0 allows unlimited qualifying re-entries.', 'entries')}
-          {numberField('feePerOrderEstimate', 'Estimated cost per filled order', 'Planning estimate; actual broker charges may differ.', '₹')}
-        </div><button type="button" className="settings-reset" disabled={!!working} onClick={reset}><RotateCcw size={13} />Restore 4-lot defaults</button></details>
       </div>
       <aside className="settings-overview" aria-label="Configuration preview">
         <div className="settings-summary"><span className="settings-kicker">ORDER ALLOCATION</span><div className="settings-total">{shownForm.entryLots || '—'}<span>lots per leg</span></div><div className="settings-allocation"><div><span>Target 1</span><strong>{shownForm.target1Lots || '—'} <small>lots</small></strong></div><div><span>Target 2</span><strong>{target2Lots || '—'} <small>lots</small></strong></div></div>
