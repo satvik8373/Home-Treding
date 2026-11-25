@@ -20,6 +20,7 @@ import type {
   UTCTimestamp,
 } from 'lightweight-charts';
 import { CandlestickChart, TrendingUp, Maximize2, RefreshCw } from 'lucide-react';
+import { SplineCurveChart } from './SplineCurveChart';
 import type { ChartSymbol, Leg, Mark, Trade } from '../../shared/model';
 import { useMarketChart } from '../hooks/useMarketChart';
 import { chartCandles, tradeMarkers } from '../lib/chartData';
@@ -49,7 +50,7 @@ export function MarketChart({
   trades,
 }: Props) {
   const [symbol, setSymbol] = useState<ChartSymbol>('NIFTY');
-  const [chartType, setChartType] = useState<'candles' | 'line'>('candles');
+  const [chartType, setChartType] = useState<'candles' | 'line'>('line');
 
   const { data, error, loading } = useMarketChart(
     symbol,
@@ -322,12 +323,12 @@ export function MarketChart({
         { value: average, label: 'Avg fill', color: '#7c3aed' },
         ...(settings.target1Lots && target1Level != null
           ? [
-              {
-                value: target1Level,
-                label: target1Remaining ? 'T1' : 'T1 filled',
-                color: '#16a34a',
-              },
-            ]
+            {
+              value: target1Level,
+              label: target1Remaining ? 'T1' : 'T1 filled',
+              color: '#16a34a',
+            },
+          ]
           : []),
         ...(target2Level != null ? [{ value: target2Level, label: 'T2', color: '#059669' }] : []),
         ...(stopLevel != null && stopLevel > 0
@@ -414,36 +415,38 @@ export function MarketChart({
         </div>
       </div>
 
-      {/* 2. Streamlined Quote & Stats Row (Clean 1-line Fintech Row) */}
-      <div className="fintech-chart-quote-bar">
-        <div className="quote-main-col">
-          <div className="quote-price-line">
-            <span className="quote-large-price">
-              {live?.price != null ? `₹${price(live.price)}` : '—'}
-            </span>
-            {change != null && (
-              <span className={`quote-change-badge ${change >= 0 ? 'positive' : 'negative'}`}>
-                {change >= 0 ? '+' : ''}{price(change)} ({percent != null && percent >= 0 ? '+' : ''}{percent?.toFixed(2)}%)
+      {/* 2. Streamlined Quote & Stats Row (Only in Candles mode to avoid competing with Hero balance) */}
+      {chartType === 'candles' && (
+        <div className="fintech-chart-quote-bar">
+          <div className="quote-main-col">
+            <div className="quote-price-line">
+              <span className="quote-large-price">
+                {live?.price != null ? `₹${price(live.price)}` : '—'}
               </span>
-            )}
-            <span className={`quote-feed-pill ${!marketOpen ? 'closed' : fresh ? 'live' : 'delayed'}`}>
-              <i className={`status-dot ${!marketOpen ? 'closed' : fresh ? 'green' : ''}`} />
-              {!marketOpen ? 'Market Closed' : fresh ? 'Live' : connected ? 'Polling' : 'Disconnected'}
-            </span>
+              {change != null && (
+                <span className={`quote-change-badge ${change >= 0 ? 'positive' : 'negative'}`}>
+                  {change >= 0 ? '+' : ''}{price(change)} ({percent != null && percent >= 0 ? '+' : ''}{percent?.toFixed(2)}%)
+                </span>
+              )}
+              <span className={`quote-feed-pill ${!marketOpen ? 'closed' : fresh ? 'live' : 'delayed'}`}>
+                <i className={`status-dot ${!marketOpen ? 'closed' : fresh ? 'green' : ''}`} />
+                {!marketOpen ? 'Market Closed' : fresh ? 'Live' : connected ? 'Polling' : 'Disconnected'}
+              </span>
+            </div>
           </div>
-        </div>
 
-        <div className="quote-hl-col">
-          <div className="quote-hl-box">
-            <span className="hl-label">HIGH</span>
-            <strong className="hl-val">{dayHigh != null ? `₹${price(dayHigh)}` : '—'}</strong>
-          </div>
-          <div className="quote-hl-box">
-            <span className="hl-label">LOW</span>
-            <strong className="hl-val">{dayLow != null ? `₹${price(dayLow)}` : '—'}</strong>
+          <div className="quote-hl-col">
+            <div className="quote-hl-box">
+              <span className="hl-label">HIGH</span>
+              <strong className="hl-val">{dayHigh != null ? `₹${price(dayHigh)}` : '—'}</strong>
+            </div>
+            <div className="quote-hl-box">
+              <span className="hl-label">LOW</span>
+              <strong className="hl-val">{dayLow != null ? `₹${price(dayLow)}` : '—'}</strong>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* 3. Subtle OHLC readout only when inspecting a candle */}
       {hover && (
@@ -460,63 +463,77 @@ export function MarketChart({
 
       {/* 4. Chart Canvas Container */}
       <div className="fintech-chart-canvas-wrap">
-        <div ref={host} className="chart-canvas-element" />
-        {!points.length && (
-          <div className="chart-empty-overlay">
-            <CandlestickChart size={28} strokeWidth={1.4} />
-            <h3>
-              {!connected
-                ? 'Connect your broker to see the live chart'
-                : loading
-                  ? 'Loading market candles…'
-                  : symbol !== 'NIFTY' && !leg
-                    ? 'ATM contracts are not locked yet'
-                    : 'No candle history available'}
-            </h3>
-            <p>
-              {!connected
-                ? 'NIFTY and option charts stream live from official broker feeds.'
-                : error || payload?.warning || 'Official candles appear when trading session data is active.'}
-            </p>
-          </div>
+        {chartType === 'line' ? (
+          <SplineCurveChart
+            candles={payload?.candles}
+            livePrice={live?.price}
+            symbol={symbol}
+            percentChange={percent}
+          />
+        ) : (
+          <>
+            <div ref={host} className="chart-canvas-element" />
+            {!points.length && (
+              <div className="chart-empty-overlay">
+                <CandlestickChart size={28} strokeWidth={1.4} />
+                <h3>
+                  {!connected
+                    ? 'Connect your broker to see the live chart'
+                    : loading
+                      ? 'Loading market candles…'
+                      : symbol !== 'NIFTY' && !leg
+                        ? 'ATM contracts are not locked yet'
+                        : 'No candle history available'}
+                </h3>
+                <p>
+                  {!connected
+                    ? 'NIFTY and option charts stream live from official broker feeds.'
+                    : error || payload?.warning || 'Official candles appear when trading session data is active.'}
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* 5. Timeframe Selector Pills (Matches Reference Screen 2 Timeframe Bar) */}
-      <div className="fintech-chart-timeframe-bar">
-        <div className="tf-pills-group">
-          <span className="chart-cadence">5-minute candles</span>
-        </div>
+      {/* 5. Timeframe & Footer (Only in Candles mode; Spline has built-in neo timeframe pills) */}
+      {chartType === 'candles' && (
+        <>
+          <div className="fintech-chart-timeframe-bar">
+            <div className="tf-pills-group">
+              <span className="chart-cadence">5-minute candles</span>
+            </div>
 
-        <button
-          className="timeframe-fit-btn"
-          onClick={() => chart.current?.timeScale().fitContent()}
-          title="Fit chart content"
-          aria-label="Fit chart content"
-        >
-          <Maximize2 size={13} />
-        </button>
-      </div>
+            <button
+              className="timeframe-fit-btn"
+              onClick={() => chart.current?.timeScale().fitContent()}
+              title="Fit chart content"
+              aria-label="Fit chart content"
+            >
+              <Maximize2 size={13} />
+            </button>
+          </div>
 
-      {/* 6. Clean Subtle Footer */}
-      <div className="fintech-chart-footer">
-        <div className="footer-status-info">
-          <RefreshCw size={11} className={loading || payload?.historyLoading ? 'spin-icon' : ''} />
-          <span>
-            {loading || payload?.historyLoading
-              ? 'Loading candles…'
-              : error || payload?.warning || 'mStock OHLC · 5-minute candles'}
-          </span>
-          {payload?.contract && (
-            <span className="contract-tag">
-              Lot {payload.contract.lotSize} · Expiry {payload.contract.expiry}
-            </span>
-          )}
-        </div>
-        <div className="chart-attribution">
-          <span>Lightweight Charts™</span>
-        </div>
-      </div>
+          <div className="fintech-chart-footer">
+            <div className="footer-status-info">
+              <RefreshCw size={11} className={loading || payload?.historyLoading ? 'spin-icon' : ''} />
+              <span>
+                {loading || payload?.historyLoading
+                  ? 'Loading candles…'
+                  : error || payload?.warning || 'mStock OHLC · 5-minute candles'}
+              </span>
+              {payload?.contract && (
+                <span className="contract-tag">
+                  Lot {payload.contract.lotSize} · Expiry {payload.contract.expiry}
+                </span>
+              )}
+            </div>
+            <div className="chart-attribution">
+              <span>Lightweight Charts™</span>
+            </div>
+          </div>
+        </>
+      )}
     </section>
   );
 }

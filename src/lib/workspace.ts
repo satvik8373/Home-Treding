@@ -1,5 +1,6 @@
 export const workspacePages = {
   market: { title: 'Market overview', description: 'Your market, positions, orders and execution controls.' },
+  explore: { title: 'Explore', description: 'Search assets, crypto, market indices and stock lists.' },
   analytics: { title: 'History & analytics', description: 'Daily, weekly and monthly performance from recorded sessions.' },
   backtest: { title: 'Backtest', description: 'Replay your strategy against available historical candles.' },
   settings: { title: 'Strategy settings', description: 'Manage entry size, target exits and session protection.' },

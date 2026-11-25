@@ -29,7 +29,6 @@ export type LiveScoreData = {
 let activeDocPiP: Window | null = null;
 let activeCanvas: HTMLCanvasElement | null = null;
 let activeVideo: HTMLVideoElement | null = null;
-let silentAudio: HTMLAudioElement | null = null;
 let latestArtworkBlobUrl: string | null = null;
 let latestData: LiveScoreData | null = null;
 let squareOffCallback: (() => void) | null = null;
@@ -74,11 +73,6 @@ export function isFloatingWidgetSupported(): boolean {
 }
 
 export async function requestLockScreenAccess(): Promise<boolean> {
-  // On iOS, mediaSession needs zero permissions; user gesture starts it
-  if (isIOS() && 'mediaSession' in navigator) {
-    ensureSilentAudioPlaying();
-    return true;
-  }
   if (!('Notification' in window)) return true;
   if (Notification.permission === 'granted') return true;
   if (Notification.permission === 'denied') return false;
@@ -91,7 +85,6 @@ export function setLockScreenActive(active: boolean) {
   if (!active) {
     void clearLockScreenNotification();
   } else {
-    ensureSilentAudioPlaying();
     if (latestData) {
       void updateLockScreenNotification(latestData);
     }
@@ -113,48 +106,7 @@ export function isFloatingActive(): boolean {
 }
 
 // --------------------------------------------------------------------------
-// 1. Silent Background Audio for iOS Lock Screen Card Persistence
-// --------------------------------------------------------------------------
-
-function ensureSilentAudioPlaying() {
-  if (typeof window === 'undefined') return;
-  try {
-    if (!silentAudio) {
-      silentAudio = new Audio();
-      silentAudio.src = '/silent.wav';
-      silentAudio.loop = true;
-      silentAudio.preload = 'auto';
-      silentAudio.crossOrigin = 'anonymous';
-      silentAudio.volume = 0.05;
-      silentAudio.setAttribute('playsinline', '');
-      silentAudio.setAttribute('webkit-playsinline', '');
-    }
-    if (silentAudio.paused) {
-      const playPromise = silentAudio.play();
-      if (playPromise && typeof playPromise.then === 'function') {
-        playPromise.catch(() => {
-          // If WAV fails or is blocked, try MP3 fallback
-          if (silentAudio) {
-            silentAudio.src = '/silent.mp3';
-            void silentAudio.play().catch(() => {});
-          }
-        });
-      }
-    }
-  } catch (err) {
-    console.warn('Silent audio init error:', err);
-  }
-}
-
-function stopSilentAudio() {
-  if (silentAudio && !silentAudio.paused) {
-    silentAudio.pause();
-    silentAudio.currentTime = 0;
-  }
-}
-
-// --------------------------------------------------------------------------
-// 2. High-Res Artwork Generator for iPhone Lock Screen (Image 2 & 3 Reference)
+// 1. High-Res Artwork Generator for iPhone Lock Screen (Image 2 & 3 Reference)
 // --------------------------------------------------------------------------
 
 function generateMatchBarArtwork(data: LiveScoreData): void {
@@ -312,7 +264,6 @@ export async function updateLockScreenNotification(data: LiveScoreData): Promise
   // Branch A: iOS Lock Screen Live Card via navigator.mediaSession (Image 3 reference)
   if ('mediaSession' in navigator) {
     try {
-      ensureSilentAudioPlaying();
       generateMatchBarArtwork(data);
 
       if (navigator.mediaSession) {
@@ -337,15 +288,6 @@ export async function updateLockScreenNotification(data: LiveScoreData): Promise
           artwork: artworkItems
         });
 
-        // Required iOS MediaSession handlers to maintain lock screen card
-        navigator.mediaSession.setActionHandler('play', () => {
-          ensureSilentAudioPlaying();
-          if (navigator.mediaSession) navigator.mediaSession.playbackState = 'playing';
-        });
-        navigator.mediaSession.setActionHandler('pause', () => {
-          if (silentAudio) silentAudio.pause();
-          if (navigator.mediaSession) navigator.mediaSession.playbackState = 'paused';
-        });
         navigator.mediaSession.setActionHandler('stop', () => {
           if (squareOffCallback) squareOffCallback();
           void clearLockScreenNotification();
@@ -410,7 +352,6 @@ export async function clearLockScreenNotification(): Promise<void> {
   lastNotifTitle = '';
   lastNotifBody = '';
   lastNotifTime = 0;
-  stopSilentAudio();
 
   if (latestArtworkBlobUrl) {
     try {

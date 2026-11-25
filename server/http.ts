@@ -17,7 +17,7 @@ import { AccountAudit } from './audit.ts';
 import { DEFAULT_SETTINGS } from '../shared/settings.ts';
 import { ExecutionNetwork, observeExecutionIPv4 } from './setup.ts';
 import { createEgressAgent, createProxyFetcher } from './proxy.ts';
-import { Analytics } from './analytics.ts';
+import { Analytics, analyticsFilters } from './analytics.ts';
 import type { AnalyticsRepository } from './analytics.ts';
 import { dailyScope } from './backup/dailyArchives.ts';
 import { firestoreClient } from './backup/accountSync.ts';
@@ -202,6 +202,44 @@ export function createApp(
   app.get('/api/backtest/latest', (_req, res) => res.json({ job: backtests.latest() }));
   app.post('/api/history/fetch', (req, res) => res.status(202).json(historical.start(req.body)));
   app.get('/api/history/latest', (_req, res) => res.json({ job: historical.latest() }));
+  app.get('/api/history/orders-trades', (req, res) => {
+    try {
+      const mode = String(req.query.mode ?? 'paper') === 'live' ? 'live' : 'paper';
+      const now = Date.now();
+      const today = new Date(now + 330 * 60_000).toISOString().slice(0, 10);
+      const fiveYearsAgo = new Date(now - 365 * 86_400_000 * 5).toISOString().slice(0, 10);
+      const filters = analyticsFilters({
+        mode,
+        from: typeof req.query.from === 'string' && req.query.from ? req.query.from : fiveYearsAgo,
+        to: typeof req.query.to === 'string' && req.query.to ? req.query.to : today,
+        strategy: 'all',
+        product: 'all',
+        account: '',
+      }, now);
+      const sessions = analytics.selected(filters);
+      const sessionId = typeof req.query.sessionId === 'string' && req.query.sessionId && req.query.sessionId !== 'all' ? req.query.sessionId : null;
+      const targetSessions = sessionId ? sessions.filter(s => s.id === sessionId) : sessions;
+
+      const trades = targetSessions.flatMap(s => (s.trades ?? []).map(t => ({ ...t, sessionId: s.id, sessionDate: s.date, sessionMode: s.mode }))).sort((a, b) => b.at - a.at);
+      const orders = targetSessions.flatMap(s => (s.orderAudit ?? []).map(o => ({ ...o, sessionId: s.id, sessionDate: s.date, sessionMode: s.mode }))).sort((a, b) => b.submittedAt - a.submittedAt);
+
+      res.json({
+        sessions: sessions.map(s => ({
+          id: s.id,
+          date: s.date,
+          mode: s.mode,
+          status: s.status,
+          tradesCount: s.trades?.length ?? 0,
+          ordersCount: s.orderAudit?.length ?? 0,
+        })).reverse(),
+        trades,
+        orders,
+        activeSessionId: sessionId,
+      });
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : 'Could not read historical orders and trades.' });
+    }
+  });
   app.get('/api/history/jobs/:id', (req, res) => res.json(historical.job(String(req.params.id))));
   app.get('/api/history/jobs/:id/data', (req, res) => {
     const bundle = historical.bundle(String(req.params.id));

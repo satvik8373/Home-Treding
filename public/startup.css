@@ -1,12 +1,174 @@
 /* Shared by the first HTML paint and the session check; no artificial loading delay. */
-body { margin: 0; background: #f5f5f7; }
-.startup-screen { box-sizing: border-box; display: grid; place-items: center; width: 100%; max-width: none; min-height: 100vh; min-height: 100dvh; margin: 0; padding: max(24px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left)); background: var(--canvas,#f5f5f7); color: var(--ink,#1d1d1f); font-family: var(--font-family,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif); }
-.startup-content { display: flex; flex-direction: column; align-items: center; gap: 26px; text-align: center; }
-.startup-brand { display: flex; align-items: center; gap: 12px; }
-.startup-brand img { width: 44px; height: 44px; border-radius: 11px; object-fit: cover; }
-.startup-brand > div { text-align: left; }
-.startup-brand h1 { margin: 0; font-size: 20px; line-height: 1.2; font-weight: 700; letter-spacing: .07em; color: inherit; }
-.startup-brand span { display: block; margin-top: 5px; font-size: 9px; line-height: 1.3; font-weight: 500; letter-spacing: .22em; color: var(--text-secondary,#6e6e73); }
-.startup-message { margin: 0; font-size: 12px; font-weight: 400; line-height: 1.6; color: var(--text-secondary,#6e6e73); }
+body { margin: 0; background: #f6f8fb; }
+.startup-screen {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  background: var(--canvas, #f6f8fb);
+  color: var(--ink, #0f172a);
+  font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+}
+.startup-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  text-align: center;
+}
+.startup-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.startup-brand img {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  object-fit: cover;
+}
+.startup-brand > div {
+  text-align: left;
+}
+.startup-brand h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: .07em;
+  color: inherit;
+}
+.startup-brand span {
+  display: block;
+  margin-top: 5px;
+  font-size: 9px;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: .22em;
+  color: var(--text-secondary, #64748b);
+}
+.startup-brand .brand-lockup {
+  width: 174px;
+  height: 55.68px;
+  border-radius: 0;
+  object-fit: contain;
+}
 
-.startup-brand .brand-lockup { width: 174px; height: 55.68px; border-radius: 0; object-fit: contain; }
+/* ==========================================================================
+   ANIMATED TRADING GRAPH SPLASH LOADER (Pure Green & Electric Blue Edition)
+   ========================================================================== */
+.startup-trading-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 6px;
+  filter: drop-shadow(0 4px 14px rgba(16, 185, 129, 0.18));
+}
+
+.trading-loader-svg {
+  display: block;
+  overflow: visible;
+}
+
+/* Background Depth / Volume Bars (Blue into Pure Green Progression) */
+.loader-bar {
+  transform-origin: bottom;
+  animation: loaderBarPulse 1.8s ease-in-out infinite alternate;
+}
+.loader-bar-1 { fill: #e2e8f0; animation-delay: 0s; }
+.loader-bar-2 { fill: #bae6fd; animation-delay: 0.18s; }
+.loader-bar-3 { fill: #7dd3fc; animation-delay: 0.36s; }
+.loader-bar-4 { fill: #67e8f9; animation-delay: 0.54s; }
+.loader-bar-5 { fill: #6ee7b7; animation-delay: 0.72s; }
+.loader-bar-6 { fill: #10b981; animation-delay: 0.90s; }
+
+@keyframes loaderBarPulse {
+  0% { transform: scaleY(0.65); opacity: 0.5; }
+  100% { transform: scaleY(1.08); opacity: 1; }
+}
+
+/* Dynamic Upward Curve Stroke Draw (Blue to Green) */
+.loader-curve-line {
+  stroke-dasharray: 180;
+  stroke-dashoffset: 180;
+  animation: drawLoaderCurve 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes drawLoaderCurve {
+  0% {
+    stroke-dashoffset: 180;
+    opacity: 0.3;
+  }
+  42% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  82% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0.4;
+  }
+}
+
+/* Area Fill with Shimmer & Pure Green Breathing Expansion */
+.loader-area-fill {
+  animation: fillLoaderArea 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  transform-origin: bottom;
+}
+
+@keyframes fillLoaderArea {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.3);
+  }
+  42% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  82% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  100% {
+    opacity: 0.25;
+    transform: scaleY(0.9);
+  }
+}
+
+/* Live Beacon Price Dot (Pure Green) */
+.loader-beacon-core {
+  animation: beaconCoreGlow 2.2s ease-in-out infinite;
+}
+
+@keyframes beaconCoreGlow {
+  0%, 20% { transform: scale(0); opacity: 0; }
+  42%, 82% { transform: scale(1); opacity: 1; }
+  100% { opacity: 0.5; }
+}
+
+/* Radar Pulse Wave Ripple (Pure Green) */
+.loader-beacon-radar {
+  animation: beaconRadarPing 1.4s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+  transform-origin: 122px 7px;
+}
+
+@keyframes beaconRadarPing {
+  0% {
+    r: 3.2;
+    opacity: 0.95;
+    stroke-width: 1.5;
+  }
+  75%, 100% {
+    r: 10;
+    opacity: 0;
+    stroke-width: 0.5;
+  }
+}

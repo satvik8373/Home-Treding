@@ -1,3 +1,4 @@
+import type { Position } from './model.ts'
 import type { StrategySettings } from './settings.ts'
 export type StrategyDirection = 'buy' | 'sell' | 'both'
 export const directionOf = (settings?: Pick<StrategySettings, 'direction'> | null): StrategyDirection =>
@@ -6,6 +7,10 @@ export const directionOf = (settings?: Pick<StrategySettings, 'direction'> | nul
 export const signFor = (settings?: Pick<StrategySettings, 'direction'> | null, positionDirection?: 'buy' | 'sell' | null) => {
   if (positionDirection) return positionDirection === 'sell' ? -1 : 1
   return directionOf(settings) === 'sell' ? -1 : 1
+}
+
+export function positionPnl(position: Position, premium: number, settings?: Pick<StrategySettings, 'direction'>): number {
+  return signFor(settings, position.direction) * (premium - position.average) * position.quantity
 }
 
 export const strategyName = (settings?: Pick<StrategySettings, 'direction'> | StrategyDirection | null) => {
