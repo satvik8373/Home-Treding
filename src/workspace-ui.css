@@ -3951,15 +3951,15 @@ tr:hover td {
 .fintech-chart-card {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 20px !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
-  padding: 1.35rem 1.65rem !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  padding: 12px 14px !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 1rem !important;
+  gap: 10px !important;
   overflow: visible !important;
   box-sizing: border-box !important;
-  margin-top: 0.75rem !important;
+  margin-top: 0.5rem !important;
   transition: border-color 150ms ease !important;
 }
 
@@ -4725,15 +4725,15 @@ tr:hover td {
   }
 
   .fintech-chart-card {
-    padding: 1.15rem 1.25rem !important;
+    padding: 10px 12px !important;
     border: 1px solid #e2e8f0 !important;
-    border-radius: 18px !important;
+    border-radius: 10px !important;
     background: #ffffff !important;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+    box-shadow: none !important;
     min-width: 0 !important;
     max-width: 100% !important;
     margin-top: 0.5rem !important;
-    gap: 0.85rem !important;
+    gap: 0.65rem !important;
   }
 
   .fintech-chart-header {
@@ -7052,10 +7052,10 @@ tr:hover td {
   width: 100% !important;
   max-width: 840px !important;
   margin: 0 auto !important;
-  padding: 0.35rem 0.35rem 85px !important;
+  padding: 0.75rem 16px 85px !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 0.75rem !important;
+  gap: 0.85rem !important;
   box-sizing: border-box !important;
   min-height: 100vh;
 }
@@ -7063,8 +7063,8 @@ tr:hover td {
 @media (max-width: 600px) {
   .neo-mobile-canvas {
     max-width: 100% !important;
-    padding: 0.2rem 0.2rem 80px !important;
-    gap: 0.65rem !important;
+    padding: 0.5rem 12px 80px !important;
+    gap: 0.75rem !important;
   }
 }
 
@@ -7073,7 +7073,7 @@ tr:hover td {
   width: 100%;
   max-width: 840px;
   margin: 0 auto;
-  padding: 0 0.25rem;
+  padding: 0 16px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -7082,7 +7082,7 @@ tr:hover td {
 
 @media (max-width: 600px) {
   .neo-notification-tray {
-    padding: 0 0.2rem;
+    padding: 0 12px;
   }
 }
 
@@ -7208,10 +7208,11 @@ tr:hover td {
 
 .strategy-direction-pills {
   display: flex;
-  gap: 6px;
-  background: #edf2f7;
-  padding: 4px;
-  border-radius: var(--pill-radius);
+  gap: 4px;
+  background: #f1f5f9;
+  padding: 3px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
   width: 100%;
   box-sizing: border-box;
 }
@@ -7222,15 +7223,15 @@ tr:hover td {
   align-items: center;
   justify-content: center;
   gap: 5px;
-  padding: 8px 12px;
-  border-radius: var(--pill-radius);
+  padding: 6px 12px;
+  border-radius: 6px;
   border: none;
   background: transparent;
-  font-size: 12px;
-  font-weight: 750;
+  font-size: 11.5px;
+  font-weight: 700;
   color: #64748b;
   cursor: pointer;
-  transition: all 150ms ease;
+  transition: all 140ms ease;
   user-select: none;
 }
 
@@ -7241,11 +7242,11 @@ tr:hover td {
 .strategy-dir-btn.active {
   background: #0f172a !important;
   color: #ffffff !important;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.16);
+  box-shadow: none !important;
 }
 
 .strategy-dir-btn:disabled {
-  opacity: 0.65;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -7271,8 +7272,8 @@ tr:hover td {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
-  border-radius: var(--pill-radius);
+  padding: 4px 8px;
+  border-radius: 6px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   font-size: 11px;
@@ -7291,9 +7292,9 @@ tr:hover td {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
-  border-radius: var(--pill-radius);
-  background: #e0f2fe;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #f0f9ff;
   border: 1px solid #bae6fd;
   font-size: 11px;
   font-weight: 700;
@@ -7305,7 +7306,7 @@ tr:hover td {
 }
 
 .focus-rules-btn:hover {
-  background: #bae6fd;
+  background: #e0f2fe;
 }
 
 /* 3. PORTFOLIO HERO BALANCE (Exact Image 1 Floating Balance & Controls) */
@@ -7615,10 +7616,10 @@ tr:hover td {
   margin-top: 10px !important;
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 16px !important;
+  border-radius: 10px !important;
   overflow: hidden !important;
   padding: 0 !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03) !important;
+  box-shadow: none !important;
 }
 
 .neo-metric-cell {
@@ -7626,7 +7627,7 @@ tr:hover td {
   border: none !important;
   border-right: 1px solid #f1f5f9 !important;
   border-radius: 0 !important;
-  padding: 10px 14px !important;
+  padding: 8px 12px !important;
   display: flex !important;
   flex-direction: column !important;
   gap: 2px !important;
@@ -7655,23 +7656,23 @@ tr:hover td {
 }
 
 .metric-cell-label {
-  font-size: 9.5px !important;
-  font-weight: 750 !important;
-  letter-spacing: 0.06em !important;
-  color: #8e9cae !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  color: #64748b !important;
   text-transform: uppercase !important;
 }
 
 .metric-cell-value {
-  font-size: 14px !important;
-  font-weight: 800 !important;
-  color: var(--ink) !important;
+  font-size: 13.5px !important;
+  font-weight: 750 !important;
+  color: #0f172a !important;
   font-variant-numeric: tabular-nums !important;
 }
 
 .metric-cell-sub {
   font-size: 9.5px !important;
-  color: #94a3b8 !important;
+  color: #64748b !important;
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
@@ -8875,10 +8876,10 @@ tr:hover td {
 .cockpit-unified-card {
   background: #ffffff !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 18px !important;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
   overflow: hidden !important;
-  margin-bottom: 1.25rem !important;
+  margin-bottom: 0.75rem !important;
   width: 100% !important;
   box-sizing: border-box !important;
 }
@@ -8887,45 +8888,45 @@ tr:hover td {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  padding: 10px 16px !important;
+  padding: 8px 12px !important;
   background: #f8fafc !important;
   border-bottom: 1px solid #e2e8f0 !important;
-  gap: 12px !important;
+  gap: 10px !important;
 }
 
 .cockpit-header-left {
   display: flex !important;
   align-items: center !important;
-  gap: 10px !important;
+  gap: 8px !important;
   flex-wrap: wrap !important;
 }
 
 .cockpit-header-title {
-  font-size: 13.5px !important;
-  font-weight: 800 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
   color: #0f172a !important;
   letter-spacing: -0.01em !important;
 }
 
 .cockpit-atm-pill {
-  font-size: 11px !important;
-  font-weight: 700 !important;
-  color: #0284c7 !important;
-  background: rgba(14, 165, 233, 0.1) !important;
-  border: 1px solid rgba(14, 165, 233, 0.25) !important;
-  border-radius: 999px !important;
-  padding: 2px 10px !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  color: #0369a1 !important;
+  background: #f0f9ff !important;
+  border: 1px solid #bae6fd !important;
+  border-radius: 6px !important;
+  padding: 2px 8px !important;
   letter-spacing: 0.01em !important;
 }
 
 .cockpit-status-tag {
-  font-size: 11px !important;
-  font-weight: 700 !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
   color: #64748b !important;
   background: #f1f5f9 !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 999px !important;
-  padding: 3px 10px !important;
+  border-radius: 6px !important;
+  padding: 2px 8px !important;
 }
 
 .cockpit-status-tag.active {
@@ -8946,10 +8947,10 @@ tr:hover td {
 .cockpit-side-column {
   flex: 1 !important;
   min-width: 0 !important;
-  padding: 12px 12px !important;
+  padding: 10px 12px !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 10px !important;
+  gap: 8px !important;
   box-sizing: border-box !important;
 }
 
@@ -8970,14 +8971,14 @@ tr:hover td {
 .cockpit-identity {
   display: flex !important;
   align-items: center !important;
-  gap: 10px !important;
+  gap: 8px !important;
   min-width: 0 !important;
 }
 
 .cockpit-circle-badge {
-  width: 34px !important;
-  height: 34px !important;
-  border-radius: 50% !important;
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 6px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -9006,20 +9007,20 @@ tr:hover td {
 .cockpit-title-row {
   display: flex !important;
   align-items: center !important;
-  gap: 6px !important;
+  gap: 5px !important;
 }
 
 .cockpit-side-title {
-  font-size: 16px !important;
-  font-weight: 800 !important;
+  font-size: 14px !important;
+  font-weight: 750 !important;
   color: #0f172a !important;
-  letter-spacing: -0.02em !important;
+  letter-spacing: -0.01em !important;
 }
 
 .cockpit-side-tag {
-  font-size: 10px !important;
-  font-weight: 800 !important;
-  padding: 1.5px 6px !important;
+  font-size: 9.5px !important;
+  font-weight: 750 !important;
+  padding: 1px 5px !important;
   border-radius: 4px !important;
   letter-spacing: 0.02em !important;
 }
@@ -9037,19 +9038,19 @@ tr:hover td {
 }
 
 .cockpit-strike-sub {
-  font-size: 11.5px !important;
+  font-size: 11px !important;
   color: #64748b !important;
-  font-weight: 550 !important;
+  font-weight: 500 !important;
 }
 
 .cockpit-pill-state {
-  font-size: 11px !important;
-  font-weight: 650 !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
   color: #64748b !important;
   background: #f8fafc !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 999px !important;
-  padding: 3px 10px !important;
+  border-radius: 6px !important;
+  padding: 2px 8px !important;
   white-space: nowrap !important;
 }
 
@@ -9064,11 +9065,11 @@ tr:hover td {
   display: flex !important;
   align-items: flex-start !important;
   justify-content: space-between !important;
-  gap: 12px !important;
-  padding: 10px 14px !important;
+  gap: 10px !important;
+  padding: 8px 10px !important;
   background: #f8fafc !important;
-  border: 1px solid #edf2f7 !important;
-  border-radius: 12px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
 }
 
 .cockpit-ltp-group,
@@ -9079,30 +9080,30 @@ tr:hover td {
 }
 
 .cockpit-micro-tag {
-  font-size: 9.5px !important;
-  font-weight: 750 !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
   color: #64748b !important;
   letter-spacing: 0.05em !important;
   text-transform: uppercase !important;
 }
 
 .cockpit-ltp-val {
-  font-size: 20px !important;
-  font-weight: 850 !important;
+  font-size: 18px !important;
+  font-weight: 750 !important;
   color: #0f172a !important;
-  letter-spacing: -0.02em !important;
+  letter-spacing: -0.01em !important;
   font-variant-numeric: tabular-nums !important;
 }
 
 .cockpit-ltp-sub {
-  font-size: 10.5px !important;
+  font-size: 10px !important;
   color: #64748b !important;
   font-weight: 500 !important;
 }
 
 .cockpit-pnl-val {
-  font-size: 16px !important;
-  font-weight: 800 !important;
+  font-size: 15px !important;
+  font-weight: 750 !important;
   letter-spacing: -0.01em !important;
   font-variant-numeric: tabular-nums !important;
 }
@@ -9120,9 +9121,9 @@ tr:hover td {
 }
 
 .cockpit-pos-sub {
-  font-size: 10.5px !important;
+  font-size: 10px !important;
   color: #64748b !important;
-  font-weight: 550 !important;
+  font-weight: 500 !important;
 }
 
 /* Key Levels Grid: Seamless Hairline Cells, No Clunky Nested Boxes */
@@ -9132,31 +9133,31 @@ tr:hover td {
   gap: 1px !important;
   background: #e2e8f0 !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 10px !important;
+  border-radius: 6px !important;
   overflow: hidden !important;
 }
 
 .cockpit-metric-cell {
   background: #ffffff !important;
-  padding: 8px 10px !important;
+  padding: 6px 8px !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 2px !important;
+  gap: 1px !important;
   min-width: 0 !important;
   box-sizing: border-box !important;
 }
 
 .cockpit-metric-cell .cell-lbl {
-  font-size: 9.5px !important;
-  font-weight: 700 !important;
+  font-size: 9px !important;
+  font-weight: 600 !important;
   color: #64748b !important;
   letter-spacing: 0.03em !important;
   text-transform: uppercase !important;
 }
 
 .cockpit-metric-cell .cell-val {
-  font-size: 12.5px !important;
-  font-weight: 750 !important;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
   color: #0f172a !important;
   letter-spacing: -0.01em !important;
   font-variant-numeric: tabular-nums !important;
@@ -9168,31 +9169,31 @@ tr:hover td {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 16px !important;
-  padding: 9px 16px !important;
+  gap: 12px !important;
+  padding: 6px 12px !important;
   background: #f8fafc !important;
   border-top: 1px solid #e2e8f0 !important;
-  font-size: 11.5px !important;
+  font-size: 10.5px !important;
   flex-wrap: wrap !important;
 }
 
 .cockpit-footer-item {
   display: flex !important;
   align-items: center !important;
-  gap: 5px !important;
+  gap: 4px !important;
 }
 
 .cockpit-footer-item .footer-lbl {
-  font-size: 10px !important;
-  font-weight: 750 !important;
+  font-size: 9.5px !important;
+  font-weight: 700 !important;
   color: #64748b !important;
   text-transform: uppercase !important;
   letter-spacing: 0.03em !important;
 }
 
 .cockpit-footer-item .footer-val {
-  font-size: 11.5px !important;
-  font-weight: 700 !important;
+  font-size: 11px !important;
+  font-weight: 650 !important;
   color: #1e293b !important;
   font-variant-numeric: tabular-nums !important;
 }
@@ -9218,7 +9219,7 @@ tr:hover td {
   }
 
   .cockpit-side-column {
-    padding: 10px 8px !important;
+    padding: 10px 10px !important;
   }
 
   .cockpit-metrics-grid {
