@@ -325,14 +325,13 @@ export default function App() {
         {/* 1. Market (Main View: Pure, Minimal, Light Aesthetic Matching Image 1) */}
         <div hidden={view !== 'market'}>
           <div className="fintech-dashboard neo-mobile-canvas" aria-label="Strategy controls and session summary">
-            {/* Top Terminal Header (Profile Avatar + Broker + Live Score) */}
+            {/* Top Terminal Header (Mavrix Trading Brand + Broker + Profile) */}
             <NeoHeader
               connected={connected}
               deploymentAvailable={deployment.available}
               brokerPhase={broker?.connection?.phase}
               brokerLinked={!!broker?.linked}
               onBroker={() => setBrokerDialog(true)}
-              onLiveScore={() => setLiveScoreOpen(true)}
               onProfile={account ? () => setProfileOpen(true) : undefined}
             />
 
@@ -350,7 +349,7 @@ export default function App() {
               onRules={() => setRulesDialog(true)}
             />
 
-            {/* Primary Portfolio Hero Balance (Exact Image 1: $3,942.00 & +1.34% Today & Action Buttons) */}
+            {/* Primary Portfolio Hero Balance */}
             <PortfolioHeroCard
               session={session}
               locked={locked}
@@ -372,8 +371,8 @@ export default function App() {
               positions={positions}
             />
 
-            {/* Single Unified Container with Divided Minimal Parts for CALL & PUT */}
-            <UnifiedOptionsCockpit
+            {/* Separate Options Deck (Clean CALL and PUT Dual-Cards) */}
+            <SeparateOptionsDeck
               session={session}
               marks={data?.marks ?? {}}
               now={now}

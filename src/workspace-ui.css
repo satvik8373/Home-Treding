@@ -7100,101 +7100,121 @@ tr:hover td {
   transition: opacity 180ms ease, transform 180ms ease !important;
 }
 
-/* 1. Terminal Header Bar (Clean, Minimal, Zero Dark Mode) */
+/* 1. Terminal Header Bar (Mavrix Trading Institutional Header) */
 .neo-header-bar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 8px 12px !important;
+  width: 100% !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+  margin-bottom: 8px !important;
+}
+
+.neo-header-brand-group {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 4px 0 6px;
-  width: 100%;
-  background: transparent !important;
-  border: none !important;
-  box-sizing: border-box;
+  gap: 8px;
+  min-width: 0;
 }
 
-.neo-header-left {
+.neo-brand-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #0f172a;
+  color: #ffffff;
   display: flex;
   align-items: center;
-  gap: 11px;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.neo-avatar-btn {
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
+.neo-brand-text {
   display: flex;
   align-items: center;
+  gap: 7px;
+  min-width: 0;
 }
 
-.neo-greeting-group {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.15;
+.neo-brand-title {
+  font-size: 15px;
+  font-weight: 750;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
 }
 
-.neo-greeting-sub {
-  font-size: 12px;
-  font-weight: 600;
-  color: #8e9cae;
+.neo-brand-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 4px;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.neo-greeting-name {
-  font-size: 21px;
-  font-weight: 800;
-  color: var(--ink);
-  letter-spacing: -0.02em;
+  white-space: nowrap;
 }
 
 .neo-header-right {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
-.neo-header-action-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border-radius: var(--pill-radius);
-  font-size: 12px;
-  font-weight: 650;
-  background: #ffffff;
-  border: 1.2px solid #e2e8f0;
-  color: var(--ink);
+.neo-avatar-btn {
+  background: none;
+  border: 1px solid #e2e8f0;
+  border-radius: 50%;
+  padding: 0;
   cursor: pointer;
-  transition: all 140ms ease;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  transition: border-color 140ms ease;
+  box-sizing: border-box;
 }
 
-.neo-header-action-pill:hover {
-  background: #f8fafc;
-  transform: translateY(-1px);
+.neo-avatar-btn:hover {
+  border-color: #94a3b8;
 }
 
 .neo-broker-pill {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 6px 12px;
-  border-radius: var(--pill-radius);
-  font-size: 12px;
+  padding: 0 10px;
+  height: 30px;
+  border-radius: 6px;
+  font-size: 11.5px;
   font-weight: 650;
   background: #ffffff;
-  border: 1.2px solid #e2e8f0;
+  border: 1px solid #e2e8f0;
   color: #334155;
   cursor: pointer;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.03);
+  box-shadow: none;
   transition: all 140ms ease;
 }
 
+.neo-broker-pill:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
 .neo-broker-pill.connected {
-  background: #ecfdf5;
-  border-color: #a7f3d0;
-  color: #065f46;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
 }
 
 /* 2. TOP STRATEGY DIRECTION & FOCUS HUB ("stretegy need to top buttons and focus") */
@@ -7772,39 +7792,45 @@ tr:hover td {
    SEPARATE OPTIONS DECK (CALL & PUT Separate, All Required Info at Once)
    ========================================================================== */
 .separate-options-deck {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-  box-sizing: border-box;
-  margin-top: 0.25rem;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin-top: 0.25rem !important;
+}
+
+@media (max-width: 768px) {
+  .separate-options-deck {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
 }
 
 .separate-leg-card {
-  background: #ffffff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 22px;
-  padding: 14px 16px;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.035);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  box-sizing: border-box;
-  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  padding: 12px 14px !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 9px !important;
+  box-sizing: border-box !important;
+  transition: border-color 140ms ease !important;
 }
 
 .separate-leg-card:hover {
-  transform: translateY(-1px);
-  border-color: #cbd5e1;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+  border-color: #cbd5e1 !important;
+  box-shadow: none !important;
 }
 
 .separate-leg-card.call-card {
-  border-left: 3.5px solid #0284c7;
+  border-left: 3px solid #15803d !important;
 }
 
 .separate-leg-card.put-card {
-  border-left: 3.5px solid #ea580c;
+  border-left: 3px solid #dc2626 !important;
 }
 
 /* 1. Header */
@@ -7819,27 +7845,29 @@ tr:hover td {
 .leg-card-title-group {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 9px;
   min-width: 0;
 }
 
 .leg-circle-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
   display: grid;
   place-items: center;
   flex-shrink: 0;
 }
 
 .leg-circle-badge.call-badge {
-  background: #e0f2fe;
-  color: #0284c7;
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
 }
 
 .leg-circle-badge.put-badge {
-  background: #fee2e2;
-  color: #ea580c;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
 }
 
 .leg-naming-meta {
@@ -7852,53 +7880,55 @@ tr:hover td {
 .leg-title-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .leg-main-title {
-  font-size: 15px;
-  font-weight: 800;
-  color: var(--ink);
-  letter-spacing: -0.015em;
+  font-size: 14px;
+  font-weight: 750;
+  color: #0f172a;
+  letter-spacing: -0.01em;
 }
 
 .leg-strike-badge {
-  font-size: 12px;
-  font-weight: 750;
-  padding: 1px 7px;
-  border-radius: var(--pill-radius);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
   font-variant-numeric: tabular-nums;
 }
 
 .leg-strike-badge.ce {
-  background: #e0f2fe;
-  color: #0369a1;
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
 }
 
 .leg-strike-badge.pe {
-  background: #fee2e2;
-  color: #c2410c;
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
 }
 
 .leg-side-indicator {
-  font-size: 9.5px;
-  font-weight: 800;
-  padding: 1px 5px;
-  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 750;
+  padding: 1px 4px;
+  border-radius: 3px;
 }
 
 .leg-side-indicator.ce {
-  background: #e0f2fe;
-  color: #0284c7;
+  background: #f0fdf4;
+  color: #15803d;
 }
 
 .leg-side-indicator.pe {
-  background: #fee2e2;
-  color: #ea580c;
+  background: #fef2f2;
+  color: #dc2626;
 }
 
 .leg-contract-sub {
-  font-size: 11px;
+  font-size: 10.5px;
   color: #64748b;
   font-weight: 500;
   white-space: nowrap;
@@ -7907,20 +7937,22 @@ tr:hover td {
 }
 
 .leg-state-pill {
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 650;
   color: #64748b;
-  background: #f1f5f9;
-  padding: 2px 8px;
-  border-radius: var(--pill-radius);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 2px 7px;
+  border-radius: 4px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .leg-state-pill.active {
-  background: #ecfdf5;
-  color: #065f46;
-  font-weight: 750;
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
+  font-weight: 700;
 }
 
 /* 2. Price & P&L Hero Row */
@@ -7939,17 +7971,17 @@ tr:hover td {
 }
 
 .leg-ltp-label {
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 650;
-  color: #94a3b8;
+  color: #64748b;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .leg-ltp-price {
-  font-size: 1.6rem;
-  font-weight: 850;
-  color: var(--ink);
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #0f172a;
   font-variant-numeric: tabular-nums;
   line-height: 1.15;
 }
@@ -7961,23 +7993,23 @@ tr:hover td {
   gap: 1px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 4px 10px;
-  min-width: 95px;
+  border-radius: 6px;
+  padding: 3px 8px;
+  min-width: 85px;
   box-sizing: border-box;
 }
 
 .leg-capsule-label {
   font-size: 9px;
   font-weight: 650;
-  color: #94a3b8;
+  color: #64748b;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .leg-capsule-pnl {
-  font-size: 12.5px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 750;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
 }
@@ -7987,7 +8019,7 @@ tr:hover td {
 }
 
 .leg-capsule-pnl.negative {
-  color: #b91c1c;
+  color: #dc2626;
 }
 
 .leg-capsule-pnl.neutral {
@@ -7995,7 +8027,7 @@ tr:hover td {
 }
 
 .leg-units-count {
-  font-size: 10px;
+  font-size: 9.5px;
   color: #64748b;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -8005,18 +8037,18 @@ tr:hover td {
 .leg-levels-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  gap: 5px;
   background: #f8fafc;
-  border: 1px solid #edf2f7;
-  border-radius: 14px;
-  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 7px 9px;
   box-sizing: border-box;
 }
 
 @media (max-width: 480px) {
   .leg-levels-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 6px 8px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px 6px;
   }
 }
 
@@ -8028,7 +8060,7 @@ tr:hover td {
 }
 
 .level-label {
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 600;
   color: #64748b;
   text-transform: uppercase;
@@ -8036,9 +8068,9 @@ tr:hover td {
 }
 
 .level-val {
-  font-size: 11.5px;
-  font-weight: 750;
-  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f172a;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

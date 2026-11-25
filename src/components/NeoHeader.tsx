@@ -1,4 +1,4 @@
-import { Link2, Check, PictureInPicture2 } from 'lucide-react'
+import { Link2, Check, TrendingUp } from 'lucide-react'
 import { NeoAvatar } from './NeoAvatar'
 
 interface NeoHeaderProps {
@@ -7,7 +7,7 @@ interface NeoHeaderProps {
   brokerPhase?: string
   brokerLinked?: boolean
   onBroker: () => void
-  onLiveScore: () => void
+  onLiveScore?: () => void
   onProfile?: () => void
 }
 
@@ -17,36 +17,23 @@ export function NeoHeader({
   brokerPhase,
   brokerLinked,
   onBroker,
-  onLiveScore,
   onProfile,
 }: NeoHeaderProps) {
   return (
     <header className="neo-header-bar" aria-label="Terminal header">
-      {/* 1. Left: Profile Avatar (Compact, saves space) */}
-      <div className="neo-header-left">
-        <button
-          type="button"
-          className="neo-avatar-btn"
-          onClick={onProfile}
-          title="Account Profile"
-          aria-label="Account Profile"
-        >
-          <NeoAvatar size={36} />
-        </button>
+      {/* 1. Left: Brand Mark + Title "Mavrix Trading" + Algo Badge */}
+      <div className="neo-header-brand-group">
+        <div className="neo-brand-mark" aria-hidden="true">
+          <TrendingUp size={16} strokeWidth={2.4} />
+        </div>
+        <div className="neo-brand-text">
+          <h1 className="neo-brand-title">Mavrix Trading</h1>
+          <span className="neo-brand-badge">009 ALGO</span>
+        </div>
       </div>
 
-      {/* 2. Right: Real Trading Tool Actions (Score & Broker Link) */}
+      {/* 2. Right: Broker Link Pill & Account Profile Avatar */}
       <div className="neo-header-right">
-        <button
-          type="button"
-          className="neo-header-action-pill"
-          onClick={onLiveScore}
-          title="Open floating live match score window"
-        >
-          <PictureInPicture2 size={13} />
-          <span className="pill-text">Score</span>
-        </button>
-
         <button
           type="button"
           className={`neo-broker-pill ${connected ? 'connected' : ''}`}
@@ -57,15 +44,27 @@ export function NeoHeader({
           <Link2 size={13} />
           <span>
             {connected
-              ? 'mStock'
+              ? 'mStock Connected'
               : brokerPhase === 'checking' || brokerPhase === 'retrying'
-              ? 'Restoring'
+              ? 'Restoring…'
               : brokerLinked
-              ? 'Verify'
-              : 'Connect'}
+              ? 'Verify mStock'
+              : 'Connect mStock'}
           </span>
-          {connected && <Check size={11} strokeWidth={3} />}
+          {connected && <Check size={12} strokeWidth={2.5} />}
         </button>
+
+        {onProfile && (
+          <button
+            type="button"
+            className="neo-avatar-btn"
+            onClick={onProfile}
+            title="Account Profile"
+            aria-label="Account Profile"
+          >
+            <NeoAvatar size={32} />
+          </button>
+        )}
       </div>
     </header>
   )
