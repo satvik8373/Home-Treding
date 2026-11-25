@@ -106,8 +106,8 @@ export async function validateEgressRoute(raw: string, options: ValidateProxyOpt
 
 class ProxyConnectAgent extends https.Agent {
   private proxy: URL
-  constructor(proxyUrl: string) {
-    super({ keepAlive: false })
+  constructor(proxyUrl: string, keepAlive = true) {
+    super({ keepAlive, keepAliveMsecs: 15_000, maxSockets: 16, maxFreeSockets: 8 })
     this.proxy = new URL(proxyUrl)
   }
 
@@ -199,7 +199,7 @@ export function createEgressAgent(routeUrl: string): https.Agent {
   if (routeUrl.startsWith('bind://')) {
     return new https.Agent({ localAddress: routeUrl.slice('bind://'.length), keepAlive: true })
   }
-  return new ProxyConnectAgent(routeUrl)
+  return new ProxyConnectAgent(routeUrl, false)
 }
 
 async function serializeBody(body: BodyInit | null | undefined, headers: Headers): Promise<Buffer | string | undefined> {
@@ -224,8 +224,9 @@ async function serializeBody(body: BodyInit | null | undefined, headers: Headers
 export function createProxyFetcher(routeUrl: string): typeof fetch {
   const isBind = routeUrl.startsWith('bind://')
   const localAddress = isBind ? routeUrl.slice('bind://'.length) : undefined
-  const httpsAgent = isBind ? new https.Agent({ localAddress, keepAlive: false }) : new ProxyConnectAgent(routeUrl)
-  const httpAgent = isBind ? new http.Agent({ localAddress, keepAlive: false }) : undefined
+  const poolOptions = { keepAlive: true, keepAliveMsecs: 15_000, maxSockets: 16, maxFreeSockets: 8 }
+  const httpsAgent = isBind ? new https.Agent({ localAddress, ...poolOptions }) : new ProxyConnectAgent(routeUrl, true)
+  const httpAgent = isBind ? new http.Agent({ localAddress, ...poolOptions }) : undefined
   const parsedProxy = isBind ? null : new URL(routeUrl)
 
   return async function proxyFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {

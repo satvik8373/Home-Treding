@@ -52,6 +52,8 @@ export class Controller {
   private historyInFlight = false
   private lastPendingAttempt = 0
   private backoff: Partial<Record<Side, number>> = {}
+  private recentFills: Partial<Record<Side, { at: number; preQuantity: number; postQuantity: number }>> = {}
+  private repumpPending = false
   private retryAt = 0
   private pumpTask: Promise<void> | null = null
   private savedSession = ''
@@ -91,6 +93,7 @@ export class Controller {
             const exit = priceExitSignal(leg, mark.price, settingsFor(this.session), this.now())
             if (exit && (!leg.exitReason || exit === 'STOP_LOSS' && ['TARGET_1', 'TARGET_2'].includes(leg.exitReason))) {
               leg.exitReason = exit; this.save()
+              if (this.busy || this.pumpTask) this.repumpPending = true
             }
           }
         }
@@ -165,7 +168,13 @@ export class Controller {
     const result = this.queue.catch(() => {}).then(async () => {
       this.busy = true; this.onChange()
       try { return await work() } finally {
-        try { await this.store.persist?.() } finally { this.busy = false; this.onChange() }
+        try { await this.store.persist?.() } finally {
+          this.busy = false; this.onChange()
+          if (this.repumpPending) {
+            this.repumpPending = false
+            queueMicrotask(() => void this.pump())
+          }
+        }
       }
     })
     this.queue = result
@@ -202,7 +211,7 @@ export class Controller {
       if (this.session && ['armed', 'preparing', 'running'].includes(this.session.status) && this.session.date === istDate(this.now())
         && this.now() < istTime(this.session.date, settingsFor(this.session).cutoff)) {
         if (this.session.mode === 'live' && !this.session.pending) {
-          await this.checkPositions()
+          await this.checkPositions(false)
           if (!this.session.pnlVerified) { this.session.status = 'blocked'; this.note('Saved broker quantities do not match. Reconcile this same day-session before resuming.', 'error'); return }
         }
         this.session.status = this.session.legs.CE && this.session.legs.PE ? 'running' : 'armed'
@@ -333,6 +342,8 @@ export class Controller {
       if (mode === 'live' && !this.session!.pnlVerified) throw new Error('This day-session has unverified quantity accounting. Automatic entries remain blocked; review the broker ledger before resuming. Position reconciliation alone does not verify historical P&L.')
       this.session!.settings ??= structuredClone(settingsFor(this.session))
       this.stopRequested = false
+      this.recentFills = {}
+      this.repumpPending = false
       this.session!.status = 'armed'
       // A restart never backfills entry signals from earlier candles.
       for (const side of SIDES) if (this.session!.legs[side]) this.session!.legs[side]!.lastCandleEnd = completedBoundary(now)
@@ -364,7 +375,8 @@ export class Controller {
       if (this.session.account !== this.broker.credentials!.account) throw new Error('The saved strategy belongs to a different broker account.')
       await this.resolvePending()
       if (this.session.pending) return
-      await this.checkPositions()
+      await this.checkPositions(false)
+      this.recentFills = {}
       this.session.status = hasExposure(this.session) ? 'stopping' : 'stopped'
       this.stopRequested = hasExposure(this.session)
       this.note(hasExposure(this.session) ? 'Positions reconciled. Closing the recovered exposure.' : !this.session.pnlVerified ? 'Broker positions are flat, but historical quantity accounting remains unverified. Automatic entries remain blocked; review the broker ledger.' : 'Broker and saved state reconciled. Start when ready.')
@@ -374,17 +386,19 @@ export class Controller {
   private async prepare(): Promise<void> {
     const session = this.session!, now = this.now()
     session.status = 'preparing'; this.note('Checking the completed 09:15–09:20 NIFTY spot candle.')
-    const spotBars = await this.broker.history(INDEX_TOKEN, 'NSE', session.date, now)
+    const spotBars = await this.broker.history(INDEX_TOKEN, 'NSE', session.date, now, false, true)
     const opening = spotBars.find(c => c.start === istTime(session.date, RULES.referenceStart))
     if (!opening) throw new Error('The official NIFTY opening candle is unavailable. Retry when broker history is ready.')
-    const contracts = await this.broker.contracts(session.date, opening.close)
+    const contracts = await this.broker.contracts(session.date, opening.close, true)
     const legs: TradingSession['legs'] = {}
     for (const contract of contracts) {
-      const bars = await this.broker.history(contract.token, 'NFO', session.date, this.now())
+      const preHistoryBoundary = completedBoundary(this.now())
+      const bars = await this.broker.history(contract.token, 'NFO', session.date, this.now(), false, true)
       const reference = bars.find(c => c.start === opening.start)
       if (!reference) throw new Error(`The 09:15–09:20 ${contract.side} reference candle is unavailable. No levels were guessed.`)
+      const seenEnd = Math.max(reference.end, bars.filter(bar => bar.end <= preHistoryBoundary).at(-1)?.end ?? reference.end)
       legs[contract.side] = { contract, reference, ...levels(reference.close, settingsFor(session)), position: null, realized: 0,
-        entries: 0, lastCandleEnd: completedBoundary(this.now()), exitReason: null }
+        entries: 0, lastCandleEnd: seenEnd, exitReason: null }
       const leg = legs[contract.side]!
       const past = bars.filter(bar => validCandle(bar) && bar.start >= istTime(session.date, RULES.referenceEnd) && bar.end <= leg.lastCandleEnd).sort((a, b) => a.end - b.end)
       leg.firstSignalConsumed = past.some(bar => isBeyondEntry(bar.close, leg, settingsFor(session), true))
@@ -403,7 +417,7 @@ export class Controller {
     const leg = this.session?.legs[side], mark = leg ? this.marks[leg.contract.token] : null
     return freshMark(mark, this.now(), maxAge) ? mark : null
   }
-  private async checkPositions(): Promise<void> {
+  private async checkPositions(allowLagGrace = true): Promise<void> {
     if (!this.session || this.session.mode === 'paper') return
     // An unavailable read pauses this cycle, without turning a transient outage
     // into a permanent stop. Verified quantity mismatches remain hard errors.
@@ -415,13 +429,22 @@ export class Controller {
       if (!leg) continue
       const relevant = positions.filter(p => matchesPositionRow(p, leg.contract, productFor(settingsFor(this.session))))
       const actual = signFor(settingsFor(this.session), leg.position?.direction) * relevant.reduce((total, p) => total + p.quantity, 0), expected = leg.position?.quantity ?? 0
-      if (actual < 0 || actual > expected) throw new Error(`Unexpected ${side} broker exposure. Automatic orders are blocked until reconciled.`)
-      if (actual !== expected) {
-        this.session.pnlVerified = false
-        if (leg.position && actual) leg.position.quantity = actual
-        else leg.position = null
-        this.note(`${side} quantity changed outside this engine. New entries are paused; realized P&L needs broker verification.`, 'error')
+      if (actual === expected) {
+        delete this.recentFills[side]
+        continue
       }
+      const recent = allowLagGrace ? this.recentFills[side] : undefined
+      if (recent && this.now() - recent.at < 12_000) {
+        const low = Math.min(recent.preQuantity, recent.postQuantity)
+        const high = Math.max(recent.preQuantity, recent.postQuantity)
+        if (actual >= low && actual <= high) continue
+      }
+      if (actual < 0 || actual > expected) throw new Error(`Unexpected ${side} broker exposure. Automatic orders are blocked until reconciled.`)
+      this.session.pnlVerified = false
+      if (leg.position && actual) leg.position.quantity = actual
+      else leg.position = null
+      delete this.recentFills[side]
+      this.note(`${side} quantity changed outside this engine. New entries are paused; realized P&L needs broker verification.`, 'error')
     }
     this.lastPositionCheck = this.now(); this.save()
   }
@@ -431,27 +454,30 @@ export class Controller {
     const buy = reason === 'BREAKOUT'
     if (buy && (this.stopRequested || session.status !== 'running' || !session.pnlVerified
       || !settingsFor(session).enabledSides.includes(side) || this.now() >= istTime(session.date, settingsFor(session).cutoff))) return
+    const quantity = orderQuantity(leg, reason, settingsFor(session))
+    if (quantity <= 0) return
     let mark = this.fresh(side)
-    if (buy && !mark) {
+    const hadMarkBeforePositions = !!mark
+    if (session.mode === 'live') {
+      if (buy && !mark) await Promise.all([this.loadQuotes([side]), this.checkPositions()])
+      else await this.checkPositions()
+      if (buy && !session.pnlVerified) return
+      mark = this.fresh(side)
+    } else if (buy && !mark) {
       await this.loadQuotes([side])
       mark = this.fresh(side)
     }
-    if (buy && !mark) {
-      this.note(`${side} entry waiting: ${this.quoteIssues[side] ?? 'no fresh official market price'}. Retrying for up to 90 seconds after the signal candle.`); return
-    }
-    if (session.mode === 'live') {
-      await this.checkPositions()
-      if (buy && !session.pnlVerified) return
-    }
-    const quantity = orderQuantity(leg, reason, settingsFor(session))
-    if (quantity <= 0) return
     // Stop can arrive while broker position verification is in flight.
     if (buy && (this.stopRequested || this.now() >= istTime(session.date, settingsFor(session).cutoff))) return
-    if (buy && !this.fresh(side)) {
+    if (buy && !mark && hadMarkBeforePositions) {
       await this.loadQuotes([side])
-      if (!this.fresh(side)) {
+      mark = this.fresh(side)
+      if (!mark) {
         this.note(`${side} entry waiting: ${this.quoteIssues[side] ?? 'price became stale during broker verification'}. Retrying for up to 90 seconds after the signal candle.`); return
       }
+    }
+    if (buy && !mark) {
+      this.note(`${side} entry waiting: ${this.quoteIssues[side] ?? 'no fresh official market price'}. Retrying for up to 90 seconds after the signal candle.`); return
     }
     // Quote/position reads may finish after Stop, cutoff, logout or signal expiry.
     if (buy && (!this.connected() || this.stopRequested || session !== this.session || session.status !== 'running'
@@ -471,6 +497,7 @@ export class Controller {
       if (!mark) { this.note(`${side} paper exit is waiting for a verified market price.`); return }
       applyFill(session, intent, { orderId: `PAPER-${intent.id}`, quantity, average: mark.price, status: 'COMPLETE' }, this.now())
       if (buy) leg.pendingBreakout = null
+      if (buy || !leg.position || reason === 'TARGET_1' && leg.position.target1Remaining === 0 && leg.exitReason === 'TARGET_1') leg.exitReason = null
       this.audit(intent, { orderId: `PAPER-${intent.id}`, status: 'simulated', filled: quantity, average: mark.price, detail: 'Simulated fill from a fresh market price. No broker order or cash debit.' })
       this.note(`${side} ${intent.transaction}: ${quantity} units at ₹${mark.price.toFixed(2)} · ${reason}`); return
     }
@@ -504,7 +531,16 @@ export class Controller {
     }
     const fill = await this.broker.order({ ...expected, orderId: intent.orderId })
     if (fill) {
+      const targetLeg = session.legs[intent.side]
+      const preQuantity = targetLeg?.position?.quantity ?? 0
       applyFill(session, intent, fill, this.now())
+      if (targetLeg) {
+        const postQuantity = targetLeg.position?.quantity ?? 0
+        if (fill.quantity > 0) this.recentFills[intent.side] = { at: this.now(), preQuantity, postQuantity }
+        if (intent.reason === 'BREAKOUT' || !targetLeg.position || intent.reason === 'TARGET_1' && targetLeg.position.target1Remaining === 0 && targetLeg.exitReason === 'TARGET_1') {
+          targetLeg.exitReason = null
+        }
+      }
       this.audit(intent, { status: fill.quantity === intent.quantity ? 'filled' : fill.quantity > 0 ? 'partial-terminal' : String(fill.status).toUpperCase() === 'REJECTED' ? 'rejected' : 'cancelled',
         filled: fill.quantity, average: fill.average, detail: fill.rejectionReason ?? `Broker confirmed terminal status ${fill.status}.` })
       this.backoff[intent.side] = this.now() + (fill.quantity ? 0 : 3000)
@@ -524,8 +560,14 @@ export class Controller {
     if (this.auth && this.auth.expires <= this.now()) this.auth = null
     if (!this.verified && this.connection.phase === 'retrying' && !this.auth && !this.busy && this.now() >= (this.connection.nextRetryAt ?? Infinity)) { await this.restore(); return }
     if (this.broker.credentials && this.broker.credentials.expiresAt <= this.now() && this.verified) { this.verified = false; this.feed.close(); this.onChange() }
-    if (this.pumpTask) return this.pumpTask
-    if (this.busy || !this.session || !active(this.session) && !hasExposure(this.session) || this.now() < this.retryAt) return
+    if (this.pumpTask) {
+      if (this.stopRequested) this.repumpPending = true
+      return this.pumpTask
+    }
+    if (this.busy || !this.session || !active(this.session) && !hasExposure(this.session) || this.now() < this.retryAt) {
+      if (this.busy && this.stopRequested) this.repumpPending = true
+      return
+    }
     this.pumpTask = this.exclusive(async () => {
       const session = this.session
       if (!session) return
@@ -534,7 +576,7 @@ export class Controller {
         const now = this.now()
         if (istDate(now) !== session.date || now >= istTime(session.date, settingsFor(session).cutoff) || this.stopRequested) session.status = 'stopping'
         if (session.pending) {
-          if (now - this.lastPendingAttempt >= 1500) await this.resolvePending()
+          if (now - this.lastPendingAttempt >= 250) await this.resolvePending()
           return
         }
         if (session.status === 'stopping') {
@@ -589,12 +631,12 @@ export class Controller {
         if (!(error instanceof PositionReadError)) session.status = 'blocked'
         this.retryAt = this.now() + 5000
         this.note(error instanceof Error ? error.message : 'The broker operation failed. Reconcile before continuing.', 'error')
-      } finally { this.save() }
-    }).finally(() => { this.pumpTask = null })
+      } finally { this.save(); this.pumpTask = null }
+    })
     return this.pumpTask
   }
   private refreshQuotes(): void {
-    if (this.quotesInFlight || this.now() - this.lastQuotes < 2500) return
+    if (this.quotesInFlight || this.now() - this.lastQuotes < 1000) return
     const session = this.session
     const sides = SIDES.filter(side => session?.legs[side] && !this.fresh(side))
     if (!sides.length) return
@@ -635,24 +677,37 @@ export class Controller {
   }
   private evaluateCandles(): void {
     const session = this.session!, now = this.now(), boundary = completedBoundary(now)
-    if (this.historyInFlight || now - boundary < 2000 || now - this.lastHistoryAttempt < 5000) return
+    if (this.historyInFlight || now - boundary < 2000 || now - this.lastHistoryAttempt < 1000) return
     if (SIDES.every(side => session.legs[side]!.lastCandleEnd >= boundary)) return
     this.lastHistoryAttempt = now; this.historyInFlight = true
     // Historical downloads run outside the order queue. A slow chart endpoint
     // must never delay targets, Stop, or the exchange-time square-off.
     const read = async () => {
+      const fetched: Array<{ side: Side; bars: Candle[] }> = []
       for (const side of SIDES) {
         const leg = session.legs[side]!
         if (leg.lastCandleEnd >= boundary) continue
         let bars: Candle[]
-        try { bars = await this.broker.history(leg.contract.token, 'NFO', session.date, this.now()) }
+        try { bars = await this.broker.history(leg.contract.token, 'NFO', session.date, this.now(), false, true) }
         catch {
           if (this.session === session && session.status === 'running') this.note(`${side} candle history is delayed. Retrying; protective exits remain monitored.`, 'error')
           continue
         }
-        await this.exclusive(async () => {
-          if (this.session !== session || session.status !== 'running' || session.pending || this.stopRequested
-            || this.now() >= istTime(session.date, settingsFor(session).cutoff)) return
+        const refBar = bars.find(c => c.start === leg.reference.start)
+        if (refBar && (Math.abs(refBar.open - leg.reference.open) > 0.05 || Math.abs(refBar.high - leg.reference.high) > 0.05 || Math.abs(refBar.low - leg.reference.low) > 0.05 || Math.abs(refBar.close - leg.reference.close) > 0.05)) {
+          if (this.session === session && session.status === 'running') this.note(`${side} candle history timestamp alignment mismatch detected. Retrying; protective exits remain monitored.`, 'error')
+          continue
+        }
+        fetched.push({ side, bars })
+      }
+      if (!fetched.length) return
+      await this.exclusive(async () => {
+        if (this.session !== session || session.status !== 'running' || session.pending || this.stopRequested
+          || this.now() >= istTime(session.date, settingsFor(session).cutoff)) return
+        const actions: Array<{ side: Side; signal: 'BREAKOUT' | 'LOWER_CLOSE' | 'UPPER_CLOSE' }> = []
+        for (const { side, bars } of fetched) {
+          const leg = session.legs[side]!
+          if (leg.lastCandleEnd >= boundary) continue
           const unseen = bars.filter(c => c.end <= boundary && c.end > leg.lastCandleEnd).sort((a, b) => a.end - b.end)
           if (!leg.position && (leg.entries > 0 || leg.firstSignalConsumed)) {
             // Older saved sessions have no gate metadata: infer the last full exit while flat and fail closed without one.
@@ -666,7 +721,7 @@ export class Controller {
           // first protective exit even if a later candle recovered above lower.
           // Flat legs still consider only the latest close, never replay entries.
           const candle = (leg.position ? unseen.find(c => ['LOWER_CLOSE', 'UPPER_CLOSE'].includes(candleSignal(leg, c, this.now(), session.date, settingsFor(session)) ?? '')) : null) ?? unseen.at(-1)
-          if (!candle) return
+          if (!candle) continue
           const signal = candleSignal(leg, candle, this.now(), session.date, settingsFor(session))
           if (!leg.position && validCandle(candle) && isBeyondEntry(candle.close, leg, settingsFor(session), true)) {
             leg.firstSignalConsumed = true; leg.reentryReady = false
@@ -677,11 +732,20 @@ export class Controller {
           leg.lastDecision = { candle, evaluatedAt: this.now(), signal, explanation: signal === 'BREAKOUT' ? leg.entries > 0 ? directionOf(settingsFor(session)) === 'both' ? 'A post-exit reset was followed by a breakout.' : directionOf(settingsFor(session)) === 'sell' ? 'A post-exit close above the fixed lower breakout was followed by a later close below it.' : 'A post-exit close below the fixed breakout level was followed by a later close above it.' : 'Completed close reached the breakout level while flat.' : signal === 'UPPER_CLOSE' ? 'Completed close rose above the upper exit while short.' : signal === 'LOWER_CLOSE' ? 'Completed close fell below the lower exit while holding units.' : leg.position ? 'No completed-candle lower exit. Fresh-price targets remain monitored.' : !settingsFor(session).enabledSides.includes(side) ? 'Leg disabled in this session settings.' : settingsFor(session).maxEntriesPerLeg && leg.entries >= settingsFor(session).maxEntriesPerLeg ? 'Configured entry limit reached.' : (leg.entries > 0 || leg.firstSignalConsumed) && !leg.reentryReady ? directionOf(settingsFor(session)) === 'both' ? 'Fresh-cross gate locked: waiting for a completed close inside the channel.' : directionOf(settingsFor(session)) === 'sell' ? 'Fresh-cross gate locked: waiting for a completed close above the original lower breakout, then a later close below it.' : 'Fresh-cross gate locked: waiting for a completed close below the original breakout level, then a later close above it.' : this.now() - candle.end > 90_000 ? 'Candle too old for a new entry.' : 'Completed close did not meet the entry rule.' }
           session.decisionAudit ??= []
           session.decisionAudit.push({ side, ...leg.lastDecision })
-          leg.lastCandleEnd = candle.end; this.save()
+          leg.lastCandleEnd = candle.end
           if (signal === 'LOWER_CLOSE' || signal === 'UPPER_CLOSE') leg.exitReason = signal
-          if (signal) await this.submit(side, signal)
-        })
-      }
+          if (signal) actions.push({ side, signal })
+        }
+        this.save()
+        // Process exits first, then entries; each leg's decision is already saved
+        // so one live pending acknowledgement never starves the other leg's signal.
+        actions.sort((a, b) => Number(a.signal === 'BREAKOUT') - Number(b.signal === 'BREAKOUT'))
+        for (const { side, signal } of actions) {
+          if (session.pending || this.stopRequested || session !== this.session || session.status !== 'running'
+            || this.now() >= istTime(session.date, settingsFor(session).cutoff)) break
+          await this.submit(side, signal)
+        }
+      })
     }
     void read().catch(error => {
       if (this.session === session) {

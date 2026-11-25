@@ -16,8 +16,8 @@ export class BrokerError extends Error {
 export interface PositionRow { symbol: string; exchange: string; product: string; quantity: number }
 export interface TradingBroker {
   credentials: SavedBroker | null
-  history(token: string, exchange: 'NSE' | 'NFO', day: string, now: number): Promise<Candle[]>
-  contracts(day: string, spot: number): Promise<[Contract, Contract]>
+  history(token: string, exchange: 'NSE' | 'NFO', day: string, now: number, includeForming?: boolean, urgent?: boolean): Promise<Candle[]>
+  contracts(day: string, spot: number, urgent?: boolean): Promise<[Contract, Contract]>
   positions(): Promise<PositionRow[]>
   quotes(contracts: Contract[]): Promise<Mark[]>
   place(intent: OrderIntent): Promise<string>
@@ -31,21 +31,24 @@ export class MStock implements TradingBroker {
   credentials: SavedBroker | null = null
   onAuthFailure: (error: BrokerError) => void = () => {}
   private fetcher: typeof fetch
-  private dataQueue: Promise<unknown> = Promise.resolve()
+  private dataBusy = false
+  private urgentQueue: Array<() => void> = []
+  private normalQueue: Array<() => void> = []
   private lastDataAt = 0
   private master: Row[] = []
   private masterDate = ''
+  private masterLoad: { day: string; task: Promise<void> } | null = null
   constructor(fetcher: typeof fetch = fetch) { this.fetcher = fetcher }
   setFetcher(fetcher: typeof fetch) { this.fetcher = fetcher }
 
-  async request(path: string, method = 'GET', form?: Record<string, string>, authenticated = true, text = false): Promise<unknown> {
+  async request(path: string, method = 'GET', form?: Record<string, string>, authenticated = true, text = false, timeoutMs = 12_000): Promise<unknown> {
     if (authenticated && (!this.credentials || this.credentials.expiresAt <= Date.now())) throw new BrokerError('mStock session expired. Reconnect your broker.', true, true)
     const credentials = this.credentials
     const headers: Record<string, string> = { 'X-Mirae-Version': '1' }
     if (authenticated && credentials) headers.Authorization = `token ${credentials.apiKey}:${credentials.accessToken}`
     if (form) headers['Content-Type'] = 'application/x-www-form-urlencoded'
     const response = await this.fetcher(`${ROOT}${path}`, { method, headers,
-      body: form ? new URLSearchParams(form) : undefined, signal: AbortSignal.timeout(12_000), redirect: 'error' })
+      body: form ? new URLSearchParams(form) : undefined, signal: AbortSignal.timeout(timeoutMs), redirect: 'error' })
     const raw = await response.text()
     let body: Row = {}
     try { body = record(JSON.parse(raw)) } catch { /* CSV is the only non-JSON endpoint used. */ }
@@ -54,7 +57,8 @@ export class MStock implements TradingBroker {
       let message = typeof body.message === 'string' ? body.message.slice(0, 240) : `mStock request failed (HTTP ${response.status}).`
       for (const secret of [credentials?.apiKey, credentials?.accessToken, ...Object.values(form ?? {})])
         if (secret && secret.length >= 4) message = message.split(secret).join('[redacted]')
-      const error = new BrokerError(message, response.status < 500 && response.status !== 408 && response.status !== 429 && body.error_type !== 'GeneralException',
+      const transientErrorType = ['GeneralException', 'NetworkException'].includes(String(body.error_type ?? ''))
+      const error = new BrokerError(message, response.status < 500 && response.status !== 408 && response.status !== 429 && !transientErrorType,
         authenticated && (response.status === 401 || ['TokenException', 'APIKeyException'].includes(String(body.error_type))), response.status)
       if (error.authentication && this.credentials === credentials) this.onAuthFailure(error)
       throw error
@@ -80,42 +84,57 @@ export class MStock implements TradingBroker {
   }
   async verifyAccount(): Promise<void> { await this.request('/user/fundsummary') }
   async logout(): Promise<void> { await this.request('/logout') }
-  private async dataCall<T>(work: () => Promise<T>): Promise<T> {
-    const result = this.dataQueue.catch(() => {}).then(async () => {
-      await pause(Math.max(0, this.lastDataAt + 1100 - Date.now()))
+  private async dataCall<T>(work: () => Promise<T>, urgent = false): Promise<T> {
+    if (this.dataBusy) {
+      await new Promise<void>(resolve => (urgent ? this.urgentQueue : this.normalQueue).push(resolve))
+    }
+    this.dataBusy = true
+    try {
+      const gap = urgent ? 350 : 1100
+      await pause(Math.max(0, this.lastDataAt + gap - Date.now()))
       this.lastDataAt = Date.now()
-      return work()
-    })
-    this.dataQueue = result
-    return result
+      return await work()
+    } finally {
+      const next = this.urgentQueue.shift() ?? this.normalQueue.shift()
+      if (next) next()
+      else this.dataBusy = false
+    }
   }
-  async history(token: string, exchange: 'NSE' | 'NFO', day: string, now: number, includeForming = false): Promise<Candle[]> {
+  async history(token: string, exchange: 'NSE' | 'NFO', day: string, now: number, includeForming = false, urgent = false): Promise<Candle[]> {
     const from = `${day} 09:15:00`, to = `${day} 15:30:00`
     const path = `/instruments/historical/${exchange}/${encodeURIComponent(token)}/5minute?${new URLSearchParams({ from, to })}`
+    const intradayPath = `/instruments/intraday/${exchange === 'NFO' ? 2 : 1}/${encodeURIComponent(token)}/5minute`
     let raw: unknown, usedIntraday = false
-    try { raw = await this.dataCall(() => this.request(path)) }
+    try { raw = await this.dataCall(() => this.request(path, 'GET', undefined, true, false, 8000), urgent) }
     catch {
       if (day !== istDate(now)) throw new BrokerError('Historical candles are unavailable for this date.')
       usedIntraday = true
-      raw = await this.dataCall(() => this.request(`/instruments/intraday/${exchange === 'NFO' ? 2 : 1}/${encodeURIComponent(token)}/5minute`))
+      raw = await this.dataCall(() => this.request(intradayPath, 'GET', undefined, true, false, 8000), urgent)
     }
     let rows = record(raw).candles
     if ((!Array.isArray(rows) || !rows.length) && day === istDate(now) && !usedIntraday) {
-      rows = record(await this.dataCall(() => this.request(`/instruments/intraday/${exchange === 'NFO' ? 2 : 1}/${encodeURIComponent(token)}/5minute`))).candles
+      rows = record(await this.dataCall(() => this.request(intradayPath, 'GET', undefined, true, false, 8000), urgent)).candles
     }
     if (!Array.isArray(rows)) throw new BrokerError('mStock returned no candle array from either history endpoint.')
     return normalizeCandles(rows, day, includeForming ? now + FIVE_MINUTES : now)
   }
-  private async loadMaster(day: string): Promise<void> {
-    if (this.masterDate !== day) {
-      const csv = await this.dataCall(() => this.request('/instruments/scriptmaster', 'GET', undefined, true, true))
-      this.master = parse(String(csv), { columns: true, skip_empty_lines: true, bom: true, trim: true }) as Row[]
-      if (!this.master.length || !('instrument_token' in this.master[0])) throw new BrokerError('Official instrument master has an unexpected format.')
+  private async loadMaster(day: string, urgent = false): Promise<void> {
+    if (this.masterDate === day) return
+    if (this.masterLoad?.day === day) return this.masterLoad.task
+    const task = (async () => {
+      const csv = await this.dataCall(() => this.request('/instruments/scriptmaster', 'GET', undefined, true, true, 20_000), urgent)
+      const parsed = parse(String(csv), { columns: true, skip_empty_lines: true, bom: true, trim: true }) as Row[]
+      if (!parsed.length || !('instrument_token' in parsed[0])) throw new BrokerError('Official instrument master has an unexpected format.')
+      this.master = parsed
       this.masterDate = day
-    }
+    })().finally(() => {
+      if (this.masterLoad?.task === task) this.masterLoad = null
+    })
+    this.masterLoad = { day, task }
+    return task
   }
-  async contracts(day: string, spot: number): Promise<[Contract, Contract]> {
-    await this.loadMaster(day)
+  async contracts(day: string, spot: number, urgent = false): Promise<[Contract, Contract]> {
+    await this.loadMaster(day, urgent)
     return resolveContracts(this.master, day, spot)
   }
   async catalog(): Promise<{ date: string; contracts: Contract[] }> {
@@ -124,7 +143,7 @@ export class MStock implements TradingBroker {
     return { date, contracts: parseContractMaster(this.master, date) }
   }
   async positions(): Promise<PositionRow[]> {
-    const raw = record(await this.request('/portfolio/positions')).net
+    const raw = record(await this.request('/portfolio/positions', 'GET', undefined, true, false, 5000)).net
     // A verified successful empty account response uses {net:null,day:null}.
     // Missing fields or malformed non-null values still fail closed.
     if (raw === null) return []
@@ -141,7 +160,7 @@ export class MStock implements TradingBroker {
     // Type A requires exchange:tradingsymbol for every i value. One bare
     // symbol can invalidate the whole batch, including the other option leg.
     for (const symbol of new Set(contracts.map(c => c.symbol.replace(/^NFO:/i, '').trim()))) params.append('i', `NFO:${symbol}`)
-    const raw = await this.request(`/instruments/quote/ltp?${params}`)
+    const raw = await this.request(`/instruments/quote/ltp?${params}`, 'GET', undefined, true, false, 5000)
     const data = record(raw)
     return contracts.flatMap(c => {
       const target = c.symbol.replace(/^NFO:/i, '').trim()
@@ -150,7 +169,8 @@ export class MStock implements TradingBroker {
         // relabel another expiry/strike's premium with the requested token.
         const parts = key.split(':')
         if (parts.length > 2 || parts.length === 2 && !['NFO', 'NSE'].includes(parts[0].toUpperCase())) return false
-        if (row.instrument_token != null && String(row.instrument_token) !== c.token) return false
+        const tokenText = row.instrument_token == null ? '' : String(row.instrument_token).trim()
+        if (tokenText && tokenText !== '0' && tokenText !== c.token) return false
         return sameTradingSymbol(parts.at(-1), target, c.expiry)
       })?.row
       const price = typeof row?.last_price === 'number' || typeof row?.last_price === 'string' && row.last_price.trim() !== '' ? Number(row.last_price) : NaN
@@ -168,11 +188,11 @@ export class MStock implements TradingBroker {
   async order(intent: OrderIntent): Promise<Fill | null> {
     if (!intent.orderId) return null
     // Current official Node SDK uses POST here; the prose docs still show GET.
-    const rows = await this.request('/order/details', 'POST', { order_no: intent.orderId, segment: 'D' })
+    const rows = await this.request('/order/details', 'POST', { order_no: intent.orderId, segment: 'D' }, true, false, 5000)
     return parseReceipt(rows, intent)
   }
   async findOrder(intent: OrderIntent): Promise<string | null> {
-    const data = await this.request('/orders'), raw = data === null ? [] : data
+    const data = await this.request('/orders', 'GET', undefined, true, false, 5000), raw = data === null ? [] : data
     if (!Array.isArray(raw)) throw new BrokerError('Order book unavailable for reconciliation.')
     const matches = raw.map(record).filter(row => matchesOrderRow(row, intent, true))
     if (matches.length > 1) throw new BrokerError('Multiple orders match the saved intent. Check mStock before continuing.')
@@ -235,7 +255,14 @@ export function parseReceipt(raw: unknown, intent: OrderIntent): Fill | null {
   for (const row of rows) {
     if (!matchesOrderRow(row, intent)) throw new BrokerError('Broker order details do not match the saved intent.')
   }
-  const terminal = (row: Row) => ['COMPLETE', 'COMPLETED', 'TRADED', 'EXECUTED', 'CANCELLED', 'CANCELED', 'REJECTED'].includes(String(row.status).toUpperCase())
+  const terminal = (r: Row) => {
+    const s = String(r.status || '').trim().toUpperCase()
+    if (['COMPLETE', 'COMPLETED', 'TRADED', 'EXECUTED', 'FILLED', 'ALL TRADED', 'CANCELLED', 'CANCELED', 'REJECTED'].includes(s)) return true
+    const filled = Number(r.filled_quantity || 0)
+    const pending = r.pending_quantity
+    return pending != null && pending !== '' && Number(pending) === 0 && filled === intent.quantity && filled > 0
+      && !['OPEN', 'PENDING', 'PARTIAL', 'PARTIALLY FILLED', 'TRIGGER PENDING', 'VALIDATION PENDING', 'PUT ORDER REQ RECEIVED'].includes(s)
+  }
   rows.sort((a, b) => Number(b.filled_quantity || 0) - Number(a.filled_quantity || 0) || Number(terminal(b)) - Number(terminal(a)))
   const row = rows[0], quantity = Number(row.filled_quantity || 0), average = Number(row.average_price || 0)
   if (!Number.isInteger(quantity) || quantity < 0 || quantity > intent.quantity || quantity > 0 && (!Number.isFinite(average) || average <= 0)) throw new BrokerError('Broker execution quantities or prices are invalid.')

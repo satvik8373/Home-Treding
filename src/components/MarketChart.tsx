@@ -119,10 +119,10 @@ export function MarketChart({
   const short = directionOf(settings) === 'sell';
   const stopLevel =
     referenceClose != null && (settings.stopLossPoints ?? 0) > 0
-      ? referenceStop(referenceClose, settings)
+      ? referenceStop(referenceClose, settings, leg?.position?.direction)
       : null;
-  const target1Level = average != null ? targetPrice(settings, 1, average) : null;
-  const target2Level = average != null ? targetPrice(settings, 2, average) : null;
+  const target1Level = average != null ? targetPrice(settings, 1, average, leg?.position?.direction) : null;
+  const target2Level = average != null ? targetPrice(settings, 2, average, leg?.position?.direction) : null;
   const markerSpec = JSON.stringify(
     payload ? tradeMarkers(trades, payload.candles, payload.title) : [],
   );

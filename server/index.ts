@@ -67,7 +67,7 @@ server.on("error", (error) => {
   process.exit(1);
 });
 if (workspaces) await workspaces.restore(); else await controller!.restore();
-let timer = setInterval(() => void (workspaces ? workspaces.pump() : controller!.pump()), 1000);
+let timer = setInterval(() => void (workspaces ? workspaces.pump() : controller!.pump()), 250);
 let shuttingDown = false;
 async function shutdown() {
   if (shuttingDown) return;
@@ -78,7 +78,7 @@ async function shutdown() {
     else await controller!.checkpointForRestart();
   } catch {
     console.error('Restart checkpoint failed. Engine remains running; resolve storage before restarting.');
-    timer = setInterval(() => void (workspaces ? workspaces.pump() : controller!.pump()), 1000);
+    timer = setInterval(() => void (workspaces ? workspaces.pump() : controller!.pump()), 250);
     shuttingDown = false;
     return;
   }
