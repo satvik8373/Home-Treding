@@ -324,17 +324,17 @@ export default function App() {
 
         {/* 1. Market (Main View: Pure, Minimal, Light Aesthetic Matching Image 1) */}
         <div hidden={view !== 'market'}>
-          <div className="fintech-dashboard neo-mobile-canvas" aria-label="Strategy controls and session summary">
-            {/* Top Terminal Header (Mavrix Trading Brand + Broker + Profile) */}
-            <NeoHeader
-              connected={connected}
-              deploymentAvailable={deployment.available}
-              brokerPhase={broker?.connection?.phase}
-              brokerLinked={!!broker?.linked}
-              onBroker={() => setBrokerDialog(true)}
-              onProfile={account ? () => setProfileOpen(true) : undefined}
-            />
+          {/* Top Full-Width Terminal Header (Mavrix Trading Brand + Broker + Profile - Edge to Edge) */}
+          <NeoHeader
+            connected={connected}
+            deploymentAvailable={deployment.available}
+            brokerPhase={broker?.connection?.phase}
+            brokerLinked={!!broker?.linked}
+            onBroker={() => setBrokerDialog(true)}
+            onProfile={account ? () => setProfileOpen(true) : undefined}
+          />
 
+          <div className="fintech-dashboard neo-mobile-canvas" aria-label="Strategy controls and session summary">
             {/* Top Strategy Direction Buttons & Focus Parameters Strip ("stretegy need to top buttons and focus") */}
             <StrategyTopBar
               settings={locked || dayLocked ? settingsFor(session) : selectedSettings}

@@ -7027,7 +7027,7 @@ tr:hover td {
 .home-view #workspace-content {
   padding-left: 0 !important;
   padding-right: 0 !important;
-  padding-top: 4px !important;
+  padding-top: 0 !important;
   max-width: 100% !important;
 }
 
@@ -7037,18 +7037,18 @@ tr:hover td {
   .home-view #workspace-content {
     padding-left: 0 !important;
     padding-right: 0 !important;
-    padding-top: 2px !important;
+    padding-top: 0 !important;
   }
 }
 
 .neo-mobile-canvas {
   width: 100% !important;
-  max-width: 960px !important;
+  max-width: 920px !important;
   margin: 0 auto !important;
-  padding: 6px 10px 60px !important;
+  padding: 14px 16px 70px !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 6px !important;
+  gap: 8px !important;
   box-sizing: border-box !important;
   min-height: 100vh;
 }
@@ -7056,33 +7056,40 @@ tr:hover td {
 @media (max-width: 600px) {
   .neo-mobile-canvas {
     max-width: 100% !important;
-    padding: 4px 6px 60px !important;
-    gap: 5px !important;
+    padding: 10px 12px 70px !important;
+    gap: 7px !important;
+  }
+}
+
+@media (max-width: 400px) {
+  .neo-mobile-canvas {
+    padding: 8px 10px 70px !important;
+    gap: 6px !important;
   }
 }
 
 /* Stable Non-Fluctuating Notification Tray */
 .neo-notification-tray {
   width: 100%;
-  max-width: 960px;
+  max-width: 920px;
   margin: 0 auto;
-  padding: 0 10px;
+  padding: 0 16px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 @media (max-width: 600px) {
   .neo-notification-tray {
-    padding: 0 6px;
+    padding: 0 12px;
   }
 }
 
 .stable-notice {
   min-height: 40px;
   border-radius: 10px !important;
-  padding: 6px 10px !important;
+  padding: 6px 12px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -7093,25 +7100,26 @@ tr:hover td {
   transition: opacity 180ms ease, transform 180ms ease !important;
 }
 
-/* 1. Terminal Header Bar (Mavrix Trading Institutional Header) */
+/* 1. Terminal Header Bar (Full Width Institutional Header - Not involved in content canvas padding) */
 .neo-header-bar {
-  position: relative !important;
-  top: auto !important;
-  z-index: 10 !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 50 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  padding: 7px 10px !important;
+  padding: 10px 18px !important;
   width: 100% !important;
   background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 10px !important;
-  box-shadow: none !important;
+  border: none !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-radius: 0 !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
   box-sizing: border-box !important;
   height: auto !important;
-  min-height: 44px !important;
+  min-height: 50px !important;
   margin: 0 !important;
-  gap: 8px !important;
+  gap: 10px !important;
 }
 
 .neo-header-brand-group {
@@ -7123,8 +7131,8 @@ tr:hover td {
 }
 
 .neo-brand-mark {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 6px;
   background: #0f172a;
   color: #ffffff;
@@ -7142,7 +7150,7 @@ tr:hover td {
 }
 
 .neo-brand-title {
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 750;
   color: #0f172a;
   margin: 0;
@@ -7171,25 +7179,25 @@ tr:hover td {
 
 @media (max-width: 600px) {
   .neo-header-bar {
-    padding: 6px 8px !important;
-    gap: 6px !important;
-    min-height: 42px !important;
+    padding: 8px 14px !important;
+    gap: 8px !important;
+    min-height: 48px !important;
   }
   .neo-brand-title {
-    font-size: 13.5px !important;
+    font-size: 14px !important;
   }
   .neo-brand-badge {
-    font-size: 8.5px !important;
-    padding: 1px 4px !important;
+    font-size: 9px !important;
+    padding: 1.5px 5px !important;
   }
   .neo-broker-pill {
-    padding: 0 7px !important;
+    padding: 0 8px !important;
     font-size: 11px !important;
-    height: 28px !important;
+    height: 30px !important;
   }
   .neo-avatar-btn {
-    width: 28px !important;
-    height: 28px !important;
+    width: 30px !important;
+    height: 30px !important;
   }
 }
 
@@ -7198,11 +7206,11 @@ tr:hover td {
     display: none !important;
   }
   .neo-brand-title {
-    font-size: 13px !important;
+    font-size: 13.5px !important;
   }
   .neo-header-bar {
-    padding: 5px 6px !important;
-    gap: 4px !important;
+    padding: 7px 10px !important;
+    gap: 6px !important;
   }
 }
 
