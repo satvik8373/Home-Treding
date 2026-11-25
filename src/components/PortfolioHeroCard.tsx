@@ -68,15 +68,15 @@ export function PortfolioHeroCard({
         stopped: 'Stopped',
       }[session?.status ?? 'idle'])
 
-  // Exact balance formatting matching Image 1: $3,942.00
-  const rawBalance = total != null ? money(total) : '$3,942.00'
+  // Balance formatting
+  const rawBalance = total != null ? money(total) : '₹0.00'
   const decimalMatch = rawBalance.match(/(.*)(\.\d{2}.*)$/)
   const integerPart = decimalMatch ? decimalMatch[1] : rawBalance
   const decimalPart = decimalMatch ? decimalMatch[2] : (total == null ? '.00' : '')
 
-  // Trend indicator calculations (exact Image 1: 1.34% ($6.94) Today ↗)
-  const returnPercentage = total != null && total !== 0 ? Math.abs((total / 250000) * 100).toFixed(2) : '1.34'
-  const returnAmount = total != null && total !== 0 ? money(Math.abs(total)) : '$6.94'
+  // Trend indicator calculations
+  const returnPercentage = total != null && total !== 0 ? Math.abs((total / 250000) * 100).toFixed(2) : '0.00'
+  const returnAmount = total != null && total !== 0 ? money(Math.abs(total)) : '₹0.00'
   const returnPositive = total != null ? total >= 0 : true
 
   return (

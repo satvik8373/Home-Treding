@@ -2,7 +2,6 @@ import { directionOf, referenceStop } from '../../shared/strategy';
 import { targetPrice } from '../../shared/targets';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AreaSeries,
   CandlestickSeries,
   ColorType,
   CrosshairMode,
@@ -19,8 +18,7 @@ import type {
   Time,
   UTCTimestamp,
 } from 'lightweight-charts';
-import { CandlestickChart, TrendingUp, Maximize2, RefreshCw } from 'lucide-react';
-import { SplineCurveChart } from './SplineCurveChart';
+import { CandlestickChart, Maximize2, RefreshCw } from 'lucide-react';
 import type { ChartSymbol, Leg, Mark, Trade } from '../../shared/model';
 import { useMarketChart } from '../hooks/useMarketChart';
 import { chartCandles, tradeMarkers } from '../lib/chartData';
@@ -50,7 +48,6 @@ export function MarketChart({
   trades,
 }: Props) {
   const [symbol, setSymbol] = useState<ChartSymbol>('NIFTY');
-  const [chartType, setChartType] = useState<'candles' | 'line'>('line');
 
   const { data, error, loading } = useMarketChart(
     symbol,
@@ -70,7 +67,7 @@ export function MarketChart({
 
   const host = useRef<HTMLDivElement>(null);
   const chart = useRef<IChartApi | null>(null);
-  const series = useRef<ISeriesApi<'Candlestick'> | ISeriesApi<'Area'> | null>(null);
+  const series = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const markers = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const liveLine = useRef<IPriceLine | null>(null);
   const levels = useRef<IPriceLine[]>([]);
@@ -172,27 +169,15 @@ export function MarketChart({
       },
     });
 
-    let activeSeries: ISeriesApi<'Candlestick'> | ISeriesApi<'Area'>;
-    if (chartType === 'line') {
-      activeSeries = api.addSeries(AreaSeries, {
-        lineColor: '#007AFF',
-        topColor: 'rgba(0, 122, 255, 0.22)',
-        bottomColor: 'rgba(0, 122, 255, 0.01)',
-        lineWidth: 2,
-        priceLineVisible: false,
-        lastValueVisible: false,
-      });
-    } else {
-      activeSeries = api.addSeries(CandlestickSeries, {
-        upColor: '#16a34a',
-        downColor: '#dc2626',
-        borderVisible: false,
-        wickUpColor: '#16a34a',
-        wickDownColor: '#dc2626',
-        priceLineVisible: false,
-        lastValueVisible: false,
-      });
-    }
+    const activeSeries = api.addSeries(CandlestickSeries, {
+      upColor: '#16a34a',
+      downColor: '#dc2626',
+      borderVisible: false,
+      wickUpColor: '#16a34a',
+      wickDownColor: '#dc2626',
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
 
     chart.current = api;
     series.current = activeSeries;
@@ -208,16 +193,6 @@ export function MarketChart({
             high: (item as CandlestickData).high,
             low: (item as CandlestickData).low,
             close: (item as CandlestickData).close,
-          },
-        });
-      } else if (item && 'value' in item) {
-        setSelection({
-          key: selectionKey.current,
-          bar: {
-            open: item.value,
-            high: item.value,
-            low: item.value,
-            close: item.value,
           },
         });
       } else {
@@ -245,7 +220,7 @@ export function MarketChart({
       levels.current = [];
       drawn.current = [];
     };
-  }, [chartType]);
+  }, []);
 
   // Reset series data when symbol or identity changes
   useEffect(() => {
@@ -272,12 +247,7 @@ export function MarketChart({
     const previous = drawn.current;
     if (JSON.stringify(previous) === JSON.stringify(points)) return;
 
-    if (chartType === 'line') {
-      const lineData = points.map((p) => ({ time: p.time, value: p.close }));
-      (s as ISeriesApi<'Area'>).setData(lineData);
-    } else {
-      (s as ISeriesApi<'Candlestick'>).setData(points);
-    }
+    s.setData(points);
 
     if (!previous.length) {
       api.timeScale().fitContent();
@@ -285,7 +255,7 @@ export function MarketChart({
       api.timeScale().scrollToRealTime();
     }
     drawn.current = points;
-  }, [points, chartType]);
+  }, [points]);
 
   // Sync LTP live price line
   useEffect(() => {
@@ -369,7 +339,7 @@ export function MarketChart({
 
   return (
     <section className="fintech-chart-card" aria-label="Official market chart">
-      {/* 1. Header Row: Instrument Selector & View Toggle (Matches Reference Screen 2) */}
+      {/* 1. Header Row: Instrument Selector & Top Actions (Zero overflow, candle only) */}
       <div className="fintech-chart-header">
         <div className="instrument-pill-group" role="tablist" aria-label="Select instrument">
           {(['NIFTY', 'CE', 'PE'] as ChartSymbol[]).map((val) => {
@@ -393,24 +363,16 @@ export function MarketChart({
           })}
         </div>
 
-        <div className="chart-view-toggle">
+        <div className="chart-header-actions">
+          <span className="chart-cadence-pill">5m</span>
           <button
             type="button"
-            className={`view-toggle-btn ${chartType === 'line' ? 'active' : ''}`}
-            onClick={() => setChartType('line')}
-            title="Line view" aria-label="Line view" aria-pressed={chartType === 'line'}
+            className="timeframe-fit-btn"
+            onClick={() => chart.current?.timeScale().fitContent()}
+            title="Fit chart content"
+            aria-label="Fit chart content"
           >
-            <TrendingUp size={13} />
-            <span className="view-label">Line</span>
-          </button>
-          <button
-            type="button"
-            className={`view-toggle-btn ${chartType === 'candles' ? 'active' : ''}`}
-            onClick={() => setChartType('candles')}
-            title="Candlestick view" aria-label="Candlestick view" aria-pressed={chartType === 'candles'}
-          >
-            <CandlestickChart size={13} />
-            <span className="view-label">Candles</span>
+            <Maximize2 size={13} />
           </button>
         </div>
       </div>
@@ -465,77 +427,47 @@ export function MarketChart({
 
       {/* 4. Chart Canvas Container */}
       <div className="fintech-chart-canvas-wrap">
-        {chartType === 'line' ? (
-          <SplineCurveChart
-            candles={payload?.candles}
-            livePrice={live?.price}
-            symbol={symbol}
-            percentChange={percent}
-          />
-        ) : (
-          <>
-            <div ref={host} className="chart-canvas-element" />
-            {!points.length && (
-              <div className="chart-empty-overlay">
-                <CandlestickChart size={28} strokeWidth={1.4} />
-                <h3>
-                  {!connected
-                    ? 'Connect your broker to see the live chart'
-                    : loading
-                      ? 'Loading market candles…'
-                      : symbol !== 'NIFTY' && !leg
-                        ? 'ATM contracts are not locked yet'
-                        : 'No candle history available'}
-                </h3>
-                <p>
-                  {!connected
-                    ? 'NIFTY and option charts stream live from official broker feeds.'
-                    : error || payload?.warning || 'Official candles appear when trading session data is active.'}
-                </p>
-              </div>
-            )}
-          </>
+        <div ref={host} className="chart-canvas-element" />
+        {!points.length && (
+          <div className="chart-empty-overlay">
+            <CandlestickChart size={28} strokeWidth={1.4} />
+            <h3>
+              {!connected
+                ? 'Connect your broker to see the live chart'
+                : loading
+                  ? 'Loading market candles…'
+                  : symbol !== 'NIFTY' && !leg
+                    ? 'ATM contracts are not locked yet'
+                    : 'No candle history available'}
+            </h3>
+            <p>
+              {!connected
+                ? 'NIFTY and option charts stream live from official broker feeds.'
+                : error || payload?.warning || 'Official candles appear when trading session data is active.'}
+            </p>
+          </div>
         )}
       </div>
 
-      {/* 5. Timeframe & Footer (Only in Candles mode; Spline has built-in neo timeframe pills) */}
-      {chartType === 'candles' && (
-        <>
-          <div className="fintech-chart-timeframe-bar">
-            <div className="tf-pills-group">
-              <span className="chart-cadence">5-minute candles</span>
-            </div>
-
-            <button
-              className="timeframe-fit-btn"
-              onClick={() => chart.current?.timeScale().fitContent()}
-              title="Fit chart content"
-              aria-label="Fit chart content"
-            >
-              <Maximize2 size={13} />
-            </button>
-          </div>
-
-          <div className="fintech-chart-footer">
-            <div className="footer-status-info">
-              <RefreshCw size={11} className={loading || payload?.historyLoading ? 'spin-icon' : ''} />
-              <span>
-                {loading || payload?.historyLoading
-                  ? 'Loading candles…'
-                  : error || payload?.warning || 'mStock OHLC · 5-minute candles'}
-              </span>
-              {payload?.contract && (
-                <span className="contract-tag">
-                  Lot {payload.contract.lotSize} · Expiry {payload.contract.expiry}
-                </span>
-              )}
-            </div>
-            <div className="chart-attribution">
-              <span>Lightweight Charts™</span>
-            </div>
-          </div>
-        </>
-      )}
+      {/* 5. Chart Status Footer */}
+      <div className="fintech-chart-footer">
+        <div className="footer-status-info">
+          <RefreshCw size={11} className={loading || payload?.historyLoading ? 'spin-icon' : ''} />
+          <span>
+            {loading || payload?.historyLoading
+              ? 'Loading candles…'
+              : error || payload?.warning || 'mStock OHLC · 5-minute candles'}
+          </span>
+          {payload?.contract && (
+            <span className="contract-tag">
+              Lot {payload.contract.lotSize} · Expiry {payload.contract.expiry}
+            </span>
+          )}
+        </div>
+        <div className="chart-attribution">
+          <span>Lightweight Charts™</span>
+        </div>
+      </div>
     </section>
   );
 }

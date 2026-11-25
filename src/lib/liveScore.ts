@@ -144,13 +144,13 @@ function generateMatchBarArtwork(data: LiveScoreData): void {
     // Status Pill: ● LIVE or Stumps
     ctx.beginPath();
     ctx.roundRect(206, 172, 100, 26, 13);
-    ctx.fillStyle = data.running ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)';
+    ctx.fillStyle = data.running ? '#f0fdf4' : '#fffbeb';
     ctx.fill();
-    ctx.strokeStyle = data.running ? '#10B981' : '#F59E0B';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = data.running ? '#bbf7d0' : '#fde68a';
+    ctx.lineWidth = 1;
     ctx.stroke();
 
-    ctx.fillStyle = data.running ? '#10B981' : '#F59E0B';
+    ctx.fillStyle = data.running ? '#166534' : '#b45309';
     ctx.font = 'bold 13px -apple-system, system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(data.running ? '● LIVE' : 'Stumps', 256, 189);
@@ -411,23 +411,23 @@ export async function openFloatingLiveScore(data: LiveScoreData, onSquareOff?: (
         .pip-topbar { display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #94A3B8; font-weight: 700; border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 5px; }
         .pip-brand { display: flex; align-items: center; gap: 5px; }
         .pip-dot { width: 6px; height: 6px; border-radius: 50%; background: #64748B; }
-        .pip-dot.running { background: #10B981; box-shadow: 0 0 6px #10B981; }
-        .pip-pill { background: rgba(245, 158, 11, 0.2); color: #F59E0B; border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 6px; border-radius: 12px; font-size: 9px; }
-        .pip-pill.pre { background: rgba(16, 185, 129, 0.15); color: #10B981; border-color: rgba(16, 185, 129, 0.3); }
+        .pip-dot.running { background: #16A34A; box-shadow: none; }
+        .pip-pill { background: #fefce8; color: #854d0e; border: 1px solid #fef08a; padding: 1px 6px; border-radius: 6px; font-size: 9px; font-weight: 700; }
+        .pip-pill.pre { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
         .pip-match-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin: 6px 0; }
         .pip-team { display: flex; align-items: center; gap: 6px; min-width: 0; }
         .pip-team.put { justify-content: flex-end; text-align: right; }
         .pip-badge { width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; font-weight: 800; font-size: 10px; flex-shrink: 0; }
-        .pip-badge.call { background: #064E3B; color: #34D399; border: 1px solid #059669; }
-        .pip-badge.put { background: #7F1D1D; color: #F87171; border: 1px solid #DC2626; }
+        .pip-badge.call { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+        .pip-badge.put { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
         .pip-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
         .pip-meta.right { text-align: right; }
         .pip-strike { font-size: 9.5px; font-weight: 700; color: #94A3B8; white-space: nowrap; }
         .pip-price { font-size: 13px; font-weight: 800; color: #F8FAFC; font-variant-numeric: tabular-nums; white-space: nowrap; }
         .pip-center { display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .pip-pnl { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; }
-        .pip-pnl.positive { color: #10B981; }
-        .pip-pnl.negative { color: #EF4444; }
+        .pip-pnl.positive { color: #15803d; }
+        .pip-pnl.negative { color: #dc2626; }
         .pip-spot { font-size: 9px; color: #94A3B8; font-weight: 600; white-space: nowrap; }
         .pip-stop-btn { width: 100%; background: #DC2626; color: #FFFFFF; border: 0; border-radius: 6px; padding: 4px; font-size: 10.5px; font-weight: 700; cursor: pointer; }
       `;
