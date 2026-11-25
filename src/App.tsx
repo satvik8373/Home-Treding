@@ -371,8 +371,8 @@ export default function App() {
               positions={positions}
             />
 
-            {/* Separate Options Deck (Clean CALL and PUT Dual-Cards) */}
-            <SeparateOptionsDeck
+            {/* Single Unified Container with Divided Minimal Parts for CALL & PUT */}
+            <UnifiedOptionsCockpit
               session={session}
               marks={data?.marks ?? {}}
               now={now}
