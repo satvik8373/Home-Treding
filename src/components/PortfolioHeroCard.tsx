@@ -1,4 +1,4 @@
-import { Play, Square, ArrowUpDown, AlertCircle, ArrowUpRight, Info } from 'lucide-react'
+import { Play, Square, ArrowUpDown, AlertCircle, Info } from 'lucide-react'
 import type { Mode, Side, TradingSession } from '../../shared/model'
 import type { StrategySettings } from '../../shared/settings'
 import { directionOf } from '../../shared/strategy'
@@ -74,11 +74,6 @@ export function PortfolioHeroCard({
   const integerPart = decimalMatch ? decimalMatch[1] : rawBalance
   const decimalPart = decimalMatch ? decimalMatch[2] : (total == null ? '.00' : '')
 
-  // Trend indicator calculations
-  const returnPercentage = total != null && total !== 0 ? Math.abs((total / 250000) * 100).toFixed(2) : '0.00'
-  const returnAmount = total != null && total !== 0 ? money(Math.abs(total)) : '₹0.00'
-  const returnPositive = total != null ? total >= 0 : true
-
   return (
     <div className={`portfolio-hero-card neo-portfolio-card ${isPositive ? 'status-positive' : isNegative ? 'status-negative' : ''}`}>
       {/* Hidden/Subtle Eyebrow elements for accessibility & unit tests */}
@@ -101,7 +96,7 @@ export function PortfolioHeroCard({
         </div>
       </div>
 
-      {/* Primary Hero Balance Display (Exact Image 1: Floating $3,942.00) */}
+      {/* Primary Hero Balance Display */}
       <div className="hero-main-row neo-balance-section">
         <div className="hero-balance-wrap neo-balance-wrap">
           <div className="neo-balance-display">
@@ -113,14 +108,6 @@ export function PortfolioHeroCard({
               <span className="neo-balance-integer">{integerPart}</span>
               {decimalPart && <span className="neo-balance-decimal">{decimalPart}</span>}
             </strong>
-          </div>
-
-          {/* Exact trend pill from Image 1: 1.34% ($6.94) Today ↗ */}
-          <div className="neo-trend-pill-wrap">
-            <span className={`neo-trend-pill ${returnPositive ? 'positive' : 'negative'}`}>
-              {returnPositive ? '+' : '-'}{returnPercentage}% ({returnAmount}) Today
-              <ArrowUpRight size={14} className="trend-arrow" />
-            </span>
           </div>
 
           <span className="hero-balance-sub-label">
@@ -195,56 +182,31 @@ export function PortfolioHeroCard({
           </button>
         </div>
 
-        {/* Strategy Notification Deck (Designed like Image 1, Light Mode Neo-Fintech) */}
-        <div className="hero-alerts-deck neo-alerts-deck" aria-label="Strategy notifications">
-          <div className="hero-alert-meta-row">
-            <div className="hero-alert-tag-group">
-              <span className={`hero-alert-mode-tag ${shownMode === 'live' ? 'live' : 'paper'}`}>
-                {shownMode === 'live' ? 'LIVE ENGINE' : 'PAPER SIMULATION'}
-              </span>
-              <span className="hero-alert-sync-status">
-                {online ? 'Engine Active · IST' : 'Engine Offline'}
-              </span>
-            </div>
-            {session && (
-              <span className={`hero-alert-session-pill ${session.status}`}>
-                <span className="status-indicator-dot" />
-                <span>{session.status.toUpperCase()}</span>
-              </span>
-            )}
-          </div>
-
-          <div className="hero-alert-content">
-            <div className="hero-alert-mode-hint">
-              <Info size={13} className="alert-icon" />
-              <span id="strategy-control-hint" className="hero-control-hint">
-                {!online
-                  ? 'Waiting for the engine connection.'
-                  : !connected
-                  ? 'Connect mStock to start.'
-                  : working
-                  ? 'Request in progress. Waiting for engine confirmation.'
-                  : shownMode === 'live' && !liveAvailable
-                  ? liveReason || 'Live execution is unavailable on this engine.'
-                  : !inWindow && !locked
-                  ? `Start window: weekdays 09:00–${settings.cutoff} IST.`
-                  : locked
-                  ? 'Monitoring continues when this page is closed.'
-                  : shownMode === 'live'
-                  ? 'Real broker orders require your confirmation above.'
-                  : 'Paper orders are simulated.'}
-              </span>
-            </div>
-
-            {session && (
-              <div className={`hero-alert-session-row ${session.status}`}>
-                <span className="status-indicator-dot" />
-                <span className="hero-session-message" role="status">
-                  {session.message}
-                </span>
-              </div>
-            )}
-          </div>
+        {/* Streamlined Strategy Status Hint Strip */}
+        <div className="hero-single-hint-strip" aria-label="Strategy status hint">
+          <Info size={13} className="hero-hint-icon" />
+          <span id="strategy-control-hint" className="hero-control-hint">
+            {!online
+              ? 'Waiting for the engine connection.'
+              : !connected
+              ? 'Connect mStock to start.'
+              : working
+              ? 'Request in progress. Waiting for engine confirmation.'
+              : shownMode === 'live' && !liveAvailable
+              ? liveReason || 'Live execution is unavailable on this engine.'
+              : !inWindow && !locked
+              ? `Start window: weekdays 09:00–${settings.cutoff} IST.`
+              : locked
+              ? 'Monitoring continues when this page is closed.'
+              : shownMode === 'live'
+              ? 'Real broker orders require your confirmation above.'
+              : 'Paper orders are simulated.'}
+          </span>
+          {session?.message && (
+            <span className="hero-session-message-inline" role="status">
+              · {session.message}
+            </span>
+          )}
         </div>
       </div>
 
