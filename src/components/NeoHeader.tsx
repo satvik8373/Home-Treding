@@ -44,12 +44,12 @@ export function NeoHeader({
           <Link2 size={13} />
           <span>
             {connected
-              ? 'mStock Connected'
+              ? 'mStock'
               : brokerPhase === 'checking' || brokerPhase === 'retrying'
               ? 'Restoring…'
               : brokerLinked
-              ? 'Verify mStock'
-              : 'Connect mStock'}
+              ? 'Verify'
+              : 'Connect'}
           </span>
           {connected && <Check size={12} strokeWidth={2.5} />}
         </button>
