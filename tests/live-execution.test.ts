@@ -219,3 +219,11 @@ test('proxy fetcher keeps connections warm with keep-alive across repeated reque
   assert.equal((await fetcher('http://example.test/two')).status, 200)
   assert.ok(sockets <= 2)
 })
+
+test('controller snapshot exposes WebSocket feed diagnostics as feedError for UI logs', async () => {
+  const f = await fixture()
+  Object.assign(f.feed, { diagnostics: { lastError: 'Unexpected server response: 502' } })
+  assert.equal(f.controller.snapshot().broker.feedError, 'Unexpected server response: 502')
+  Object.assign(f.feed, { diagnostics: { lastError: '' } })
+  assert.equal(f.controller.snapshot().broker.feedError, undefined)
+})

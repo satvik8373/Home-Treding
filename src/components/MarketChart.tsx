@@ -36,6 +36,7 @@ type Props = {
   marks: Record<string, Mark>;
   legs: Partial<Record<'CE' | 'PE', Leg>>;
   trades: Trade[];
+  onDiagnostic?: (issue: { symbol: ChartSymbol; level: 'error' | 'warn'; message: string } | null) => void;
 };
 
 export function MarketChart({
@@ -46,6 +47,7 @@ export function MarketChart({
   marks,
   legs,
   trades,
+  onDiagnostic,
 }: Props) {
   const [symbol, setSymbol] = useState<ChartSymbol>('NIFTY');
 
@@ -55,6 +57,16 @@ export function MarketChart({
     `${identity}:${symbol === 'NIFTY' ? 'index' : (legs[symbol]?.contract.token ?? 'unlocked')}`,
   );
   const payload = data?.symbol === symbol ? data : null;
+  const diagnosticText = error || payload?.warning || '';
+
+  useEffect(() => {
+    if (!onDiagnostic) return;
+    if (!diagnosticText) {
+      onDiagnostic(null);
+      return;
+    }
+    onDiagnostic({ symbol, level: error ? 'error' : 'warn', message: diagnosticText });
+  }, [symbol, error, diagnosticText, onDiagnostic]);
 
   const [selection, setSelection] = useState<{
     key: string;

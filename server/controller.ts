@@ -126,9 +126,10 @@ export class Controller {
   }
   snapshot(csrf = ''): AppState {
     const credentials = this.broker.credentials
+    const feedDiagnostics = (this.feed as { diagnostics?: { lastError?: string } }).diagnostics
     return { csrf, persistence: this.persistence?.(), runtime: this.execution, strategyProfiles: { buy: this.strategySettings('buy'), sell: this.strategySettings('sell'), both: this.strategySettings('both') }, savedSettings: this.strategySettings(), serverTime: this.now(), busy: this.busy, broker: { linked: credentials ? { account: credentials.account, name: credentials.name, totpRenewal: credentials.authMethod === 'totp' } : null, verificationMethod: credentials?.authMethod ?? null, connection: this.connectionSnapshot(), connected: this.connected(),
       account: this.connected() ? credentials!.account : null, name: this.connected() ? credentials!.name : null,
-      expiresAt: credentials?.expiresAt ?? null, feed: this.feed.status, lastTickAt: this.feed.lastTickAt },
+      expiresAt: credentials?.expiresAt ?? null, feed: this.feed.status, feedError: feedDiagnostics?.lastError || undefined, lastTickAt: this.feed.lastTickAt },
       session: this.session, marks: this.marks }
   }
   private save(): void {
@@ -147,7 +148,7 @@ export class Controller {
     if (!this.session) return
     this.session.message = message
     if (this.session.activity.at(-1)?.message !== message) this.session.activity.push({ at: this.now(), level, message })
-    this.session.activity = this.session.activity.slice(-150)
+    this.session.activity = this.session.activity.slice(-300)
     this.save()
   }
   private audit(intent: OrderIntent, change: Partial<OrderAudit>): void {
@@ -473,11 +474,11 @@ export class Controller {
       await this.loadQuotes([side])
       mark = this.fresh(side)
       if (!mark) {
-        this.note(`${side} entry waiting: ${this.quoteIssues[side] ?? 'price became stale during broker verification'}. Retrying for up to 90 seconds after the signal candle.`); return
+        this.note(`${side} entry waiting: ${this.quoteIssues[side] ?? 'price became stale during broker verification'}. Retrying for up to 90 seconds after the signal candle.`, this.quoteIssues[side] ? 'error' : 'info'); return
       }
     }
     if (buy && !mark) {
-      this.note(`${side} entry waiting: ${this.quoteIssues[side] ?? 'no fresh official market price'}. Retrying for up to 90 seconds after the signal candle.`); return
+      this.note(`${side} entry waiting: ${this.quoteIssues[side] ?? 'no fresh official market price'}. Retrying for up to 90 seconds after the signal candle.`, this.quoteIssues[side] ? 'error' : 'info'); return
     }
     // Quote/position reads may finish after Stop, cutoff, logout or signal expiry.
     if (buy && (!this.connected() || this.stopRequested || session !== this.session || session.status !== 'running'
