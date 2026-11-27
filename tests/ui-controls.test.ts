@@ -4,6 +4,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { PortfolioHeroCard } from '../src/components/PortfolioHeroCard'
 import { HomeLogsPanel } from '../src/components/HomeLogsPanel'
+import { LegCard } from '../src/components/LegCard'
 import { OrdersPanel } from '../src/components/OrdersPanel'
 import { TradesPanel } from '../src/components/TradesPanel'
 import { DEFAULT_SETTINGS } from '../shared/settings'
@@ -93,6 +94,8 @@ test('hero removes inline logs while bottom HomeLogsPanel shows all engine activ
     onClearRuntimeLogs() {},
     onReconcile() {},
   }))
+  assert.match(logsHtml, /panel activity-panel home-activity-logs/)
+  assert.match(logsHtml, /activity-list home-activity-list/)
   assert.match(logsHtml, /System Logs &amp; Errors/)
   assert.match(logsHtml, /Action request failed/)
   assert.match(logsHtml, /WebSocket HTTP 502/)
@@ -101,4 +104,12 @@ test('hero removes inline logs while bottom HomeLogsPanel shows all engine activ
   assert.match(logsHtml, /RMS margin shortfall/)
   assert.match(logsHtml, /Completed close reached breakout level/)
   assert.match(logsHtml, /Reconcile/)
+
+  const ceHtml = renderToStaticMarkup(createElement(LegCard, { side: 'CE', now, settings: DEFAULT_SETTINGS }))
+  const peHtml = renderToStaticMarkup(createElement(LegCard, { side: 'PE', now, settings: DEFAULT_SETTINGS }))
+  assert.match(ceHtml, /tile tile--wide leg-card/)
+  assert.match(ceHtml, /CALL/)
+  assert.match(ceHtml, /Target 1/)
+  assert.match(peHtml, /PUT/)
+  assert.match(peHtml, /Target 2/)
 })

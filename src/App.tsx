@@ -29,11 +29,7 @@ import { MarketChart } from './components/MarketChart'
 import { RulesDialog } from './components/RulesDialog'
 import { PortfolioHeroCard } from './components/PortfolioHeroCard'
 import { StrategyTopBar } from './components/StrategyTopBar'
-import { UnifiedOptionsCockpit } from './components/UnifiedOptionsCockpit'
-import { SeparateOptionsDeck } from './components/SeparateOptionsDeck'
-import { SplitOptionPairCard } from './components/SplitOptionPairCard'
 import { LegCard } from './components/LegCard'
-import { RealInstrumentsList } from './components/RealInstrumentsList'
 import { OrdersPanel } from './components/OrdersPanel'
 import { TradesPanel } from './components/TradesPanel'
 import { clock } from './lib/format'
@@ -481,13 +477,27 @@ export default function App() {
               positions={positions}
             />
 
-            {/* Single Unified Container with Divided Minimal Parts for CALL & PUT */}
-            <UnifiedOptionsCockpit
-              session={session}
-              marks={data?.marks ?? {}}
-              now={now}
-              settings={session ? settingsFor(session) : selectedSettings}
-            />
+            {/* Strategy Positions (10-day-old CALL & PUT LegCard containers) */}
+            <section className="dashboard-positions-section" aria-labelledby="strategy-positions-title">
+              <div className="section-heading">
+                <h2 id="strategy-positions-title">Strategy positions</h2>
+                <button type="button" className="text-button" onClick={() => navigate('audit')}>
+                  Order lifecycle →
+                </button>
+              </div>
+              <div className="legs-grid">
+                {sides.map((side) => (
+                  <LegCard
+                    key={side}
+                    side={side}
+                    leg={session?.legs[side]}
+                    mark={markFor(side)}
+                    now={now}
+                    settings={session ? settingsFor(session) : selectedSettings}
+                  />
+                ))}
+              </div>
+            </section>
 
             {/* Official Market Spline Curve Chart */}
             <div className="dashboard-chart-row">
