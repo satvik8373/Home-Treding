@@ -146,6 +146,7 @@ export interface BrokerStatus {
   name: string | null;
   expiresAt: number | null;
   feed: "disconnected" | "connecting" | "connected";
+  feedError?: string;
   lastTickAt: number | null;
 }
 export interface AppState {

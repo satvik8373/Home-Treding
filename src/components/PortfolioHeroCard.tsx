@@ -202,11 +202,6 @@ export function PortfolioHeroCard({
               ? 'Real broker orders require your confirmation above.'
               : 'Paper orders are simulated.'}
           </span>
-          {session?.message && (
-            <span className="hero-session-message-inline" role="status">
-              · {session.message}
-            </span>
-          )}
         </div>
       </div>
 

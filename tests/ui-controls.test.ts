@@ -3,6 +3,7 @@ import test from 'node:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { PortfolioHeroCard } from '../src/components/PortfolioHeroCard'
+import { HomeLogsPanel } from '../src/components/HomeLogsPanel'
 import { OrdersPanel } from '../src/components/OrdersPanel'
 import { TradesPanel } from '../src/components/TradesPanel'
 import { DEFAULT_SETTINGS } from '../shared/settings'
@@ -52,4 +53,52 @@ test('trade records render semantic tables with full quantities, timestamps and 
   assert.match(html, /6,500.00/)
   assert.doesNotMatch(html, /aria-haspopup="dialog"/)
   assert.match(html, /\/api\/trades.csv/)
+})
+
+test('hero removes inline logs while bottom HomeLogsPanel shows all engine activity, orders, trades, decisions and errors', () => {
+  const s = {
+    ...session('blocked'),
+    message: 'Broker check blocked execution.',
+    pnlVerified: false,
+    activity: [
+      { at: now - 2000, level: 'info' as const, message: 'Reference candles locked.' },
+      { at: now - 1000, level: 'error' as const, message: 'CE quantity mismatch detected.' },
+    ],
+    orderAudit: [
+      { id: 'o1', tag: 't1', orderId: 'ORD-1', side: 'CE' as const, symbol: 'NIFTY-CE', transaction: 'BUY' as const, quantity: 65, reason: 'BREAKOUT' as const, submittedAt: now - 1500, updatedAt: now - 1400, mode: 'live' as const, status: 'rejected' as const, filled: 0, average: null, detail: 'RMS margin shortfall.' },
+    ],
+    trades: [
+      { id: 'tr1', at: now - 3000, side: 'PE' as const, symbol: 'NIFTY-PE', transaction: 'SELL' as const, quantity: 65, price: 120, reason: 'TARGET_1' as const, orderId: 'ORD-0', mode: 'live' as const, pnl: 1300 },
+    ],
+    decisionAudit: [
+      { side: 'CE' as const, candle: { start: now - 300_000, end: now, open: 100, high: 104, low: 98, close: 102 }, evaluatedAt: now - 500, signal: 'BREAKOUT' as const, explanation: 'Completed close reached breakout level.' },
+    ],
+  }
+  const heroHtml = renderHero({ session: s })
+  assert.doesNotMatch(heroHtml, /hero-session-message-inline/)
+
+  const logsHtml = renderToStaticMarkup(createElement(HomeLogsPanel, {
+    session: s,
+    broker: { connected: false, account: null, name: null, expiresAt: null, feed: 'disconnected', feedError: 'WebSocket HTTP 502', lastTickAt: null },
+    online: true,
+    deploymentAvailable: true,
+    now,
+    working: '',
+    connected: false,
+    error: 'Action request failed.',
+    onDismissError() {},
+    notice: { message: 'Square-off queued.', at: now },
+    onDismissNotice() {},
+    runtimeLogs: [{ id: 'ui-1', at: now, level: 'error', source: 'ui', title: 'Action error', message: 'Action request failed.' }],
+    onClearRuntimeLogs() {},
+    onReconcile() {},
+  }))
+  assert.match(logsHtml, /System Logs &amp; Errors/)
+  assert.match(logsHtml, /Action request failed/)
+  assert.match(logsHtml, /WebSocket HTTP 502/)
+  assert.match(logsHtml, /Broker check blocked execution/)
+  assert.match(logsHtml, /CE quantity mismatch detected/)
+  assert.match(logsHtml, /RMS margin shortfall/)
+  assert.match(logsHtml, /Completed close reached breakout level/)
+  assert.match(logsHtml, /Reconcile/)
 })

@@ -3,7 +3,7 @@ import { directionOf, positionPnl } from '../shared/strategy'
 import type { StrategyDirection } from '../shared/strategy'
 import './components/StrategySettingsPanel.css'
 import { StrategySettingsPanel } from './components/StrategySettingsPanel'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   LayoutGrid,
   ArrowLeftRight,
@@ -20,7 +20,8 @@ import {
   History,
   Clock,
 } from 'lucide-react'
-import type { Mode, Side, OrderAudit, Trade } from '../shared/model'
+import type { ChartSymbol, Mode, Side, OrderAudit, Trade } from '../shared/model'
+import { HomeLogsPanel, type ClientRuntimeLog } from './components/HomeLogsPanel'
 import { freshMark } from '../shared/market'
 import { BrokerDialog } from './components/BrokerDialog'
 import { AccountProfile } from './components/AccountProfile'
@@ -94,6 +95,24 @@ export default function App() {
   } | null>(null)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState('')
+  const [runtimeLogs, setRuntimeLogs] = useState<ClientRuntimeLog[]>([])
+  const logSeqRef = useRef(0)
+  const lastLogKeysRef = useRef({
+    error: '',
+    noticeAt: 0,
+    brokerKey: '',
+    feedError: '',
+    chartKey: '',
+    offlineKey: '',
+  })
+
+  const appendRuntimeLog = useCallback(
+    (entry: Omit<ClientRuntimeLog, 'id'>) => {
+      const id = `${entry.at}-${++logSeqRef.current}`
+      setRuntimeLogs(prev => [{ ...entry, id }, ...prev].slice(0, 120))
+    },
+    [],
+  )
 
   useEffect(() => {
     if (view !== 'explore' || historyScope !== 'history') return
@@ -220,6 +239,95 @@ export default function App() {
     updateFloatingLiveScore(liveScoreData)
   }, [liveScoreData])
 
+  useEffect(() => {
+    if (error && lastLogKeysRef.current.error !== error) {
+      lastLogKeysRef.current.error = error
+      appendRuntimeLog({ at: now, level: 'error', source: 'ui', title: 'Action error', message: error })
+    } else if (!error) {
+      lastLogKeysRef.current.error = ''
+    }
+  }, [error, now, appendRuntimeLog])
+
+  useEffect(() => {
+    if (notice && lastLogKeysRef.current.noticeAt !== notice.at) {
+      lastLogKeysRef.current.noticeAt = notice.at
+      appendRuntimeLog({ at: notice.at, level: 'info', source: 'ui', title: 'Action submitted', message: notice.message })
+    }
+  }, [notice, appendRuntimeLog])
+
+  const brokerPhase = broker?.connection?.phase ?? ''
+  const brokerMessage = broker?.connection?.message ?? ''
+  const brokerFeedError = broker?.feedError ?? ''
+
+  useEffect(() => {
+    if (brokerPhase && ['rejected', 'expired', 'retrying'].includes(brokerPhase)) {
+      const key = `${brokerPhase}:${brokerMessage}`
+      if (lastLogKeysRef.current.brokerKey !== key) {
+        lastLogKeysRef.current.brokerKey = key
+        appendRuntimeLog({
+          at: broker?.connection?.checkedAt ?? now,
+          level: brokerPhase === 'retrying' ? 'warn' : 'error',
+          source: 'broker',
+          title: `Broker ${brokerPhase}`,
+          message: brokerMessage,
+        })
+      }
+    } else {
+      lastLogKeysRef.current.brokerKey = ''
+    }
+  }, [brokerPhase, brokerMessage, broker?.connection?.checkedAt, now, appendRuntimeLog])
+
+  useEffect(() => {
+    if (brokerFeedError && lastLogKeysRef.current.feedError !== brokerFeedError) {
+      lastLogKeysRef.current.feedError = brokerFeedError
+      appendRuntimeLog({ at: now, level: 'error', source: 'broker', title: 'WebSocket feed error', message: brokerFeedError })
+    } else if (!brokerFeedError) {
+      lastLogKeysRef.current.feedError = ''
+    }
+  }, [brokerFeedError, now, appendRuntimeLog])
+
+  useEffect(() => {
+    const offlineKey = !deployment.available
+      ? `deploy:${deployment.reason ?? 'unknown'}`
+      : !online
+        ? 'engine:offline'
+        : ''
+    if (offlineKey && lastLogKeysRef.current.offlineKey !== offlineKey) {
+      lastLogKeysRef.current.offlineKey = offlineKey
+      appendRuntimeLog({
+        at: now,
+        level: 'error',
+        source: 'network',
+        title: !deployment.available ? 'Engine disconnected' : 'Engine offline',
+        message: !deployment.available
+          ? 'Execution engine connection could not be verified.'
+          : 'Waiting for trading engine to reconnect.',
+      })
+    } else if (!offlineKey) {
+      lastLogKeysRef.current.offlineKey = ''
+    }
+  }, [deployment.available, deployment.reason, online, now, appendRuntimeLog])
+
+  const handleChartDiagnostic = useCallback(
+    (issue: { symbol: ChartSymbol; level: 'error' | 'warn'; message: string } | null) => {
+      if (!issue) {
+        lastLogKeysRef.current.chartKey = ''
+        return
+      }
+      const key = `${issue.symbol}:${issue.level}:${issue.message}`
+      if (lastLogKeysRef.current.chartKey === key) return
+      lastLogKeysRef.current.chartKey = key
+      appendRuntimeLog({
+        at: now,
+        level: issue.level,
+        source: 'chart',
+        title: `${issue.symbol} chart ${issue.level === 'error' ? 'error' : 'warning'}`,
+        message: issue.message,
+      })
+    },
+    [now, appendRuntimeLog],
+  )
+
   return (
     <div className={`app-shell workspace-shell light-theme ${view === 'market' ? 'home-view' : view === 'analytics' ? 'history-view' : ''}`}>
       <a
@@ -258,69 +366,71 @@ export default function App() {
           </div>
         )}
 
-        {/* Stable Non-Fluctuating Notification Tray */}
-        <div className="neo-notification-tray" aria-live="polite">
-          {!deployment.available ? (
-            <section className="deployment-notice stable-notice" role="status">
-              <div>
-                <strong>
-                  {deployment.reason === 'setup'
-                    ? 'Execution engine not connected'
-                    : 'Dashboard connection could not be verified'}
-                </strong>
-                <p>
-                  You can view the dashboard and strategy rules. Market data, broker connection, backtests and orders are
-                  unavailable until the hosted engine is connected.
-                </p>
+        {/* Stable Non-Fluctuating Notification Tray (non-Home tabs; Home consolidates all logs & errors at bottom) */}
+        {view !== 'market' && (
+          <div className="neo-notification-tray" aria-live="polite">
+            {!deployment.available ? (
+              <section className="deployment-notice stable-notice" role="status">
+                <div>
+                  <strong>
+                    {deployment.reason === 'setup'
+                      ? 'Execution engine not connected'
+                      : 'Dashboard connection could not be verified'}
+                  </strong>
+                  <p>
+                    You can view the dashboard and strategy rules. Market data, broker connection, backtests and orders are
+                    unavailable until the hosted engine is connected.
+                  </p>
+                </div>
+                <button className="button secondary" disabled={deployment.checking} onClick={deployment.retry}>
+                  {deployment.checking ? 'Checking…' : 'Check connection'}
+                </button>
+              </section>
+            ) : (
+              !online && (
+                <div className="notice engine-offline-banner stable-notice" role="status">
+                  <i className="status-dot" />
+                  <span>Waiting for the trading engine to reconnect. Market data is paused.</span>
+                </div>
+              )
+            )}
+
+            {error && (
+              <div className="notice error stable-notice" role="alert">
+                <span>{error}</span>
+                <button aria-label="Dismiss error" onClick={() => setError('')}>
+                  <X size={15} />
+                </button>
               </div>
-              <button className="button secondary" disabled={deployment.checking} onClick={deployment.retry}>
-                {deployment.checking ? 'Checking…' : 'Check connection'}
-              </button>
-            </section>
-          ) : (
-            !online && (
-              <div className="notice engine-offline-banner stable-notice" role="status">
-                <i className="status-dot" />
-                <span>Waiting for the trading engine to reconnect. Market data is paused.</span>
+            )}
+
+            {notice && (
+              <div className="notice action-notice stable-notice" role="status">
+                <span>
+                  <strong>{clock(notice.at, true)} IST</strong> · {notice.message}
+                </span>
+                <button aria-label="Dismiss action notification" onClick={() => setNotice(null)}>
+                  <X size={15} />
+                </button>
               </div>
-            )
-          )}
+            )}
 
-          {error && (
-            <div className="notice error stable-notice" role="alert">
-              <span>{error}</span>
-              <button aria-label="Dismiss error" onClick={() => setError('')}>
-                <X size={15} />
-              </button>
-            </div>
-          )}
-
-          {notice && (
-            <div className="notice action-notice stable-notice" role="status">
-              <span>
-                <strong>{clock(notice.at, true)} IST</strong> · {notice.message}
-              </span>
-              <button aria-label="Dismiss action notification" onClick={() => setNotice(null)}>
-                <X size={15} />
-              </button>
-            </div>
-          )}
-
-          {session?.status === 'blocked' && (
-            <div className="session-message attention stable-notice" role="status">
-              <Radio size={14} />
-              <span>{session.message}</span>
-              <button
-                className="text-button"
-                disabled={!online || !connected || !!working}
-                onClick={() => void action('/api/strategy/reconcile', {}, 'reconcile')}
-              >
-                <RefreshCw size={13} />
-                Reconcile
-              </button>
-            </div>
-          )}
-        </div>
+            {session?.status === 'blocked' && (
+              <div className="session-message attention stable-notice" role="status">
+                <Radio size={14} />
+                <span>{session.message}</span>
+                <button
+                  className="text-button"
+                  disabled={!online || !connected || !!working}
+                  onClick={() => void action('/api/strategy/reconcile', {}, 'reconcile')}
+                >
+                  <RefreshCw size={13} />
+                  Reconcile
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 1. Market (Main View: Pure, Minimal, Light Aesthetic Matching Image 1) */}
         <div hidden={view !== 'market'}>
@@ -379,7 +489,7 @@ export default function App() {
               settings={session ? settingsFor(session) : selectedSettings}
             />
 
-            {/* Official Market Spline Curve Chart (Positioned at bottom) */}
+            {/* Official Market Spline Curve Chart */}
             <div className="dashboard-chart-row">
               <MarketChart
                 connected={connected}
@@ -389,8 +499,29 @@ export default function App() {
                 legs={session?.legs ?? {}}
                 trades={session?.trades ?? []}
                 settings={session ? settingsFor(session) : selectedSettings}
+                onDiagnostic={handleChartDiagnostic}
               />
             </div>
+
+            {/* Consolidated Full Logs & Errors Feed (Bottom Last on Home) */}
+            <HomeLogsPanel
+              session={session}
+              broker={broker}
+              runtime={data?.runtime}
+              online={online}
+              deploymentAvailable={deployment.available}
+              deploymentReason={deployment.reason}
+              now={now}
+              working={working}
+              connected={connected}
+              error={error}
+              onDismissError={() => setError('')}
+              notice={notice}
+              onDismissNotice={() => setNotice(null)}
+              runtimeLogs={runtimeLogs}
+              onClearRuntimeLogs={() => setRuntimeLogs([])}
+              onReconcile={() => void action('/api/strategy/reconcile', {}, 'reconcile')}
+            />
           </div>
         </div>
 
